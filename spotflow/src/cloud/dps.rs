@@ -16,6 +16,8 @@ pub enum InitProvisioningError {
     InvalidProvisioningToken,
     #[error("Workspace is disabled")]
     WorkspaceDisabled,
+    #[error("Non-recoverable error: {}", .0.as_deref().unwrap_or("Unknown error"))]
+    OtherNonRecoverable(Option<String>),
     #[error(transparent)]
     Other(#[from] anyhow::Error),
 }
@@ -130,6 +132,10 @@ impl Provisioning {
                     log_workspace_disabled_error();
                     InitProvisioningError::WorkspaceDisabled
                 }
+                RequestError::Status(400, Some(problem_details)) => {
+                    InitProvisioningError::OtherNonRecoverable(problem_details.title)
+                }
+                RequestError::Status(400, _) => InitProvisioningError::OtherNonRecoverable(None),
                 _ => InitProvisioningError::Other(e.into()),
             })?
             .into_json()

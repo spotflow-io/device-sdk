@@ -449,6 +449,11 @@ fn init_operation(
                     (the current instance URL: '{}').",
                     provisioning.instance_url())
             }
+            Err(InitProvisioningError::OtherNonRecoverable(message)) => {
+                bail!(
+                    "Unable to initiate a Provisioning Operation due to a non-recoverable error: {}",
+                    message.as_deref().unwrap_or("Unknown error"))
+            }
             Err(e) => {
                 log::warn!("An attempt to initiate provisioning operation failed: {e}");
 
