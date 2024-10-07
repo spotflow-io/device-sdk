@@ -104,7 +104,7 @@ impl TokenHandler {
             };
 
             match processing_result {
-                Ok(_) => break,
+                Ok(()) => break,
                 Err(e) => {
                     log::warn!("First registration has failed, waiting for 30 seconds and trying again. Error: {e:?}");
                     tokio::time::sleep(Duration::from_secs(30)).await;
@@ -153,7 +153,7 @@ impl TokenHandler {
             // Wait until the next command is received or it is time to check token expiration time again
             // (we check it periodically to ensure that we do not miss the expiration even if the device is in sleep mode)
             select! {
-                _ = tokio::time::sleep(Duration::from_secs(60)) => {}
+                () = tokio::time::sleep(Duration::from_secs(60)) => {}
                 Some(command) = self.command_receiver.recv() => self.process_command(command).await
             }
 
@@ -240,7 +240,7 @@ impl TokenHandler {
             }
             RegistrationCommand::RefreshRegistration { time } => {
                 if time >= self.last_registration_refresh_attempt {
-                    let result = self.try_refresh_registration().await;
+                    let result = self.try_refresh_registration();
                     self.last_registration_refresh_attempt = Instant::now();
 
                     if let Err(e) = result {
@@ -264,7 +264,7 @@ impl TokenHandler {
         }
     }
 
-    async fn try_refresh_registration(&mut self) -> Result<()> {
+    fn try_refresh_registration(&mut self) -> Result<()> {
         log::info!("Refreshing registration to the platform");
         let registration = drs::register(&self.instance_url, &self.tokens.registration_token)?;
         self.tokens.iothub_sas_token = Some(ConnectionToken {

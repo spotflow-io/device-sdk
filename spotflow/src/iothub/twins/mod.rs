@@ -100,8 +100,8 @@ impl DeviceTwin {
 
         log::debug!("Setting reported properties to version {version}");
         self.reported = Some(Twin {
-            properties,
             version,
+            properties,
         });
         let reported = self
             .reported
@@ -133,8 +133,8 @@ impl DeviceTwin {
 
         log::debug!("Setting desired properties to version {version}");
         self.desired = Some(Twin {
-            properties,
             version,
+            properties,
         });
         let desired = self
             .desired
@@ -142,7 +142,7 @@ impl DeviceTwin {
             .expect("Desired properties value has just been assigned but is missing");
 
         while let Some(update) = self.desired_properties_updates.pop_front() {
-            desired.update(update)?;
+            desired.update(&update)?;
         }
 
         log::trace!("Current desired properties:\n{:#?}", desired.properties);
@@ -497,7 +497,7 @@ mod tests {
         let update: TwinUpdate =
             serde_json::from_str(update).expect("Unable to deserialize update");
 
-        twins.desired.update(update).unwrap();
+        twins.desired.update(&update).unwrap();
         let result = r#"{"lorem":"ipsum","ahoj":"hi","next":42}"#;
         let result: serde_json::Value =
             serde_json::from_str(result).expect("Unable to deserialize expected JSON result");

@@ -26,7 +26,7 @@ impl DesiredPropertiesUpdatedCallbackDispatcher {
 
                 if let Err(cause) = result {
                     let message = if let Some(s) = cause.downcast_ref::<&'static str>() {
-                        s.to_string()
+                        (*s).to_string()
                     } else if let Some(s) = cause.downcast_ref::<String>() {
                         s.clone()
                     } else {

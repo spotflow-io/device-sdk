@@ -5,7 +5,7 @@
 
 // To use this channel for d2c messages we would need to implement acknowledge last. Or the callsite would have to considerably change
 
-use std::{marker::PhantomData, ops::DerefMut, sync::Arc};
+use std::{marker::PhantomData, sync::Arc};
 
 use anyhow::{Context, Result};
 use async_trait::async_trait;
@@ -18,8 +18,9 @@ use tokio_util::sync::CancellationToken;
 
 use super::sqlite::SqliteStore;
 
+// The implementation could be made much easier and less error-prone if we used an ORM but I don't want to do that right now because of other priorities and my lack of knowledge on that topic
+//
 /// This trait must be implemented by anything that wants to be sent/stored through the sqlite channel.
-/// The implementation could be made much easier and less error-prone if we used an ORM but I don't want to do that right now because of other priorities and my lack of knowledge on that topic
 /// Each object has to have a unique ID which is returned by the store operation. The objects are guaranteed to be returned in an ascending order during the run by a given instance.
 /// If the channel is closed any unacknowledged messages will be delivered again starting from the lowest ID.
 /// The store operations must create IDs higher than the last received value. This is trivially done by returning ascending series by using SQLite AUTOINCREMENT.
@@ -41,7 +42,7 @@ pub fn channel<T: Storable>(store: SqliteStore) -> (Sender<T>, Receiver<T>) {
             phantom: PhantomData,
         },
         Receiver {
-            store: store.clone(),
+            store,
             last_saved: watch_rx,
             last_received: None,
             phantom: PhantomData,
@@ -64,10 +65,10 @@ pub struct Receiver<T> {
     phantom: PhantomData<T>,
 }
 
-impl<T: Storable> Sender<T> {
+impl<T: Storable + Sync> Sender<T> {
     pub async fn send(&self, obj: &T) -> Result<()> {
         let mut conn = self.store.connection().await;
-        let id = obj.store(conn.deref_mut()).await?;
+        let id = obj.store(&mut conn).await?;
 
         {
             let last_saved = self.last_saved.lock().await;
@@ -89,13 +90,13 @@ impl<T: Storable> Sender<T> {
     }
 }
 
-impl<T: Storable> Receiver<T> {
+impl<T: Storable + Send + Sync> Receiver<T> {
     pub async fn recv(&mut self, cancellation: &Option<CancellationToken>) -> Result<T> {
         let last_inserted = self.wait_new(cancellation).await?;
 
         let mut conn = self.store.connection().await;
 
-        let obj = T::load(conn.deref_mut(), self.last_received.unwrap_or(i32::MIN))
+        let obj = T::load(&mut conn, self.last_received.unwrap_or(i32::MIN))
             .await?
             .ok_or_else(|| {
                 anyhow::anyhow!(
@@ -117,7 +118,7 @@ impl<T: Storable> Receiver<T> {
             let result = if let Some(cancellation) = cancellation {
                 select! {
                     result = change_task => result,
-                    _ = cancellation.cancelled() => anyhow::bail!("Task cancelled."),
+                    () = cancellation.cancelled() => anyhow::bail!("Task cancelled."),
                 }
             } else {
                 change_task.await
@@ -134,7 +135,7 @@ impl<T: Storable> Receiver<T> {
 
     pub async fn ack(&self, obj: &T) -> Result<()> {
         let mut conn = self.store.connection().await;
-        T::remove(conn.deref_mut(), obj.id()).await
+        T::remove(&mut conn, obj.id()).await
     }
 
     pub async fn count(&self) -> Result<usize> {

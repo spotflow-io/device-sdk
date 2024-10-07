@@ -59,7 +59,13 @@ impl<'de> Visitor<'de> for DurationVisitor {
         let hours: u64;
         // let mut microseconds = 0;
 
-        let parts: Vec<&str> = s.split(':').collect();
+        let parts: [&str; 3] = s.split(':').collect::<Vec<_>>().try_into().map_err(|_| {
+            de::Error::invalid_value(
+                Unexpected::Str("Duration did not contain two colons."),
+                &self,
+            )
+        })?;
+
         let day_and_hour = parts[0];
         let minutes: u64 = parts[1].parse().map_err(|_| {
             de::Error::invalid_value(
@@ -131,7 +137,7 @@ mod tests {
     fn deser_duration() {
         let s = "\"8.11:55:36.3296177\"";
         let d: Duration = serde_json::from_str::<DurationWrapper>(s).unwrap().into();
-        assert_eq!(d.as_secs(), 734136);
+        assert_eq!(d.as_secs(), 734_136);
     }
 
     #[test]
@@ -156,7 +162,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic]
+    #[should_panic(expected = "This duration cannot be deserialized.")]
     fn deser_duration_fail() {
         let s = "\"10:39\"";
         let _d: Duration = serde_json::from_str::<DurationWrapper>(s).unwrap().into();

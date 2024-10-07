@@ -14,20 +14,20 @@ openssl-vendored = ["openssl/vendored"]
 [dependencies]
 anyhow = "1.0.56"
 async-trait = "0.1.61"
-brotli = "3.3.4"
+brotli = "6.0.0"
 chrono = { version = "0.4.19", features = ["serde"] }
-http = "0.2.6"
-json-patch = "0.2.6"
+http = "1.1.0"
+json-patch = "2.0.0"
 log = "0.4.16"
 native-tls = "0.2.8"
 openssl = { version = "0.10.29", optional = true }
 rumqttc = { package = "spotflow-rumqttc-fork", version = "0.12.0", features = ["use-native-tls"], default-features = false }
 serde = { version = "1.0.136", features = ["derive"] }
 serde_json = "1.0.79"
-sqlx = { version = "0.6.2", features = ["sqlite", "chrono", "macros", "runtime-tokio-native-tls", "offline"] }
+sqlx = { version = "0.7.4", features = ["sqlite", "chrono", "macros", "runtime-tokio", "tls-native-tls"] }
 thiserror = "1.0.30"
 time = "0.3.36"
-tokio = { version = "1.17.0", features = ["rt", "sync", "macros"] }
+tokio = { version = "1.17.0", features = ["rt", "sync", "macros", "rt-multi-thread"] }
 tokio-util = "0.7.1"
 ureq = { version = "2.4.0", features = ["json", "native-tls"], default-features = false }
 urlencoding = "2.1.0"
@@ -35,12 +35,12 @@ uuid = { version = "1.0.0", features = ["v4"] }
 
 [build-dependencies]
 tokio = { version = "1.17.0", features = ["rt"] }
-sqlx = { version = "0.6.2", features = ["sqlite", "runtime-tokio-native-tls"] }
+sqlx = { version = "0.7.4", features = ["sqlite", "runtime-tokio-native-tls"] }
 
 [dev-dependencies]
 azure_core = "0.1.1"
 azure_identity = "0.1.1"
-env_logger = "0.9.0"
+env_logger = "0.11.0"
 azure_storage = "0.1.0"
 azure_storage_blobs = "0.1.0"
 oauth2 = "4.1.0"

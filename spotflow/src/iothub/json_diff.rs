@@ -19,16 +19,12 @@ fn diff_objects(
         return Ok(None);
     }
 
-    if !desired.is_object() {
+    let Some(original) = original.as_object() else {
         return Ok(Some(desired.clone()));
-    }
-
-    if !original.is_object() {
+    };
+    let Some(desired) = desired.as_object() else {
         return Ok(Some(desired.clone()));
-    }
-
-    let original = original.as_object().unwrap();
-    let desired = desired.as_object().unwrap();
+    };
     let mut result = Map::new();
 
     for (name, desired_child) in desired {

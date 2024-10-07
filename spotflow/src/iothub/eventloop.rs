@@ -38,7 +38,7 @@ impl SubscriptionTask {
             acked += self.receiver.recv().await.map_err(|_|
                 anyhow!("Channel for subscribe acknowledgements was closed before startup finished, possibly because subscription failed.")
             )?;
-            log::debug!("Subscription {}/{} acknowledged", acked, self.total,)
+            log::debug!("Subscription {acked}/{} acknowledged", self.total);
         }
 
         Ok(())
@@ -141,7 +141,7 @@ impl EventLoop {
     pub(super) async fn run(&mut self) {
         loop {
             select! {
-                _ = self.cancellation.cancelled() => {
+                () = self.cancellation.cancelled() => {
                     log::debug!("Stopping MQTT because of cancellation");
                     break;
                 },
@@ -200,7 +200,7 @@ impl EventLoop {
                                 time: Instant::now(),
                             },
                         ) {
-                            Ok(_) => log::debug!("Requesting IoT Hub authentication refresh."),
+                            Ok(()) => log::debug!("Requesting IoT Hub authentication refresh."),
                             Err(e) => log::error!(
                                 "Unable to request IoT Hub authentication refresh: {e:?}"
                             ),
@@ -238,7 +238,7 @@ impl EventLoop {
                 log::warn!(
                     "Ignoring message received on unexpected topic {:?}",
                     &publish.topic,
-                )
+                );
             }
             Packet::PubAck(ack) => {
                 if self.pending_d2c.contains(&ack.pkid) {
@@ -268,11 +268,12 @@ impl EventLoop {
             }
             Packet::UnsubAck(_) => todo!(),
             Packet::Connect(_) => unreachable!("Client is responsible for connection initiation"),
-            Packet::PubRec(_) => unreachable!("Azure IoT Hub does not support QoS 2"),
-            Packet::PubRel(_) => unreachable!("Azure IoT Hub does not support QoS 2"),
-            Packet::PubComp(_) => unreachable!("Azure IoT Hub does not support QoS 2"),
-            Packet::Subscribe(_) => unreachable!("Only the client can subscribe to topics"),
-            Packet::Unsubscribe(_) => unreachable!("Only the client can subscribe to topics"),
+            Packet::PubRec(_) | Packet::PubRel(_) | Packet::PubComp(_) => {
+                unreachable!("Azure IoT Hub does not support QoS 2")
+            }
+            Packet::Subscribe(_) | Packet::Unsubscribe(_) => {
+                unreachable!("Only the client can subscribe to topics")
+            }
             Packet::Disconnect => unreachable!("Only the client sends disconnect"),
             // Packet::ConnAck(_) => {}, // Ignore ConnAck; rumqttc will handle everything for us
             // Packet::PingReq => {},
@@ -297,21 +298,19 @@ impl EventLoop {
                 // Else this is request-response type of exchange such as reported properties update
                 // We do not care about packet IDs or anything like that
             }
+            #[allow(clippy::match_same_arms)]
             Outgoing::Subscribe(_) => {
                 // We counted subscriptions beforehand so we do not want to count them now.
                 // We cannot subscribe reliably during runtime.
             }
             Outgoing::Unsubscribe(_) => todo!(),
-            Outgoing::PubRec(_) => unreachable!("Azure IoT Hub does not support QoS 2"),
-            Outgoing::PubRel(_) => unreachable!("Azure IoT Hub does not support QoS 2"),
-            Outgoing::PubComp(_) => unreachable!("Azure IoT Hub does not support QoS 2"),
-            Outgoing::AwaitAck(_) => {
-                log::warn!("MQTT is blocking until an out-of-order message is acknowledged.")
+            Outgoing::PubRec(_) | Outgoing::PubComp(_) | Outgoing::PubRel(_) => {
+                unreachable!("Azure IoT Hub does not support QoS 2")
             }
-            // Outgoing::PubAck(_) => {}
-            // Outgoing::PingReq => {},
-            // Outgoing::PingResp => {},
-            _ => {}
+            Outgoing::AwaitAck(_) => {
+                log::warn!("MQTT is blocking until an out-of-order message is acknowledged.");
+            }
+            Outgoing::PubAck(_) | Outgoing::PingReq | Outgoing::PingResp => {}
         }
     }
 }

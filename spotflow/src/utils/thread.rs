@@ -5,7 +5,7 @@ pub(crate) fn join<T>(handle: &mut Option<JoinHandle<T>>) {
     if let Some(handle) = handle {
         let thread = handle.thread();
         let id = thread.id();
-        let name = thread.name().map(|n| n.to_string()).unwrap_or_default();
+        let name = thread.name().map(ToString::to_string).unwrap_or_default();
         log::trace!("Joining thread {:?} named `{}`", id, name);
         if let Err(cause) = handle.join() {
             if let Some(s) = cause.downcast_ref::<&'static str>() {

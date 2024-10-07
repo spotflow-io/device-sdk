@@ -10,14 +10,14 @@ pub(super) fn c2d_topic(device_id: &str) -> String {
     format!("devices/{device_id}/messages/devicebound/")
 }
 
-pub(crate) fn response_topic(status: i32, request_id: String) -> String {
+pub(crate) fn response_topic(status: i32, request_id: &str) -> String {
     format!("$iothub/methods/res/{status}/?$rid={request_id}")
 }
 
-pub(crate) fn patch_reported_properties(rid: String) -> String {
+pub(crate) fn patch_reported_properties(rid: &str) -> String {
     format!("$iothub/twin/PATCH/properties/reported/?$rid={rid}")
 }
 
-pub(crate) fn get_twins(rid: String) -> String {
+pub(crate) fn get_twins(rid: &str) -> String {
     format!("$iothub/twin/GET/?$rid={rid}")
 }

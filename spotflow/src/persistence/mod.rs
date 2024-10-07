@@ -163,14 +163,14 @@ pub async fn create(
 ) -> Result<Store> {
     let sqlite = SqliteStore::init(store_path, config).await?;
 
-    start(sqlite, config, cancellation_token).await
+    Ok(start(sqlite, config, cancellation_token))
 }
 
-async fn start(
+fn start(
     sqlite: SqliteStore,
     config: &SdkConfiguration,
     cancellation_token: CancellationToken,
-) -> Result<Store> {
+) -> Store {
     let (message_sender, message_receiver) = mpsc::channel(100);
     let (latest_msg_id_sender, mut latest_msg_id_receiver) = watch::channel(-1);
 
@@ -198,7 +198,7 @@ async fn start(
 
                     for msg in messages {
                         select!(
-                            _ = cancellation_token.cancelled() => {
+                            () = cancellation_token.cancelled() => {
                                 // Cancelled
                                 return;
                             },
@@ -213,18 +213,18 @@ async fn start(
                     }
                 } else if *latest_msg_id_receiver.borrow_and_update() == last_id {
                     select!(
-                        _ = cancellation_token.cancelled() => {
+                        () = cancellation_token.cancelled() => {
                             // Cancelled
                             return;
                         },
                         read = latest_msg_id_receiver.changed() => {
                             if read.is_err() {
-                                // No more updates are comming
+                                // No more updates are coming
                                 return;
                             }
                             // else we start running the loop again
                         },
-                    )
+                    );
                 }
             }
         });
@@ -254,7 +254,7 @@ async fn start(
         inner: sqlite.clone(),
     };
 
-    Ok(Store {
+    Store {
         store: sqlite,
         d2c_producer: producer,
         d2c_consumer: consumer,
@@ -263,7 +263,7 @@ async fn start(
         c2d_producer,
         c2d_consumer,
         twins_store,
-    })
+    }
 }
 
 #[derive(Debug)]
@@ -291,6 +291,7 @@ pub struct CloudToDeviceMessage {
 }
 
 impl CloudToDeviceMessage {
+    #[must_use]
     pub fn new(content: Vec<u8>, properties: HashMap<String, String>) -> Self {
         CloudToDeviceMessage {
             id: None,
@@ -300,7 +301,7 @@ impl CloudToDeviceMessage {
     }
 }
 
-#[derive(Debug, sqlx::Type)]
+#[derive(Copy, Clone, Debug, sqlx::Type)]
 pub enum CloseOption {
     None,
     Close,
@@ -308,7 +309,7 @@ pub enum CloseOption {
     CloseMessageOnly,
 }
 
-#[derive(Debug, sqlx::Type)]
+#[derive(Copy, Clone, Debug, sqlx::Type)]
 pub enum Compression {
     None,
     BrotliFastest,

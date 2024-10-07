@@ -55,7 +55,7 @@ impl DirectMethodHandler {
                             }
                         }
                         Ok((status, payload)) => {
-                            let topic = topics::response_topic(status, msg.request_id);
+                            let topic = topics::response_topic(status, &msg.request_id);
                             _ = client.try_publish(topic, QoS::AtLeastOnce, false, payload);
                         }
                     }
@@ -87,27 +87,31 @@ impl Handler for DirectMethodHandler {
         log::debug!("Received direct method call on topic {topic}");
 
         // Because the method name may contain slashes we need to look for `/` from the right
-        let topic_without_prefix = &topic[topics::METHODS_PREFIX.len()..];
-        let last_slash = topic_without_prefix
-            .rfind('/')
-            .expect("Invalid topic starts like direct method call but misses fourth slash.");
-        let method_name = topic_without_prefix[..last_slash].to_string();
+        let Some(topic_without_prefix) = topic.strip_prefix(topics::METHODS_PREFIX) else {
+            // Ignore malformed requests
+            return;
+        };
+        let Some((method_name, rest)) = topic_without_prefix.rsplit_once('/') else {
+            // "Invalid topic starts like direct method call but misses fourth slash."
+            return;
+        };
+
+        let Some(properties) = rest.strip_prefix("?$") else {
+            return;
+        };
 
         // Skip the last slash and the leading question mark
-        let properties = match query::parse(&topic_without_prefix[last_slash + 2..]) {
+        let properties = match query::parse(properties) {
             Ok(properties) => properties,
             Err(e) => {
-                log::error!("Failed parsing method call topic `{}`: {:?}", topic, e);
+                log::error!("Failed parsing method call topic `{topic}`: {e:?}");
                 return;
             }
         };
 
-        let request_id = match properties.get("$rid") {
-            Some(Some(id)) => id.to_string(),
-            _ => {
-                log::error!("Request ID is missing in method call on topic `{}`", topic);
-                return;
-            }
+        let Some(Some(request_id)) = properties.get("$rid") else {
+            log::error!("Request ID is missing in method call on topic `{topic}`");
+            return;
         };
 
         log::debug!("Invoking method named {method_name}");
@@ -118,14 +122,14 @@ impl Handler for DirectMethodHandler {
             .expect("The sender is wrapped in Option only to be able to drop it explicitly")
             .try_send(Invocation {
                 publish: publish.clone(),
-                method_name,
-                request_id,
+                method_name: method_name.to_owned(),
+                request_id: request_id.to_owned(),
             }) {
                 Err(TrySendError::Full(invocation)) =>
                     log::warn!("Received unexpectedly many direct method calls before they could be processed. Ignoring call to {} with request ID {}.", invocation.method_name, invocation.request_id),
                 Err(TrySendError::Disconnected(invocation)) =>
                     log::error!("Received direct method call after processor shut down. Ignoring call to {} with request ID {}.", invocation.method_name, invocation.request_id),
-                Ok(_) => {},
+                Ok(()) => {},
         }
     }
 }
@@ -143,7 +147,7 @@ fn join<T>(handle: &mut Option<JoinHandle<T>>) {
     if let Some(handle) = handle {
         let thread = handle.thread();
         let id = thread.id();
-        let name = thread.name().map(|n| n.to_string()).unwrap_or_default();
+        let name = thread.name().map(ToString::to_string).unwrap_or_default();
         log::trace!("Joining thread {:?} named `{}`", id, name);
         if let Err(cause) = handle.join() {
             if let Some(s) = cause.downcast_ref::<&'static str>() {

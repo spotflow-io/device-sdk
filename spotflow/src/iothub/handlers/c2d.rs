@@ -40,16 +40,15 @@ impl AsyncHandler for CloudToDeviceHandler {
         let topic = &publish.topic;
         log::debug!("Received C2D message on topic {topic}");
 
-        let properties = match query::parse(&publish.topic[self.c2d_prefix.len()..]) {
-            Ok(properties) => properties,
-            Err(e) => {
-                log::error!(
-                    "Failed parsing cloud to device message topic `{}`: {:?}",
-                    topic,
-                    e
-                );
-                return;
-            }
+        let Some(properties) = publish.topic.strip_prefix(&self.c2d_prefix) else {
+            // Ignore malformed requests
+            return;
+        };
+
+        let Ok(properties) = query::parse(properties).inspect_err(|e| {
+            log::error!("Failed parsing cloud to device message topic `{topic}`: {e:?}");
+        }) else {
+            return;
         };
 
         let msg = CloudToDeviceMessage::new(

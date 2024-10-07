@@ -1,3 +1,27 @@
+#![deny(
+    clippy::expect_used,
+    clippy::future_not_send,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::pedantic,
+    clippy::todo,
+    clippy::unreachable,
+    clippy::unwrap_used,
+    unsafe_code
+)]
+#![allow(
+    // These should be also fixed sooner or later.
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::todo,
+    clippy::unreachable,
+
+    clippy::missing_errors_doc,
+    clippy::module_name_repetitions,
+    clippy::struct_field_names,
+    clippy::too_many_lines,
+)]
+
 //! This crate contains the Device SDK for the Spotflow IoT Platform.
 //! More information:
 //!

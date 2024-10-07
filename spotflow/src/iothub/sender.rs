@@ -40,16 +40,21 @@ impl Sender {
     pub(super) async fn process_saved(&mut self) {
         loop {
             select!(
-                _ = self.cancellation.cancelled() => break,
+                () = self.cancellation.cancelled() => break,
                 // At this point we panic. I don't know what else to do as this is core functionality.
                 // In a better world I will let the user know that the SDK stopped working and they need to restart or something.
                 // For now this should panic on our own thread (not on user's thread) and cascade to the SDK itself which will probably return Error when the user tries to send more messages.
                 Some(msg) = self.message_queue.get_message() => self.publish_iothub(msg).await.unwrap(),
-            )
+            );
         }
     }
 
     async fn publish_iothub(&self, msg: DeviceMessage) -> Result<()> {
+        fn encode_property(key: &str, value: &str) -> String {
+            let value = urlencoding::encode(value);
+            format!("{key}={value}")
+        }
+
         let id = msg
             .id
             .expect("We have a saved message without an ID. This should never happen.");
@@ -121,7 +126,7 @@ impl Sender {
             log::trace!("Sending message {} through file upload", id);
             properties.push(String::from("has-externalized-payload=true"));
             let blob_name = loop {
-                match self.publish_file(content.as_ref()).await {
+                match self.publish_file(content.as_ref()) {
                     Ok(name) => break name,
                     Err(e) => log::error!("Failed uploading file: {:?}", e),
                 }
@@ -170,15 +175,10 @@ impl Sender {
 
         log::trace!("Message sent {}", id);
 
-        return Ok(());
-
-        fn encode_property(key: &str, value: &str) -> String {
-            let value = urlencoding::encode(value);
-            format!("{}={}", key, value)
-        }
+        Ok(())
     }
 
-    async fn publish_file(&self, content: &[u8]) -> Result<String> {
+    fn publish_file(&self, content: &[u8]) -> Result<String> {
         let registration = self.registration_watch.borrow();
         let registration = registration
             .as_ref()

@@ -7,16 +7,14 @@ pub(crate) fn parse(query: &str) -> Result<HashMap<String, Option<String>>> {
     let mut map = HashMap::new();
 
     for prop in query.split('&') {
-        match prop.find('=') {
+        match prop.split_once('=') {
             None => {
                 let key = decode(prop).context(format!("Unable to URL decode key {prop}"))?;
                 map.insert(key.into_owned(), None);
             }
-            Some(pos) => {
-                let key =
-                    decode(&prop[..pos]).context(format!("Unable to URL decode key {prop}"))?;
-                let value = decode(&prop[pos + 1..])
-                    .context(format!("Unable to URL decode value {prop}"))?;
+            Some((key, value)) => {
+                let key = decode(key).context(format!("Unable to URL decode key {prop}"))?;
+                let value = decode(value).context(format!("Unable to URL decode value {prop}"))?;
                 map.insert(key.into_owned(), Some(value.into_owned()));
             }
         }

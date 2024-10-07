@@ -126,8 +126,8 @@ impl TwinsMiddleware {
     pub(crate) async fn process(&mut self) {
         loop {
             if let Err(e) = select!(
-                _ = self.cancellation.cancelled() => break,
-                Some(_) = self.get_twins.recv() => {
+                () = self.cancellation.cancelled() => break,
+                Some(()) = self.get_twins.recv() => {
                     self.get_twins().await.context("Receiving complete twins failed")
                 }
                 Ok(msg) = self.reported_properties_updates.recv(&None) => {
@@ -182,7 +182,7 @@ impl TwinsMiddleware {
         log::debug!("Updating reported properties with request ID {rid}");
         self.mqtt_client
             .try_publish(
-                topics::patch_reported_properties(rid),
+                topics::patch_reported_properties(&rid),
                 rumqttc::QoS::AtLeastOnce,
                 false,
                 patch.as_bytes(),
@@ -206,7 +206,7 @@ impl TwinsMiddleware {
         log::debug!("Requesting device twins with request ID {rid}");
         self.mqtt_client
             .try_publish(
-                topics::get_twins(rid),
+                topics::get_twins(&rid),
                 rumqttc::QoS::AtLeastOnce,
                 false,
                 Vec::new(),
@@ -237,16 +237,15 @@ impl TwinsMiddleware {
         let topic = &publish.topic;
 
         log::debug!("Received device twin desired properties update on topic {topic}");
-        let mut parts = topic.split('/');
-        if parts.clone().count() != 6 {
-            bail!("Received message on invalid topic '{}'.", topic);
-        }
+        let Ok(parts): Result<[_; 6], _> = topic.split('/').collect::<Vec<_>>().try_into() else {
+            bail!("Received message on invalid topic '{topic}'.");
+        };
 
-        let properties = parts
-            .nth(5)
-            .expect("Unreachable because we have checked the number of parts");
+        let Some(properties) = parts[5].strip_prefix('?') else {
+            bail!("Received message with malformed properties '{}'.", parts[5]);
+        };
 
-        let properties = query::parse(&properties[1..]).context(format!(
+        let properties = query::parse(properties).context(format!(
             "Failed parsing twin desired properties update topic `{topic}`"
         ))?;
         let version = match properties.get("$version") {
@@ -285,25 +284,21 @@ impl TwinsMiddleware {
         let topic = &publish.topic;
 
         log::debug!("Received device twin desired properties or reported properties change result on topic {topic}");
-        let mut parts = topic.split('/');
-        if parts.clone().count() != 5 {
-            bail!("Received message on an invalid topic '{}'.", topic);
+        let Ok(parts): Result<[_; 5], _> = topic.split('/').collect::<Vec<_>>().try_into() else {
+            bail!("Received message on an invalid topic '{topic}'.");
+        };
+
+        let status = parts[3];
+        if status.parse::<usize>().is_err() {
+            bail!("Received message on an invalid topic '{topic}'.");
         }
 
-        // This status is currently unused. However the side effect of advancing in the parts enum is important
-        let status = parts
-            .nth(3)
-            .expect("Unreachable because we have checked the number of parts");
-        let _status: usize = status
-            .parse()
-            .unwrap_or_else(|_| panic!("Received message on an invalid topic '{topic}'"));
-
-        let properties = parts
-            .next()
-            .expect("Unreachable because we have checked the number of parts");
+        let Some(properties) = parts[4].strip_prefix('?') else {
+            bail!("Received message with malformed properties '{}'.", parts[4]);
+        };
 
         // Skip leading question mark
-        let properties = query::parse(&properties[1..]).context(format!(
+        let properties = query::parse(properties).context(format!(
             "Failed parsing twin response message topic `{topic}`"
         ))?;
 

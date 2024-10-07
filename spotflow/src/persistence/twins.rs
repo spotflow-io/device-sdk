@@ -21,7 +21,7 @@ pub struct Twin {
 }
 
 impl Twin {
-    pub fn update(&mut self, update: TwinUpdate) -> Result<()> {
+    pub fn update(&mut self, update: &TwinUpdate) -> Result<()> {
         match update.version {
             None => {
                 log::debug!("Applying twin patch to automatically incremented version");
@@ -140,6 +140,7 @@ impl Storable for ReportedPropertiesUpdate {
             .fetch_one(conn)
             .await?;
 
-        Ok(res.count as usize)
+        // This is safe because the result cannot be negative
+        Ok(res.count.try_into().unwrap_or_default())
     }
 }

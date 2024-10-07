@@ -26,7 +26,7 @@ impl Storable for CloudToDeviceMessage {
             SELECT last_insert_rowid() as id"#,
             self.content,
         )
-        .fetch_one(&mut transaction)
+        .fetch_one(&mut *transaction)
         .await?;
 
         log::debug!("Saved C2D message with ID {}", record.id);
@@ -38,7 +38,7 @@ impl Storable for CloudToDeviceMessage {
                 k,
                 v,
             )
-            .execute(&mut transaction)
+            .execute(&mut *transaction)
             .await?;
         }
 
@@ -90,6 +90,7 @@ impl Storable for CloudToDeviceMessage {
             .fetch_one(conn)
             .await?;
 
-        Ok(res.cnt as usize)
+        // `cnt` cannot be negative so this is safe.
+        Ok(res.cnt.try_into().unwrap_or_default())
     }
 }

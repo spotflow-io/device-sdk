@@ -3,7 +3,7 @@ use chrono::{DateTime, Utc};
 use http::Uri;
 use log::{debug, warn};
 use sqlx::{Connection, Row, SqliteConnection};
-use std::{fs::File, ops::DerefMut, path::Path, str::FromStr, sync::Arc};
+use std::{fs::File, path::Path, str::FromStr, sync::Arc};
 use tokio::sync::{Mutex, MutexGuard};
 
 use super::{
@@ -178,7 +178,7 @@ impl SqliteStore {
             msg.compression as _,
             msg.batch_slice_id,
             msg.chunk_id,
-        ).fetch_one(conn.deref_mut()).await?;
+        ).fetch_one(&mut *conn).await?;
 
         Ok(record.id)
     }
@@ -189,16 +189,17 @@ impl SqliteStore {
         sqlx::query_as!(
             DeviceMessage,
             r#"SELECT id AS "id?: i32", site_id, stream_group, stream, batch_id, message_id, content, close_option AS "close_option!: CloseOption", compression AS "compression!: Compression", batch_slice_id, chunk_id FROM Messages WHERE id > ? ORDER BY id LIMIT 100"#, after,
-        ).fetch_all(conn.deref_mut()).await.map_err(anyhow::Error::from)
+        ).fetch_all(&mut *conn).await.map_err(anyhow::Error::from)
     }
 
     pub async fn message_count(&self) -> Result<usize> {
         let mut conn = self.conn.lock().await;
         let res = sqlx::query!("SELECT COUNT(id) as cnt FROM Messages")
-            .fetch_one(conn.deref_mut())
+            .fetch_one(&mut *conn)
             .await?;
 
-        Ok(res.cnt as usize)
+        // This is safe because the result cannot be negative.
+        Ok(res.cnt.try_into().unwrap_or_default())
     }
 
     pub async fn remove_oldest_message(&self) -> Result<()> {
@@ -206,7 +207,7 @@ impl SqliteStore {
         sqlx::query!(
             "DELETE FROM Messages WHERE id = (SELECT id FROM Messages ORDER BY id LIMIT 1)"
         )
-        .execute(conn.deref_mut())
+        .execute(&mut *conn)
         .await?;
 
         Ok(())
@@ -232,16 +233,16 @@ impl SqliteStore {
 
     async fn load_twin_properties(&self, twin_type: &str) -> Result<Option<Twin>> {
         let mut conn = self.conn.lock().await;
-        let res = match sqlx::query!(
+        let res = sqlx::query!(
             r#"SELECT properties FROM Twins WHERE type = ? ORDER BY id DESC LIMIT 1"#,
             twin_type,
         )
-        .fetch_optional(conn.deref_mut())
+        .fetch_optional(&mut *conn)
         .await
-        .context("Unable to load twin")?
-        {
-            Some(row) => row,
-            None => return Ok(None),
+        .context("Unable to load twin")?;
+
+        let Some(res) = res else {
+            return Ok(None);
         };
 
         Ok(Some(
@@ -257,7 +258,7 @@ impl SqliteStore {
             twin_type,
             json,
         )
-        .execute(conn.deref_mut())
+        .execute(&mut *conn)
         .await
         .context(format!("Unable to save twin {twin_type} properties"))
         .map(|_| ())
@@ -269,7 +270,7 @@ impl SqliteStore {
         let mut conn = self.conn.lock().await;
         Ok(
             sqlx::query!(r#"SELECT requested_device_id FROM SdkConfiguration WHERE id = "0""#,)
-                .fetch_one(conn.deref_mut())
+                .fetch_one(&mut *conn)
                 .await
                 .context("Unable to load device ID from configuration")?
                 .requested_device_id,
@@ -282,7 +283,7 @@ impl SqliteStore {
             r#"UPDATE SdkConfiguration SET workspace_id = ? WHERE id = "0""#,
             workspace_id,
         )
-        .execute(conn.deref_mut())
+        .execute(&mut *conn)
         .await
         .context("Unable to save Workspace ID to configuration")?;
 
@@ -293,7 +294,7 @@ impl SqliteStore {
         let mut conn = self.conn.lock().await;
         Ok(
             sqlx::query!(r#"SELECT workspace_id FROM SdkConfiguration WHERE id = "0""#,)
-                .fetch_one(conn.deref_mut())
+                .fetch_one(&mut *conn)
                 .await
                 .context("Unable to load workspace ID from configuration")?
                 .workspace_id,
@@ -306,7 +307,7 @@ impl SqliteStore {
             r#"UPDATE SdkConfiguration SET device_id = ? WHERE id = "0""#,
             device_id,
         )
-        .execute(conn.deref_mut())
+        .execute(&mut *conn)
         .await
         .context("Unable to save Device ID to configuration")?;
 
@@ -317,7 +318,7 @@ impl SqliteStore {
         let mut conn = self.conn.lock().await;
         Ok(
             sqlx::query!(r#"SELECT device_id FROM SdkConfiguration WHERE id = "0""#,)
-                .fetch_one(conn.deref_mut())
+                .fetch_one(&mut *conn)
                 .await
                 .context("Unable to load device ID from configuration")?
                 .device_id,
@@ -330,7 +331,7 @@ impl SqliteStore {
             ProvisioningToken,
             r#"SELECT provisioning_token AS token FROM SdkConfiguration WHERE id = "0""#,
         )
-        .fetch_one(conn.deref_mut())
+        .fetch_one(&mut *conn)
         .await
         .context("Unable to load provisioning token from configuration")
     }
@@ -342,7 +343,7 @@ impl SqliteStore {
             r#"UPDATE SdkConfiguration SET provisioning_token = ? WHERE id = "0""#,
             token.token,
         )
-        .execute(conn.deref_mut())
+        .execute(&mut *conn)
         .await?;
 
         Ok(())
@@ -354,7 +355,7 @@ impl SqliteStore {
             RegistrationToken,
             r#"SELECT registration_token AS token, rt_expiration AS "expiration: DateTime<Utc>" FROM SdkConfiguration WHERE id = "0""#,
         )
-        .fetch_one(conn.deref_mut())
+        .fetch_one(&mut *conn)
         .await
         .context("Unable to load registration token from configuration")
     }
@@ -370,7 +371,7 @@ impl SqliteStore {
             token.token,
             token.expiration,
         )
-        .execute(conn.deref_mut())
+        .execute(&mut *conn)
         .await?;
 
         Ok(())
@@ -379,7 +380,7 @@ impl SqliteStore {
     pub(crate) async fn load_instance_url(&self) -> Result<String> {
         let mut conn = self.conn.lock().await;
         let record = sqlx::query!(r#"SELECT instance_url FROM SdkConfiguration WHERE id = "0""#)
-            .fetch_one(conn.deref_mut())
+            .fetch_one(&mut *conn)
             .await?;
 
         Ok(record.instance_url)
@@ -538,6 +539,18 @@ async fn update_version_to_1_0_1(conn: &mut SqliteConnection) -> Result<(), anyh
 }
 
 async fn update_version_to_1_1_0(conn: &mut SqliteConnection) -> Result<(), anyhow::Error> {
+    async fn do_columns_exist(conn: &mut SqliteConnection) -> Result<bool> {
+        let res = sqlx::query_scalar!(
+            r#"SELECT COUNT(*)
+            FROM pragma_table_info('Messages')
+            WHERE name = 'batch_slice_id' OR name = 'chunk_id'"#
+        )
+        .fetch_one(conn)
+        .await?;
+
+        Ok(res == 2)
+    }
+
     log::debug!("Updating database schema from version 1.0.1 to 1.1.0");
 
     // There was an error in the code causing schema of version 1.1.0 to be marked 1.0.1, so we need to check if the
@@ -557,19 +570,7 @@ async fn update_version_to_1_1_0(conn: &mut SqliteConnection) -> Result<(), anyh
     query.execute(conn).await?;
 
     log::debug!("Database schema updated to version 1.1.0");
-    return Ok(());
-
-    async fn do_columns_exist(conn: &mut SqliteConnection) -> Result<bool> {
-        let res = sqlx::query_scalar!(
-            r#"SELECT COUNT(*)
-            FROM pragma_table_info('Messages')
-            WHERE name = 'batch_slice_id' OR name = 'chunk_id'"#
-        )
-        .fetch_one(conn)
-        .await?;
-
-        Ok(res == 2)
-    }
+    Ok(())
 }
 
 async fn update_version_to_1_2_0(
@@ -656,7 +657,7 @@ fn convert_dps_url_to_instance_url(dps_url: &str) -> Result<String, anyhow::Erro
     // Individual services used to be hosted on separate domains
     let instance_host = dps_host.trim_start_matches("device-provisioning.");
 
-    let instance_uri = format!("https://{}/", instance_host);
+    let instance_uri = format!("https://{instance_host}/");
 
     Ok(instance_uri)
 }

@@ -162,7 +162,11 @@ impl<F> IotHubConnection<F> {
     //     Ok(Box::new(self.twins_client.as_ref().unwrap().clone()))
     // }
     pub fn twins_client(&self) -> Result<IotHubTwinsClient> {
-        Ok(self.twins_client.as_ref().unwrap().clone())
+        Ok(self
+            .twins_client
+            .as_ref()
+            .ok_or(anyhow!("Connection was not established yet."))?
+            .clone())
     }
 }
 
@@ -308,7 +312,10 @@ impl<F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'sta
             .ok()
             .and_then(|o| match &*o.state.borrow() {
                 State::Ready => None,
-                State::ConnectionError(e) => Some(e.clone() as Arc<dyn std::error::Error>),
+                State::ConnectionError(e) => {
+                    let cast: Arc<dyn std::error::Error> = e.to_owned();
+                    Some(cast)
+                }
             })
     }
 }

@@ -13,11 +13,11 @@ crate-type = ["cdylib", "staticlib"]
 spotflow = { path = "../spotflow", version = "0.7.0", features = ["openssl-vendored"] }
 anyhow = "1.0.57"
 chrono = "0.4.20"
-simple_logger = { version = "4.3.0", features = ["stderr"] }
-http = "0.2.6"
+simple_logger = { version = "5.0.0", features = ["stderr"] }
+http = "1.1.0"
 # Used because stable std does not have c_size_t
 libc = "0.2.121"
 log = "0.4.16"
 
 [build-dependencies]
-cbindgen = "0.21.0"
+cbindgen = "0.26.0"

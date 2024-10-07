@@ -122,6 +122,7 @@ impl DeviceClientBuilder {
 
     /// Hidden from the documentation because the concept of Sites and their IDs is not yet explained in the Platform documentation.
     #[doc(hidden)]
+    #[must_use]
     pub fn with_site_id(mut self, site_id: String) -> DeviceClientBuilder {
         self.site_id = Some(site_id);
         self
@@ -132,6 +133,7 @@ impl DeviceClientBuilder {
     ///
     /// If your company uses a dedicated instance of the Platform, such as `acme.spotflow.io`, specify it here.
     /// The default value is `api.eu1.spotflow.io`.
+    #[must_use]
     pub fn with_instance(mut self, instance: String) -> DeviceClientBuilder {
         self.instance = Some(instance);
         self
@@ -140,6 +142,7 @@ impl DeviceClientBuilder {
     /// Set the callback to display the details of the
     /// [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation)
     /// when [`DeviceClientBuilder::build`] is performing [Device Provisioning](https://docs.spotflow.io/connect-devices/#device-provisioning).
+    #[must_use]
     pub fn with_display_provisioning_operation_callback(
         mut self,
         callback: Box<dyn ProvisioningOperationDisplayHandler>,
@@ -153,6 +156,7 @@ impl DeviceClientBuilder {
     /// [Device](https://docs.spotflow.io/connect-devices/#device) receives their update from the Platform.
     /// The [Device configuration tutorial](https://docs.spotflow.io/configure-devices/tutorial-configure-device#1-start-device)
     /// shows how to use this option. The callback must be `Send` and `Sync`, because it's called in a separate thread.
+    #[must_use]
     pub fn with_desired_properties_updated_callback(
         mut self,
         callback: Box<dyn DesiredPropertiesUpdatedCallback>,
@@ -162,6 +166,7 @@ impl DeviceClientBuilder {
     }
 
     /// Set the source of the system signals that can request the process to stop.
+    #[must_use]
     pub fn with_signals_source(mut self, signals_src: Box<dyn ProcessSignalsSource>) -> Self {
         self.signals_src = Some(signals_src);
         self

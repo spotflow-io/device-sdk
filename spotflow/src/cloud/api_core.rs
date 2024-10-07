@@ -44,7 +44,7 @@ pub(crate) fn put(
     token: impl AsRef<str>,
     data: impl serde::Serialize,
 ) -> Result<Response, RequestError> {
-    send(http::Method::PUT, base_uri, relative_uri, token, data)
+    send(&http::Method::PUT, base_uri, relative_uri, token, data)
 }
 
 pub(crate) fn post(
@@ -53,21 +53,18 @@ pub(crate) fn post(
     token: impl AsRef<str>,
     data: impl serde::Serialize,
 ) -> Result<Response, RequestError> {
-    send(http::Method::POST, base_uri, relative_uri, token, data)
+    send(&http::Method::POST, base_uri, relative_uri, token, data)
 }
 
 pub(crate) fn send(
-    method: http::Method,
+    method: &http::Method,
     base_uri: &Uri,
     relative_uri: &Uri,
     token: impl AsRef<str>,
     data: impl serde::Serialize,
 ) -> Result<Response, RequestError> {
-    let authority = match base_uri.authority() {
-        Some(authority) => authority,
-        None => {
-            return Err(anyhow!("Provided base URI {base_uri:?} does not contain the authority (e.g., 'api.eu1.spotflow.io').").into())
-        }
+    let Some(authority) = base_uri.authority() else {
+        return Err(anyhow!("Provided base URI {base_uri:?} does not contain the authority (e.g., 'api.eu1.spotflow.io').").into());
     };
     let path = relative_uri.path_and_query();
 
@@ -89,7 +86,7 @@ pub(crate) fn send(
         Arc::new(native_tls::TlsConnector::new().expect("Unable to build TLS connector"));
     let agent = ureq::AgentBuilder::new().tls_connector(connector).build();
 
-    let request = match method {
+    let request = match *method {
         http::Method::POST => agent.post(&uri.to_string()),
         http::Method::PUT => agent.put(&uri.to_string()),
         _ => unimplemented!("Method {} is not implemented.", method),

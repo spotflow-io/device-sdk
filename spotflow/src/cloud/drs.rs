@@ -44,8 +44,7 @@ impl RegistrationResponse {
             bail!("Cannot parse anything but Shared Access Signature.");
         }
 
-        let device_id = self
-            .connection_string
+        self.connection_string
             .split(';')
             .find_map(|part| {
                 if let Some((k, v)) = part.split_once('=') {
@@ -55,31 +54,20 @@ impl RegistrationResponse {
                 }
                 None
             })
-            .unwrap();
-
-        Ok(device_id)
+            .context("Connection string does not contain `DeviceId`.")
     }
 
     pub fn workspace_id(&self) -> Result<&str> {
-        let iot_hub_device_id = self.iot_hub_device_id()?;
-
-        let separator_pos = Self::get_iot_hub_device_id_separator_pos(iot_hub_device_id)?;
-
-        Ok(&iot_hub_device_id[..separator_pos])
+        Ok(self.split_iot_hub_device_id()?.0)
     }
 
     pub fn device_id(&self) -> Result<&str> {
-        let iot_hub_device_id = self.iot_hub_device_id()?;
-
-        let separator_pos = Self::get_iot_hub_device_id_separator_pos(iot_hub_device_id)?;
-
-        Ok(&iot_hub_device_id[separator_pos + 1..])
+        Ok(self.split_iot_hub_device_id()?.1)
     }
 
-    fn get_iot_hub_device_id_separator_pos(
-        iot_hub_device_id: &str,
-    ) -> Result<usize, anyhow::Error> {
-        iot_hub_device_id.find(':').ok_or_else(|| {
+    fn split_iot_hub_device_id(&self) -> Result<(&str, &str), anyhow::Error> {
+        let iot_hub_device_id = self.iot_hub_device_id()?;
+        iot_hub_device_id.split_once(':').ok_or_else(|| {
             anyhow::anyhow!("Unknown format of IoT Hub Device ID, it does not contain a colon: '{iot_hub_device_id}'.")
         })
     }
@@ -89,8 +77,7 @@ impl RegistrationResponse {
             bail!("Cannot parse anything but Shared Access Signature.");
         }
 
-        let sas = self
-            .connection_string
+        self.connection_string
             .split(';')
             .find_map(|part| {
                 if let Some((k, v)) = part.split_once('=') {
@@ -100,9 +87,7 @@ impl RegistrationResponse {
                 }
                 None
             })
-            .unwrap();
-
-        Ok(sas)
+            .context("Connection string does not contain `SharedAccessSignature`.")
     }
 }
 
@@ -126,5 +111,5 @@ pub fn register(
         })?
         .into_json()
         .context("Failed deserializing response from JSON")
-        .map_err(|e| e.into())
+        .map_err(Into::into)
 }

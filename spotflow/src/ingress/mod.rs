@@ -57,6 +57,7 @@ pub struct MessageContext {
 impl MessageContext {
     // Create a new instance of [`MessageContext`] with the provided [Stream Group](https://docs.spotflow.io/send-data/#stream-group)
     // and [Stream](https://docs.spotflow.io/send-data/#stream).
+    #[must_use]
     pub fn new(stream_group: Option<String>, stream: Option<String>) -> Self {
         Self {
             stream_group,
@@ -67,6 +68,7 @@ impl MessageContext {
 
     /// Get the [Stream Group](https://docs.spotflow.io/send-data/#stream-group) where
     /// [Messages](https://docs.spotflow.io/send-data/#message) will be sent to.
+    #[must_use]
     pub fn stream_group(&self) -> Option<&str> {
         self.stream_group.as_deref()
     }
@@ -79,6 +81,7 @@ impl MessageContext {
 
     /// Get the [Stream](https://docs.spotflow.io/send-data/#stream) where
     /// [Messages](https://docs.spotflow.io/send-data/#message) will be sent to.
+    #[must_use]
     pub fn stream(&self) -> Option<&str> {
         self.stream.as_deref()
     }
@@ -90,6 +93,7 @@ impl MessageContext {
     }
 
     /// Get the compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
+    #[must_use]
     pub fn compression(&self) -> Option<Compression> {
         self.compression.clone()
     }
@@ -338,6 +342,7 @@ impl DeviceClient {
     /// if their version is higher than `version`. Otherwise, return `None`.
     ///
     /// Only the latest version is returned, any versions between the last obtained one and the current one are skipped.
+    #[must_use]
     pub fn desired_properties_if_newer(&self, version: u64) -> Option<DesiredProperties> {
         self.connection.desired_properties_if_newer(version)
     }
@@ -393,6 +398,7 @@ impl DeviceClient {
     /// **Warning**: Deprecated, don't use.
     #[deprecated]
     #[doc(hidden)]
+    #[must_use]
     pub fn reported_properties(&self) -> Option<String> {
         self.connection.reported_properties()
     }
