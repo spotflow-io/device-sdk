@@ -171,9 +171,7 @@ impl TokenHandler {
         // Get the time of expiration of the registration token. If none was provided it does not expire. It gets lowered a bit to account for clockskew
         let registration_token_expiry = registration_response.token_remaining_lifetime.map(|t| {
             Self::expect_clockskew(
-                Utc::now()
-                    + chrono::Duration::from_std(t.into())
-                        .unwrap_or(TimeDelta::MAX),
+                Utc::now() + chrono::Duration::from_std(t.into()).unwrap_or(TimeDelta::MAX),
             )
         });
 
