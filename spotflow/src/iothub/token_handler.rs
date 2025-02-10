@@ -173,7 +173,7 @@ impl TokenHandler {
             Self::expect_clockskew(
                 Utc::now()
                     + chrono::Duration::from_std(t.into())
-                        .unwrap_or_else(|_| TimeDelta::max_value()),
+                        .unwrap_or(TimeDelta::MAX),
             )
         });
 
