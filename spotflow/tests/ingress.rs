@@ -32,7 +32,6 @@ fn ingress() {
 
     let stream_group = "device-sdk";
     let stream = "rust";
-    let site = "test-site";
 
     let batch_count = 10;
     let message_count = 10;
@@ -57,7 +56,6 @@ fn ingress() {
             env_ctx.provisioning_token.clone(),
             path,
         )
-        .with_site_id(site.to_owned())
         .with_instance(env_ctx.instance_url.to_string())
         .with_display_provisioning_operation_callback(Box::new(
             common::ProvisioningOperationApprovalHandler::new(Some(platform_caller.clone())),
@@ -144,8 +142,6 @@ fn ingress() {
         .as_storage_client();
 
     let container_client = storage_client.as_container_client(container_name);
-
-    container_client.list_blobs();
 
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
