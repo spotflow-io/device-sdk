@@ -147,7 +147,7 @@ If you want to run the examples or integration tests, you need to set up the Spo
 1. [Create a new Workspace](https://docs.spotflow.io/manage-access/tutorial-create-workspace), for example, "Device SDK Test".
 1. [Install the Spotflow CLI](https://docs.spotflow.io/cli/#installation).
 1. If not already installed, [install Powershell](https://docs.microsoft.com/en-us/powershell/scripting/install/installing-powershell).
-1. Launch Powershell and run the following script: `.\examples\prepare-spotflow.ps1 -WorkspaceId <Your Workspace ID>` (also specify `-Instance` if your company uses another instance than the default one).
+1. Launch Powershell and run the following script: `.\examples\prepare-workspace.ps1 -WorkspaceId <Your Workspace ID>` (also specify `-Instance` if your company uses another instance than the default one).
    You can find the Workspace ID in the [Spotflow IoT Platform Portal](https://portal.spotflow.io/configuration/workspaces).
    This script creates all the necessary resources (a [Provisioning Token](https://docs.spotflow.io/connect-devices/tutorial-connect-device/#1-create-provisioning-token) and several [Streams](https://docs.spotflow.io/send-data/#stream)) in the specified Workspace.
 
