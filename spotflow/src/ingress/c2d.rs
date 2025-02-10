@@ -25,7 +25,7 @@ impl<'a> CloudToDeviceMessageGuard<'a> {
     }
 }
 
-impl<'a> Deref for CloudToDeviceMessageGuard<'a> {
+impl Deref for CloudToDeviceMessageGuard<'_> {
     type Target = CloudToDeviceMessage;
 
     fn deref(&self) -> &Self::Target {
@@ -33,7 +33,7 @@ impl<'a> Deref for CloudToDeviceMessageGuard<'a> {
     }
 }
 
-impl<'a> Drop for CloudToDeviceMessageGuard<'a> {
+impl Drop for CloudToDeviceMessageGuard<'_> {
     fn drop(&mut self) {
         let ack_result = self
             .runtime

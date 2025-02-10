@@ -1,7 +1,7 @@
 use std::time::{Duration, Instant};
 
 use anyhow::{anyhow, Result};
-use chrono::{DateTime, Utc};
+use chrono::{DateTime, TimeDelta, Utc};
 use http::Uri;
 use tokio::select;
 use tokio::sync::{mpsc, watch};
@@ -173,7 +173,7 @@ impl TokenHandler {
             Self::expect_clockskew(
                 Utc::now()
                     + chrono::Duration::from_std(t.into())
-                        .unwrap_or_else(|_| chrono::Duration::max_value()),
+                        .unwrap_or_else(|_| TimeDelta::max_value()),
             )
         });
 
