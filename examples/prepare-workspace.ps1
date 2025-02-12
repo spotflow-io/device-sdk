@@ -31,21 +31,21 @@ $streamGroupName = "device-sdk"
 
 spotf stream-group create-or-update --name $streamGroupName --use-workspace-storage
 
-spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "autofilled-batch" --concatenation-mode WithNewLines `
+spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "autofilled-batch" --concatenation-mode WithNewLines --enable-site-id false `
     --with-batch-id-autofill-pattern "{dateTime:yyyy-MM-dd-hh-mm}" --with-msg-id-autofill-pattern "{dateTime:yyyy-MM-dd}_{sequenceId}"
 
-spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "c" --concatenation-mode WithNewLines
+spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "c" --concatenation-mode WithNewLines --enable-site-id false
 
-spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "default" --concatenation-mode None `
+spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "default" --concatenation-mode None --enable-site-id false `
     --with-batch-id-autofill-pattern "{dateTime:yyyy-MM-dd-hh-mm}" --with-msg-id-autofill-pattern "{sequenceId}"
 
-spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "manual" --concatenation-mode None
+spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "manual" --concatenation-mode None --enable-site-id false
 
-spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "manual-batch" --concatenation-mode WithNewLines
+spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "manual-batch" --concatenation-mode WithNewLines --enable-site-id false
 
-spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "manual-batch-slices" --concatenation-mode WithNewLines
+spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "manual-batch-slices" --concatenation-mode WithNewLines --enable-site-id false
 
-spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "rust" --concatenation-mode WithNewLines
+spotf stream create-or-update --stream-group-name $streamGroupName --stream-name "rust" --concatenation-mode WithNewLines --enable-site-id false
 
 spotf stream-group create-or-update --name $streamGroupName --default-stream "default"
 
