@@ -62,7 +62,7 @@ impl DirectMethodHandler {
                                 topic,
                                 QoS::AtLeastOnce,
                                 false,
-                                b"{{\"error\": \"Internal error\"}}",
+                                b"{\"error\": \"Internal error\"}",
                             );
                         }
                         Ok(Some((status, payload))) => {
@@ -79,7 +79,7 @@ impl DirectMethodHandler {
                                 topic,
                                 QoS::AtLeastOnce,
                                 false,
-                                b"{{\"error\": \"No handler found\"}}",
+                                b"{\"error\": \"No handler found\"}",
                             );
                         }
                     }

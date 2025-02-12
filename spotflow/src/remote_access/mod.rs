@@ -7,6 +7,7 @@ use serde::Deserialize;
 use crate::ingress::Handler;
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct RequestPayload {
     pub port: u16,
     pub tunnel_secure_uri: String,
@@ -20,7 +21,7 @@ pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F
 
         if method_name == "remote_access" {
             let Ok(payload) = serde_json::from_slice::<RequestPayload>(payload) else {
-                return Some((400, b"Invalid payload".to_vec()));
+                return Some((400, b"{\"error\": \"Invalid payload\"}".to_vec()));
             };
 
             let result = connections.connect(payload.port, payload.tunnel_secure_uri);
