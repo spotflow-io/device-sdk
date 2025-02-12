@@ -17,9 +17,7 @@ pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F
     let connections = connections::ConnectionManager::new();
 
     move |method_name: String, payload: &[u8]| {
-        // let connections = connections.clone();
-
-        if method_name == "remote_access" {
+        if method_name == "!remote-access" {
             let Ok(payload) = serde_json::from_slice::<RequestPayload>(payload) else {
                 return Some((400, b"{\"error\": \"Invalid payload\"}".to_vec()));
             };
