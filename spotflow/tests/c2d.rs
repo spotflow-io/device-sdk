@@ -102,7 +102,7 @@ fn c2d() {
     sender.join().expect("Failed joining thread");
 }
 
-fn handler(method: String, payload: &[u8]) -> (i32, Vec<u8>) {
+fn handler(method: String, payload: &[u8]) -> Option<(i32, Vec<u8>)> {
     let payload = std::str::from_utf8(payload).unwrap();
     log::info!(
         "Received {} method invocation with payload `{}`.",
@@ -110,5 +110,5 @@ fn handler(method: String, payload: &[u8]) -> (i32, Vec<u8>) {
         payload
     );
 
-    (200, Vec::new())
+    Some((200, Vec::new()))
 }
