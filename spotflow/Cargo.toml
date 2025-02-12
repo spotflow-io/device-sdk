@@ -15,7 +15,7 @@ openssl-vendored = ["openssl/vendored"]
 anyhow = "1.0.56"
 async-trait = "0.1.61"
 brotli = "3.3.4"
-chrono = { version = "0.4.19", features = ["serde"] }
+chrono = { version = "0.4.39", features = ["serde"] }
 http = "0.2.6"
 json-patch = "0.2.6"
 log = "0.4.16"
