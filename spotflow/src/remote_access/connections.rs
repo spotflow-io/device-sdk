@@ -128,8 +128,11 @@ impl RuntimeManager {
         tunnel_uri: String,
     ) -> Result<(), ConnectionError> {
         // Check if a connection already exists for this port
-        if self.active_connections.contains_key(&target_port) {
-            return Err(ConnectionError::ConnectionAlreadyExists);
+        if let Some(handle) = self.active_connections.get(&target_port) {
+            if !handle.is_finished() {
+                log::info!("Attempting to connect to port {} which is already in use by another connection.", target_port);
+                return Err(ConnectionError::ConnectionAlreadyExists);
+            }
         }
 
         // Spawn a new tokio task to handle the connection
@@ -154,24 +157,36 @@ async fn process_connection(target_port: u16, tunnel_uri: &str) -> Result<(), Co
     let (ws_stream, _) = connect_async(tunnel_uri)
         .await
         .map_err(ConnectionError::ServerConnectionFailed)?;
-    println!("Connected to the server.");
+    log::info!("Connected to the server for port {}", target_port);
 
     let socket_stream = TcpStream::connect(format!("127.0.0.1:{}", target_port))
         .await
         .map_err(ConnectionError::TargetPortConnectionFailed)?;
+
+    log::info!("Connected to the target port {}", target_port);
 
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
     let (mut socket_read, mut socket_write) = socket_stream.into_split();
 
     let ws_to_socket = tokio::spawn(async move {
         while let Some(Ok(msg)) = ws_stream.next().await {
-            println!("DeviceWS->Device: Forwarding {} bytes.", msg.len());
-            if let Err(e) = socket_write.write_all(&msg.into_data()).await {
-                log::info!(
-                    "Failed to write message to the target port, cancelling forwarding: {}",
-                    e
-                );
-                break;
+            match msg {
+                Message::Binary(_) | Message::Text(_) => {
+                    let data = msg.into_data();
+                    println!("DeviceWS->Device: Forwarding {} bytes.", data.len());
+                    if let Err(e) = socket_write.write_all(&data).await {
+                        log::info!(
+                            "Failed to write message to the target port, cancelling forwarding: {}",
+                            e
+                        );
+                        break;
+                    }
+                }
+                Message::Close(_) => {
+                    log::info!("DeviceWS->Device: Close message received, cancelling forwarding.");
+                    break;
+                },
+                _ => {} // Ping and Pong are handled automatically and raw frames are never received
             }
         }
     });
@@ -179,6 +194,16 @@ async fn process_connection(target_port: u16, tunnel_uri: &str) -> Result<(), Co
     let socket_to_ws = tokio::spawn(async move {
         let mut buf = vec![0; 1024];
         while let Ok(n) = socket_read.read(&mut buf).await {
+            if n == 0 {
+                log::info!("Device->DeviceWS: Received 0 bytes from the port, sending close message.");
+                if let Err(e) = ws_sink.send(Message::Close(None)).await {
+                    log::warn!("Failed to send close message: {}", e);
+                }
+
+                log::info!("Device->DeviceWS: Cancelling forwarding.");
+                break;
+            }
+
             println!("Device->DeviceWS: Forwarding {} bytes.", n);
             if let Err(e) = ws_sink
                 .send(Message::Binary(buf[..n].to_vec().into()))
@@ -206,6 +231,8 @@ async fn process_connection(target_port: u16, tunnel_uri: &str) -> Result<(), Co
             e
         );
     }
+
+    log::info!("Forwarding between the server and the target port {} cancelled in both directions.", target_port);
 
     Ok(())
 }
