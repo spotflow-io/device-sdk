@@ -1,6 +1,5 @@
 use core::str;
 use std::{
-    panic::RefUnwindSafe,
     path::Path,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -36,7 +35,7 @@ use crate::iothub::{
     IotHubConnection,
 };
 
-use super::{c2d::CloudToDeviceMessageGuard, Compression, MessageContext};
+use super::{c2d::CloudToDeviceMessageGuard, Compression, Handler, MessageContext};
 
 pub struct BaseConnection<T: ?Sized + Send + Sync> {
     configuration_store: ConfigurationStore,
@@ -63,7 +62,7 @@ impl<F: Send + Sync> BaseConnection<IotHubConnection<F>> {
         initial_registration_response: Option<RegistrationResponse>,
     ) -> Result<BaseConnection<dyn ConnectionImplementation + Send + Sync>>
     where
-        F: Fn(String, &[u8]) -> (i32, Vec<u8>) + RefUnwindSafe + 'static,
+        F: Handler,
     {
         // One thread is currently not enough, `runtime::Builder::new_current_thread` deadlocks when reconnect example is run.
         // We also force the number of threads to be at least 2 -- one worker thread plus one thread we spawn ourselves
@@ -113,7 +112,7 @@ impl<F: Send + Sync> BaseConnection<IotHubConnection<F>> {
         cancellation: CancellationToken,
     ) -> BaseConnection<dyn ConnectionImplementation + Send + Sync>
     where
-        F: Fn(String, &[u8]) -> (i32, Vec<u8>) + RefUnwindSafe + 'static,
+        F: Handler,
     {
         let mut iothub = IotHubConnection::create(
             rt.handle().clone(),

@@ -1,15 +1,15 @@
 use std::{
-    panic::{catch_unwind, RefUnwindSafe},
+    panic::catch_unwind,
     sync::mpsc::{self, TrySendError},
     thread::{self, JoinHandle},
 };
 
 use rumqttc::{AsyncClient, Publish, QoS};
 
-use super::super::query;
-use super::super::topics;
+use crate::ingress::Handler as HandlerFn;
 
-use super::Handler;
+use super::super::topics;
+use super::{super::query, Handler};
 
 struct Invocation {
     publish: Publish,
@@ -25,7 +25,7 @@ pub(crate) struct DirectMethodHandler {
 impl DirectMethodHandler {
     pub(crate) fn new<F>(client: AsyncClient, method_handler: F) -> Self
     where
-        F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + RefUnwindSafe + 'static,
+        F: HandlerFn,
     {
         let (sender, receiver) = mpsc::sync_channel::<Invocation>(50);
 
@@ -46,17 +46,41 @@ impl DirectMethodHandler {
                         Err(cause) => {
                             if let Some(s) = cause.downcast_ref::<&'static str>() {
                                 log::error!("Direct method processing failed with panic: {}", s);
-                            }
-                            if let Some(s) = cause.downcast_ref::<String>() {
+                            } else if let Some(s) = cause.downcast_ref::<String>() {
                                 log::error!(
                                     "Direct method message processing failed with panic: {}",
                                     s
                                 );
+                            } else {
+                                log::error!(
+                                    "Direct method message processing failed with unknown panic."
+                                );
                             }
+
+                            let topic = topics::response_topic(500, msg.request_id);
+                            _ = client.try_publish(
+                                topic,
+                                QoS::AtLeastOnce,
+                                false,
+                                b"{\"error\": \"Internal error\"}",
+                            );
                         }
-                        Ok((status, payload)) => {
+                        Ok(Some((status, payload))) => {
                             let topic = topics::response_topic(status, msg.request_id);
                             _ = client.try_publish(topic, QoS::AtLeastOnce, false, payload);
+                        }
+                        Ok(None) => {
+                            log::warn!(
+                                "Unhandled direct method call on topic {}.",
+                                msg.publish.topic
+                            );
+                            let topic = topics::response_topic(404, msg.request_id);
+                            _ = client.try_publish(
+                                topic,
+                                QoS::AtLeastOnce,
+                                false,
+                                b"{\"error\": \"No handler found\"}",
+                            );
                         }
                     }
                 }

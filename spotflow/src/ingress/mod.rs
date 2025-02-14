@@ -1,4 +1,3 @@
-use std::panic::RefUnwindSafe;
 use std::time::Duration;
 use std::{path::Path, sync::Arc};
 
@@ -19,6 +18,8 @@ pub use builder::DeviceClientBuilder;
 pub use builder::ProvisioningOperation;
 pub use builder::ProvisioningOperationDisplayHandler;
 pub use c2d::CloudToDeviceMessage;
+
+pub use builder::Handler;
 
 use crate::connection::ConnectionImplementation;
 
@@ -125,7 +126,7 @@ impl DeviceClient {
         initial_registration_response: Option<RegistrationResponse>,
     ) -> Result<DeviceClient>
     where
-        F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static,
+        F: Handler,
     {
         let connection = BaseConnection::init_ingress(
             config,
