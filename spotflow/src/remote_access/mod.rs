@@ -58,8 +58,7 @@ pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F
         } else {
             chained_handler
                 .as_ref()
-                .map(|handler| handler(method_name, payload))
-                .flatten()
+                .and_then(|handler| handler(method_name, payload))
         }
     }
 }

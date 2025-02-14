@@ -185,7 +185,7 @@ async fn process_connection(target_port: u16, tunnel_uri: &str) -> Result<(), Co
                 Message::Close(_) => {
                     log::info!("DeviceWS->Device: Close message received, cancelling forwarding.");
                     break;
-                },
+                }
                 _ => {} // Ping and Pong are handled automatically and raw frames are never received
             }
         }
@@ -195,7 +195,9 @@ async fn process_connection(target_port: u16, tunnel_uri: &str) -> Result<(), Co
         let mut buf = vec![0; 1024];
         while let Ok(n) = socket_read.read(&mut buf).await {
             if n == 0 {
-                log::info!("Device->DeviceWS: Received 0 bytes from the port, sending close message.");
+                log::info!(
+                    "Device->DeviceWS: Received 0 bytes from the port, sending close message."
+                );
                 if let Err(e) = ws_sink.send(Message::Close(None)).await {
                     log::warn!("Failed to send close message: {}", e);
                 }
@@ -232,7 +234,10 @@ async fn process_connection(target_port: u16, tunnel_uri: &str) -> Result<(), Co
         );
     }
 
-    log::info!("Forwarding between the server and the target port {} cancelled in both directions.", target_port);
+    log::info!(
+        "Forwarding between the server and the target port {} cancelled in both directions.",
+        target_port
+    );
 
     Ok(())
 }
