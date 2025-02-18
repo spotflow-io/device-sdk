@@ -1,6 +1,9 @@
 mod connections;
 
+use std::str::FromStr;
+
 use connections::ConnectionError;
+use http::Uri;
 use log::warn;
 use serde::Deserialize;
 
@@ -11,6 +14,7 @@ use crate::ingress::Handler;
 struct RequestPayload {
     pub port: u16,
     pub tunnel_secure_uri: String,
+    pub traceparent_header: Option<String>,
 }
 
 pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F>) -> impl Handler {
@@ -22,7 +26,11 @@ pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F
                 return Some((400, b"{\"error\": \"Invalid payload\"}".to_vec()));
             };
 
-            let result = connections.connect(payload.port, payload.tunnel_secure_uri);
+            let Ok(tunnel_secure_uri) = Uri::from_str(&payload.tunnel_secure_uri) else {
+                return Some((400, b"{\"error\": \"Invalid tunnel secure URI\"}".to_vec()));
+            };
+
+            let result = connections.connect(payload.port, tunnel_secure_uri, payload.traceparent_header);
 
             match result {
                 Ok(_) => Some((200, vec![])),

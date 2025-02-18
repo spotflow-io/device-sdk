@@ -1,4 +1,5 @@
 use futures_util::{future, SinkExt, StreamExt};
+use http::Uri;
 use std::{
     collections::HashMap,
     mem,
@@ -16,13 +17,14 @@ use tokio::{
     runtime::Runtime,
     task::JoinHandle,
 };
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{connect_async, tungstenite::{ClientRequestBuilder, Message}};
 
 // Command enum for communication with the runtime thread
 enum Command {
     Connect {
         target_port: u16,
-        tunnel_uri: String,
+        tunnel_uri: Uri,
+        traceparent_header: Option<String>,
         response_tx: mpsc::Sender<Result<(), ConnectionError>>,
     },
     Shutdown,
@@ -70,10 +72,11 @@ impl ConnectionManager {
                         Command::Connect {
                             target_port,
                             tunnel_uri,
+                            traceparent_header,
                             response_tx,
                         } => {
                             let result = runtime_manager
-                                .handle_connect(target_port, tunnel_uri)
+                                .handle_connect(target_port, tunnel_uri, traceparent_header)
                                 .await;
                             let _ = response_tx.send(result);
                         }
@@ -92,13 +95,14 @@ impl ConnectionManager {
         }
     }
 
-    pub fn connect(&self, target_port: u16, tunnel_uri: String) -> Result<(), ConnectionError> {
+    pub fn connect(&self, target_port: u16, tunnel_uri: Uri, traceparent_header: Option<String>) -> Result<(), ConnectionError> {
         let (response_tx, response_rx) = mpsc::channel();
 
         self.command_tx
             .send(Command::Connect {
                 target_port,
                 tunnel_uri,
+                traceparent_header,
                 response_tx,
             })
             .expect("Runtime thread has terminated");
@@ -125,7 +129,8 @@ impl RuntimeManager {
     async fn handle_connect(
         &mut self,
         target_port: u16,
-        tunnel_uri: String,
+        tunnel_uri: Uri,
+        traceparent_header: Option<String>,
     ) -> Result<(), ConnectionError> {
         // Check if a connection already exists for this port
         if let Some(handle) = self.active_connections.get(&target_port) {
@@ -137,7 +142,7 @@ impl RuntimeManager {
 
         // Spawn a new tokio task to handle the connection
         let handle =
-            tokio::spawn(async move { process_connection(target_port, &tunnel_uri).await });
+            tokio::spawn(async move { process_connection(target_port, tunnel_uri, traceparent_header).await });
 
         // Store the handle in our active connections
         self.active_connections.insert(target_port, handle);
@@ -153,10 +158,17 @@ impl RuntimeManager {
     }
 }
 
-async fn process_connection(target_port: u16, tunnel_uri: &str) -> Result<(), ConnectionError> {
-    let (ws_stream, _) = connect_async(tunnel_uri)
+async fn process_connection(target_port: u16, tunnel_uri: Uri, traceparent_header: Option<String>) -> Result<(), ConnectionError> {
+    let mut request_builder = ClientRequestBuilder::new(tunnel_uri);
+
+    if let Some(traceparent) = traceparent_header {
+        request_builder = request_builder.with_header("traceparent", traceparent);
+    }
+
+    let (ws_stream, _) = connect_async(request_builder)
         .await
         .map_err(ConnectionError::ServerConnectionFailed)?;
+    
     log::info!("Connected to the server for port {}", target_port);
 
     let socket_stream = TcpStream::connect(format!("127.0.0.1:{}", target_port))
