@@ -17,7 +17,7 @@ async-trait = "0.1.61"
 brotli = "3.3.4"
 chrono = { version = "0.4.39", features = ["serde"] }
 futures-util = "0.3.31"
-http = "0.2.6"
+http = "1.2.0"
 json-patch = "0.2.6"
 log = "0.4.16"
 native-tls = "0.2.8"

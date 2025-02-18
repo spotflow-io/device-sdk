@@ -14,7 +14,7 @@ spotflow = { path = "../spotflow", version = "0.7.0", features = ["openssl-vendo
 anyhow = "1.0.57"
 chrono = "0.4.20"
 simple_logger = { version = "4.3.0", features = ["stderr"] }
-http = "0.2.6"
+http = "1.2.0"
 # Used because stable std does not have c_size_t
 libc = "0.2.121"
 log = "0.4.16"
