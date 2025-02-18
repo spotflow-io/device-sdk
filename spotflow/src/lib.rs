@@ -12,6 +12,7 @@ mod connection;
 mod ingress;
 mod iothub;
 mod persistence;
+mod remote_access;
 
 #[doc(hidden)]
 pub use ingress::CloudToDeviceMessage;

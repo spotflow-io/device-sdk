@@ -1,4 +1,5 @@
 use crate::connection::twins::DesiredPropertiesUpdatedCallback;
+use crate::remote_access::create_remote_access_method_handler;
 use crate::{
     cloud,
     persistence::sqlite::{SdkConfiguration, SdkConfigurationFragment, SqliteStore},
@@ -26,15 +27,15 @@ use super::DeviceClient;
 
 // Defining a super-trait for what traits must the handler implement Fn(...) + Send + RefUnwindSafe + 'static
 pub trait Handler:
-    Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static
+    Fn(String, &[u8]) -> Option<(i32, Vec<u8>)> + Send + Sync + RefUnwindSafe + 'static
 {
 }
 impl<T> Handler for T where
-    T: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static
+    T: Fn(String, &[u8]) -> Option<(i32, Vec<u8>)> + Send + Sync + RefUnwindSafe + 'static
 {
 }
 // Used where Option::None is needed for the handler type
-type NoneHandler = fn(String, &[u8]) -> (i32, Vec<u8>);
+type NoneHandler = fn(String, &[u8]) -> Option<(i32, Vec<u8>)>;
 
 /// The summary of an ongoing [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
 ///
@@ -261,7 +262,7 @@ impl DeviceClientBuilder {
                 site_id: self.site_id,
             },
             &self.database_file,
-            method_handler,
+            Some(create_remote_access_method_handler(method_handler)),
             self.desired_properties_updated_callback,
             self.signals_src,
             registration_response,
