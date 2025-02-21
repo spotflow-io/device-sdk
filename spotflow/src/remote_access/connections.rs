@@ -62,35 +62,38 @@ impl ConnectionManager {
         let (command_tx, command_rx) = mpsc::channel();
 
         // Spawn a new thread with tokio runtime
-        let runtime_thread = thread::spawn(move || {
-            let runtime = Runtime::new().expect("Failed to create Tokio runtime");
-            let mut runtime_manager = RuntimeManager {
-                active_connections: HashMap::new(),
-                command_rx,
-            };
+        let runtime_thread = thread::Builder::new()
+            .name("Connection manager Tokio runtime".into())
+            .spawn(move || {
+                let runtime = Runtime::new().expect("Failed to create Tokio runtime");
+                let mut runtime_manager = RuntimeManager {
+                    active_connections: HashMap::new(),
+                    command_rx,
+                };
 
-            runtime.block_on(async {
-                while let Ok(cmd) = runtime_manager.command_rx.recv() {
-                    match cmd {
-                        Command::Connect {
-                            target_port,
-                            tunnel_uri,
-                            traceparent_header,
-                            response_tx,
-                        } => {
-                            let result = runtime_manager
-                                .handle_connect(target_port, tunnel_uri, traceparent_header)
-                                .await;
-                            let _ = response_tx.send(result);
-                        }
-                        Command::Shutdown => {
-                            runtime_manager.shutdown().await;
-                            break;
+                runtime.block_on(async {
+                    while let Ok(cmd) = runtime_manager.command_rx.recv() {
+                        match cmd {
+                            Command::Connect {
+                                target_port,
+                                tunnel_uri,
+                                traceparent_header,
+                                response_tx,
+                            } => {
+                                let result = runtime_manager
+                                    .handle_connect(target_port, tunnel_uri, traceparent_header)
+                                    .await;
+                                let _ = response_tx.send(result);
+                            }
+                            Command::Shutdown => {
+                                runtime_manager.shutdown().await;
+                                break;
+                            }
                         }
                     }
-                }
-            });
-        });
+                });
+            })
+            .expect("Failed to spawn connection manager runtime thread");
 
         Self {
             command_tx: Arc::new(command_tx),
