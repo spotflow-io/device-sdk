@@ -17,7 +17,10 @@ use tokio::{
     runtime::Runtime,
     task::JoinHandle,
 };
-use tokio_tungstenite::{connect_async, tungstenite::{ClientRequestBuilder, Message}};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{ClientRequestBuilder, Message},
+};
 
 // Command enum for communication with the runtime thread
 enum Command {
@@ -95,7 +98,12 @@ impl ConnectionManager {
         }
     }
 
-    pub fn connect(&self, target_port: u16, tunnel_uri: Uri, traceparent_header: Option<String>) -> Result<(), ConnectionError> {
+    pub fn connect(
+        &self,
+        target_port: u16,
+        tunnel_uri: Uri,
+        traceparent_header: Option<String>,
+    ) -> Result<(), ConnectionError> {
         let (response_tx, response_rx) = mpsc::channel();
 
         self.command_tx
@@ -141,8 +149,9 @@ impl RuntimeManager {
         }
 
         // Spawn a new tokio task to handle the connection
-        let handle =
-            tokio::spawn(async move { process_connection(target_port, tunnel_uri, traceparent_header).await });
+        let handle = tokio::spawn(async move {
+            process_connection(target_port, tunnel_uri, traceparent_header).await
+        });
 
         // Store the handle in our active connections
         self.active_connections.insert(target_port, handle);
@@ -158,7 +167,11 @@ impl RuntimeManager {
     }
 }
 
-async fn process_connection(target_port: u16, tunnel_uri: Uri, traceparent_header: Option<String>) -> Result<(), ConnectionError> {
+async fn process_connection(
+    target_port: u16,
+    tunnel_uri: Uri,
+    traceparent_header: Option<String>,
+) -> Result<(), ConnectionError> {
     let mut request_builder = ClientRequestBuilder::new(tunnel_uri);
 
     if let Some(traceparent) = traceparent_header {
@@ -168,7 +181,7 @@ async fn process_connection(target_port: u16, tunnel_uri: Uri, traceparent_heade
     let (ws_stream, _) = connect_async(request_builder)
         .await
         .map_err(ConnectionError::ServerConnectionFailed)?;
-    
+
     log::info!("Connected to the server for port {}", target_port);
 
     let socket_stream = TcpStream::connect(format!("127.0.0.1:{}", target_port))

@@ -30,7 +30,8 @@ pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F
                 return Some((400, b"{\"error\": \"Invalid tunnel secure URI\"}".to_vec()));
             };
 
-            let result = connections.connect(payload.port, tunnel_secure_uri, payload.traceparent_header);
+            let result =
+                connections.connect(payload.port, tunnel_secure_uri, payload.traceparent_header);
 
             match result {
                 Ok(_) => Some((200, vec![])),
