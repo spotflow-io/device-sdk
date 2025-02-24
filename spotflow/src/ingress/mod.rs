@@ -1,3 +1,4 @@
+use std::panic::RefUnwindSafe;
 use std::time::Duration;
 use std::{path::Path, sync::Arc};
 
@@ -18,8 +19,6 @@ pub use builder::DeviceClientBuilder;
 pub use builder::ProvisioningOperation;
 pub use builder::ProvisioningOperationDisplayHandler;
 pub use c2d::CloudToDeviceMessage;
-
-pub use builder::Handler;
 
 use crate::connection::ConnectionImplementation;
 
@@ -101,6 +100,18 @@ impl MessageContext {
     }
 }
 
+// Defining a super-trait for what traits must the handler implement Fn(...) + Send + RefUnwindSafe + 'static
+pub trait MethodHandler:
+    Fn(String, &[u8]) -> Option<(i32, Vec<u8>)> + Send + Sync + RefUnwindSafe + 'static
+{
+}
+impl<T> MethodHandler for T where
+    T: Fn(String, &[u8]) -> Option<(i32, Vec<u8>)> + Send + Sync + RefUnwindSafe + 'static
+{
+}
+// Used where Option::None is needed for the handler type
+type NoneHandler = fn(String, &[u8]) -> Option<(i32, Vec<u8>)>;
+
 /// A client communicating with the Platform.
 ///
 /// Create its instance using [`DeviceClientBuilder::build`].
@@ -126,7 +137,7 @@ impl DeviceClient {
         initial_registration_response: Option<RegistrationResponse>,
     ) -> Result<DeviceClient>
     where
-        F: Handler,
+        F: MethodHandler,
     {
         let connection = BaseConnection::init_ingress(
             config,

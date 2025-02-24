@@ -5,7 +5,7 @@ use crate::connection::{
     twins::{DesiredPropertiesUpdatedCallback, TwinsClient},
     ConnectionImplementation, JoinHandleVec,
 };
-use crate::ingress::Handler;
+use crate::ingress::MethodHandler;
 use anyhow::{anyhow, bail, Context, Result};
 use rumqttc::{AsyncClient, ConnectionError, MqttOptions, TlsConfiguration, Transport};
 use token_handler::{RegistrationCommand, RegistrationCommandSender};
@@ -90,7 +90,7 @@ impl<F> IotHubConnection<F> {
         cancellation: CancellationToken,
     ) -> Self
     where
-        F: Handler,
+        F: MethodHandler,
     {
         IotHubConnection {
             runtime,
@@ -167,7 +167,7 @@ impl<F> IotHubConnection<F> {
     }
 }
 
-impl<F: Handler> ConnectionImplementation for IotHubConnection<F> {
+impl<F: MethodHandler> ConnectionImplementation for IotHubConnection<F> {
     fn connect(&mut self) -> Pin<Box<dyn Future<Output = Result<JoinHandleVec>> + Send>> {
         let (response_sender, response_receiver) = mpsc::channel(100);
         let (desired_properties_sender, desired_properties_receiver) = mpsc::channel(100);

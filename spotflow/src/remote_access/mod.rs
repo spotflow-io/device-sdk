@@ -8,7 +8,7 @@ use log::warn;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::ingress::Handler;
+use crate::ingress::MethodHandler;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -19,7 +19,9 @@ struct RequestPayload {
     pub traceparent_header: Option<String>,
 }
 
-pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F>) -> impl Handler {
+pub fn create_remote_access_method_handler<F: MethodHandler>(
+    chained_handler: Option<F>,
+) -> impl MethodHandler {
     let connections = connections::ConnectionManager::new();
 
     move |method_name: String, payload: &[u8]| {

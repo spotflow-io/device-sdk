@@ -6,7 +6,7 @@ use std::{
 
 use rumqttc::{AsyncClient, Publish, QoS};
 
-use crate::ingress::Handler as HandlerFn;
+use crate::ingress::MethodHandler as HandlerFn;
 
 use super::super::topics;
 use super::{super::query, Handler};

@@ -6,10 +6,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
-use std::{
-    panic::RefUnwindSafe,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use http::Uri;
 
@@ -23,19 +20,7 @@ use crate::cloud::{
 
 use crate::{EmptyProcessSignalsSource, ProcessSignalsSource};
 
-use super::DeviceClient;
-
-// Defining a super-trait for what traits must the handler implement Fn(...) + Send + RefUnwindSafe + 'static
-pub trait Handler:
-    Fn(String, &[u8]) -> Option<(i32, Vec<u8>)> + Send + Sync + RefUnwindSafe + 'static
-{
-}
-impl<T> Handler for T where
-    T: Fn(String, &[u8]) -> Option<(i32, Vec<u8>)> + Send + Sync + RefUnwindSafe + 'static
-{
-}
-// Used where Option::None is needed for the handler type
-type NoneHandler = fn(String, &[u8]) -> Option<(i32, Vec<u8>)>;
+use super::{DeviceClient, MethodHandler, NoneHandler};
 
 /// The summary of an ongoing [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
 ///
@@ -173,7 +158,7 @@ impl DeviceClientBuilder {
     #[doc(hidden)]
     pub fn with_method_handler<F>(self, method_handler: F) -> DeviceClientBuilderWithHandler<F>
     where
-        F: Handler,
+        F: MethodHandler,
     {
         DeviceClientBuilderWithHandler {
             builder: self,
@@ -199,7 +184,7 @@ impl DeviceClientBuilder {
 
     fn build_impl<F>(self, method_handler: Option<F>) -> Result<DeviceClient>
     where
-        F: Handler,
+        F: MethodHandler,
     {
         // Validate the options
         if self.database_file.as_os_str().is_empty() {
@@ -558,7 +543,7 @@ pub struct DeviceClientBuilderWithHandler<F> {
 
 impl<F> DeviceClientBuilderWithHandler<F>
 where
-    F: Handler,
+    F: MethodHandler,
 {
     /// **Warning**: Don't use, the interface for Cloud-to-Device Messages hasn't been finalized yet.
     #[deprecated]
