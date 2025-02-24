@@ -8,7 +8,7 @@ use log::warn;
 use serde::Deserialize;
 use uuid::Uuid;
 
-use crate::ingress::MethodHandler;
+use crate::ingress::{MethodError, MethodHandler, MethodReturnValue};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -27,11 +27,14 @@ pub fn create_remote_access_method_handler<F: MethodHandler>(
     move |method_name: String, payload: &[u8]| {
         if method_name == "!remote-access" {
             let Ok(payload) = serde_json::from_slice::<RequestPayload>(payload) else {
-                return Some((400, b"{\"error\": \"Invalid payload\"}".to_vec()));
+                return Some(Err(MethodError::new(400, "Invalid payload".to_string())));
             };
 
             let Ok(tunnel_uri) = Uri::from_str(&payload.tunnel_secure_uri) else {
-                return Some((400, b"{\"error\": \"Invalid tunnel secure URI\"}".to_vec()));
+                return Some(Err(MethodError::new(
+                    400,
+                    "Invalid tunnel secure URI".to_string(),
+                )));
             };
 
             let details = ConnectionDetails {
@@ -44,37 +47,30 @@ pub fn create_remote_access_method_handler<F: MethodHandler>(
             let result = connections.connect(details);
 
             match result {
-                Ok(_) => Some((200, vec![])),
+                Ok(_) => Some(Ok(MethodReturnValue::new(200, None))),
                 Err(ConnectionError::PreviousAttemptStillActive(tunnel_id)) => {
                     warn!(
                         "The previous attempt to connect to the tunnel '{}' is still active.",
                         tunnel_id
                     );
-                    Some((
+                    Some(Err(MethodError::new(
                         409,
-                        b"{\"error\": \"Previous attempt still active.\"}".to_vec(),
-                    ))
+                        "Previous attempt still active.".to_string(),
+                    )))
                 }
                 Err(ConnectionError::TargetPortConnectionFailed(e)) => {
                     warn!("Unable to connect to port {} because the target port connection failed: {}", payload.port, e);
-                    Some((
+                    Some(Err(MethodError::new(
                         500,
-                        format!("{{\"error\": \"Failed to connect to target port: {}\"}}", e)
-                            .as_bytes()
-                            .to_vec(),
-                    ))
+                        format!("Failed to connect to target port: {}", e),
+                    )))
                 }
                 Err(ConnectionError::ServerConnectionFailed(e)) => {
                     warn!("Unable to connect to port {} because the remote server connection failed: {}", payload.port, e);
-                    Some((
+                    Some(Err(MethodError::new(
                         500,
-                        format!(
-                            "{{\"error\": \"Failed to connect to remote server: {}\"}}",
-                            e
-                        )
-                        .as_bytes()
-                        .to_vec(),
-                    ))
+                        format!("Failed to connect to remote server: {}", e),
+                    )))
                 }
             }
         } else {

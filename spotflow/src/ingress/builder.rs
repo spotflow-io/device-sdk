@@ -153,7 +153,7 @@ impl DeviceClientBuilder {
         self
     }
 
-    /// **Warning**: Don't use, the interface for Cloud-to-Device Messages hasn't been finalized yet.
+    /// **Warning**: Don't use, the interface for direct method calls hasn't been finalized yet.
     #[deprecated]
     #[doc(hidden)]
     pub fn with_method_handler<F>(self, method_handler: F) -> DeviceClientBuilderWithHandler<F>

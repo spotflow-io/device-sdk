@@ -6,7 +6,7 @@ use std::{
 
 use rumqttc::{AsyncClient, Publish, QoS};
 
-use crate::ingress::MethodHandler as HandlerFn;
+use crate::ingress::{MethodError, MethodHandler as HandlerFn, MethodReturnValue};
 
 use super::super::topics;
 use super::{super::query, Handler};
@@ -42,7 +42,8 @@ impl DirectMethodHandler {
                         _ = client.try_ack(&msg.publish);
                         method_handler(msg.method_name, msg.publish.payload.as_ref())
                     });
-                    match result {
+
+                    let result = match result {
                         Err(cause) => {
                             if let Some(s) = cause.downcast_ref::<&'static str>() {
                                 log::error!("Direct method processing failed with panic: {}", s);
@@ -57,32 +58,46 @@ impl DirectMethodHandler {
                                 );
                             }
 
-                            let topic = topics::response_topic(500, msg.request_id);
-                            _ = client.try_publish(
-                                topic,
-                                QoS::AtLeastOnce,
-                                false,
-                                b"{\"error\": \"Internal error\"}",
-                            );
+                            Err(MethodError::new(500, "Internal error".to_string()))
                         }
-                        Ok(Some((status, payload))) => {
-                            let topic = topics::response_topic(status, msg.request_id);
-                            _ = client.try_publish(topic, QoS::AtLeastOnce, false, payload);
-                        }
+                        Ok(Some(result)) => result,
                         Ok(None) => {
                             log::warn!(
                                 "Unhandled direct method call on topic {}.",
                                 msg.publish.topic
                             );
-                            let topic = topics::response_topic(404, msg.request_id);
+                            Err(MethodError::new(404, "No handler found".to_string()))
+                        }
+                    };
+
+                    match result {
+                        Ok(MethodReturnValue { status_code, body }) => {
+                            let topic = topics::response_topic(status_code, msg.request_id);
+
                             _ = client.try_publish(
                                 topic,
                                 QoS::AtLeastOnce,
                                 false,
-                                b"{\"error\": \"No handler found\"}",
+                                body.unwrap_or_default(),
                             );
                         }
-                    }
+                        Err(MethodError {
+                            status_code,
+                            message,
+                        }) => {
+                            let topic = topics::response_topic(status_code, msg.request_id);
+
+                            // We might extend to full Problem Details format in the future, using only the details field for now
+                            let payload = format!("{{\"detail\": \"{}\"}}", message);
+
+                            _ = client.try_publish(
+                                topic,
+                                QoS::AtLeastOnce,
+                                false,
+                                payload.as_bytes(),
+                            );
+                        }
+                    };
                 }
 
                 log::debug!("Direct method handler is stopping.");
