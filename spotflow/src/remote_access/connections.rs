@@ -21,9 +21,11 @@ use tokio_tungstenite::{
     connect_async,
     tungstenite::{ClientRequestBuilder, Message},
 };
+use uuid::Uuid;
 
 #[derive(Clone)]
 pub struct ConnectionDetails {
+    pub tunnel_id: Uuid,
     pub target_port: u16,
     pub tunnel_uri: Uri,
     pub traceparent_header: Option<String>,
@@ -48,14 +50,14 @@ pub struct ConnectionManager {
 impl RefUnwindSafe for ConnectionManager {}
 
 struct RuntimeManager {
-    active_connections: HashMap<u16, JoinHandle<Result<(), ConnectionError>>>,
+    active_connections: HashMap<Uuid, JoinHandle<Result<(), ConnectionError>>>,
     command_rx: Receiver<Command>,
 }
 
 #[derive(Debug, Error)]
 pub enum ConnectionError {
-    #[error("Connection already exists")]
-    ConnectionAlreadyExists,
+    #[error("The previous attempt to connect to the tunnel '{0}' is still active.")]
+    PreviousAttemptStillActive(Uuid),
     #[error("Failed to connect to the target port: {0}")]
     TargetPortConnectionFailed(#[from] std::io::Error),
     #[error("Failed to connect to the remote server: {0}")]
@@ -133,20 +135,21 @@ impl Drop for ConnectionManager {
 impl RuntimeManager {
     async fn handle_connect(&mut self, details: ConnectionDetails) -> Result<(), ConnectionError> {
         // Check if a connection already exists for this port
-        if let Some(handle) = self.active_connections.get(&details.target_port) {
+        if let Some(handle) = self.active_connections.get(&details.tunnel_id) {
             if !handle.is_finished() {
-                log::info!("Attempting to connect to port {} which is already in use by another connection.", details.target_port);
-                return Err(ConnectionError::ConnectionAlreadyExists);
+                return Err(ConnectionError::PreviousAttemptStillActive(
+                    details.tunnel_id,
+                ));
             }
         }
 
-        let target_port = details.target_port;
+        let tunnel_id = details.tunnel_id;
 
         // Spawn a new tokio task to handle the connection
         let handle = tokio::spawn(async move { process_connection(details).await });
 
         // Store the handle in our active connections
-        self.active_connections.insert(target_port, handle);
+        self.active_connections.insert(tunnel_id, handle);
 
         Ok(())
     }

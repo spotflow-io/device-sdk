@@ -6,12 +6,14 @@ use connections::{ConnectionDetails, ConnectionError};
 use http::Uri;
 use log::warn;
 use serde::Deserialize;
+use uuid::Uuid;
 
 use crate::ingress::Handler;
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct RequestPayload {
+    pub tunnel_id: Uuid,
     pub port: u16,
     pub tunnel_secure_uri: String,
     pub traceparent_header: Option<String>,
@@ -31,6 +33,7 @@ pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F
             };
 
             let details = ConnectionDetails {
+                tunnel_id: payload.tunnel_id,
                 target_port: payload.port,
                 tunnel_uri,
                 traceparent_header: payload.traceparent_header,
@@ -40,12 +43,15 @@ pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F
 
             match result {
                 Ok(_) => Some((200, vec![])),
-                Err(ConnectionError::ConnectionAlreadyExists) => {
+                Err(ConnectionError::PreviousAttemptStillActive(tunnel_id)) => {
                     warn!(
-                        "Unable to connect to port {} because a connection already exists.",
-                        payload.port
+                        "The previous attempt to connect to the tunnel '{}' is still active.",
+                        tunnel_id
                     );
-                    Some((409, b"{\"error\": \"Connection already exists\"}".to_vec()))
+                    Some((
+                        409,
+                        b"{\"error\": \"Previous attempt still active.\"}".to_vec(),
+                    ))
                 }
                 Err(ConnectionError::TargetPortConnectionFailed(e)) => {
                     warn!("Unable to connect to port {} because the target port connection failed: {}", payload.port, e);

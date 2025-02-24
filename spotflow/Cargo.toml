@@ -33,7 +33,7 @@ tokio-tungstenite = { version = "0.26.1", features = ["native-tls"] }
 tokio-util = "0.7.1"
 ureq = { version = "2.4.0", features = ["json", "native-tls"], default-features = false }
 urlencoding = "2.1.0"
-uuid = { version = "1.0.0", features = ["v4"] }
+uuid = { version = "1.0.0", features = ["serde", "v4"] }
 
 [build-dependencies]
 tokio = { version = "1.17.0", features = ["rt"] }
