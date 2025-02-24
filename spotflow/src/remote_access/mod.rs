@@ -2,7 +2,7 @@ mod connections;
 
 use std::str::FromStr;
 
-use connections::ConnectionError;
+use connections::{ConnectionDetails, ConnectionError};
 use http::Uri;
 use log::warn;
 use serde::Deserialize;
@@ -26,12 +26,17 @@ pub fn create_remote_access_method_handler<F: Handler>(chained_handler: Option<F
                 return Some((400, b"{\"error\": \"Invalid payload\"}".to_vec()));
             };
 
-            let Ok(tunnel_secure_uri) = Uri::from_str(&payload.tunnel_secure_uri) else {
+            let Ok(tunnel_uri) = Uri::from_str(&payload.tunnel_secure_uri) else {
                 return Some((400, b"{\"error\": \"Invalid tunnel secure URI\"}".to_vec()));
             };
 
-            let result =
-                connections.connect(payload.port, tunnel_secure_uri, payload.traceparent_header);
+            let details = ConnectionDetails {
+                target_port: payload.port,
+                tunnel_uri,
+                traceparent_header: payload.traceparent_header,
+            };
+
+            let result = connections.connect(details);
 
             match result {
                 Ok(_) => Some((200, vec![])),
