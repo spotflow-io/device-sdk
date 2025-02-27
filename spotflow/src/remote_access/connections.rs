@@ -189,7 +189,7 @@ async fn process_connection(details: ConnectionDetails) -> Result<(), Connection
             match msg {
                 Message::Binary(_) | Message::Text(_) => {
                     let data = msg.into_data();
-                    println!("DeviceWS->Device: Forwarding {} bytes.", data.len());
+                    log::trace!("DeviceWS->Device: Forwarding {} bytes.", data.len());
                     if let Err(e) = socket_write.write_all(&data).await {
                         log::info!(
                             "Failed to write message to the target port, cancelling forwarding: {}",
@@ -222,7 +222,7 @@ async fn process_connection(details: ConnectionDetails) -> Result<(), Connection
                 break;
             }
 
-            println!("Device->DeviceWS: Forwarding {} bytes.", n);
+            log::trace!("Device->DeviceWS: Forwarding {} bytes.", n);
             if let Err(e) = ws_sink
                 .send(Message::Binary(buf[..n].to_vec().into()))
                 .await
