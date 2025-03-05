@@ -40,7 +40,7 @@ fn remote_access() {
 
     log::info!("Creating Device Client");
 
-    let _client =
+    let client =
         DeviceClientBuilder::new(Some(device_id.clone()), env_ctx.provisioning_token, path)
             .with_instance(env_ctx.instance_url.to_string())
             .with_display_provisioning_operation_callback(Box::new(
@@ -107,4 +107,12 @@ fn remote_access() {
 
     log::info!("Waiting for the background thread to finish");
     handle.join().unwrap();
+
+    log::info!("Terminating connection");
+    drop(client);
+
+    log::info!("Deleting the device");
+    platform_caller
+        .delete_device(&device_id)
+        .expect("Unable to delete the device");
 }
