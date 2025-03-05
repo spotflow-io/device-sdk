@@ -71,6 +71,7 @@ pub struct DeviceClientBuilder {
     display_provisioning_operation_callback: Option<Box<dyn ProvisioningOperationDisplayHandler>>,
     desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
     signals_src: Option<Box<dyn ProcessSignalsSource>>,
+    remote_access_allowed: bool,
 }
 
 impl DeviceClientBuilder {
@@ -103,6 +104,7 @@ impl DeviceClientBuilder {
             display_provisioning_operation_callback: None,
             desired_properties_updated_callback: None,
             signals_src: None,
+            remote_access_allowed: false,
         }
     }
 
@@ -150,6 +152,12 @@ impl DeviceClientBuilder {
     /// Set the source of the system signals that can request the process to stop.
     pub fn with_signals_source(mut self, signals_src: Box<dyn ProcessSignalsSource>) -> Self {
         self.signals_src = Some(signals_src);
+        self
+    }
+
+    /// Allow the Device to accept remote access requests for all ports.
+    pub fn with_remote_access_allowed_for_all_ports(mut self) -> Self {
+        self.remote_access_allowed = true;
         self
     }
 
@@ -236,22 +244,37 @@ impl DeviceClientBuilder {
 
         signals_src.check_signals()?;
 
-        DeviceClient::new(
-            SdkConfiguration {
-                instance_url,
-                provisioning_token: self.provisioning_token,
-                registration_token,
-                requested_device_id: self.device_id,
-                workspace_id,
-                device_id,
-                site_id: self.site_id,
-            },
-            &self.database_file,
-            Some(create_remote_access_method_handler(method_handler)),
-            self.desired_properties_updated_callback,
-            self.signals_src,
-            registration_response,
-        )
+        let config = SdkConfiguration {
+            instance_url,
+            provisioning_token: self.provisioning_token,
+            registration_token,
+            requested_device_id: self.device_id,
+            workspace_id,
+            device_id,
+            site_id: self.site_id,
+        };
+
+        // This code duplication is caused by having the method handler type generic
+        // (might be simplified in the future if we decide to use dynamic dispatch instead)
+        if self.remote_access_allowed {
+            DeviceClient::new(
+                config,
+                &self.database_file,
+                Some(create_remote_access_method_handler(method_handler)),
+                self.desired_properties_updated_callback,
+                self.signals_src,
+                registration_response,
+            )
+        } else {
+            DeviceClient::new(
+                config,
+                &self.database_file,
+                method_handler,
+                self.desired_properties_updated_callback,
+                self.signals_src,
+                registration_response,
+            )
+        }
     }
 
     fn obtain_valid_credentials(
