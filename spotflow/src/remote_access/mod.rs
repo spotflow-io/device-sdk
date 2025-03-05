@@ -46,33 +46,42 @@ pub fn create_remote_access_method_handler<F: MethodHandler>(
 
             let result = connections.connect(details);
 
-            match result {
-                Ok(_) => Some(Ok(MethodReturnValue::new(200, None))),
+            let method_return_value = match result {
+                Ok(_) => {
+                    log::info!(
+                        "Connected to the tunnel '{}' and port '{}'.",
+                        payload.tunnel_id,
+                        payload.port
+                    );
+                    Ok(MethodReturnValue::new(200, None))
+                }
                 Err(ConnectionError::PreviousAttemptStillActive(tunnel_id)) => {
                     warn!(
                         "The previous attempt to connect to the tunnel '{}' is still active.",
                         tunnel_id
                     );
-                    Some(Err(MethodError::new(
+                    Err(MethodError::new(
                         409,
                         "Previous attempt still active.".to_string(),
-                    )))
+                    ))
                 }
                 Err(ConnectionError::TargetPortConnectionFailed(e)) => {
                     warn!("Unable to connect to port {} because the target port connection failed: {}", payload.port, e);
-                    Some(Err(MethodError::new(
+                    Err(MethodError::new(
                         500,
                         format!("Failed to connect to target port: {}", e),
-                    )))
+                    ))
                 }
                 Err(ConnectionError::ServerConnectionFailed(e)) => {
                     warn!("Unable to connect to port {} because the remote server connection failed: {}", payload.port, e);
-                    Some(Err(MethodError::new(
+                    Err(MethodError::new(
                         500,
                         format!("Failed to connect to remote server: {}", e),
-                    )))
+                    ))
                 }
-            }
+            };
+
+            Some(method_return_value)
         } else {
             chained_handler
                 .as_ref()

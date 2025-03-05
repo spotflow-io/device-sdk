@@ -68,6 +68,8 @@ impl ConnectionManager {
     pub fn new() -> Self {
         let (command_tx, command_rx) = mpsc::channel();
 
+        log::debug!("Starting connection manager Tokio runtime thread");
+
         // Spawn a new thread with tokio runtime
         let runtime_thread = thread::Builder::new()
             .name("Connection manager Tokio runtime".into())
@@ -121,12 +123,16 @@ impl ConnectionManager {
 
 impl Drop for ConnectionManager {
     fn drop(&mut self) {
+        log::debug!("Shutting down connection manager Tokio runtime thread");
+
         // Send shutdown command when the last instance is dropped
         if Arc::strong_count(&self.command_tx) == 1 {
             let _ = self.command_tx.send(Command::Shutdown);
             // We can safely take the JoinHandle since we're the last reference
             if let Some(thread) = Arc::get_mut(&mut self.runtime_thread) {
                 let _ = mem::replace(thread, thread::spawn(|| {})).join();
+
+                log::debug!("Connection manager Tokio runtime thread shut down");
             }
         }
     }
@@ -163,6 +169,12 @@ impl RuntimeManager {
 }
 
 async fn process_connection(details: ConnectionDetails) -> Result<(), ConnectionError> {
+    log::debug!(
+        "Starting connection to tunnel '{}' and port '{}'.",
+        details.tunnel_id,
+        details.target_port
+    );
+
     let mut request_builder = ClientRequestBuilder::new(details.tunnel_uri);
 
     if let Some(traceparent) = details.traceparent_header {
@@ -173,13 +185,13 @@ async fn process_connection(details: ConnectionDetails) -> Result<(), Connection
         .await
         .map_err(ConnectionError::ServerConnectionFailed)?;
 
-    log::info!("Connected to the server for port {}", details.target_port);
+    log::debug!("Connected to WebSocket for port {}", details.target_port);
 
     let socket_stream = TcpStream::connect(format!("127.0.0.1:{}", details.target_port))
         .await
         .map_err(ConnectionError::TargetPortConnectionFailed)?;
 
-    log::info!("Connected to the target port {}", details.target_port);
+    log::debug!("Connected to the target port {}", details.target_port);
 
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
     let (mut socket_read, mut socket_write) = socket_stream.into_split();
@@ -189,17 +201,20 @@ async fn process_connection(details: ConnectionDetails) -> Result<(), Connection
             match msg {
                 Message::Binary(_) | Message::Text(_) => {
                     let data = msg.into_data();
-                    log::trace!("DeviceWS->Device: Forwarding {} bytes.", data.len());
+                    log::trace!(
+                        "Forwarding {} bytes from WebSocket to the target port.",
+                        data.len()
+                    );
                     if let Err(e) = socket_write.write_all(&data).await {
-                        log::info!(
-                            "Failed to write message to the target port, cancelling forwarding: {}",
+                        log::debug!(
+                            "Failed to write bytes to the target port, cancelling forwarding: {}",
                             e
                         );
                         break;
                     }
                 }
                 Message::Close(_) => {
-                    log::info!("DeviceWS->Device: Close message received, cancelling forwarding.");
+                    log::debug!("Close message received from WebSocket, cancelling forwarding.");
                     break;
                 }
                 _ => {} // Ping and Pong are handled automatically and raw frames are never received
@@ -211,23 +226,21 @@ async fn process_connection(details: ConnectionDetails) -> Result<(), Connection
         let mut buf = vec![0; 1024];
         while let Ok(n) = socket_read.read(&mut buf).await {
             if n == 0 {
-                log::info!(
-                    "Device->DeviceWS: Received 0 bytes from the port, sending close message."
-                );
+                log::debug!("Received 0 bytes from the target port, sending close message.");
                 if let Err(e) = ws_sink.send(Message::Close(None)).await {
-                    log::warn!("Failed to send close message: {}", e);
+                    log::debug!("Failed to send close message: {}", e);
                 }
 
-                log::info!("Device->DeviceWS: Cancelling forwarding.");
+                log::debug!("Cancelling forwarding.");
                 break;
             }
 
-            log::trace!("Device->DeviceWS: Forwarding {} bytes.", n);
+            log::trace!("Forwarding {} bytes to WebSocket.", n);
             if let Err(e) = ws_sink
                 .send(Message::Binary(buf[..n].to_vec().into()))
                 .await
             {
-                log::info!(
+                log::debug!(
                     "Failed to write message to the server, cancelling forwarding: {}",
                     e
                 );
@@ -251,7 +264,8 @@ async fn process_connection(details: ConnectionDetails) -> Result<(), Connection
     }
 
     log::info!(
-        "Forwarding between the server and the target port {} cancelled in both directions.",
+        "Disconnected from the tunnel '{}' and port '{}'.",
+        details.tunnel_id,
         details.target_port
     );
 

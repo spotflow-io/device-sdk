@@ -5,6 +5,7 @@ use std::{
 };
 
 use rumqttc::{AsyncClient, Publish, QoS};
+use serde_json::json;
 
 use crate::ingress::{MethodError, MethodHandler as HandlerFn, MethodReturnValue};
 
@@ -30,6 +31,7 @@ impl DirectMethodHandler {
         let (sender, receiver) = mpsc::sync_channel::<Invocation>(50);
 
         log::debug!("Starting direct method processing thread");
+
         // This is thread and not a simple Tokio task because the handler could potentially block
         // The thread ends when the channel sender is dropped (and all methods are done).
         let thread = thread::spawn({
@@ -45,20 +47,25 @@ impl DirectMethodHandler {
 
                     let result = match result {
                         Err(cause) => {
-                            if let Some(s) = cause.downcast_ref::<&'static str>() {
+                            let error_message = if let Some(s) =
+                                cause.downcast_ref::<&'static str>()
+                            {
                                 log::error!("Direct method processing failed with panic: {}", s);
+                                format!("Panic: {}", s)
                             } else if let Some(s) = cause.downcast_ref::<String>() {
                                 log::error!(
                                     "Direct method message processing failed with panic: {}",
                                     s
                                 );
+                                format!("Panic: {}", s)
                             } else {
                                 log::error!(
                                     "Direct method message processing failed with unknown panic."
                                 );
-                            }
+                                "Unknown panic".to_string()
+                            };
 
-                            Err(MethodError::new(500, "Internal error".to_string()))
+                            Err(MethodError::new(500, error_message))
                         }
                         Ok(Some(result)) => result,
                         Ok(None) => {
@@ -72,6 +79,11 @@ impl DirectMethodHandler {
 
                     match result {
                         Ok(MethodReturnValue { status_code, body }) => {
+                            log::debug!(
+                                "Sending successful response with status code {}.",
+                                status_code
+                            );
+
                             let topic = topics::response_topic(status_code, msg.request_id);
 
                             _ = client.try_publish(
@@ -85,10 +97,19 @@ impl DirectMethodHandler {
                             status_code,
                             message,
                         }) => {
+                            log::debug!(
+                                "Sending error response '{}' with status code {}",
+                                message,
+                                status_code
+                            );
+
                             let topic = topics::response_topic(status_code, msg.request_id);
 
                             // We might extend to full Problem Details format in the future, using only the details field for now
-                            let payload = format!("{{\"detail\": \"{}\"}}", message);
+                            let payload = json!({
+                                "detail": message
+                            })
+                            .to_string();
 
                             _ = client.try_publish(
                                 topic,
