@@ -5,8 +5,7 @@ use std::{
     thread,
 };
 
-use futures_util::{SinkExt, StreamExt};
-use tokio_tungstenite::tungstenite::Message;
+use tungstenite::Message;
 use uuid::Uuid;
 
 use spotflow::DeviceClientBuilder;
@@ -14,8 +13,8 @@ use spotflow::DeviceClientBuilder;
 #[path = "../examples/common/mod.rs"]
 mod common;
 
-#[tokio::test]
-async fn remote_access() {
+#[test]
+fn remote_access() {
     env_logger::Builder::from_env(
         env_logger::Env::default().default_filter_or("sqlx=warn,ureq=warn,rumqtt=warn,info"),
     )
@@ -89,26 +88,22 @@ async fn remote_access() {
 
     log::info!("Tunnel URI: {}", tunnel_uri);
 
-    let (ws_stream, _) = tokio_tungstenite::connect_async(tunnel_uri)
-        .await
-        .expect("Failed to connect to the tunnel");
+    let (mut ws_stream, _) =
+        tungstenite::connect(tunnel_uri).expect("Failed to connect to the tunnel");
 
     log::info!("Connected to the tunnel");
 
-    let (mut write, mut read) = ws_stream.split();
-
     log::info!("Sending message to the tunnel");
-    write.send(Message::text("test")).await.unwrap();
+    ws_stream.send(Message::text("test")).unwrap();
 
     log::info!("Waiting for the response from the tunnel");
-    let message = read.next().await.unwrap().unwrap();
+    let message = ws_stream.read().unwrap();
     log::info!("Received message from the tunnel: {}", message);
 
     assert_eq!(message.to_string(), "Hello, test!");
 
     log::info!("Closing the connection to the tunnel");
-    drop(write);
-    drop(read);
+    drop(ws_stream);
 
     log::info!("Waiting for the background thread to finish");
     handle.join().unwrap();

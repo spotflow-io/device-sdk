@@ -50,3 +50,4 @@ uuid = { version = "1.0.0", features = ["v4"] }
 serde_json = "1.0.79"
 ureq = { version = "2.4.0", features = ["json", "native-tls"], default-features = false }
 native-tls = "0.2.8"
+tungstenite = "0.26.1"
