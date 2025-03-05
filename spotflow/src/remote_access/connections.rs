@@ -67,7 +67,8 @@ impl ConnectionManager {
 
         log::debug!("Starting connection manager Tokio runtime thread");
 
-        // Spawn a new thread with tokio runtime
+        // Spawn a new thread with Tokio runtime
+        // (Needed to make sure the runtime is stable enough to allow remote device management even in the case of problems in other parts of Device SDK.)
         let runtime_thread = thread::Builder::new()
             .name("Connection manager Tokio runtime".into())
             .spawn(move || {
