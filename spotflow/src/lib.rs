@@ -12,13 +12,14 @@ mod connection;
 mod ingress;
 mod iothub;
 mod persistence;
+mod remote_access;
 
 #[doc(hidden)]
 pub use ingress::CloudToDeviceMessage;
 
 pub use ingress::{
     Compression, DesiredProperties, DesiredPropertiesUpdatedCallback, DeviceClient,
-    DeviceClientBuilder, MessageContext, ProvisioningOperation,
+    DeviceClientBuilder, MessageContext, MethodError, MethodReturnValue, ProvisioningOperation,
     ProvisioningOperationDisplayHandler,
 };
 

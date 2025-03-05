@@ -5,13 +5,13 @@ use std::{
 };
 
 use serde_json::json;
-use spotflow::DeviceClientBuilder;
+use spotflow::{DeviceClientBuilder, MethodError, MethodReturnValue};
 use uuid::Uuid;
 
 #[path = "../examples/common/mod.rs"]
 mod common;
 
-#[allow(deprecated)] // We're using the current Cloud-to-Device interface here until it's stabilized
+#[allow(deprecated)] // We're using the current direct method call interface here until it's stabilized
 #[test]
 #[ignore]
 fn c2d() {
@@ -102,7 +102,7 @@ fn c2d() {
     sender.join().expect("Failed joining thread");
 }
 
-fn handler(method: String, payload: &[u8]) -> (i32, Vec<u8>) {
+fn handler(method: String, payload: &[u8]) -> Option<Result<MethodReturnValue, MethodError>> {
     let payload = std::str::from_utf8(payload).unwrap();
     log::info!(
         "Received {} method invocation with payload `{}`.",
@@ -110,5 +110,5 @@ fn handler(method: String, payload: &[u8]) -> (i32, Vec<u8>) {
         payload
     );
 
-    (200, Vec::new())
+    Some(Ok(MethodReturnValue::new(200, None)))
 }

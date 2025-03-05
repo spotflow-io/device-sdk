@@ -1,15 +1,16 @@
 use std::{
-    panic::{catch_unwind, RefUnwindSafe},
+    panic::catch_unwind,
     sync::mpsc::{self, TrySendError},
     thread::{self, JoinHandle},
 };
 
 use rumqttc::{AsyncClient, Publish, QoS};
+use serde_json::json;
 
-use super::super::query;
+use crate::ingress::{MethodError, MethodHandler as HandlerFn, MethodReturnValue};
+
 use super::super::topics;
-
-use super::Handler;
+use super::{super::query, Handler};
 
 struct Invocation {
     publish: Publish,
@@ -25,11 +26,12 @@ pub(crate) struct DirectMethodHandler {
 impl DirectMethodHandler {
     pub(crate) fn new<F>(client: AsyncClient, method_handler: F) -> Self
     where
-        F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + RefUnwindSafe + 'static,
+        F: HandlerFn,
     {
         let (sender, receiver) = mpsc::sync_channel::<Invocation>(50);
 
         log::debug!("Starting direct method processing thread");
+
         // This is thread and not a simple Tokio task because the handler could potentially block
         // The thread ends when the channel sender is dropped (and all methods are done).
         let thread = thread::spawn({
@@ -42,23 +44,81 @@ impl DirectMethodHandler {
                         _ = client.try_ack(&msg.publish);
                         method_handler(msg.method_name, msg.publish.payload.as_ref())
                     });
-                    match result {
+
+                    let result = match result {
                         Err(cause) => {
-                            if let Some(s) = cause.downcast_ref::<&'static str>() {
+                            let error_message = if let Some(s) =
+                                cause.downcast_ref::<&'static str>()
+                            {
                                 log::error!("Direct method processing failed with panic: {}", s);
-                            }
-                            if let Some(s) = cause.downcast_ref::<String>() {
+                                format!("Panic: {}", s)
+                            } else if let Some(s) = cause.downcast_ref::<String>() {
                                 log::error!(
                                     "Direct method message processing failed with panic: {}",
                                     s
                                 );
-                            }
+                                format!("Panic: {}", s)
+                            } else {
+                                log::error!(
+                                    "Direct method message processing failed with unknown panic."
+                                );
+                                "Unknown panic".to_string()
+                            };
+
+                            Err(MethodError::new(500, error_message))
                         }
-                        Ok((status, payload)) => {
-                            let topic = topics::response_topic(status, msg.request_id);
-                            _ = client.try_publish(topic, QoS::AtLeastOnce, false, payload);
+                        Ok(Some(result)) => result,
+                        Ok(None) => {
+                            log::warn!(
+                                "Unhandled direct method call on topic {}.",
+                                msg.publish.topic
+                            );
+                            Err(MethodError::new(404, "No handler found".to_string()))
                         }
-                    }
+                    };
+
+                    match result {
+                        Ok(MethodReturnValue { status_code, body }) => {
+                            log::debug!(
+                                "Sending successful response with status code {}.",
+                                status_code
+                            );
+
+                            let topic = topics::response_topic(status_code, msg.request_id);
+
+                            _ = client.try_publish(
+                                topic,
+                                QoS::AtLeastOnce,
+                                false,
+                                body.unwrap_or_default(),
+                            );
+                        }
+                        Err(MethodError {
+                            status_code,
+                            message,
+                        }) => {
+                            log::debug!(
+                                "Sending error response '{}' with status code {}",
+                                message,
+                                status_code
+                            );
+
+                            let topic = topics::response_topic(status_code, msg.request_id);
+
+                            // We might extend to full Problem Details format in the future, using only the details field for now
+                            let payload = json!({
+                                "detail": message
+                            })
+                            .to_string();
+
+                            _ = client.try_publish(
+                                topic,
+                                QoS::AtLeastOnce,
+                                false,
+                                payload.as_bytes(),
+                            );
+                        }
+                    };
                 }
 
                 log::debug!("Direct method handler is stopping.");

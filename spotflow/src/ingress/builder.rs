@@ -1,14 +1,12 @@
 use crate::connection::twins::DesiredPropertiesUpdatedCallback;
+use crate::remote_access::create_remote_access_method_handler;
 use crate::{
     cloud,
     persistence::sqlite::{SdkConfiguration, SdkConfigurationFragment, SqliteStore},
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
-use std::{
-    panic::RefUnwindSafe,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use http::Uri;
 
@@ -22,19 +20,7 @@ use crate::cloud::{
 
 use crate::{EmptyProcessSignalsSource, ProcessSignalsSource};
 
-use super::DeviceClient;
-
-// Defining a super-trait for what traits must the handler implement Fn(...) + Send + RefUnwindSafe + 'static
-pub trait Handler:
-    Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static
-{
-}
-impl<T> Handler for T where
-    T: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static
-{
-}
-// Used where Option::None is needed for the handler type
-type NoneHandler = fn(String, &[u8]) -> (i32, Vec<u8>);
+use super::{DeviceClient, MethodHandler, NoneHandler};
 
 /// The summary of an ongoing [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
 ///
@@ -85,6 +71,7 @@ pub struct DeviceClientBuilder {
     display_provisioning_operation_callback: Option<Box<dyn ProvisioningOperationDisplayHandler>>,
     desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
     signals_src: Option<Box<dyn ProcessSignalsSource>>,
+    remote_access_allowed: bool,
 }
 
 impl DeviceClientBuilder {
@@ -117,6 +104,7 @@ impl DeviceClientBuilder {
             display_provisioning_operation_callback: None,
             desired_properties_updated_callback: None,
             signals_src: None,
+            remote_access_allowed: false,
         }
     }
 
@@ -167,12 +155,18 @@ impl DeviceClientBuilder {
         self
     }
 
-    /// **Warning**: Don't use, the interface for Cloud-to-Device Messages hasn't been finalized yet.
+    /// Allow the Device to accept remote access requests for all ports.
+    pub fn with_remote_access_allowed_for_all_ports(mut self) -> Self {
+        self.remote_access_allowed = true;
+        self
+    }
+
+    /// **Warning**: Don't use, the interface for direct method calls hasn't been finalized yet.
     #[deprecated]
     #[doc(hidden)]
     pub fn with_method_handler<F>(self, method_handler: F) -> DeviceClientBuilderWithHandler<F>
     where
-        F: Handler,
+        F: MethodHandler,
     {
         DeviceClientBuilderWithHandler {
             builder: self,
@@ -198,7 +192,7 @@ impl DeviceClientBuilder {
 
     fn build_impl<F>(self, method_handler: Option<F>) -> Result<DeviceClient>
     where
-        F: Handler,
+        F: MethodHandler,
     {
         // Validate the options
         if self.database_file.as_os_str().is_empty() {
@@ -250,22 +244,37 @@ impl DeviceClientBuilder {
 
         signals_src.check_signals()?;
 
-        DeviceClient::new(
-            SdkConfiguration {
-                instance_url,
-                provisioning_token: self.provisioning_token,
-                registration_token,
-                requested_device_id: self.device_id,
-                workspace_id,
-                device_id,
-                site_id: self.site_id,
-            },
-            &self.database_file,
-            method_handler,
-            self.desired_properties_updated_callback,
-            self.signals_src,
-            registration_response,
-        )
+        let config = SdkConfiguration {
+            instance_url,
+            provisioning_token: self.provisioning_token,
+            registration_token,
+            requested_device_id: self.device_id,
+            workspace_id,
+            device_id,
+            site_id: self.site_id,
+        };
+
+        // This code duplication is caused by having the method handler type generic
+        // (might be simplified in the future if we decide to use dynamic dispatch instead)
+        if self.remote_access_allowed {
+            DeviceClient::new(
+                config,
+                &self.database_file,
+                Some(create_remote_access_method_handler(method_handler)),
+                self.desired_properties_updated_callback,
+                self.signals_src,
+                registration_response,
+            )
+        } else {
+            DeviceClient::new(
+                config,
+                &self.database_file,
+                method_handler,
+                self.desired_properties_updated_callback,
+                self.signals_src,
+                registration_response,
+            )
+        }
     }
 
     fn obtain_valid_credentials(
@@ -557,7 +566,7 @@ pub struct DeviceClientBuilderWithHandler<F> {
 
 impl<F> DeviceClientBuilderWithHandler<F>
 where
-    F: Handler,
+    F: MethodHandler,
 {
     /// **Warning**: Don't use, the interface for Cloud-to-Device Messages hasn't been finalized yet.
     #[deprecated]

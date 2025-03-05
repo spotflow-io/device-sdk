@@ -100,6 +100,49 @@ impl MessageContext {
     }
 }
 
+/// **Warning**: Don't use, the interface for direct method calls hasn't been finalized yet.
+#[doc(hidden)]
+pub struct MethodReturnValue {
+    pub status_code: i32,
+    pub body: Option<Vec<u8>>,
+}
+
+impl MethodReturnValue {
+    pub fn new(status_code: i32, body: Option<Vec<u8>>) -> Self {
+        Self { status_code, body }
+    }
+}
+
+/// **Warning**: Don't use, the interface for direct method calls hasn't been finalized yet.
+#[doc(hidden)]
+pub struct MethodError {
+    pub status_code: i32,
+    pub message: String,
+}
+
+impl MethodError {
+    pub fn new(status_code: i32, message: String) -> Self {
+        Self {
+            status_code,
+            message,
+        }
+    }
+}
+
+pub type MethodResult = Result<MethodReturnValue, MethodError>;
+
+// Defining a super-trait for what traits must the handler implement Fn(...) + Send + RefUnwindSafe + 'static
+pub trait MethodHandler:
+    Fn(String, &[u8]) -> Option<MethodResult> + Send + Sync + RefUnwindSafe + 'static
+{
+}
+impl<T> MethodHandler for T where
+    T: Fn(String, &[u8]) -> Option<MethodResult> + Send + Sync + RefUnwindSafe + 'static
+{
+}
+// Used where Option::None is needed for the handler type
+type NoneHandler = fn(String, &[u8]) -> Option<MethodResult>;
+
 /// A client communicating with the Platform.
 ///
 /// Create its instance using [`DeviceClientBuilder::build`].
@@ -125,7 +168,7 @@ impl DeviceClient {
         initial_registration_response: Option<RegistrationResponse>,
     ) -> Result<DeviceClient>
     where
-        F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static,
+        F: MethodHandler,
     {
         let connection = BaseConnection::init_ingress(
             config,

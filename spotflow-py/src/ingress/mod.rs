@@ -137,6 +137,9 @@ impl DeviceClient {
     ///   from the Platform. The [Device configuration tutorial](https://docs.spotflow.io/configure-devices/tutorial-configure-device#1-start-device)
     ///   shows how to use this option. The function is called in a separate thread, so make sure that you properly synchronize
     ///   access to your shared resources. The whole interface of the Device SDK is thread-safe, so it's safe to use it in the function.
+    /// - **allow_remote_access**: Whether the Device should accept remote access requests for all ports.
+    ///   If the Device is not configured to accept remote access requests, it will reject any incoming requests.
+    ///   The default value is `False`.
     ///
     /// If the [Device](https://docs.spotflow.io/connect-devices/#device) is
     /// not yet registered in the Platform, or its
@@ -149,7 +152,7 @@ impl DeviceClient {
     /// the last run is still valid, this method succeeds even without the connection to the Internet. The Device SDK will
     /// store all outgoing communication in the local database file and send it once it connects to the Platform.
     #[classmethod]
-    #[pyo3(signature = (device_id, provisioning_token, db, instance=None, display_provisioning_operation_callback=None, desired_properties_updated_callback=None))]
+    #[pyo3(signature = (device_id, provisioning_token, db, instance=None, display_provisioning_operation_callback=None, desired_properties_updated_callback=None, allow_remote_access=false))]
     #[allow(clippy::too_many_arguments)]
     fn start(
         _cls: &PyType,
@@ -160,6 +163,7 @@ impl DeviceClient {
         instance: Option<String>,
         display_provisioning_operation_callback: Option<PyObject>,
         desired_properties_updated_callback: Option<PyObject>,
+        allow_remote_access: bool,
     ) -> PyResult<DeviceClient> {
         py.allow_threads(|| {
             let mut builder = DeviceClientBuilder::new(device_id, provisioning_token, db);
@@ -178,6 +182,13 @@ impl DeviceClient {
                 builder = builder.with_desired_properties_updated_callback(Box::new(
                     DesiredPropertiesUpdatedCallable { callable: callback },
                 ));
+            }
+
+            // If we decide to enable specifying which specific ports are allowed, we'll need to change this to
+            // a more complex object. However, the nature of Python would allow us to accept both this object and
+            // bool to maintain backward compatibility.
+            if allow_remote_access {
+                builder = builder.with_remote_access_allowed_for_all_ports();
             }
 
             builder

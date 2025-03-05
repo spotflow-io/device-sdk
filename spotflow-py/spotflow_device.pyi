@@ -28,7 +28,8 @@ class DeviceClient:
               db: str,
               instance: Optional[str] = None,
               display_provisioning_operation_callback: Optional[Callable[[ProvisioningOperation], None]] = None,
-              desired_properties_updated_callback: Optional[Callable[[DesiredProperties], None]] = None) -> DeviceClient:
+              desired_properties_updated_callback: Optional[Callable[[DesiredProperties], None]] = None,
+              allow_remote_access: bool = False) -> DeviceClient:
          ...
 
     @property
