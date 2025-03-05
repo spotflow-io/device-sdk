@@ -2,12 +2,8 @@ use futures_util::{future, SinkExt, StreamExt};
 use http::Uri;
 use std::{
     collections::HashMap,
-    mem,
     panic::RefUnwindSafe,
-    sync::{
-        mpsc::{self, Receiver, Sender},
-        Arc,
-    },
+    sync::mpsc::{self, Receiver, Sender},
     thread,
 };
 use thiserror::Error;
@@ -22,6 +18,8 @@ use tokio_tungstenite::{
     tungstenite::{ClientRequestBuilder, Message},
 };
 use uuid::Uuid;
+
+use crate::utils::thread::join;
 
 #[derive(Clone)]
 pub struct ConnectionDetails {
@@ -40,10 +38,9 @@ enum Command {
     Shutdown,
 }
 
-#[derive(Clone)]
 pub struct ConnectionManager {
-    command_tx: Arc<Sender<Command>>,
-    runtime_thread: Arc<thread::JoinHandle<()>>,
+    command_tx: Sender<Command>,
+    runtime_thread: Option<thread::JoinHandle<()>>,
 }
 
 // Explicitly implement RefUnwindSafe since our internal state is protected by channels
@@ -101,8 +98,8 @@ impl ConnectionManager {
             .expect("Failed to spawn connection manager runtime thread");
 
         Self {
-            command_tx: Arc::new(command_tx),
-            runtime_thread: Arc::new(runtime_thread),
+            command_tx,
+            runtime_thread: Some(runtime_thread),
         }
     }
 
@@ -125,16 +122,10 @@ impl Drop for ConnectionManager {
     fn drop(&mut self) {
         log::debug!("Shutting down connection manager Tokio runtime thread");
 
-        // Send shutdown command when the last instance is dropped
-        if Arc::strong_count(&self.command_tx) == 1 {
-            let _ = self.command_tx.send(Command::Shutdown);
-            // We can safely take the JoinHandle since we're the last reference
-            if let Some(thread) = Arc::get_mut(&mut self.runtime_thread) {
-                let _ = mem::replace(thread, thread::spawn(|| {})).join();
+        let _ = self.command_tx.send(Command::Shutdown);
+        join(&mut self.runtime_thread);
 
-                log::debug!("Connection manager Tokio runtime thread shut down");
-            }
-        }
+        log::debug!("Connection manager Tokio runtime thread shut down");
     }
 }
 
