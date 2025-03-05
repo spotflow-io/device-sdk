@@ -85,6 +85,9 @@ They communicate mostly through message queues and shared objects protected by m
   Furthermore, it stores both the Desired and Reported Properties in the database.
 - **Reported Properties Updated Callback Dispatcher:** As its name suggests, it dispatches the callbacks registered by the user code when the Reported Properties are updated.
   This is done in a separate thread to avoid blocking any other components.
+- **Connection Manager:** This component manages the connections created from the Spotflow IoT Platform to local ports on the device.
+  This enables, for example, remote management via VNC or SSH.
+  The manager uses a separate Tokio runtime so that any such connection isn't affected by potential problems in other parts of the Device SDK.
 
 > **Note:** The code contains also components for handling Cloud-to-Device (C2D) Messages and direct method calls.
 > However, their implementation isn't finalized yet, so they aren't described here.
