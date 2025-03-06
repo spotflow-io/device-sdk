@@ -685,7 +685,7 @@ jobs:
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.CDN_SUBSCRIPTION_ID }}
+          subscription-id: ${{ secrets.DOWNLOADS_CDN_SUBSCRIPTION_ID }}
       - name: Publish C interface
         shell: pwsh
         run: >
@@ -693,16 +693,16 @@ jobs:
           -ArtifactsDir c/artifacts
           -StagingDir c/staging
           -GitHubRef '${{ github.event.ref }}'
-          -AccountName '${{ secrets.CDN_STORAGE_ACCOUNT_NAME }}'
-          -ContainerName '${{ secrets.CDN_STORAGE_CONTAINER_NAME }}'
+          -AccountName '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
+          -ContainerName '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
       - name: Wait before purging CDN
         run: sleep 60
       - name: Purge CDN
         run: >
           az cdn endpoint purge
-          -g '${{ secrets.CDN_RESOURCE_GROUP_NAME }}'
-          --profile-name '${{ secrets.CDN_PROFILE_NAME }}'
-          -n '${{ secrets.CDN_ENDPOINT_NAME }}'
+          -g '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
+          --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
+          -n '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
           --content-paths '/*'
 
   test-python-linux:
