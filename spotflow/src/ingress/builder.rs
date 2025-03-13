@@ -1,5 +1,4 @@
 use crate::connection::twins::DesiredPropertiesUpdatedCallback;
-use crate::remote_access::create_remote_access_method_handler;
 use crate::{
     cloud,
     persistence::sqlite::{SdkConfiguration, SdkConfigurationFragment, SqliteStore},
@@ -20,7 +19,7 @@ use crate::cloud::{
 
 use crate::{EmptyProcessSignalsSource, ProcessSignalsSource};
 
-use super::{DeviceClient, MethodHandler, NoneHandler};
+use super::DeviceClient;
 
 /// The summary of an ongoing [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
 ///
@@ -174,13 +173,6 @@ impl DeviceClientBuilder {
     /// the last run is still valid, this method succeeds even without the connection to the Internet. The Device SDK will
     /// store all outgoing communication in the local database file and send it once it connects to the Platform.
     pub fn build(self) -> Result<DeviceClient> {
-        self.build_impl(None::<NoneHandler>)
-    }
-
-    fn build_impl<F>(self, method_handler: Option<F>) -> Result<DeviceClient>
-    where
-        F: MethodHandler,
-    {
         // Validate the options
         if self.database_file.as_os_str().is_empty() {
             bail!("The path to the local database file cannot be empty; provide a value.");
@@ -241,27 +233,14 @@ impl DeviceClientBuilder {
             site_id: self.site_id,
         };
 
-        // This code duplication is caused by having the method handler type generic
-        // (might be simplified in the future if we decide to use dynamic dispatch instead)
-        if self.remote_access_allowed_for_all_ports {
-            DeviceClient::new(
-                config,
-                &self.database_file,
-                Some(create_remote_access_method_handler(method_handler)),
-                self.desired_properties_updated_callback,
-                self.signals_src,
-                registration_response,
-            )
-        } else {
-            DeviceClient::new(
-                config,
-                &self.database_file,
-                method_handler,
-                self.desired_properties_updated_callback,
-                self.signals_src,
-                registration_response,
-            )
-        }
+        DeviceClient::new(
+            config,
+            &self.database_file,
+            self.desired_properties_updated_callback,
+            self.signals_src,
+            registration_response,
+            self.remote_access_allowed_for_all_ports,
+        )
     }
 
     fn obtain_valid_credentials(

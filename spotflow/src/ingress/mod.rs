@@ -100,8 +100,6 @@ impl MessageContext {
     }
 }
 
-/// **Warning**: Don't use, the interface for direct method calls hasn't been finalized yet.
-#[doc(hidden)]
 pub struct MethodReturnValue {
     pub status_code: i32,
     pub body: Option<Vec<u8>>,
@@ -113,8 +111,6 @@ impl MethodReturnValue {
     }
 }
 
-/// **Warning**: Don't use, the interface for direct method calls hasn't been finalized yet.
-#[doc(hidden)]
 pub struct MethodError {
     pub status_code: i32,
     pub message: String,
@@ -131,17 +127,9 @@ impl MethodError {
 
 pub type MethodResult = Result<MethodReturnValue, MethodError>;
 
-// Defining a super-trait for what traits must the handler implement Fn(...) + Send + RefUnwindSafe + 'static
-pub trait MethodHandler:
-    Fn(String, &[u8]) -> Option<MethodResult> + Send + Sync + RefUnwindSafe + 'static
-{
+pub trait MethodInvocationHandler: Send + RefUnwindSafe {
+    fn handle(&self, payload: &[u8]) -> Option<MethodResult>;
 }
-impl<T> MethodHandler for T where
-    T: Fn(String, &[u8]) -> Option<MethodResult> + Send + Sync + RefUnwindSafe + 'static
-{
-}
-// Used where Option::None is needed for the handler type
-type NoneHandler = fn(String, &[u8]) -> Option<MethodResult>;
 
 /// A client communicating with the Platform.
 ///
@@ -159,24 +147,21 @@ pub struct DeviceClient {
 impl DeviceClient {
     /// Starts an ingress and saves the provided tokens and URLs to a state file. If the provided file does not exist this function creates it.
     /// It also makes sure that both desired and reported properties of the Device Twin are available.
-    fn new<F>(
+    fn new(
         config: SdkConfiguration,
         path: &Path,
-        method_handler: Option<F>,
         desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
         signals_src: Option<Box<dyn ProcessSignalsSource>>,
         initial_registration_response: Option<RegistrationResponse>,
-    ) -> Result<DeviceClient>
-    where
-        F: MethodHandler,
-    {
+        remote_access_allowed_for_all_ports: bool,
+    ) -> Result<DeviceClient> {
         let connection = BaseConnection::init_ingress(
             config,
             path,
-            method_handler,
             desired_properties_updated_callback,
             signals_src,
             initial_registration_response,
+            remote_access_allowed_for_all_ports,
         )?;
 
         connection.wait_properties_ready()?;

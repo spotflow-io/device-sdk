@@ -35,7 +35,7 @@ use crate::iothub::{
     IotHubConnection,
 };
 
-use super::{c2d::CloudToDeviceMessageGuard, Compression, MessageContext, MethodHandler};
+use super::{c2d::CloudToDeviceMessageGuard, Compression, MessageContext};
 
 pub struct BaseConnection<T: ?Sized + Send + Sync> {
     configuration_store: ConfigurationStore,
@@ -50,20 +50,17 @@ pub struct BaseConnection<T: ?Sized + Send + Sync> {
     cancellation: CancellationToken,
 }
 
-impl<F: Send + Sync> BaseConnection<IotHubConnection<F>> {
+impl BaseConnection<IotHubConnection> {
     // Startup
     // ================================================================================
     pub(super) fn init_ingress(
         config: SdkConfiguration,
         store_path: &Path,
-        method_handler: Option<F>,
         desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
         signals_src: Option<Box<dyn ProcessSignalsSource>>,
         initial_registration_response: Option<RegistrationResponse>,
-    ) -> Result<BaseConnection<dyn ConnectionImplementation + Send + Sync>>
-    where
-        F: MethodHandler,
-    {
+        remote_access_allowed_for_all_ports: bool,
+    ) -> Result<BaseConnection<dyn ConnectionImplementation + Send + Sync>> {
         // One thread is currently not enough, `runtime::Builder::new_current_thread` deadlocks when reconnect example is run.
         // We also force the number of threads to be at least 2 -- one worker thread plus one thread we spawn ourselves
         let rt = tokio::runtime::Builder::new_multi_thread()
@@ -93,9 +90,9 @@ impl<F: Send + Sync> BaseConnection<IotHubConnection<F>> {
             store,
             registration_watch,
             registration_command_sender,
-            method_handler,
             desired_properties_updated_callback,
             signals_src,
+            remote_access_allowed_for_all_ports,
             cancellation,
         ))
     }
@@ -106,14 +103,11 @@ impl<F: Send + Sync> BaseConnection<IotHubConnection<F>> {
         store: Store,
         registration_watch: watch::Receiver<Option<RegistrationResponse>>,
         registration_command_sender: mpsc::UnboundedSender<RegistrationCommand>,
-        method_handler: Option<F>,
         desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
         signals_src: Option<Box<dyn ProcessSignalsSource>>,
+        remote_access_allowed_for_all_ports: bool,
         cancellation: CancellationToken,
-    ) -> BaseConnection<dyn ConnectionImplementation + Send + Sync>
-    where
-        F: MethodHandler,
-    {
+    ) -> BaseConnection<dyn ConnectionImplementation + Send + Sync> {
         let mut iothub = IotHubConnection::create(
             rt.handle().clone(),
             store.store,
@@ -123,8 +117,8 @@ impl<F: Send + Sync> BaseConnection<IotHubConnection<F>> {
             store.twins_store,
             registration_watch,
             registration_command_sender,
-            method_handler,
             desired_properties_updated_callback,
+            remote_access_allowed_for_all_ports,
             cancellation.clone(),
         );
 
