@@ -1,4 +1,5 @@
 use std::{
+    collections::HashMap,
     panic::catch_unwind,
     sync::mpsc::{self, TrySendError},
     thread::{self, JoinHandle},
@@ -8,10 +9,7 @@ use rumqttc::{AsyncClient, Publish, QoS};
 use serde_json::json;
 
 use crate::ingress::MethodInvocationHandler;
-use crate::{
-    ingress::{MethodError, MethodReturnValue},
-    remote_access::RemoteAccessMethodHandler,
-};
+use crate::ingress::{MethodError, MethodReturnValue};
 
 use super::super::topics;
 use super::{super::query, Handler};
@@ -28,9 +26,10 @@ pub(crate) struct DirectMethodHandler {
 }
 
 impl DirectMethodHandler {
-    pub(crate) fn new(client: AsyncClient) -> Self {
-        let remote_access_handler = RemoteAccessMethodHandler::new();
-
+    pub(crate) fn new(
+        client: AsyncClient,
+        handler_map: HashMap<String, Box<dyn MethodInvocationHandler>>,
+    ) -> Self {
         let (sender, receiver) = mpsc::sync_channel::<Invocation>(50);
 
         log::debug!("Starting direct method processing thread");
@@ -46,8 +45,8 @@ impl DirectMethodHandler {
                         // We want to acknowledge first and then run and return result. These are not retryable.
                         _ = client.try_ack(&msg.publish);
 
-                        if msg.method_name == "!remote-access" {
-                            remote_access_handler.handle(msg.publish.payload.as_ref())
+                        if let Some(handler) = handler_map.get(&msg.method_name) {
+                            handler.handle(msg.publish.payload.as_ref())
                         } else {
                             None
                         }

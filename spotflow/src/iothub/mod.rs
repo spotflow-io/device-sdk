@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::cloud::drs::{ConnectionStringType, RegistrationResponse};
@@ -5,6 +6,8 @@ use crate::connection::{
     twins::{DesiredPropertiesUpdatedCallback, TwinsClient},
     ConnectionImplementation, JoinHandleVec,
 };
+use crate::ingress::MethodInvocationHandler;
+use crate::remote_access::{RemoteAccessMethodHandler, REMOTE_ACCESS_METHOD_NAME};
 use anyhow::{anyhow, bail, Context, Result};
 use rumqttc::{AsyncClient, ConnectionError, MqttOptions, TlsConfiguration, Transport};
 use token_handler::{RegistrationCommand, RegistrationCommandSender};
@@ -220,7 +223,14 @@ impl ConnectionImplementation for IotHubConnection {
                 ingress_eventloop.register_async_handler(c2d_handler);
 
                 if remote_access_allowed_for_all_ports {
-                    let method_handler = DirectMethodHandler::new(client.clone());
+                    let mut handler_map: HashMap<String, Box<dyn MethodInvocationHandler>> =
+                        HashMap::new();
+                    handler_map.insert(
+                        REMOTE_ACCESS_METHOD_NAME.to_string(),
+                        Box::new(RemoteAccessMethodHandler::new()),
+                    );
+
+                    let method_handler = DirectMethodHandler::new(client.clone(), handler_map);
                     ingress_eventloop.register_handler(method_handler);
                 }
 

@@ -18,6 +18,8 @@ struct RequestPayload {
     pub traceparent_header: Option<String>,
 }
 
+pub const REMOTE_ACCESS_METHOD_NAME: &str = "!remote-access";
+
 pub struct RemoteAccessMethodHandler {
     connections: connections::ConnectionManager,
 }
