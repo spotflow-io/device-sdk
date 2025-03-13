@@ -19,7 +19,7 @@ pub use ingress::CloudToDeviceMessage;
 
 pub use ingress::{
     Compression, DesiredProperties, DesiredPropertiesUpdatedCallback, DeviceClient,
-    DeviceClientBuilder, MessageContext, MethodError, MethodReturnValue, ProvisioningOperation,
+    DeviceClientBuilder, MessageContext, ProvisioningOperation,
     ProvisioningOperationDisplayHandler,
 };
 

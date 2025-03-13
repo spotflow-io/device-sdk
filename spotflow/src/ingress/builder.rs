@@ -161,19 +161,6 @@ impl DeviceClientBuilder {
         self
     }
 
-    /// **Warning**: Don't use, the interface for direct method calls hasn't been finalized yet.
-    #[deprecated]
-    #[doc(hidden)]
-    pub fn with_method_handler<F>(self, method_handler: F) -> DeviceClientBuilderWithHandler<F>
-    where
-        F: MethodHandler,
-    {
-        DeviceClientBuilderWithHandler {
-            builder: self,
-            method_handler,
-        }
-    }
-
     /// Build the [`DeviceClient`] that starts communicating with the Platform.
     ///
     /// If the [Device](https://docs.spotflow.io/connect-devices/#device) is
@@ -556,22 +543,5 @@ fn register_device(
         std::thread::sleep(std::time::Duration::from_millis(5000));
 
         signals_src.check_signals().map_err(ErrorAction::Fail)?;
-    }
-}
-
-pub struct DeviceClientBuilderWithHandler<F> {
-    builder: DeviceClientBuilder,
-    method_handler: F,
-}
-
-impl<F> DeviceClientBuilderWithHandler<F>
-where
-    F: MethodHandler,
-{
-    /// **Warning**: Don't use, the interface for Cloud-to-Device Messages hasn't been finalized yet.
-    #[deprecated]
-    #[doc(hidden)]
-    pub fn build(self) -> Result<DeviceClient> {
-        self.builder.build_impl(Some(self.method_handler))
     }
 }
