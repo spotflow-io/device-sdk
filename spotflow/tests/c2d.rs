@@ -11,7 +11,7 @@ use uuid::Uuid;
 #[path = "../examples/common/mod.rs"]
 mod common;
 
-#[allow(deprecated)] // We're using the current direct method call interface here until it's stabilized
+#[allow(deprecated)] // We're using the current Cloud-to-Device call interface here until it's stabilized
 #[test]
 #[ignore]
 fn c2d() {
