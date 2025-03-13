@@ -68,7 +68,7 @@ pub struct ClientOptions {
     display_provisioning_operation_context: *mut c_void,
     desired_properties_updated_callback: DesiredPropertiesUpdatedCallback,
     desired_properties_updated_context: *mut c_void,
-    remote_access_allowed: bool,
+    remote_access_allowed_for_all_ports: bool,
 }
 
 struct DisplayProvisioningOperationCallbackHolder {
@@ -156,7 +156,7 @@ pub extern "C" fn spotflow_client_options_create(
             display_provisioning_operation_context: null_mut(),
             desired_properties_updated_callback: None,
             desired_properties_updated_context: null_mut(),
-            remote_access_allowed: false,
+            remote_access_allowed_for_all_ports: false,
         };
 
         Ok(options)
@@ -363,7 +363,7 @@ pub unsafe extern "C" fn spotflow_client_options_set_remote_access_allowed_for_a
         ensure_logging();
 
         let options = unsafe { ptr_to_mut(options) }?;
-        options.remote_access_allowed = true;
+        options.remote_access_allowed_for_all_ports = true;
 
         Ok(())
     })
@@ -441,7 +441,7 @@ pub extern "C" fn spotflow_client_start(
             builder = builder.with_desired_properties_updated_callback(callback);
         }
 
-        if options.remote_access_allowed {
+        if options.remote_access_allowed_for_all_ports {
             builder = builder.with_remote_access_allowed_for_all_ports();
         }
 

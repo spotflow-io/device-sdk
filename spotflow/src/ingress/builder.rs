@@ -71,7 +71,7 @@ pub struct DeviceClientBuilder {
     display_provisioning_operation_callback: Option<Box<dyn ProvisioningOperationDisplayHandler>>,
     desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
     signals_src: Option<Box<dyn ProcessSignalsSource>>,
-    remote_access_allowed: bool,
+    remote_access_allowed_for_all_ports: bool,
 }
 
 impl DeviceClientBuilder {
@@ -104,7 +104,7 @@ impl DeviceClientBuilder {
             display_provisioning_operation_callback: None,
             desired_properties_updated_callback: None,
             signals_src: None,
-            remote_access_allowed: false,
+            remote_access_allowed_for_all_ports: false,
         }
     }
 
@@ -157,7 +157,7 @@ impl DeviceClientBuilder {
 
     /// Allow the Device to accept remote access requests for all ports.
     pub fn with_remote_access_allowed_for_all_ports(mut self) -> Self {
-        self.remote_access_allowed = true;
+        self.remote_access_allowed_for_all_ports = true;
         self
     }
 
@@ -256,7 +256,7 @@ impl DeviceClientBuilder {
 
         // This code duplication is caused by having the method handler type generic
         // (might be simplified in the future if we decide to use dynamic dispatch instead)
-        if self.remote_access_allowed {
+        if self.remote_access_allowed_for_all_ports {
             DeviceClient::new(
                 config,
                 &self.database_file,
