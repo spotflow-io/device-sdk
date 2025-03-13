@@ -123,9 +123,9 @@ impl PlatformCaller {
         get_workspace_storage_sas_uri(&self.instance_url, &self.workspace_id, &token)
     }
 
-    pub fn get_tunnel_uri(&self, device_id: &str, port: u16) -> Result<Uri> {
+    pub fn get_tunnel_secure_uri(&self, device_id: &str, port: u16) -> Result<Uri> {
         let token = self.get_token("device-management")?;
-        get_tunnel_uri(
+        get_tunnel_secure_uri(
             &self.instance_url,
             &self.workspace_id,
             device_id,
@@ -339,7 +339,7 @@ pub fn get_workspace_storage_sas_uri(
     Ok(uri.parse()?)
 }
 
-pub fn get_tunnel_uri(
+pub fn get_tunnel_secure_uri(
     instance_url: &Uri,
     workspace_id: &str,
     device_id: &str,

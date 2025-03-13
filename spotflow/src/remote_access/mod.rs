@@ -30,7 +30,7 @@ pub fn create_remote_access_method_handler<F: MethodHandler>(
                 return Some(Err(MethodError::new(400, "Invalid payload".to_string())));
             };
 
-            let Ok(tunnel_uri) = Uri::from_str(&payload.tunnel_secure_uri) else {
+            let Ok(tunnel_secure_uri) = Uri::from_str(&payload.tunnel_secure_uri) else {
                 return Some(Err(MethodError::new(
                     400,
                     "Invalid tunnel secure URI".to_string(),
@@ -40,7 +40,7 @@ pub fn create_remote_access_method_handler<F: MethodHandler>(
             let details = ConnectionDetails {
                 tunnel_id: payload.tunnel_id,
                 target_port: payload.port,
-                tunnel_uri,
+                tunnel_secure_uri,
                 traceparent_header: payload.traceparent_header,
             };
 

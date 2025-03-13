@@ -25,7 +25,7 @@ use crate::utils::thread::join;
 pub struct ConnectionDetails {
     pub tunnel_id: Uuid,
     pub target_port: u16,
-    pub tunnel_uri: Uri,
+    pub tunnel_secure_uri: Uri,
     pub traceparent_header: Option<String>,
 }
 
@@ -167,7 +167,7 @@ async fn process_connection(details: ConnectionDetails) -> Result<(), Connection
         details.target_port
     );
 
-    let mut request_builder = ClientRequestBuilder::new(details.tunnel_uri);
+    let mut request_builder = ClientRequestBuilder::new(details.tunnel_secure_uri);
 
     if let Some(traceparent) = details.traceparent_header {
         request_builder = request_builder.with_header("traceparent", traceparent);

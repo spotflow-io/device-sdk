@@ -82,14 +82,14 @@ fn remote_access() {
         );
     });
 
-    let tunnel_uri = platform_caller
-        .get_tunnel_uri(&device_id, port)
+    let tunnel_secure_uri = platform_caller
+        .get_tunnel_secure_uri(&device_id, port)
         .expect("Unable to get tunnel URI");
 
-    log::info!("Tunnel URI: {}", tunnel_uri);
+    log::info!("Tunnel URI: {}", tunnel_secure_uri);
 
     let (mut ws_stream, _) =
-        tungstenite::connect(tunnel_uri).expect("Failed to connect to the tunnel");
+        tungstenite::connect(tunnel_secure_uri).expect("Failed to connect to the tunnel");
 
     log::info!("Connected to the tunnel");
 
