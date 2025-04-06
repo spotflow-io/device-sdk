@@ -16,6 +16,7 @@ use tokio::{
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{ClientRequestBuilder, Message},
+    MaybeTlsStream, WebSocketStream,
 };
 use uuid::Uuid;
 
@@ -47,7 +48,7 @@ pub struct ConnectionManager {
 impl RefUnwindSafe for ConnectionManager {}
 
 struct RuntimeManager {
-    active_connections: HashMap<Uuid, JoinHandle<Result<(), ConnectionError>>>,
+    active_connections: HashMap<Uuid, JoinHandle<()>>,
     command_rx: Receiver<Command>,
 }
 
@@ -85,8 +86,7 @@ impl ConnectionManager {
                                 details,
                                 response_tx,
                             } => {
-                                let result = runtime_manager.handle_connect(details).await;
-                                let _ = response_tx.send(result);
+                                runtime_manager.handle_connect(details, response_tx).await;
                             }
                             Command::Shutdown => {
                                 runtime_manager.shutdown().await;
@@ -131,25 +131,28 @@ impl Drop for ConnectionManager {
 }
 
 impl RuntimeManager {
-    async fn handle_connect(&mut self, details: ConnectionDetails) -> Result<(), ConnectionError> {
+    async fn handle_connect(
+        &mut self,
+        details: ConnectionDetails,
+        response_tx: mpsc::Sender<Result<(), ConnectionError>>,
+    ) {
         // Check if a connection already exists for this port
         if let Some(handle) = self.active_connections.get(&details.tunnel_id) {
             if !handle.is_finished() {
-                return Err(ConnectionError::PreviousAttemptStillActive(
+                let _ = response_tx.send(Err(ConnectionError::PreviousAttemptStillActive(
                     details.tunnel_id,
-                ));
+                )));
+                return;
             }
         }
 
         let tunnel_id = details.tunnel_id;
 
         // Spawn a new tokio task to handle the connection
-        let handle = tokio::spawn(async move { process_connection(details).await });
+        let handle = tokio::spawn(async move { process_connection(details, response_tx).await });
 
         // Store the handle in our active connections
         self.active_connections.insert(tunnel_id, handle);
-
-        Ok(())
     }
 
     async fn shutdown(&mut self) {
@@ -160,30 +163,23 @@ impl RuntimeManager {
     }
 }
 
-async fn process_connection(details: ConnectionDetails) -> Result<(), ConnectionError> {
-    log::debug!(
-        "Starting connection to tunnel '{}' and port '{}'.",
-        details.tunnel_id,
-        details.target_port
-    );
+async fn process_connection(
+    details: ConnectionDetails,
+    response_tx: mpsc::Sender<Result<(), ConnectionError>>,
+) {
+    let tunnel_id = details.tunnel_id;
+    let target_port = details.target_port;
 
-    let mut request_builder = ClientRequestBuilder::new(details.tunnel_secure_uri);
-
-    if let Some(traceparent) = details.traceparent_header {
-        request_builder = request_builder.with_header("traceparent", traceparent);
-    }
-
-    let (ws_stream, _) = connect_async(request_builder)
-        .await
-        .map_err(ConnectionError::ServerConnectionFailed)?;
-
-    log::debug!("Connected to WebSocket for port {}", details.target_port);
-
-    let socket_stream = TcpStream::connect(format!("127.0.0.1:{}", details.target_port))
-        .await
-        .map_err(ConnectionError::TargetPortConnectionFailed)?;
-
-    log::debug!("Connected to the target port {}", details.target_port);
+    let (ws_stream, socket_stream) = match init_connection(details).await {
+        Ok(result) => {
+            let _ = response_tx.send(Ok(()));
+            result
+        }
+        Err(e) => {
+            let _ = response_tx.send(Err(e));
+            return;
+        }
+    };
 
     let (mut ws_sink, mut ws_stream) = ws_stream.split();
     let (mut socket_read, mut socket_write) = socket_stream.into_split();
@@ -257,9 +253,37 @@ async fn process_connection(details: ConnectionDetails) -> Result<(), Connection
 
     log::info!(
         "Disconnected from the tunnel '{}' and port '{}'.",
+        tunnel_id,
+        target_port
+    );
+}
+
+async fn init_connection(
+    details: ConnectionDetails,
+) -> Result<(WebSocketStream<MaybeTlsStream<TcpStream>>, TcpStream), ConnectionError> {
+    log::debug!(
+        "Starting connection to tunnel '{}' and port '{}'.",
         details.tunnel_id,
         details.target_port
     );
 
-    Ok(())
+    let mut request_builder = ClientRequestBuilder::new(details.tunnel_secure_uri);
+
+    if let Some(traceparent) = details.traceparent_header {
+        request_builder = request_builder.with_header("traceparent", traceparent);
+    }
+
+    let socket_stream = TcpStream::connect(format!("127.0.0.1:{}", details.target_port))
+        .await
+        .map_err(ConnectionError::TargetPortConnectionFailed)?;
+
+    log::debug!("Connected to the target port {}", details.target_port);
+
+    let (ws_stream, _) = connect_async(request_builder)
+        .await
+        .map_err(ConnectionError::ServerConnectionFailed)?;
+
+    log::debug!("Connected to WebSocket for port {}", details.target_port);
+
+    Ok((ws_stream, socket_stream))
 }
