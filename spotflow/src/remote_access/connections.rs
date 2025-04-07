@@ -5,6 +5,7 @@ use std::{
     panic::RefUnwindSafe,
     sync::mpsc::{self, Receiver, Sender},
     thread,
+    time::Duration,
 };
 use thiserror::Error;
 use tokio::{
@@ -21,6 +22,10 @@ use tokio_tungstenite::{
 use uuid::Uuid;
 
 use crate::utils::thread::join;
+
+// The timeout to respond to the direct method call is 30 seconds, these timeouts are chosen to fit into this time frame.
+const LOCAL_PORT_CONNECTION_TIMEOUT: Duration = Duration::from_secs(5);
+const WEBSOCKET_CONNECTION_TIMEOUT: Duration = Duration::from_secs(20);
 
 #[derive(Clone)]
 pub struct ConnectionDetails {
@@ -273,15 +278,37 @@ async fn init_connection(
         request_builder = request_builder.with_header("traceparent", traceparent);
     }
 
-    let socket_stream = TcpStream::connect(format!("127.0.0.1:{}", details.target_port))
-        .await
-        .map_err(ConnectionError::TargetPortConnectionFailed)?;
+    // We connect to the target port first, because once the connection to the WebSocket is established, another connections to the same
+    // tunnel (i.e., the same tunnel secure URI) will be rejected. Therefore, connecting to the WebSocket first (or trying both in parallel)
+    // would in the case of a failed connection to the target port cause any additional retries (i.e., another calls of the direct method) to fail.
+
+    let socket_stream = tokio::time::timeout(
+        LOCAL_PORT_CONNECTION_TIMEOUT,
+        TcpStream::connect(format!("127.0.0.1:{}", details.target_port)),
+    )
+    .await
+    .map_err(|_| {
+        ConnectionError::TargetPortConnectionFailed(std::io::Error::new(
+            std::io::ErrorKind::TimedOut,
+            "Connection to target port timed out.",
+        ))
+    })?
+    .map_err(ConnectionError::TargetPortConnectionFailed)?;
 
     log::debug!("Connected to the target port {}", details.target_port);
 
-    let (ws_stream, _) = connect_async(request_builder)
-        .await
-        .map_err(ConnectionError::ServerConnectionFailed)?;
+    let (ws_stream, _) =
+        tokio::time::timeout(WEBSOCKET_CONNECTION_TIMEOUT, connect_async(request_builder))
+            .await
+            .map_err(|_| {
+                ConnectionError::ServerConnectionFailed(tokio_tungstenite::tungstenite::Error::Io(
+                    std::io::Error::new(
+                        std::io::ErrorKind::TimedOut,
+                        "Connection to WebSocket timed out.",
+                    ),
+                ))
+            })?
+            .map_err(ConnectionError::ServerConnectionFailed)?;
 
     log::debug!("Connected to WebSocket for port {}", details.target_port);
 
