@@ -25,7 +25,7 @@ use crate::connection::ConnectionImplementation;
 use crate::{persistence, ProcessSignalsSource};
 
 /// The compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug)]
 pub enum Compression {
     /// Compress the message using the fastest compression algorithm settings.
     Fastest,
@@ -91,7 +91,7 @@ impl MessageContext {
 
     /// Get the compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
     pub fn compression(&self) -> Option<Compression> {
-        self.compression.clone()
+        self.compression
     }
 
     /// Set the compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
