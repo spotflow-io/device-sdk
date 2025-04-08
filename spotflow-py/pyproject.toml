@@ -27,7 +27,7 @@ classifiers = [
 ]
 
 [project.urls]
-Homepage = "https://spotflow.io"
+Homepage = "https://iot.spotflow.io/platform"
 Documentation = "https://docs.spotflow.io/device-sdk/python/"
 
 [build-system]
