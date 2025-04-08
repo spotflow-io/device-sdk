@@ -252,15 +252,28 @@ impl SqliteStore {
     async fn save_twin_properties(&self, twin_type: &str, twin: &Twin) -> Result<()> {
         let mut conn = self.conn.lock().await;
         let json = serde_json::to_string(twin).context("Unable to deserialize twin")?;
-        sqlx::query!(
+
+        let result = sqlx::query!(
             r#"INSERT INTO Twins (type, properties) VALUES (?, ?);"#,
             twin_type,
             json,
         )
         .execute(conn.deref_mut())
         .await
-        .context(format!("Unable to save twin {twin_type} properties"))
-        .map(|_| ())
+        .context(format!("Unable to save twin {twin_type} properties"))?;
+
+        let id = result.last_insert_rowid();
+
+        sqlx::query!(
+            r#"DELETE FROM Twins WHERE type = ? AND id != ?"#,
+            twin_type,
+            id
+        )
+        .execute(conn.deref_mut())
+        .await
+        .context("Unable to delete old twin properties")?;
+
+        Ok(())
     }
 
     // Configuration & Tokens
