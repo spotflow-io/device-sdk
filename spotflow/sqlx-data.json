@@ -332,6 +332,16 @@
     },
     "query": "INSERT INTO Messages (site_id, stream_group, stream, batch_id, message_id, content, close_option, compression, batch_slice_id, chunk_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);\n            SELECT last_insert_rowid() as id"
   },
+  "a2aafc30872d19a002cd33400eb75eb18de8beb0c9ac3eed6ce55dcf7378be96": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Right": 2
+      }
+    },
+    "query": "DELETE FROM Twins WHERE type = ? AND id != ?"
+  },
   "a5224dd817e243c09359af4f3f36f108572fd7a3ccba34ce60c033ff8b84505d": {
     "describe": {
       "columns": [
