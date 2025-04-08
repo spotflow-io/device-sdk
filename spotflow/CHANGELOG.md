@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.8.0] - 2025-04-09
+
+### Added
+
+- The ability to allow remote access to TCP ports on the device.
+
+### Fixed
+
+- Disabled retrying after non-recoverable error 400 during provisioning operation initialization.
+- Old reported and desired properties are not kept in the local database.
+
 ## [0.7.0] - 2024-06-26
 
 ### Added
