@@ -1,10 +1,13 @@
-use std::{future::Future, panic::RefUnwindSafe, pin::Pin, sync::Arc, time::Duration};
+use std::collections::HashMap;
+use std::{future::Future, pin::Pin, sync::Arc, time::Duration};
 
 use crate::cloud::drs::{ConnectionStringType, RegistrationResponse};
 use crate::connection::{
     twins::{DesiredPropertiesUpdatedCallback, TwinsClient},
     ConnectionImplementation, JoinHandleVec,
 };
+use crate::ingress::MethodInvocationHandler;
+use crate::remote_access::{RemoteAccessMethodHandler, REMOTE_ACCESS_METHOD_NAME};
 use anyhow::{anyhow, bail, Context, Result};
 use rumqttc::{AsyncClient, ConnectionError, MqttOptions, TlsConfiguration, Transport};
 use token_handler::{RegistrationCommand, RegistrationCommandSender};
@@ -56,7 +59,7 @@ pub struct OnlineConnection {
     state: watch::Receiver<State>,
 }
 
-pub struct IotHubConnection<F> {
+pub struct IotHubConnection {
     runtime: Handle,
     store: SqliteStore,
     d2c_consumer: Option<Consumer>,
@@ -66,14 +69,14 @@ pub struct IotHubConnection<F> {
     registration_watch: Receiver<Option<RegistrationResponse>>,
     registration_command_sender: RegistrationCommandSender,
     cancellation: CancellationToken,
-    method_handler: Option<F>,
     desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
+    remote_access_allowed_for_all_ports: bool,
 
     connection_receiver: Option<oneshot::Receiver<OnlineConnection>>,
     twins_client: Option<IotHubTwinsClient>,
 }
 
-impl<F> IotHubConnection<F> {
+impl IotHubConnection {
     #[allow(clippy::too_many_arguments)]
     pub fn create(
         runtime: Handle,
@@ -84,13 +87,10 @@ impl<F> IotHubConnection<F> {
         twins_store: TwinsStore,
         registration_watch: Receiver<Option<RegistrationResponse>>,
         registration_command_sender: mpsc::UnboundedSender<RegistrationCommand>,
-        method_handler: Option<F>,
         desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
+        remote_access_allowed_for_all_ports: bool,
         cancellation: CancellationToken,
-    ) -> Self
-    where
-        F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + RefUnwindSafe + 'static,
-    {
+    ) -> Self {
         IotHubConnection {
             runtime,
             store,
@@ -101,9 +101,8 @@ impl<F> IotHubConnection<F> {
             registration_watch,
             registration_command_sender,
             cancellation,
-            method_handler,
             desired_properties_updated_callback,
-
+            remote_access_allowed_for_all_ports,
             connection_receiver: None,
             twins_client: None,
         }
@@ -166,9 +165,7 @@ impl<F> IotHubConnection<F> {
     }
 }
 
-impl<F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static>
-    ConnectionImplementation for IotHubConnection<F>
-{
+impl ConnectionImplementation for IotHubConnection {
     fn connect(&mut self) -> Pin<Box<dyn Future<Output = Result<JoinHandleVec>> + Send>> {
         let (response_sender, response_receiver) = mpsc::channel(100);
         let (desired_properties_sender, desired_properties_receiver) = mpsc::channel(100);
@@ -194,10 +191,10 @@ impl<F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'sta
             let cancellation = self.cancellation.clone();
             let mut registration_watch = self.registration_watch.clone();
             let registration_command_sender = self.registration_command_sender.clone();
-            let method_handler = self.method_handler.take();
             let d2c_acknowledger = self.d2c_acknowledger.take().unwrap();
             let d2c_consumer = self.d2c_consumer.take().unwrap();
             let c2d_producer = self.c2d_producer.take().unwrap();
+            let remote_access_allowed_for_all_ports = self.remote_access_allowed_for_all_ports;
             async move {
                 log::debug!("Registering to the platform");
                 let (client, rumqttc_eventloop) =
@@ -225,8 +222,15 @@ impl<F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'sta
                     CloudToDeviceHandler::new(client.clone(), &device_id, c2d_producer);
                 ingress_eventloop.register_async_handler(c2d_handler);
 
-                if let Some(method_handler) = method_handler {
-                    let method_handler = DirectMethodHandler::new(client.clone(), method_handler);
+                if remote_access_allowed_for_all_ports {
+                    let mut handler_map: HashMap<String, Box<dyn MethodInvocationHandler>> =
+                        HashMap::new();
+                    handler_map.insert(
+                        REMOTE_ACCESS_METHOD_NAME.to_string(),
+                        Box::new(RemoteAccessMethodHandler::new()),
+                    );
+
+                    let method_handler = DirectMethodHandler::new(client.clone(), handler_map);
                     ingress_eventloop.register_handler(method_handler);
                 }
 
@@ -313,7 +317,7 @@ impl<F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'sta
     }
 }
 
-impl<F> Drop for IotHubConnection<F> {
+impl Drop for IotHubConnection {
     fn drop(&mut self) {
         if let Ok(online_connection) = self.connection_receiver.as_mut().unwrap().try_recv() {
             self.runtime.block_on(async {

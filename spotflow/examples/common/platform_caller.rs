@@ -122,6 +122,17 @@ impl PlatformCaller {
         let token = self.get_token("workspace-management")?;
         get_workspace_storage_sas_uri(&self.instance_url, &self.workspace_id, &token)
     }
+
+    pub fn get_tunnel_secure_uri(&self, device_id: &str, port: u16) -> Result<Uri> {
+        let token = self.get_token("device-management")?;
+        get_tunnel_secure_uri(
+            &self.instance_url,
+            &self.workspace_id,
+            device_id,
+            port,
+            &token,
+        )
+    }
 }
 
 fn get_azure_token(url: &Uri, service: &str) -> Result<AccessToken> {
@@ -324,6 +335,34 @@ pub fn get_workspace_storage_sas_uri(
         .ok_or_else(|| anyhow!("The response doesn't contain the 'secureUri' field"))?
         .as_str()
         .ok_or_else(|| anyhow!("The 'secureUri' field is not a string"))?;
+
+    Ok(uri.parse()?)
+}
+
+pub fn get_tunnel_secure_uri(
+    instance_url: &Uri,
+    workspace_id: &str,
+    device_id: &str,
+    port: u16,
+    token: &str,
+) -> Result<Uri> {
+    let url = format!("{instance_url}workspaces/{workspace_id}/devices/{device_id}/remote-access/ports/{port}/secure-uri");
+    let auth_header = format!("Bearer {token}");
+
+    let connector = Arc::new(native_tls::TlsConnector::new().unwrap());
+    let agent = ureq::AgentBuilder::new().tls_connector(connector).build();
+
+    let json = agent
+        .post(&url)
+        .set("Authorization", &auth_header)
+        .call()?
+        .into_json::<serde_json::Value>()?;
+
+    let uri = json
+        .get("tunnelSecureUri")
+        .ok_or_else(|| anyhow!("The response doesn't contain the 'tunnelSecureUri' field"))?
+        .as_str()
+        .ok_or_else(|| anyhow!("The 'tunnelSecureUri' field is not a string"))?;
 
     Ok(uri.parse()?)
 }

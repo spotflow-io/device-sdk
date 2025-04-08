@@ -100,6 +100,37 @@ impl MessageContext {
     }
 }
 
+pub struct MethodReturnValue {
+    pub status_code: i32,
+    pub body: Option<Vec<u8>>,
+}
+
+impl MethodReturnValue {
+    pub fn new(status_code: i32, body: Option<Vec<u8>>) -> Self {
+        Self { status_code, body }
+    }
+}
+
+pub struct MethodError {
+    pub status_code: i32,
+    pub message: String,
+}
+
+impl MethodError {
+    pub fn new(status_code: i32, message: String) -> Self {
+        Self {
+            status_code,
+            message,
+        }
+    }
+}
+
+pub type MethodResult = Result<MethodReturnValue, MethodError>;
+
+pub trait MethodInvocationHandler: Send + RefUnwindSafe {
+    fn handle(&self, payload: &[u8]) -> Option<MethodResult>;
+}
+
 /// A client communicating with the Platform.
 ///
 /// Create its instance using [`DeviceClientBuilder::build`].
@@ -116,24 +147,21 @@ pub struct DeviceClient {
 impl DeviceClient {
     /// Starts an ingress and saves the provided tokens and URLs to a state file. If the provided file does not exist this function creates it.
     /// It also makes sure that both desired and reported properties of the Device Twin are available.
-    fn new<F>(
+    fn new(
         config: SdkConfiguration,
         path: &Path,
-        method_handler: Option<F>,
         desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
         signals_src: Option<Box<dyn ProcessSignalsSource>>,
         initial_registration_response: Option<RegistrationResponse>,
-    ) -> Result<DeviceClient>
-    where
-        F: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static,
-    {
+        remote_access_allowed_for_all_ports: bool,
+    ) -> Result<DeviceClient> {
         let connection = BaseConnection::init_ingress(
             config,
             path,
-            method_handler,
             desired_properties_updated_callback,
             signals_src,
             initial_registration_response,
+            remote_access_allowed_for_all_ports,
         )?;
 
         connection.wait_properties_ready()?;

@@ -5,10 +5,7 @@ use crate::{
 };
 use anyhow::{anyhow, bail, Result};
 use chrono::{DateTime, Utc};
-use std::{
-    panic::RefUnwindSafe,
-    path::{Path, PathBuf},
-};
+use std::path::{Path, PathBuf};
 
 use http::Uri;
 
@@ -23,18 +20,6 @@ use crate::cloud::{
 use crate::{EmptyProcessSignalsSource, ProcessSignalsSource};
 
 use super::DeviceClient;
-
-// Defining a super-trait for what traits must the handler implement Fn(...) + Send + RefUnwindSafe + 'static
-pub trait Handler:
-    Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static
-{
-}
-impl<T> Handler for T where
-    T: Fn(String, &[u8]) -> (i32, Vec<u8>) + Send + Sync + RefUnwindSafe + 'static
-{
-}
-// Used where Option::None is needed for the handler type
-type NoneHandler = fn(String, &[u8]) -> (i32, Vec<u8>);
 
 /// The summary of an ongoing [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
 ///
@@ -85,6 +70,7 @@ pub struct DeviceClientBuilder {
     display_provisioning_operation_callback: Option<Box<dyn ProvisioningOperationDisplayHandler>>,
     desired_properties_updated_callback: Option<Box<dyn DesiredPropertiesUpdatedCallback>>,
     signals_src: Option<Box<dyn ProcessSignalsSource>>,
+    remote_access_allowed_for_all_ports: bool,
 }
 
 impl DeviceClientBuilder {
@@ -117,6 +103,7 @@ impl DeviceClientBuilder {
             display_provisioning_operation_callback: None,
             desired_properties_updated_callback: None,
             signals_src: None,
+            remote_access_allowed_for_all_ports: false,
         }
     }
 
@@ -167,17 +154,10 @@ impl DeviceClientBuilder {
         self
     }
 
-    /// **Warning**: Don't use, the interface for Cloud-to-Device Messages hasn't been finalized yet.
-    #[deprecated]
-    #[doc(hidden)]
-    pub fn with_method_handler<F>(self, method_handler: F) -> DeviceClientBuilderWithHandler<F>
-    where
-        F: Handler,
-    {
-        DeviceClientBuilderWithHandler {
-            builder: self,
-            method_handler,
-        }
+    /// Allow the Device to accept remote access requests for all ports.
+    pub fn with_remote_access_allowed_for_all_ports(mut self) -> Self {
+        self.remote_access_allowed_for_all_ports = true;
+        self
     }
 
     /// Build the [`DeviceClient`] that starts communicating with the Platform.
@@ -193,13 +173,6 @@ impl DeviceClientBuilder {
     /// the last run is still valid, this method succeeds even without the connection to the Internet. The Device SDK will
     /// store all outgoing communication in the local database file and send it once it connects to the Platform.
     pub fn build(self) -> Result<DeviceClient> {
-        self.build_impl(None::<NoneHandler>)
-    }
-
-    fn build_impl<F>(self, method_handler: Option<F>) -> Result<DeviceClient>
-    where
-        F: Handler,
-    {
         // Validate the options
         if self.database_file.as_os_str().is_empty() {
             bail!("The path to the local database file cannot be empty; provide a value.");
@@ -250,21 +223,23 @@ impl DeviceClientBuilder {
 
         signals_src.check_signals()?;
 
+        let config = SdkConfiguration {
+            instance_url,
+            provisioning_token: self.provisioning_token,
+            registration_token,
+            requested_device_id: self.device_id,
+            workspace_id,
+            device_id,
+            site_id: self.site_id,
+        };
+
         DeviceClient::new(
-            SdkConfiguration {
-                instance_url,
-                provisioning_token: self.provisioning_token,
-                registration_token,
-                requested_device_id: self.device_id,
-                workspace_id,
-                device_id,
-                site_id: self.site_id,
-            },
+            config,
             &self.database_file,
-            method_handler,
             self.desired_properties_updated_callback,
             self.signals_src,
             registration_response,
+            self.remote_access_allowed_for_all_ports,
         )
     }
 
@@ -547,22 +522,5 @@ fn register_device(
         std::thread::sleep(std::time::Duration::from_millis(5000));
 
         signals_src.check_signals().map_err(ErrorAction::Fail)?;
-    }
-}
-
-pub struct DeviceClientBuilderWithHandler<F> {
-    builder: DeviceClientBuilder,
-    method_handler: F,
-}
-
-impl<F> DeviceClientBuilderWithHandler<F>
-where
-    F: Handler,
-{
-    /// **Warning**: Don't use, the interface for Cloud-to-Device Messages hasn't been finalized yet.
-    #[deprecated]
-    #[doc(hidden)]
-    pub fn build(self) -> Result<DeviceClient> {
-        self.builder.build_impl(Some(self.method_handler))
     }
 }

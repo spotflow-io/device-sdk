@@ -11,7 +11,7 @@ use uuid::Uuid;
 #[path = "../examples/common/mod.rs"]
 mod common;
 
-#[allow(deprecated)] // We're using the current Cloud-to-Device interface here until it's stabilized
+#[allow(deprecated)] // We're using the current Cloud-to-Device call interface here until it's stabilized
 #[test]
 #[ignore]
 fn c2d() {
@@ -42,7 +42,6 @@ fn c2d() {
             .with_display_provisioning_operation_callback(Box::new(
                 common::ProvisioningOperationApprovalHandler::new(Some(platform_caller.clone())),
             ))
-            .with_method_handler(handler)
             .build()
             .expect("Unable to build ingress connection");
 
@@ -100,15 +99,4 @@ fn c2d() {
         .expect("Unable to register c2d handler");
 
     sender.join().expect("Failed joining thread");
-}
-
-fn handler(method: String, payload: &[u8]) -> (i32, Vec<u8>) {
-    let payload = std::str::from_utf8(payload).unwrap();
-    log::info!(
-        "Received {} method invocation with payload `{}`.",
-        method,
-        payload
-    );
-
-    (200, Vec::new())
 }
