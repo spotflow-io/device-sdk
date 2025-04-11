@@ -6,6 +6,7 @@ on:
     tags:
       - python-v*
       - c-v*
+      - rust-v*
   pull_request:
   workflow_dispatch:
 
@@ -635,6 +636,19 @@ jobs:
         with:
           name: wheels-linux-armv7
           path: spotflow-py/dist
+
+  release-rust-crate:
+    name: Release Rust Crate
+    runs-on: ubuntu-22.04
+    environment: crates-io
+    if: startsWith(github.event.ref, 'refs/tags/rust-v')
+    needs:
+      - build
+      - test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish Crate
+        run: cargo publish --package spotflow --no-verify --token ${{ secrets.CRATES_IO_TOKEN }}
 
   release-python-packages:
     name: Release Python Packages

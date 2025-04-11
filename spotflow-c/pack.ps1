@@ -16,6 +16,7 @@ New-Item -Path $examplesDir -ItemType Directory
 
 Copy-Item "./include/spotflow.h" $includeDir
 Copy-Item "./packaging/get_started.c" $examplesDir
+Copy-Item "./CHANGELOG.md" $packageDir
 
 if ($Os -Eq "Windows") {
     Copy-Item "$TargetDir/spotflow.dll" $binDir

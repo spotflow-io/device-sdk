@@ -5,4 +5,4 @@ More information:
 
 - [Python interface documentation](https://docs.spotflow.io/device-sdk/python/)
 - [Spotflow IoT Platform documentation](https://docs.spotflow.io)
-- [Spotflow IoT Platform homepage](https://spotflow.io)
+- [Spotflow IoT Platform homepage](https://iot.spotflow.io/platform)

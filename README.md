@@ -8,7 +8,7 @@
     <a href="#license">License</a>
 </p>
 
-Devices can use this SDK to connect to the [Spotflow IoT Platform](https://spotflow.io).
+Devices can use this SDK to connect to the [Spotflow IoT Platform](https://iot.spotflow.io/platform).
 See the [Device SDK documentation](https://docs.spotflow.io/device-sdk) ([Rust](https://docs.spotflow.io/device-sdk/rust/), [Python](https://docs.spotflow.io/device-sdk/python/), [C](https://docs.spotflow.io/device-sdk/c/)) for more information on how to use it in your projects.
 The following text explains how the Device SDK works internally, how you can compile it yourself, and what issues you might encounter.
 
