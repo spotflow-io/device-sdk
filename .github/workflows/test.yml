@@ -674,6 +674,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           pattern: wheels-*
+          merge-multiple: true
       - run: maturin upload --username "__token__" --password ${{ secrets.PYPI_TOKEN }} *.whl
 
   release-c-packages:
