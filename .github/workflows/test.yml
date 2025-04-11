@@ -658,11 +658,11 @@ jobs:
     needs:
       - build
       - test
+      - build-python-linux
       - build-python-macos
       - build-python-windows
       - build-python-armv7
       - build-python-aarch64
-      - test-python-linux
     steps:
       - name: Set up Python
         uses: actions/setup-python@v5
