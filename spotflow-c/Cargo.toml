@@ -1,6 +1,6 @@
 [package]
 name = "spotflow-c"
-version = "2.2.0"
+version = "2.2.1"
 edition = "2021"
 
 [lib]
@@ -10,7 +10,7 @@ crate-type = ["cdylib", "staticlib"]
 # crate-type = ["cdylib"]
 
 [dependencies]
-spotflow = { path = "../spotflow", version = "0.8.0", features = ["openssl-vendored"] }
+spotflow = { path = "../spotflow", version = "0.8.1", features = ["openssl-vendored"] }
 anyhow = "1.0.57"
 chrono = "0.4.20"
 simple_logger = { version = "4.3.0", features = ["stderr"] }

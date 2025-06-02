@@ -9,7 +9,7 @@ after_includes = """
 /**
  * Device SDK for Spotflow IoT Platform
  * 
- * Version: 2.2.0
+ * Version: 2.2.1
  * Documentation: https://docs.iot.spotflow.io/device-sdk/c/
  */
 

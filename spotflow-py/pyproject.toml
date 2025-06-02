@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "spotflow_device"
-version = "2.1.0"
+version = "2.1.1"
 description = "Device SDK for Spotflow IoT Platform"
 authors = ["Spotflow <support@spotflow.io>"]
 [tool.poetry.dependencies]
