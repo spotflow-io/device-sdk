@@ -24,7 +24,7 @@ use crate::connection::ConnectionImplementation;
 
 use crate::{persistence, ProcessSignalsSource};
 
-/// The compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
+/// The compression to use for sending [Messages](https://docs.iot.spotflow.io/send-data/#message).
 #[derive(Clone, Copy, Debug)]
 pub enum Compression {
     /// Compress the message using the fastest compression algorithm settings.
@@ -45,8 +45,8 @@ impl Compression {
     }
 }
 
-/// A set of options for sending [Messages](https://docs.spotflow.io/send-data/#message) to
-/// a [Stream](https://docs.spotflow.io/send-data/#stream).
+/// A set of options for sending [Messages](https://docs.iot.spotflow.io/send-data/#message) to
+/// a [Stream](https://docs.iot.spotflow.io/send-data/#stream).
 #[derive(Clone, Debug, Default)]
 pub struct MessageContext {
     stream_group: Option<String>,
@@ -55,8 +55,8 @@ pub struct MessageContext {
 }
 
 impl MessageContext {
-    // Create a new instance of [`MessageContext`] with the provided [Stream Group](https://docs.spotflow.io/send-data/#stream-group)
-    // and [Stream](https://docs.spotflow.io/send-data/#stream).
+    // Create a new instance of [`MessageContext`] with the provided [Stream Group](https://docs.iot.spotflow.io/send-data/#stream-group)
+    // and [Stream](https://docs.iot.spotflow.io/send-data/#stream).
     pub fn new(stream_group: Option<String>, stream: Option<String>) -> Self {
         Self {
             stream_group,
@@ -65,36 +65,36 @@ impl MessageContext {
         }
     }
 
-    /// Get the [Stream Group](https://docs.spotflow.io/send-data/#stream-group) where
-    /// [Messages](https://docs.spotflow.io/send-data/#message) will be sent to.
+    /// Get the [Stream Group](https://docs.iot.spotflow.io/send-data/#stream-group) where
+    /// [Messages](https://docs.iot.spotflow.io/send-data/#message) will be sent to.
     pub fn stream_group(&self) -> Option<&str> {
         self.stream_group.as_deref()
     }
 
-    /// Set the [Stream Group](https://docs.spotflow.io/send-data/#stream-group) where
-    /// [Messages](https://docs.spotflow.io/send-data/#message) will be sent to.
+    /// Set the [Stream Group](https://docs.iot.spotflow.io/send-data/#stream-group) where
+    /// [Messages](https://docs.iot.spotflow.io/send-data/#message) will be sent to.
     pub fn set_stream_group(&mut self, stream_group: Option<String>) {
         self.stream_group = stream_group;
     }
 
-    /// Get the [Stream](https://docs.spotflow.io/send-data/#stream) where
-    /// [Messages](https://docs.spotflow.io/send-data/#message) will be sent to.
+    /// Get the [Stream](https://docs.iot.spotflow.io/send-data/#stream) where
+    /// [Messages](https://docs.iot.spotflow.io/send-data/#message) will be sent to.
     pub fn stream(&self) -> Option<&str> {
         self.stream.as_deref()
     }
 
-    /// Set the [Stream](https://docs.spotflow.io/send-data/#stream) where
-    /// [Messages](https://docs.spotflow.io/send-data/#message) will be sent to.
+    /// Set the [Stream](https://docs.iot.spotflow.io/send-data/#stream) where
+    /// [Messages](https://docs.iot.spotflow.io/send-data/#message) will be sent to.
     pub fn set_stream(&mut self, stream: Option<String>) {
         self.stream = stream;
     }
 
-    /// Get the compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
+    /// Get the compression to use for sending [Messages](https://docs.iot.spotflow.io/send-data/#message).
     pub fn compression(&self) -> Option<Compression> {
         self.compression
     }
 
-    /// Set the compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
+    /// Set the compression to use for sending [Messages](https://docs.iot.spotflow.io/send-data/#message).
     pub fn set_compression(&mut self, compression: Option<Compression>) {
         self.compression = compression;
     }
@@ -171,33 +171,33 @@ impl DeviceClient {
         Ok(DeviceClient { connection })
     }
 
-    /// Get the ID of the [Workspace](https://docs.spotflow.io/manage-access/workspaces/) to which the
-    /// [Device](https://docs.spotflow.io/connect-devices/#device) belongs.
+    /// Get the ID of the [Workspace](https://docs.iot.spotflow.io/manage-access/workspaces/) to which the
+    /// [Device](https://docs.iot.spotflow.io/connect-devices/#device) belongs.
     pub fn workspace_id(&self) -> Result<String> {
         self.connection.workspace_id()
     }
 
-    /// The [Device ID](https://docs.spotflow.io/connect-devices/#device-id). Note that the value
+    /// The [Device ID](https://docs.iot.spotflow.io/connect-devices/#device-id). Note that the value
     /// might differ from the one requested in [`DeviceClientBuilder::new`] if the technician overrides it during the approval
-    /// of the [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
+    /// of the [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation).
     pub fn device_id(&self) -> Result<String> {
         self.connection.device_id()
     }
 
-    /// Enqueue a [Message](https://docs.spotflow.io/send-data/#message) to
+    /// Enqueue a [Message](https://docs.iot.spotflow.io/send-data/#message) to
     /// be sent to the Platform.
     ///
-    /// If the [Stream](https://docs.spotflow.io/send-data/#stream) doesn't have a
-    /// [Message ID Autofill Pattern](https://docs.spotflow.io/send-data/#message-id-autofill-pattern),
+    /// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) doesn't have a
+    /// [Message ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#message-id-autofill-pattern),
     /// you must provide the `message_id`.
-    /// If the [Stream](https://docs.spotflow.io/send-data/#stream) groups
-    /// [Messages](https://docs.spotflow.io/send-data/#message) into
-    /// [Batches](https://docs.spotflow.io/send-data/#batch) and doesn't have a
-    /// [Batch ID Autofill Pattern](https://docs.spotflow.io/send-data/#batch-id-autofill-pattern),
-    /// you must provide the `batch_id`. See [User Guide](https://docs.spotflow.io/send-data/) for
+    /// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) groups
+    /// [Messages](https://docs.iot.spotflow.io/send-data/#message) into
+    /// [Batches](https://docs.iot.spotflow.io/send-data/#batch) and doesn't have a
+    /// [Batch ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#batch-id-autofill-pattern),
+    /// you must provide the `batch_id`. See [User Guide](https://docs.iot.spotflow.io/send-data/) for
     /// more details.
     ///
-    /// The method returns right after it saves the [Message](https://docs.spotflow.io/send-data/#message) to
+    /// The method returns right after it saves the [Message](https://docs.iot.spotflow.io/send-data/#message) to
     /// the queue in the local database file. A background thread asynchronously sends the messages from the queue to the Platform.
     /// You can check the number of pending messages in the queue using [`DeviceClient::pending_messages_count`].
     pub fn enqueue_message(
@@ -211,21 +211,21 @@ impl DeviceClient {
             .enqueue_message(message_context, batch_id, message_id, payload)
     }
 
-    /// Enqueue a [Message](https://docs.spotflow.io/send-data/#message) to
+    /// Enqueue a [Message](https://docs.iot.spotflow.io/send-data/#message) to
     /// be sent to the Platform.
     ///
-    /// If the [Stream](https://docs.spotflow.io/send-data/#stream) doesn't have a
-    /// [Message ID Autofill Pattern](https://docs.spotflow.io/send-data/#message-id-autofill-pattern),
+    /// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) doesn't have a
+    /// [Message ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#message-id-autofill-pattern),
     /// you must provide the `message_id`.
-    /// If the [Stream](https://docs.spotflow.io/send-data/#stream) groups
-    /// [Messages](https://docs.spotflow.io/send-data/#message) into
-    /// [Batches](https://docs.spotflow.io/send-data/#batch) and doesn't have a
-    /// [Batch ID Autofill Pattern](https://docs.spotflow.io/send-data/#batch-id-autofill-pattern),
-    /// you must provide the `batch_id`. See [User Guide](https://docs.spotflow.io/send-data/) for
+    /// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) groups
+    /// [Messages](https://docs.iot.spotflow.io/send-data/#message) into
+    /// [Batches](https://docs.iot.spotflow.io/send-data/#batch) and doesn't have a
+    /// [Batch ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#batch-id-autofill-pattern),
+    /// you must provide the `batch_id`. See [User Guide](https://docs.iot.spotflow.io/send-data/) for
     /// more details.
     /// Optionally, you can provide also `batch_slice_id` to use Batch Slices and `chunk_id` to use Message Chunking.
     ///
-    /// The method returns right after it saves the [Message](https://docs.spotflow.io/send-data/#message) to
+    /// The method returns right after it saves the [Message](https://docs.iot.spotflow.io/send-data/#message) to
     /// the queue in the local database file. A background thread asynchronously sends the messages from the queue to the Platform.
     /// You can check the number of pending messages in the queue using [`DeviceClient::pending_messages_count`].
     pub fn enqueue_message_advanced(
@@ -247,14 +247,14 @@ impl DeviceClient {
         )
     }
 
-    /// Enqueue the manual completion of the current [Batch](https://docs.spotflow.io/send-data/#batch) to
+    /// Enqueue the manual completion of the current [Batch](https://docs.iot.spotflow.io/send-data/#batch) to
     /// be sent to the Platform.
     ///
-    /// The Platform also completes the previous [Batch](https://docs.spotflow.io/send-data/#batch) automatically
+    /// The Platform also completes the previous [Batch](https://docs.iot.spotflow.io/send-data/#batch) automatically
     /// when the new one starts. Therefore, you might not need to call this method at all.
-    /// See [User Guide](https://docs.spotflow.io/send-data/) for more details.
+    /// See [User Guide](https://docs.iot.spotflow.io/send-data/) for more details.
     ///
-    /// The method returns right after it saves the batch-completing [Message](https://docs.spotflow.io/send-data/#message) to
+    /// The method returns right after it saves the batch-completing [Message](https://docs.iot.spotflow.io/send-data/#message) to
     /// the queue in the local database file. A background thread asynchronously sends the messages from the queue to the Platform.
     /// You can check the number of pending messages in the queue using [`DeviceClient::pending_messages_count`].
     pub fn enqueue_batch_completion(
@@ -266,7 +266,7 @@ impl DeviceClient {
             .enqueue_batch_completion(message_context, batch_id)
     }
 
-    /// Enqueue the manual completion of the current [Message](https://docs.spotflow.io/send-data/#message) to
+    /// Enqueue the manual completion of the current [Message](https://docs.iot.spotflow.io/send-data/#message) to
     /// be sent to the Platform. Use this methods when Message Chunking is used.
     ///
     /// The method returns right after it saves the message-completing Message to the queue in the local database file.
@@ -282,20 +282,20 @@ impl DeviceClient {
             .enqueue_message_completion(message_context, batch_id, message_id)
     }
 
-    /// Send a [Message](https://docs.spotflow.io/send-data/#message) to
+    /// Send a [Message](https://docs.iot.spotflow.io/send-data/#message) to
     /// the Platform.
     ///
     /// **Warning:** This method blocks the current thread until the Message (and all the Messages enqueued before it)
     /// is sent to the Platform. If your Device doesn't have a stable Internet connection, consider using `spotflow_client_enqueue_message` instead.
     ///
-    /// If the [Stream](https://docs.spotflow.io/send-data/#stream) doesn't have a
-    /// [Message ID Autofill Pattern](https://docs.spotflow.io/send-data/#message-id-autofill-pattern),
+    /// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) doesn't have a
+    /// [Message ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#message-id-autofill-pattern),
     /// you must provide `message_id`.
-    /// If the [Stream](https://docs.spotflow.io/send-data/#stream) groups
-    /// [Messages](https://docs.spotflow.io/send-data/#message) into
-    /// [Batches](https://docs.spotflow.io/send-data/#batch) and doesn't have a
-    /// [Batch ID Autofill Pattern](https://docs.spotflow.io/send-data/#batch-id-autofill-pattern),
-    /// you must provide `batch_id`. See [User Guide](https://docs.spotflow.io/send-data/) for
+    /// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) groups
+    /// [Messages](https://docs.iot.spotflow.io/send-data/#message) into
+    /// [Batches](https://docs.iot.spotflow.io/send-data/#batch) and doesn't have a
+    /// [Batch ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#batch-id-autofill-pattern),
+    /// you must provide `batch_id`. See [User Guide](https://docs.iot.spotflow.io/send-data/) for
     /// more details.
     pub fn send_message(
         &self,
@@ -308,20 +308,20 @@ impl DeviceClient {
             .send_message(message_context, batch_id, message_id, payload)
     }
 
-    /// Send a [Message](https://docs.spotflow.io/send-data/#message) to
+    /// Send a [Message](https://docs.iot.spotflow.io/send-data/#message) to
     /// the Platform.
     ///
     /// **Warning:** This method blocks the current thread until the Message (and all the Messages enqueued before it)
     /// is sent to the Platform. If your Device doesn't have a stable Internet connection, consider using `spotflow_client_enqueue_message_advanced` instead.
     ///
-    /// If the [Stream](https://docs.spotflow.io/send-data/#stream) doesn't have a
-    /// [Message ID Autofill Pattern](https://docs.spotflow.io/send-data/#message-id-autofill-pattern),
+    /// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) doesn't have a
+    /// [Message ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#message-id-autofill-pattern),
     /// you must provide `message_id`.
-    /// If the [Stream](https://docs.spotflow.io/send-data/#stream) groups
-    /// [Messages](https://docs.spotflow.io/send-data/#message) into
-    /// [Batches](https://docs.spotflow.io/send-data/#batch) and doesn't have a
-    /// [Batch ID Autofill Pattern](https://docs.spotflow.io/send-data/#batch-id-autofill-pattern),
-    /// you must provide `batch_id`. See [User Guide](https://docs.spotflow.io/send-data/) for
+    /// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) groups
+    /// [Messages](https://docs.iot.spotflow.io/send-data/#message) into
+    /// [Batches](https://docs.iot.spotflow.io/send-data/#batch) and doesn't have a
+    /// [Batch ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#batch-id-autofill-pattern),
+    /// you must provide `batch_id`. See [User Guide](https://docs.iot.spotflow.io/send-data/) for
     /// more details.
     /// Optionally, you can provide also `batch_slice_id` to use Batch Slices and `chunk_id` to use Message Chunking.
     pub fn send_message_advanced(
@@ -343,26 +343,26 @@ impl DeviceClient {
         )
     }
 
-    /// Get the number of [Messages](https://docs.spotflow.io/send-data/#message) that
+    /// Get the number of [Messages](https://docs.iot.spotflow.io/send-data/#message) that
     /// have been persisted in the local database file but haven't been sent to the Platform yet.
     pub fn pending_messages_count(&self) -> Result<usize> {
         self.connection.pending_messages_count()
     }
 
-    /// Block the current thread until all the [Messages](https://docs.spotflow.io/send-data/#message) that
+    /// Block the current thread until all the [Messages](https://docs.iot.spotflow.io/send-data/#message) that
     /// have been previously enqueued are sent to the Platform.
     pub fn wait_enqueued_messages_sent(&self) -> Result<()> {
         self.connection.wait_enqueued_messages_sent()
     }
 
-    /// Get the current [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties).
+    /// Get the current [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties).
     ///
     /// Only the latest version is returned, any versions between the last obtained one and the current one are skipped.
     pub fn desired_properties(&self) -> Result<DesiredProperties> {
         self.connection.desired_properties()
     }
 
-    /// Get the current [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties)
+    /// Get the current [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties)
     /// if their version is higher than `version`. Otherwise, return `None`.
     ///
     /// Only the latest version is returned, any versions between the last obtained one and the current one are skipped.
@@ -370,7 +370,7 @@ impl DeviceClient {
         self.connection.desired_properties_if_newer(version)
     }
 
-    /// Enqueue an update of the [Reported Properties](https://docs.spotflow.io/configure-devices/#reported-properties)
+    /// Enqueue an update of the [Reported Properties](https://docs.iot.spotflow.io/configure-devices/#reported-properties)
     /// to be sent to the Platform.
     ///
     /// This method saves these Reported Properties persistently in the local database file.
@@ -381,7 +381,7 @@ impl DeviceClient {
         self.connection.update_reported_properties(properties)
     }
 
-    /// Get whether are there any updates to [Reported Properties](https://docs.spotflow.io/configure-devices/#reported-properties)
+    /// Get whether are there any updates to [Reported Properties](https://docs.iot.spotflow.io/configure-devices/#reported-properties)
     /// that are yet to be sent to the Platform.
     pub fn any_pending_reported_properties_updates(&self) -> Result<bool> {
         self.connection.any_pending_reported_properties_updates()

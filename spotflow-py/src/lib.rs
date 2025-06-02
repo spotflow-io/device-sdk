@@ -21,8 +21,8 @@ create_exception!(
 );
 
 /// You can use the Python package `spotflow_device` to integrate your
-/// [Devices](https://docs.spotflow.io/connect-devices/#device) with the
-/// Spotflow IoT Platform, see [Get Started](https://docs.spotflow.io/get-started).
+/// [Devices](https://docs.iot.spotflow.io/connect-devices/#device) with the
+/// Spotflow IoT Platform, see [Get Started](https://docs.iot.spotflow.io/get-started).
 ///
 /// ## Requirements
 ///
@@ -47,9 +47,9 @@ create_exception!(
 /// The following code connects the Device to the Platform and starts sending simulated sensor measurements.
 ///
 /// You need to [register to the Platform](https://portal.spotflow.io) and set it up before you can use the code.
-/// See [Get Started](https://docs.spotflow.io/get-started) for more information on configuring the Platform,
+/// See [Get Started](https://docs.iot.spotflow.io/get-started) for more information on configuring the Platform,
 /// registering your Device, and viewing the received data. Don't forget to replace `<Your Provisioning Token>`
-/// with the [actual Provisioning Token](https://docs.spotflow.io/connect-devices/tutorial-connect-device#1-create-provisioning-token) from
+/// with the [actual Provisioning Token](https://docs.iot.spotflow.io/connect-devices/tutorial-connect-device#1-create-provisioning-token) from
 /// the Platform.
 ///
 /// ```

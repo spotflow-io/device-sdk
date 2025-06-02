@@ -28,7 +28,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://iot.spotflow.io/platform"
-Documentation = "https://docs.spotflow.io/device-sdk/python/"
+Documentation = "https://docs.iot.spotflow.io/device-sdk/python/"
 Changelog = "https://github.com/spotflow-io/device-sdk/blob/main/spotflow-py/CHANGELOG.md"
 
 [build-system]

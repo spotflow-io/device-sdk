@@ -17,11 +17,11 @@ pub mod error;
 pub mod ingress;
 pub(crate) mod marshall;
 
-/// The maximum number of bytes of any [Device ID](https://docs.spotflow.io/connect-devices/#device-id) string
+/// The maximum number of bytes of any [Device ID](https://docs.iot.spotflow.io/connect-devices/#device-id) string
 /// including the trailing NUL character.
 pub const SPOTFLOW_DEVICE_ID_MAX_LENGTH: usize = 128;
 
-/// The maximum number of bytes of any [Workspace ID](https://docs.spotflow.io/manage-access/workspaces/) string
+/// The maximum number of bytes of any [Workspace ID](https://docs.iot.spotflow.io/manage-access/workspaces/) string
 /// including the trailing NUL character.
 pub const SPOTFLOW_WORKSPACE_ID_MAX_LENGTH: usize = 37;
 

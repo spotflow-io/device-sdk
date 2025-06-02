@@ -1,6 +1,6 @@
 use pyo3::prelude::*;
 
-/// A wrapper of [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties).
+/// A wrapper of [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties).
 #[pyclass]
 #[derive(Clone)]
 pub struct DesiredProperties {

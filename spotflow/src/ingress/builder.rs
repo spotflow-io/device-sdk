@@ -21,7 +21,7 @@ use crate::{EmptyProcessSignalsSource, ProcessSignalsSource};
 
 use super::DeviceClient;
 
-/// The summary of an ongoing [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
+/// The summary of an ongoing [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation).
 ///
 /// If you specify a custom implementation of [`ProvisioningOperationDisplayHandler`] to
 /// [`DeviceClientBuilder::with_desired_properties_updated_callback`], you'll receive a
@@ -49,9 +49,9 @@ impl From<InitProvisioningResponse> for ProvisioningOperation {
     }
 }
 
-/// Displays the details of the current [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
+/// Displays the details of the current [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation).
 pub trait ProvisioningOperationDisplayHandler {
-    /// Display the details of the current [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation) to the user.
+    /// Display the details of the current [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation) to the user.
     fn display(&self, provisioning_operation: &ProvisioningOperation) -> Result<()>;
 }
 
@@ -76,13 +76,13 @@ pub struct DeviceClientBuilder {
 impl DeviceClientBuilder {
     /// Creates a new [`DeviceClientBuilder`] with the provided basic configuration options:
     ///
-    /// * `device_id`: The unique [Device ID](https://docs.spotflow.io/connect-devices/#device-id) you
+    /// * `device_id`: The unique [Device ID](https://docs.iot.spotflow.io/connect-devices/#device-id) you
     ///   are running the code from. If you don't specify it here, you'll need to either store it in the
-    ///   [Provisioning Token](https://docs.spotflow.io/connect-devices/#provisioning-token),
+    ///   [Provisioning Token](https://docs.iot.spotflow.io/connect-devices/#provisioning-token),
     ///   or choose it during the approval of the
-    ///   [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
-    /// * `provisioning_token`: The [Provisioning Token](https://docs.spotflow.io/connect-devices/#provisioning-token)
-    ///   used to start [Device Provisioning](https://docs.spotflow.io/connect-devices/#device-provisioning).
+    ///   [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation).
+    /// * `provisioning_token`: The [Provisioning Token](https://docs.iot.spotflow.io/connect-devices/#provisioning-token)
+    ///   used to start [Device Provisioning](https://docs.iot.spotflow.io/connect-devices/#device-provisioning).
     /// * `db`: The path to the local database file where the Device SDK stores the connection credentials and temporarily persists
     ///   incoming and outgoing messages. This method creates the file if it doesn't exist.
     ///   The file must end with the suffix `".db"`, for example, `"spotflow.db"`.
@@ -115,7 +115,7 @@ impl DeviceClientBuilder {
     }
 
     /// Set the URI/hostname of the Platform instance where the
-    /// [Device](https://docs.spotflow.io/connect-devices/#device) will connect to.
+    /// [Device](https://docs.iot.spotflow.io/connect-devices/#device) will connect to.
     ///
     /// If your company uses a dedicated instance of the Platform, such as `acme.spotflow.io`, specify it here.
     /// The default value is `api.eu1.spotflow.io`.
@@ -125,8 +125,8 @@ impl DeviceClientBuilder {
     }
 
     /// Set the callback to display the details of the
-    /// [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation)
-    /// when [`DeviceClientBuilder::build`] is performing [Device Provisioning](https://docs.spotflow.io/connect-devices/#device-provisioning).
+    /// [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation)
+    /// when [`DeviceClientBuilder::build`] is performing [Device Provisioning](https://docs.iot.spotflow.io/connect-devices/#device-provisioning).
     pub fn with_display_provisioning_operation_callback(
         mut self,
         callback: Box<dyn ProvisioningOperationDisplayHandler>,
@@ -136,9 +136,9 @@ impl DeviceClientBuilder {
     }
 
     /// Set the callback that is called right after [`DeviceClientBuilder::build`] with the current version of the
-    /// [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties) and then whenever the
-    /// [Device](https://docs.spotflow.io/connect-devices/#device) receives their update from the Platform.
-    /// The [Device configuration tutorial](https://docs.spotflow.io/configure-devices/tutorial-configure-device#1-start-device)
+    /// [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties) and then whenever the
+    /// [Device](https://docs.iot.spotflow.io/connect-devices/#device) receives their update from the Platform.
+    /// The [Device configuration tutorial](https://docs.iot.spotflow.io/configure-devices/tutorial-configure-device#1-start-device)
     /// shows how to use this option. The callback must be `Send` and `Sync`, because it's called in a separate thread.
     pub fn with_desired_properties_updated_callback(
         mut self,
@@ -162,14 +162,14 @@ impl DeviceClientBuilder {
 
     /// Build the [`DeviceClient`] that starts communicating with the Platform.
     ///
-    /// If the [Device](https://docs.spotflow.io/connect-devices/#device) is
+    /// If the [Device](https://docs.iot.spotflow.io/connect-devices/#device) is
     /// not yet registered in the Platform, or its
-    /// [Registration Token](https://docs.spotflow.io/connect-devices/#registration-token) is
-    /// expired, this method performs [Device Provisioning](https://docs.spotflow.io/connect-devices/#device-provisioning)
+    /// [Registration Token](https://docs.iot.spotflow.io/connect-devices/#registration-token) is
+    /// expired, this method performs [Device Provisioning](https://docs.iot.spotflow.io/connect-devices/#device-provisioning)
     /// and waits for the approval.
-    /// [Get Started](https://docs.spotflow.io/get-started) shows this process in practice.
+    /// [Get Started](https://docs.iot.spotflow.io/get-started) shows this process in practice.
     ///
-    /// If the [Registration Token](https://docs.spotflow.io/connect-devices/#registration-token) from
+    /// If the [Registration Token](https://docs.iot.spotflow.io/connect-devices/#registration-token) from
     /// the last run is still valid, this method succeeds even without the connection to the Internet. The Device SDK will
     /// store all outgoing communication in the local database file and send it once it connects to the Platform.
     pub fn build(self) -> Result<DeviceClient> {

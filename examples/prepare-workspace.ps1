@@ -57,4 +57,4 @@ Write-Output "The Workspace is ready for testing. Set the following environment 
 Write-Output "SPOTFLOW_DEVICE_SDK_TEST_INSTANCE: $Instance"
 Write-Output "SPOTFLOW_DEVICE_SDK_TEST_PROVISIONING_TOKEN: $($token.provisioningToken)"
 Write-Output "SPOTFLOW_DEVICE_SDK_TEST_WORKSPACE_ID: $WorkspaceId"
-Write-Output "SPOTFLOW_DEVICE_SDK_TEST_API_TOKEN: Set according to this guide: https://docs.spotflow.io/api/#authentication"
+Write-Output "SPOTFLOW_DEVICE_SDK_TEST_API_TOKEN: Set according to this guide: https://docs.iot.spotflow.io/api/#authentication"
