@@ -320,7 +320,7 @@ pub fn get_workspace_storage_sas_uri(
 
     let data = json!({
         "container": "Messages",
-        "duration": "00:00:10:00",
+        "duration": "00:10:00",
     });
 
     let json = agent

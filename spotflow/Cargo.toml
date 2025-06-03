@@ -1,10 +1,10 @@
 [package]
 name = "spotflow"
-version = "0.8.0"
+version = "0.8.1"
 edition = "2021"
 license = "MIT"
 description = "Device SDK for Spotflow IoT Platform"
-homepage = "https://docs.spotflow.io/device-sdk/rust/"
+homepage = "https://docs.iot.spotflow.io/device-sdk/rust/"
 readme = "README-CRATE.md"
 keywords = ["spotflow", "iot", "device", "sdk"]
 

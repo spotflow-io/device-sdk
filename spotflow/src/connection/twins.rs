@@ -3,7 +3,7 @@ use std::panic::RefUnwindSafe;
 use anyhow::Result;
 use async_trait::async_trait;
 
-/// A wrapper of [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties).
+/// A wrapper of [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties).
 #[derive(Clone, Debug)]
 pub struct DesiredProperties {
     /// The version of the properties.
@@ -12,9 +12,9 @@ pub struct DesiredProperties {
     pub values: String,
 }
 
-/// Handles updates of the [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties).
+/// Handles updates of the [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties).
 pub trait DesiredPropertiesUpdatedCallback: Send + Sync + RefUnwindSafe {
-    /// Handle the updated version of the [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties).
+    /// Handle the updated version of the [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties).
     fn properties_updated(&self, properties: DesiredProperties) -> Result<()>;
 }
 

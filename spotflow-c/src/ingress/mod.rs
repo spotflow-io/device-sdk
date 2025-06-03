@@ -21,7 +21,7 @@ use self::twins::DesiredPropertiesUpdatedCallback;
 mod c2d;
 mod twins;
 
-/// The compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
+/// The compression to use for sending [Messages](https://docs.iot.spotflow.io/send-data/#message).
 #[repr(C)]
 pub enum Compression {
     /// Do not compress the message.
@@ -46,8 +46,8 @@ impl Compression {
     }
 }
 
-/// A set of options for sending [Messages](https://docs.spotflow.io/send-data/#message) to
-/// a [Stream](https://docs.spotflow.io/send-data/#stream). This object is
+/// A set of options for sending [Messages](https://docs.iot.spotflow.io/send-data/#message) to
+/// a [Stream](https://docs.iot.spotflow.io/send-data/#stream). This object is
 /// managed by the Device SDK. Create its instance using @ref spotflow_message_context_create and delete it using
 /// @ref spotflow_message_context_destroy.
 pub struct MessageContext {
@@ -124,10 +124,10 @@ impl spotflow::DesiredPropertiesUpdatedCallback for DesiredPropertiesUpdatedCall
 ///      spotflow_client_options_set_remote_access_allowed_for_all_ports
 ///
 /// @param options (Output) The pointer to the @ref spotflow_client_options_t object that will be created by this function.
-/// @param device_id (Optional) The [ID of the Device](https://docs.spotflow.io/connect-devices/#device-id) you
+/// @param device_id (Optional) The [ID of the Device](https://docs.iot.spotflow.io/connect-devices/#device-id) you
 ///                  are running the code from. Use `NULL` if you don't want to specify it. See @ref spotflow_client_options_set_device_id.
-/// @param provisioning_token The [Provisioning Token](https://docs.spotflow.io/connect-devices/#provisioning-token)
-///                           that will @ref spotflow_client_start use to start [Device Provisioning](https://docs.spotflow.io/connect-devices/#device-provisioning).
+/// @param provisioning_token The [Provisioning Token](https://docs.iot.spotflow.io/connect-devices/#provisioning-token)
+///                           that will @ref spotflow_client_start use to start [Device Provisioning](https://docs.iot.spotflow.io/connect-devices/#device-provisioning).
 ///                           See @ref spotflow_client_options_set_provisioning_token.
 /// @param database_file The path to the local database file where the Device SDK stores the connection credentials and
 ///                     temporarily persists incoming and outgoing messages. See @ref spotflow_client_options_set_database_file.
@@ -194,14 +194,14 @@ pub unsafe extern "C" fn spotflow_client_options_set_database_file(
     })
 }
 
-/// Set the [Provisioning Token](https://docs.spotflow.io/connect-devices/#provisioning-token) that
-/// will @ref spotflow_client_start use to start [Device Provisioning](https://docs.spotflow.io/connect-devices/#device-provisioning).
+/// Set the [Provisioning Token](https://docs.iot.spotflow.io/connect-devices/#provisioning-token) that
+/// will @ref spotflow_client_start use to start [Device Provisioning](https://docs.iot.spotflow.io/connect-devices/#device-provisioning).
 ///
-/// See [Get Started](https://docs.spotflow.io/get-started) for instructions
-/// [how to create a Provisioning Token](https://docs.spotflow.io/get-started#3-create-provisioning-token).
+/// See [Get Started](https://docs.iot.spotflow.io/get-started) for instructions
+/// [how to create a Provisioning Token](https://docs.iot.spotflow.io/get-started#3-create-provisioning-token).
 ///
 /// @param options The @ref spotflow_client_options_t object.
-/// @param provisioning_token The [Provisioning Token](https://docs.spotflow.io/connect-devices/#provisioning-token).
+/// @param provisioning_token The [Provisioning Token](https://docs.iot.spotflow.io/connect-devices/#provisioning-token).
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid.
 #[no_mangle]
 pub unsafe extern "C" fn spotflow_client_options_set_provisioning_token(
@@ -217,11 +217,11 @@ pub unsafe extern "C" fn spotflow_client_options_set_provisioning_token(
     })
 }
 
-/// Set the ID of the [Site](https://docs.spotflow.io/connect-devices/#site) the
-/// [Device](https://docs.spotflow.io/connect-devices/#device) is located at.
+/// Set the ID of the [Site](https://docs.iot.spotflow.io/connect-devices/#site) the
+/// [Device](https://docs.iot.spotflow.io/connect-devices/#device) is located at.
 ///
 /// @param options The @ref spotflow_client_options_t object.
-/// @param site_id (Optional) The [ID of the Site](https://docs.spotflow.io/connect-devices/#site).
+/// @param site_id (Optional) The [ID of the Site](https://docs.iot.spotflow.io/connect-devices/#site).
 ///                Use `NULL` if you don't want to specify it.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid.
 #[no_mangle]
@@ -239,18 +239,18 @@ unsafe extern "C" fn spotflow_client_options_set_site_id(
     })
 }
 
-/// Set the unique [Device ID](https://docs.spotflow.io/connect-devices/#device-id) you
+/// Set the unique [Device ID](https://docs.iot.spotflow.io/connect-devices/#device-id) you
 /// are running the code from. If you don't specify it here, you'll need to either store it in the
-/// [Provisioning Token](https://docs.spotflow.io/connect-devices/#provisioning-token),
+/// [Provisioning Token](https://docs.iot.spotflow.io/connect-devices/#provisioning-token),
 /// or choose it during the approval of the
-/// [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
+/// [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation).
 ///
-/// Make sure that no two [Devices](https://docs.spotflow.io/connect-devices/#device) in
-/// the same [Workspace](https://docs.spotflow.io/manage-access/workspaces/) use the same ID.
+/// Make sure that no two [Devices](https://docs.iot.spotflow.io/connect-devices/#device) in
+/// the same [Workspace](https://docs.iot.spotflow.io/manage-access/workspaces/) use the same ID.
 /// Otherwise, unexpected errors can occur during the communication with the Platform.
 ///
 /// @param options The @ref spotflow_client_options_t object.
-/// @param device_id (Optional) The [ID of the Device](https://docs.spotflow.io/connect-devices/#device-id).
+/// @param device_id (Optional) The [ID of the Device](https://docs.iot.spotflow.io/connect-devices/#device-id).
 ///                  Use `NULL` if you don't want to specify it.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid.
 #[no_mangle]
@@ -268,7 +268,7 @@ pub unsafe extern "C" fn spotflow_client_options_set_device_id(
 }
 
 /// Set the URI/hostname of the Platform instance where the
-/// [Device](https://docs.spotflow.io/connect-devices/#device) will connect to.
+/// [Device](https://docs.iot.spotflow.io/connect-devices/#device) will connect to.
 ///
 /// If your company uses a dedicated instance of the Platform, such as `acme.spotflow.io`, specify it here.
 /// The default value is `api.eu1.spotflow.io`.
@@ -291,13 +291,13 @@ pub unsafe extern "C" fn spotflow_client_options_set_instance(
 }
 
 /// Set the function that displays the details of the
-/// [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation) when
-/// @ref spotflow_client_start is performing [Device Provisioning](https://docs.spotflow.io/connect-devices/#device-provisioning).
-/// See [Get Started](https://docs.spotflow.io/get-started#3-create-provisioning-token) for hands-on experience with this process.
+/// [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation) when
+/// @ref spotflow_client_start is performing [Device Provisioning](https://docs.iot.spotflow.io/connect-devices/#device-provisioning).
+/// See [Get Started](https://docs.iot.spotflow.io/get-started#3-create-provisioning-token) for hands-on experience with this process.
 ///
 /// @param options The @ref spotflow_client_options_t object.
 /// @param callback (Optional) The function that displays the details of the
-///                 [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
+///                 [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation).
 ///                 Use `NULL` if you don't want to specify it.
 /// @param context (Optional) The context that will be passed to `callback`. Use `NULL`
 ///                if you don't want to specify it.
@@ -320,16 +320,16 @@ pub unsafe extern "C" fn spotflow_client_options_set_display_provisioning_operat
 }
 
 /// Set the function that is called right after @ref spotflow_client_start with the current version of the
-/// [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties) and then whenever the
-/// [Device](https://docs.spotflow.io/connect-devices/#device) receives their update from the Platform.
-/// The [Device configuration tutorial](https://docs.spotflow.io/configure-devices/tutorial-configure-device#1-start-device)
+/// [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties) and then whenever the
+/// [Device](https://docs.iot.spotflow.io/connect-devices/#device) receives their update from the Platform.
+/// The [Device configuration tutorial](https://docs.iot.spotflow.io/configure-devices/tutorial-configure-device#1-start-device)
 /// shows how to use this option. The function is called in a separate thread, so make sure that you properly synchronize
 /// access to your shared resources. The functions working with @ref spotflow_client_t are thread-safe
 /// (apart from @ref spotflow_client_destroy), so it's safe to call them in the function.
 ///
 /// @param options The @ref spotflow_client_options_t object.
 /// @param callback (Optional) The function that is called with each update of the
-///                 [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties).
+///                 [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties).
 ///                 Use `NULL` if you don't want to specify it.
 /// @param context (Optional) The context that will be passed to `callback`. It will be used from a different thread,
 ///                so make sure that it's properly synchronized. Use `NULL` if you don't want to specify it.
@@ -380,14 +380,14 @@ pub unsafe extern "C" fn spotflow_client_options_destroy(options: *mut ClientOpt
 /// Start communicating with the Platform. The created object of type @ref spotflow_client_t is managed by
 /// the Device SDK. Delete it using @ref spotflow_client_destroy.
 ///
-/// If the [Device](https://docs.spotflow.io/connect-devices/#device) is
+/// If the [Device](https://docs.iot.spotflow.io/connect-devices/#device) is
 /// not yet registered in the Platform, or its
-/// [Registration Token](https://docs.spotflow.io/connect-devices/#registration-token) is
-/// expired, this method performs [Device Provisioning](https://docs.spotflow.io/connect-devices/#device-provisioning)
+/// [Registration Token](https://docs.iot.spotflow.io/connect-devices/#registration-token) is
+/// expired, this method performs [Device Provisioning](https://docs.iot.spotflow.io/connect-devices/#device-provisioning)
 /// and waits for the approval.
-/// [Get Started](https://docs.spotflow.io/get-started) shows this process in practice.
+/// [Get Started](https://docs.iot.spotflow.io/get-started) shows this process in practice.
 ///
-/// If the [Registration Token](https://docs.spotflow.io/connect-devices/#registration-token) from
+/// If the [Registration Token](https://docs.iot.spotflow.io/connect-devices/#registration-token) from
 /// the last run is still valid, this method succeeds even without the connection to the Internet. The Device SDK will
 /// store all outgoing communication in the local database file and send it once it connects to the Platform.
 ///
@@ -457,7 +457,7 @@ pub extern "C" fn spotflow_client_start(
     }
 }
 
-/// Create an object that stores the options for sending [Messages](https://docs.spotflow.io/send-data/#message) to
+/// Create an object that stores the options for sending [Messages](https://docs.iot.spotflow.io/send-data/#message) to
 /// the Platform.
 ///
 /// Initialize the @ref spotflow_message_context_t object: set the most important fields to the provided values and
@@ -470,12 +470,12 @@ pub extern "C" fn spotflow_client_start(
 ///      spotflow_message_context_set_compression
 ///
 /// @param message_context (Output) The pointer to the @ref spotflow_message_context_t object that will be created by this function.
-/// @param stream_group (Optional) The [Stream Group](https://docs.spotflow.io/send-data/#stream-group)
-///                     the [Message](https://docs.spotflow.io/send-data/#message) will be sent to.
+/// @param stream_group (Optional) The [Stream Group](https://docs.iot.spotflow.io/send-data/#stream-group)
+///                     the [Message](https://docs.iot.spotflow.io/send-data/#message) will be sent to.
 ///                     If `NULL`, the Platforms directs the Messages to the default Stream Group of the current
-///                     [Workspace](https://docs.spotflow.io/manage-access/workspaces/).
-/// @param stream (Optional) The [Stream](https://docs.spotflow.io/send-data/#stream)
-///               the [Message](https://docs.spotflow.io/send-data/#message) will be sent to.
+///                     [Workspace](https://docs.iot.spotflow.io/manage-access/workspaces/).
+/// @param stream (Optional) The [Stream](https://docs.iot.spotflow.io/send-data/#stream)
+///               the [Message](https://docs.iot.spotflow.io/send-data/#message) will be sent to.
 ///               If `NULL`, the Platform directs the Messages into the default Stream of the given Stream Group.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid.
 #[no_mangle]
@@ -506,13 +506,13 @@ pub extern "C" fn spotflow_message_context_create(
     }
 }
 
-/// Set the [Stream Group](https://docs.spotflow.io/send-data/#stream-group) where
-/// [Messages](https://docs.spotflow.io/send-data/#message) will be sent to.
+/// Set the [Stream Group](https://docs.iot.spotflow.io/send-data/#stream-group) where
+/// [Messages](https://docs.iot.spotflow.io/send-data/#message) will be sent to.
 ///
 /// @param message_context The @ref spotflow_message_context_t object.
-/// @param stream_group The [Stream Group](https://docs.spotflow.io/send-data/#stream-group).
+/// @param stream_group The [Stream Group](https://docs.iot.spotflow.io/send-data/#stream-group).
 ///                     If `NULL`, the Platforms directs the Messages to the default Stream Group of the current
-///                     [Workspace](https://docs.spotflow.io/manage-access/workspaces/).
+///                     [Workspace](https://docs.iot.spotflow.io/manage-access/workspaces/).
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid.
 #[no_mangle]
 pub unsafe extern "C" fn spotflow_message_context_set_stream_group(
@@ -531,11 +531,11 @@ pub unsafe extern "C" fn spotflow_message_context_set_stream_group(
     })
 }
 
-/// Set the [Stream](https://docs.spotflow.io/send-data/#stream) where
-/// [Messages](https://docs.spotflow.io/send-data/#message) will be sent to.
+/// Set the [Stream](https://docs.iot.spotflow.io/send-data/#stream) where
+/// [Messages](https://docs.iot.spotflow.io/send-data/#message) will be sent to.
 ///
 /// @param message_context The @ref spotflow_message_context_t object.
-/// @param stream The [Stream](https://docs.spotflow.io/send-data/#stream).
+/// @param stream The [Stream](https://docs.iot.spotflow.io/send-data/#stream).
 ///               If `NULL`, the Platform directs the Messages into the default Stream of the given Stream Group.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid.
 #[no_mangle]
@@ -555,10 +555,10 @@ pub unsafe extern "C" fn spotflow_message_context_set_stream(
     })
 }
 
-/// Set the compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
+/// Set the compression to use for sending [Messages](https://docs.iot.spotflow.io/send-data/#message).
 ///
 /// @param message_context The @ref spotflow_message_context_t object.
-/// @param compression The compression to use for sending [Messages](https://docs.spotflow.io/send-data/#message).
+/// @param compression The compression to use for sending [Messages](https://docs.iot.spotflow.io/send-data/#message).
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid.
 #[no_mangle]
 pub unsafe extern "C" fn spotflow_message_context_set_compression(
@@ -585,31 +585,31 @@ pub unsafe extern "C" fn spotflow_message_context_destroy(message_context: *mut 
     drop_ptr(message_context);
 }
 
-/// Enqueue a [Message](https://docs.spotflow.io/send-data/#message) to
+/// Enqueue a [Message](https://docs.iot.spotflow.io/send-data/#message) to
 /// be sent to the Platform.
 ///
-/// If the [Stream](https://docs.spotflow.io/send-data/#stream) doesn't have a
-/// [Message ID Autofill Pattern](https://docs.spotflow.io/send-data/#message-id-autofill-pattern),
+/// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) doesn't have a
+/// [Message ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#message-id-autofill-pattern),
 /// you must provide `message_id`.
-/// If the [Stream](https://docs.spotflow.io/send-data/#stream) groups
-/// [Messages](https://docs.spotflow.io/send-data/#message) into
-/// [Batches](https://docs.spotflow.io/send-data/#batch) and doesn't have a
-/// [Batch ID Autofill Pattern](https://docs.spotflow.io/send-data/#batch-id-autofill-pattern),
-/// you must provide `batch_id`. See [User Guide](https://docs.spotflow.io/send-data/) for
+/// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) groups
+/// [Messages](https://docs.iot.spotflow.io/send-data/#message) into
+/// [Batches](https://docs.iot.spotflow.io/send-data/#batch) and doesn't have a
+/// [Batch ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#batch-id-autofill-pattern),
+/// you must provide `batch_id`. See [User Guide](https://docs.iot.spotflow.io/send-data/) for
 /// more details.
 ///
-/// The method returns right after it saves the [Message](https://docs.spotflow.io/send-data/#message) to
+/// The method returns right after it saves the [Message](https://docs.iot.spotflow.io/send-data/#message) to
 /// the queue in the local database file. A background thread asynchronously sends the messages from the queue to the Platform.
 /// You can check the number of pending messages in the queue using @ref spotflow_client_get_pending_messages_count.
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param message_context The options that specify how to send the [Message](https://docs.spotflow.io/send-data/#message).
-/// @param batch_id (Optional) The ID of the [Batch](https://docs.spotflow.io/send-data/#batch) the
-///                 [Message](https://docs.spotflow.io/send-data/#message) is a part of.
+/// @param message_context The options that specify how to send the [Message](https://docs.iot.spotflow.io/send-data/#message).
+/// @param batch_id (Optional) The ID of the [Batch](https://docs.iot.spotflow.io/send-data/#batch) the
+///                 [Message](https://docs.iot.spotflow.io/send-data/#message) is a part of.
 ///                 Use `NULL` if you don't want to specify it.
-/// @param message_id (Optional) The ID of the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param message_id (Optional) The ID of the [Message](https://docs.iot.spotflow.io/send-data/#message).
 ///                   Use `NULL` if you don't want to specify it.
-/// @param buffer The buffer that contains the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param buffer The buffer that contains the [Message](https://docs.iot.spotflow.io/send-data/#message).
 /// @param length The length of the buffer in bytes.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid or there is an error in
 ///              persisting the message.
@@ -639,36 +639,36 @@ pub extern "C" fn spotflow_client_enqueue_message(
     }
 }
 
-/// Enqueue a [Message](https://docs.spotflow.io/send-data/#message) to
+/// Enqueue a [Message](https://docs.iot.spotflow.io/send-data/#message) to
 /// be sent to the Platform.
 ///
-/// If the [Stream](https://docs.spotflow.io/send-data/#stream) doesn't have a
-/// [Message ID Autofill Pattern](https://docs.spotflow.io/send-data/#message-id-autofill-pattern),
+/// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) doesn't have a
+/// [Message ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#message-id-autofill-pattern),
 /// you must provide `message_id`.
-/// If the [Stream](https://docs.spotflow.io/send-data/#stream) groups
-/// [Messages](https://docs.spotflow.io/send-data/#message) into
-/// [Batches](https://docs.spotflow.io/send-data/#batch) and doesn't have a
-/// [Batch ID Autofill Pattern](https://docs.spotflow.io/send-data/#batch-id-autofill-pattern),
-/// you must provide `batch_id`. See [User Guide](https://docs.spotflow.io/send-data/) for
+/// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) groups
+/// [Messages](https://docs.iot.spotflow.io/send-data/#message) into
+/// [Batches](https://docs.iot.spotflow.io/send-data/#batch) and doesn't have a
+/// [Batch ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#batch-id-autofill-pattern),
+/// you must provide `batch_id`. See [User Guide](https://docs.iot.spotflow.io/send-data/) for
 /// more details.
 /// Optionally, you can provide also `batch_slice_id` to use Batch Slices and `chunk_id` to use Message Chunking.
 ///
-/// The method returns right after it saves the [Message](https://docs.spotflow.io/send-data/#message) to
+/// The method returns right after it saves the [Message](https://docs.iot.spotflow.io/send-data/#message) to
 /// the queue in the local database file. A background thread asynchronously sends the messages from the queue to the Platform.
 /// You can check the number of pending messages in the queue using @ref spotflow_client_get_pending_messages_count.
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param message_context The options that specify how to send the [Message](https://docs.spotflow.io/send-data/#message).
-/// @param batch_id (Optional) The ID of the [Batch](https://docs.spotflow.io/send-data/#batch) the
-///                 [Message](https://docs.spotflow.io/send-data/#message) is a part of.
+/// @param message_context The options that specify how to send the [Message](https://docs.iot.spotflow.io/send-data/#message).
+/// @param batch_id (Optional) The ID of the [Batch](https://docs.iot.spotflow.io/send-data/#batch) the
+///                 [Message](https://docs.iot.spotflow.io/send-data/#message) is a part of.
 ///                 Use `NULL` if you don't want to specify it.
-/// @param batch_slice_id (Optional) The ID of the Batch Slice the [Message](https://docs.spotflow.io/send-data/#message) is
+/// @param batch_slice_id (Optional) The ID of the Batch Slice the [Message](https://docs.iot.spotflow.io/send-data/#message) is
 ///                       a part of. Use `NULL` if you dont' want to specify it.
-/// @param message_id (Optional) The ID of the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param message_id (Optional) The ID of the [Message](https://docs.iot.spotflow.io/send-data/#message).
 ///                   Use `NULL` if you don't want to specify it.
-/// @param chunk_id (Optional) The ID of the Chunk of the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param chunk_id (Optional) The ID of the Chunk of the [Message](https://docs.iot.spotflow.io/send-data/#message).
 ///                 Use `NULL` if you don't want to specify it.
-/// @param buffer The buffer that contains the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param buffer The buffer that contains the [Message](https://docs.iot.spotflow.io/send-data/#message).
 /// @param length The length of the buffer in bytes.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid or there is an error in
 ///              persisting the message.
@@ -709,20 +709,20 @@ pub extern "C" fn spotflow_client_enqueue_message_advanced(
     }
 }
 
-/// Enqueue the manual completion of the current [Batch](https://docs.spotflow.io/send-data/#batch) to
+/// Enqueue the manual completion of the current [Batch](https://docs.iot.spotflow.io/send-data/#batch) to
 /// be sent to the Platform.
 ///
-/// The Platform also completes the previous [Batch](https://docs.spotflow.io/send-data/#batch) automatically
+/// The Platform also completes the previous [Batch](https://docs.iot.spotflow.io/send-data/#batch) automatically
 /// when the new one starts. Therefore, you might not need to call this method at all.
-/// See [User Guide](https://docs.spotflow.io/send-data/) for more details.
+/// See [User Guide](https://docs.iot.spotflow.io/send-data/) for more details.
 ///
-/// The method returns right after it saves the batch-completing [Message](https://docs.spotflow.io/send-data/#message) to
+/// The method returns right after it saves the batch-completing [Message](https://docs.iot.spotflow.io/send-data/#message) to
 /// the queue in the local database file. A background thread asynchronously sends the messages from the queue to the Platform.
 /// You can check the number of pending messages in the queue using @ref spotflow_client_get_pending_messages_count.
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param message_context The options that specify how to send the batch-completing [Message](https://docs.spotflow.io/send-data/#message).
-/// @param batch_id The ID of the [Batch](https://docs.spotflow.io/send-data/#batch) that will be completed.
+/// @param message_context The options that specify how to send the batch-completing [Message](https://docs.iot.spotflow.io/send-data/#message).
+/// @param batch_id The ID of the [Batch](https://docs.iot.spotflow.io/send-data/#batch) that will be completed.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid or there is an error in
 ///              persisting the message.
 #[no_mangle]
@@ -749,7 +749,7 @@ pub extern "C" fn spotflow_client_enqueue_batch_completion(
     })
 }
 
-/// Enqueue the manual completion of the current [Message](https://docs.spotflow.io/send-data/#message) to
+/// Enqueue the manual completion of the current [Message](https://docs.iot.spotflow.io/send-data/#message) to
 /// be sent to the Platform. Use this methods when Message Chunking is used.
 ///
 /// The method returns right after it saves the message-completing Message to the queue in the local database file.
@@ -757,10 +757,10 @@ pub extern "C" fn spotflow_client_enqueue_batch_completion(
 /// You can check the number of pending messages in the queue using @ref spotflow_client_get_pending_messages_count.
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param message_context The options that specify how to send the message-completing [Message](https://docs.spotflow.io/send-data/#message).
-/// @param batch_id The ID of the [Batch](https://docs.spotflow.io/send-data/#batch) that
-///                 the [Message](https://docs.spotflow.io/send-data/#message) belongs to.
-/// @param message_id The ID of the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param message_context The options that specify how to send the message-completing [Message](https://docs.iot.spotflow.io/send-data/#message).
+/// @param batch_id The ID of the [Batch](https://docs.iot.spotflow.io/send-data/#batch) that
+///                 the [Message](https://docs.iot.spotflow.io/send-data/#message) belongs to.
+/// @param message_id The ID of the [Message](https://docs.iot.spotflow.io/send-data/#message).
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid or there is an error in
 ///              persisting the message.
 #[no_mangle]
@@ -794,7 +794,7 @@ pub extern "C" fn spotflow_client_enqueue_message_completion(
     })
 }
 
-/// Block the current thread until all the [Messages](https://docs.spotflow.io/send-data/#message) that
+/// Block the current thread until all the [Messages](https://docs.iot.spotflow.io/send-data/#message) that
 /// have been previously enqueued are sent to the Platform.
 ///
 /// @param client The @ref spotflow_client_t object.
@@ -816,30 +816,30 @@ pub extern "C" fn spotflow_client_wait_enqueued_messages_sent(
     }
 }
 
-/// Send a [Message](https://docs.spotflow.io/send-data/#message) to
+/// Send a [Message](https://docs.iot.spotflow.io/send-data/#message) to
 /// the Platform.
 ///
 /// **Warning:** This method blocks the current thread until the Message (and all the Messages enqueued before it)
 /// is sent to the Platform. If your Device doesn't have a stable Internet connection, consider using `spotflow_client_enqueue_message` instead.
 ///
-/// If the [Stream](https://docs.spotflow.io/send-data/#stream) doesn't have a
-/// [Message ID Autofill Pattern](https://docs.spotflow.io/send-data/#message-id-autofill-pattern),
+/// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) doesn't have a
+/// [Message ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#message-id-autofill-pattern),
 /// you must provide `message_id`.
-/// If the [Stream](https://docs.spotflow.io/send-data/#stream) groups
-/// [Messages](https://docs.spotflow.io/send-data/#message) into
-/// [Batches](https://docs.spotflow.io/send-data/#batch) and doesn't have a
-/// [Batch ID Autofill Pattern](https://docs.spotflow.io/send-data/#batch-id-autofill-pattern),
-/// you must provide `batch_id`. See [User Guide](https://docs.spotflow.io/send-data/) for
+/// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) groups
+/// [Messages](https://docs.iot.spotflow.io/send-data/#message) into
+/// [Batches](https://docs.iot.spotflow.io/send-data/#batch) and doesn't have a
+/// [Batch ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#batch-id-autofill-pattern),
+/// you must provide `batch_id`. See [User Guide](https://docs.iot.spotflow.io/send-data/) for
 /// more details.
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param message_context The options that specify how to send the [Message](https://docs.spotflow.io/send-data/#message).
-/// @param batch_id (Optional) The ID of the [Batch](https://docs.spotflow.io/send-data/#batch) the
-///                 [Message](https://docs.spotflow.io/send-data/#message) is a part of.
+/// @param message_context The options that specify how to send the [Message](https://docs.iot.spotflow.io/send-data/#message).
+/// @param batch_id (Optional) The ID of the [Batch](https://docs.iot.spotflow.io/send-data/#batch) the
+///                 [Message](https://docs.iot.spotflow.io/send-data/#message) is a part of.
 ///                 Use `NULL` if you don't want to specify it.
-/// @param message_id (Optional) The ID of the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param message_id (Optional) The ID of the [Message](https://docs.iot.spotflow.io/send-data/#message).
 ///                   Use `NULL` if you don't want to specify it.
-/// @param buffer The buffer that contains the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param buffer The buffer that contains the [Message](https://docs.iot.spotflow.io/send-data/#message).
 /// @param length The length of the buffer in bytes.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid or there is an error in
 ///              persisting the message.
@@ -869,35 +869,35 @@ pub extern "C" fn spotflow_client_send_message(
     }
 }
 
-/// Send a [Message](https://docs.spotflow.io/send-data/#message) to
+/// Send a [Message](https://docs.iot.spotflow.io/send-data/#message) to
 /// the Platform.
 ///
 /// **Warning:** This method blocks the current thread until the Message (and all the Messages enqueued before it)
 /// is sent to the Platform. If your Device doesn't have a stable Internet connection, consider using `spotflow_client_enqueue_message_advanced` instead.
 ///
-/// If the [Stream](https://docs.spotflow.io/send-data/#stream) doesn't have a
-/// [Message ID Autofill Pattern](https://docs.spotflow.io/send-data/#message-id-autofill-pattern),
+/// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) doesn't have a
+/// [Message ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#message-id-autofill-pattern),
 /// you must provide `message_id`.
-/// If the [Stream](https://docs.spotflow.io/send-data/#stream) groups
-/// [Messages](https://docs.spotflow.io/send-data/#message) into
-/// [Batches](https://docs.spotflow.io/send-data/#batch) and doesn't have a
-/// [Batch ID Autofill Pattern](https://docs.spotflow.io/send-data/#batch-id-autofill-pattern),
-/// you must provide `batch_id`. See [User Guide](https://docs.spotflow.io/send-data/) for
+/// If the [Stream](https://docs.iot.spotflow.io/send-data/#stream) groups
+/// [Messages](https://docs.iot.spotflow.io/send-data/#message) into
+/// [Batches](https://docs.iot.spotflow.io/send-data/#batch) and doesn't have a
+/// [Batch ID Autofill Pattern](https://docs.iot.spotflow.io/send-data/#batch-id-autofill-pattern),
+/// you must provide `batch_id`. See [User Guide](https://docs.iot.spotflow.io/send-data/) for
 /// more details.
 /// Optionally, you can provide also `batch_slice_id` to use Batch Slices and `chunk_id` to use Message Chunking.
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param message_context The options that specify how to send the [Message](https://docs.spotflow.io/send-data/#message).
-/// @param batch_id (Optional) The ID of the [Batch](https://docs.spotflow.io/send-data/#batch) the
-///                 [Message](https://docs.spotflow.io/send-data/#message) is a part of.
+/// @param message_context The options that specify how to send the [Message](https://docs.iot.spotflow.io/send-data/#message).
+/// @param batch_id (Optional) The ID of the [Batch](https://docs.iot.spotflow.io/send-data/#batch) the
+///                 [Message](https://docs.iot.spotflow.io/send-data/#message) is a part of.
 ///                 Use `NULL` if you don't want to specify it.
-/// @param batch_slice_id (Optional) The ID of the Batch Slice the [Message](https://docs.spotflow.io/send-data/#message) is
+/// @param batch_slice_id (Optional) The ID of the Batch Slice the [Message](https://docs.iot.spotflow.io/send-data/#message) is
 ///                       a part of. Use `NULL` if you dont' want to specify it.
-/// @param message_id (Optional) The ID of the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param message_id (Optional) The ID of the [Message](https://docs.iot.spotflow.io/send-data/#message).
 ///                   Use `NULL` if you don't want to specify it.
-/// @param chunk_id (Optional) The ID of the Chunk of the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param chunk_id (Optional) The ID of the Chunk of the [Message](https://docs.iot.spotflow.io/send-data/#message).
 ///                 Use `NULL` if you don't want to specify it.
-/// @param buffer The buffer that contains the [Message](https://docs.spotflow.io/send-data/#message).
+/// @param buffer The buffer that contains the [Message](https://docs.iot.spotflow.io/send-data/#message).
 /// @param length The length of the buffer in bytes.
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid or there is an error in
 ///              persisting the message.
@@ -938,11 +938,11 @@ pub extern "C" fn spotflow_client_send_message_advanced(
     }
 }
 
-/// Get the number of [Messages](https://docs.spotflow.io/send-data/#message) that
+/// Get the number of [Messages](https://docs.iot.spotflow.io/send-data/#message) that
 /// have been persisted in the local database file but haven't been sent to the Platform yet.
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param count (Output) The number of pending [Messages](https://docs.spotflow.io/send-data/#message).
+/// @param count (Output) The number of pending [Messages](https://docs.iot.spotflow.io/send-data/#message).
 /// @return @ref SPOTFLOW_OK if the function succeeds, @ref SPOTFLOW_ERROR if any argument is invalid or there is an error in
 ///              accessing the local database file.
 #[no_mangle]
@@ -965,11 +965,11 @@ pub extern "C" fn spotflow_client_get_pending_messages_count(
     }
 }
 
-/// Write the ID of the [Workspace](https://docs.spotflow.io/manage-access/workspaces/) to which the
-/// [Device](https://docs.spotflow.io/connect-devices/#device) belongs into the provided buffer.
+/// Write the ID of the [Workspace](https://docs.iot.spotflow.io/manage-access/workspaces/) to which the
+/// [Device](https://docs.iot.spotflow.io/connect-devices/#device) belongs into the provided buffer.
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param buffer The buffer where the [Workspace ID](https://docs.spotflow.io/manage-access/workspaces/) string
+/// @param buffer The buffer where the [Workspace ID](https://docs.iot.spotflow.io/manage-access/workspaces/) string
 ///               including the trailing NUL character will be written to.
 /// @param buffer_length The length of the buffer in bytes. Use @ref SPOTFLOW_WORKSPACE_ID_MAX_LENGTH to be sure that it is
 ///                      always large enough.
@@ -1010,13 +1010,13 @@ pub extern "C" fn spotflow_client_get_workspace_id(
     }
 }
 
-/// Write the [Device ID](https://docs.spotflow.io/connect-devices/#device-id) into
+/// Write the [Device ID](https://docs.iot.spotflow.io/connect-devices/#device-id) into
 /// the provided buffer. Note that the value might differ from the one requested in @ref
 /// spotflow_client_options_set_device_id if the technician overrides it during the approval of the
-/// [Provisioning Operation](https://docs.spotflow.io/connect-devices/#provisioning-operation).
+/// [Provisioning Operation](https://docs.iot.spotflow.io/connect-devices/#provisioning-operation).
 ///
 /// @param client The @ref spotflow_client_t object.
-/// @param buffer The buffer where the [Device ID](https://docs.spotflow.io/connect-devices/#device-id) string
+/// @param buffer The buffer where the [Device ID](https://docs.iot.spotflow.io/connect-devices/#device-id) string
 ///               including the trailing NUL character will be written to.
 /// @param buffer_length The length of the buffer in bytes. Use @ref SPOTFLOW_DEVICE_ID_MAX_LENGTH to be sure that it is
 ///                      always large enough.

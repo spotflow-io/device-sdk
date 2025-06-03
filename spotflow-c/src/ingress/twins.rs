@@ -10,7 +10,7 @@ use crate::{
     ptr_to_ref, ptr_to_str, SPOTFLOW_PROPERTIES_VERSION_ANY,
 };
 
-/// The callback to be called when the [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties)
+/// The callback to be called when the [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties)
 /// are updated.
 /// The callback is called only if you have configured it by @ref spotflow_client_options_set_desired_properties_updated_callback.
 /// The callback is called on a background thread.
@@ -21,7 +21,7 @@ use crate::{
 pub type DesiredPropertiesUpdatedCallback =
     Option<extern "C" fn(desired_properties: *const c_char, version: u64, context: *mut c_void)>;
 
-/// Write the current [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties)
+/// Write the current [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties)
 /// into the provided buffer and obtain their version. The content is a JSON string encoded in UTF-8.
 ///
 /// Only the latest version is returned, any versions between the last obtained one and the current one will be skipped.
@@ -61,7 +61,7 @@ pub unsafe extern "C" fn spotflow_client_get_desired_properties(
     }
 }
 
-/// Write the current [Desired Properties](https://docs.spotflow.io/configure-devices/#desired-properties)
+/// Write the current [Desired Properties](https://docs.iot.spotflow.io/configure-devices/#desired-properties)
 /// into the provided buffer and obtain their version if their version is higher than `version` or if `version` is
 /// @ref SPOTFLOW_PROPERTIES_VERSION_ANY. The content is a JSON string encoded in UTF-8.
 ///
@@ -240,7 +240,7 @@ unsafe extern "C" fn spotflow_client_read_reported_properties(
     }
 }
 
-/// Enqueue an update of the [Reported Properties](https://docs.spotflow.io/configure-devices/#reported-properties) to be sent to the Platform.
+/// Enqueue an update of the [Reported Properties](https://docs.iot.spotflow.io/configure-devices/#reported-properties) to be sent to the Platform.
 ///
 /// This method saves these reported properties persistently in the local database file.
 /// The update will be sent asynchronously when possible.
@@ -296,7 +296,7 @@ unsafe extern "C" fn spotflow_client_patch_reported_properties(
     })
 }
 
-/// Check if there are any updates to [Reported Properties](https://docs.spotflow.io/configure-devices/#reported-properties)
+/// Check if there are any updates to [Reported Properties](https://docs.iot.spotflow.io/configure-devices/#reported-properties)
 /// that are yet to be sent to the Platform.
 ///
 /// @param client The @ref spotflow_client_t object.
