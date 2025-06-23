@@ -1,5 +1,4 @@
-﻿#todo general src folder but using zephyr specific macros
-zephyr_library_sources_ifdef(CONFIG_LOG_BACKEND_SPOTFLOW
+﻿zephyr_library_sources_ifdef(CONFIG_LOG_BACKEND_SPOTFLOW
         spotflow_processor.c
         spotflow_connection_helper.c
         spotflow_mqtt.c
