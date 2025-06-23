@@ -5,3 +5,4 @@ external
 .idea
 modules/*west
 **/credentials.conf
+/.vscode/

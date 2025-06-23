@@ -2,7 +2,7 @@
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/socket.h>
 
-#include "certs_spotflow.h"
+#include "net/certs_spotflow.h"
 
 LOG_MODULE_REGISTER(SPOTFLOW_TLS, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
