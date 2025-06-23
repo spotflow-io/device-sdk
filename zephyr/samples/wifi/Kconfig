@@ -1,0 +1,11 @@
+config NET_WIFI_SSID
+	string "SSID device should connect to"
+	help
+		TODO
+
+config NET_WIFI_PASSWORD
+	string "Wifi Password device should connect to"
+	help
+		TODO
+
+source "Kconfig.zephyr"

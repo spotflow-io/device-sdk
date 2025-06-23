@@ -1,0 +1,7 @@
+.venv/
+external
+**/build*/
+.vscode/compile_commands.json
+.idea
+modules/*west
+**/credentials.conf
