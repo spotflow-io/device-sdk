@@ -30,5 +30,31 @@ manifest:
 
 ## Documentation
 
+### Architecture
 
+```mermaid
+---
+title: Main log flow
+---
+flowchart LR
+    A[User Code] --> B[Zephyr RTOS]
+    B --> C[Spotflow Logging Backend]
+    C --> D[Spotflow Mqtt Broker]
+    D --> E[Spotflow Observability Platform]
+```
 
+```mermaid
+---
+title: Spotflow Log Backend flow
+---
+flowchart LR
+    A[Zephyr logging] --> B[Spotflow Log Backend]
+    B --> C[Spotflow Mqtt Broker]
+    C --> D[Encode CBOR]
+    D --> E[Log message Queue]
+    E --> F[Processor]
+    F --> G[Send to MQTT]
+```
+
+## Feedback
+Any comments, suggestions, or issues. Create a Github issue or contact us at hello@spotflow.io, [LinkedIn](https://www.linkedin.com/company/spotflow/) or [Discord](https://discord.gg/yw8rAvGZBx)
