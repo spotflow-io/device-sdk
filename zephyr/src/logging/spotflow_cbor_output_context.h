@@ -5,8 +5,7 @@
 #include "zephyr/kernel.h"
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 struct spotflow_cbor_output_context {
@@ -16,10 +15,10 @@ struct spotflow_cbor_output_context {
 	size_t log_msg_ctr;
 };
 
-int spotflow_cbor_output_context_init(struct spotflow_cbor_output_context **_context);
+int spotflow_cbor_output_context_init(struct spotflow_cbor_output_context** _context);
 
 /* not used because output context is used for the whole lifetime of the application */
-void spotflow_cbor_output_context_free(struct spotflow_cbor_output_context *context);
+void spotflow_cbor_output_context_free(struct spotflow_cbor_output_context* context);
 
 #ifdef __cplusplus
 }

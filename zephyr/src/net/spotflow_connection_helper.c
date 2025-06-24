@@ -9,20 +9,16 @@ LOG_MODULE_REGISTER(spotflow_connection_helper, CONFIG_SPOTFLOW_PROCESSING_BACKE
 static struct net_mgmt_event_callback net_mgmt_event_cb;
 static K_SEM_DEFINE(network_connected, 0, 1);
 
-static void l4_event_handler(struct net_mgmt_event_callback *cb,
-			     uint32_t event,
-			     struct net_if *iface);
+static void l4_event_handler(struct net_mgmt_event_callback* cb, uint32_t event,
+			     struct net_if* iface);
 
 /* Query IP address for the broker URL */
-int spotflow_conn_helper_resolve_hostname(const char *hostname,
-					  struct zsock_addrinfo **server_addr)
+int spotflow_conn_helper_resolve_hostname(const char* hostname, struct zsock_addrinfo** server_addr)
 {
 	int rc;
-	struct zsock_addrinfo hints = {
-		.ai_family = AF_INET,
-		.ai_socktype = SOCK_STREAM,
-		.ai_protocol = 0
-	};
+	struct zsock_addrinfo hints = { .ai_family = AF_INET,
+					.ai_socktype = SOCK_STREAM,
+					.ai_protocol = 0 };
 
 	if (server_addr != NULL) {
 		zsock_freeaddrinfo(*server_addr);
@@ -38,11 +34,11 @@ int spotflow_conn_helper_resolve_hostname(const char *hostname,
 	return rc;
 }
 
-void spotflow_conn_helper_broker_set_addr_and_port(struct sockaddr_storage *broker,
-						   const struct zsock_addrinfo *server_addr,
+void spotflow_conn_helper_broker_set_addr_and_port(struct sockaddr_storage* broker,
+						   const struct zsock_addrinfo* server_addr,
 						   int port)
 {
-	struct sockaddr_in *broker4 = (struct sockaddr_in *) broker;
+	struct sockaddr_in* broker4 = (struct sockaddr_in*)broker;
 
 	broker4->sin_family = AF_INET;
 	broker4->sin_port = htons(port);
@@ -60,11 +56,10 @@ void wait_for_network()
 	k_sem_take(&network_connected, K_FOREVER);
 }
 
-static void l4_event_handler(struct net_mgmt_event_callback *cb, uint32_t event,
-				struct net_if *iface)
+static void l4_event_handler(struct net_mgmt_event_callback* cb, uint32_t event,
+			     struct net_if* iface)
 {
-	switch (event)
-	{
+	switch (event) {
 	case NET_EVENT_L4_CONNECTED:
 		LOG_DBG("Network connectivity established and IP address assigned");
 		/* LOG_DBG("Network connectivity established and IP address assigned, DNS server added"); */
