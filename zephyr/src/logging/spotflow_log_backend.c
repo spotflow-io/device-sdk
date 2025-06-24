@@ -55,8 +55,12 @@ static void init(const struct log_backend *const backend) {
 	LOG_INF("Spotflow log backend initialized.");
 	__ASSERT(backend->cb->ctx != NULL, "Spotflow log backend context is NULL");
 	struct spotflow_log_context *ctx = backend->cb->ctx;
-	int result = spotflow_cbor_output_context_init(&ctx->cbor_output_context);
+	int rc = spotflow_cbor_output_context_init(&ctx->cbor_output_context);
 	__ASSERT(result == 0, "Failed to initialize spotflow output context");
+	if (rc< 0) {
+		LOG_ERR("Failed to initialize spotflow output context: %d", rc);
+		return;
+	}
 	ctx->dropped_backend_count = 0;
 	ctx->message_index = 0;
 	spotflow_start_mqtt();

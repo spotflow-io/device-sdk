@@ -153,7 +153,7 @@ void spotflow_mqtt_establish_mqtt()
 			mqtt_abort(&mqtt_client_toolset.mqtt_client);
 		}
 	}
-	LOG_DBG("MQTT connected!");
+	LOG_INF("MQTT connected!");
 }
 
 static int prepare_fds()

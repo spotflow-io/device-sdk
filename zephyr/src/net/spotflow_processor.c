@@ -57,13 +57,13 @@ void spotflow_start_mqtt(void)
 
 static void mqtt_thread(void)
 {
-	LOG_INF("Starting processing thread");
+	LOG_INF("Starting Spotflow processing thread");
 
 	wait_for_network();
 
 	spotflow_tls_init();
 
-	LOG_INF("Registered TLS credentials");
+	LOG_DBG("Spotflow registered TLS credentials");
 
 	/* 1) OUTER LOOP: keep trying until mqtt_connected == true, reconnect if connection failed */
 	while (true)
