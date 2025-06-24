@@ -39,7 +39,6 @@ static int get_formatted_message(struct spotflow_cbor_output_context *output_con
 static void extract_metadata(struct message_metadata* metadata, struct log_msg *log_msg);
 
 
-/*todo split*/
 int spotflow_cbor_encode_message(struct log_msg *log_msg,
 			struct spotflow_cbor_output_context *output_context,
 			uint8_t **cbor_data,

@@ -1,11 +1,11 @@
 config NET_WIFI_SSID
 	string "SSID device should connect to"
 	help
-		TODO
+		SSID of the wifi network that the device should connect to.
 
 config NET_WIFI_PASSWORD
 	string "Wifi Password device should connect to"
 	help
-		TODO
+		Wifi password for the network that the device should connect to.
 
 source "Kconfig.zephyr"

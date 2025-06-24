@@ -60,15 +60,16 @@ if LOG_BACKEND_SPOTFLOW
 config SPOTFLOW_DEVICE_ID
 	string "Device ID device will use to connect to Spotflow observability platform"
 	help
-		TODO
+		Device ID is a unique identifier for
+		your device in Spotflow Observability platform
 config SPOTFLOW_INGEST_KEY
 	string "Password device will use to connect to Spotflow observability platform"
 	help
-		TODO
+		Ingest key is a secret key used to authenticate your device
+		It can be found in Spotflow Observability platform
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW
 	int "Additional heap size required by Spotflow"
-	#     todo reconsider how much
 	default 6144 if LOG_BACKEND_SPOTFLOW
 	help
 		Additional heap size required by Spotflow logging backend.

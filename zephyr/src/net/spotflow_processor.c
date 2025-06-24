@@ -18,13 +18,13 @@ LOG_DBG("%s: %d <%s>", (func), rc, RC_STR(rc))
 
 LOG_MODULE_REGISTER(spotflow_processor, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
-/* todo discuss alignment
-https://docs.zephyrproject.org/apidoc/
-latest/group__msgq__apis.html#ga95ef93002766901511d09c8cd8f8293b */
+/* https://docs.zephyrproject.org/apidoc/latest/group__msgq__apis.html
+ * Alignment of the message queue's ring buffer is not necessary,
+ * setting q_align to 1 is sufficient.*/
 K_MSGQ_DEFINE(g_spotflow_mqtt_msgq,
 		sizeof(struct spotflow_mqtt_msg *),
 		CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE,
-		4);
+		1);
 
 static struct k_poll_event events[1];
 
@@ -80,7 +80,6 @@ void process_mqtt()
 	while (spotflow_mqtt_is_connected())
 	{
 		int rc;
-		/* todo this means that there might be a 1 sec delay in sending - mqtt_live does the sending?? */
 		rc = spotflow_mqtt_poll();
 		if (rc < 0) {
 			LOG_DBG("spotflow_mqtt_poll() returned error %d", rc);

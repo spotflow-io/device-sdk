@@ -8,7 +8,7 @@ LOG_MODULE_REGISTER(SPOTFLOW_TLS, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
 #define APP_CA_ISGROOTX1_CERT_TAG 1
 
-static int tls_certificate_add(unsigned char *cert, size_t cert_len, int tag);
+static int tls_certificate_add(const unsigned char *cert, size_t cert_len, int tag);
 
 static sec_tag_t m_sec_tags[] = {APP_CA_ISGROOTX1_CERT_TAG};
 

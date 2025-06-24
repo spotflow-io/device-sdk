@@ -15,6 +15,7 @@
 #define APP_MQTT_BUFFER_SIZE 4096
 
 #define DEFAULT_GENERAL_TIMEOUT_MSEC 500
+#define SPOTFLOW_MQTT_CBOR_TOPIC "ingest-cbor"
 
 
 #define RC_STR(rc) ((rc) == 0 ? "OK" : "ERROR")
@@ -33,7 +34,6 @@ struct mqtt_config {
 	char* client_id;
 };
 
-/*todo Can we remove those global variables and instantiate them somewhere?*/
 struct mqtt_client_toolset {
 	struct mqtt_client mqtt_client;
 	struct sockaddr_storage broker;
@@ -54,12 +54,10 @@ static struct mqtt_config spotflow_mqtt_config = {
 	.server_addr = NULL,
 	.username = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_DEVICE_ID),
 	.password = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_INGEST_KEY),
-	/*todo consider moving to kconfig*/
-	.topic = MQTT_UTF8_LITERAL("ingest-cbor"),
+	.topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CBOR_TOPIC),
 	.client_id = CONFIG_SPOTFLOW_DEVICE_ID
 };
 
-/*todo make this object not static - provided by caller*/
 static struct mqtt_client_toolset mqtt_client_toolset = { .mqtt_connected = false };
 
 /* Buffers for MQTT client. */
@@ -87,7 +85,6 @@ int spotflow_mqtt_poll()
 	}
 }
 
-/*todo consider moving to macro*/
 void spotflow_mqtt_abort_mqtt()
 {
 	mqtt_client_toolset.mqtt_connected = false;
@@ -112,7 +109,6 @@ int spotflow_mqtt_send_live()
 void spotflow_mqtt_establish_mqtt()
 {
 	/* infinitely try to connect to mqtt broker */
-	/*todo try to clenup and make more readable*/
 	while (!mqtt_client_toolset.mqtt_connected) {
 		int rc;
 		rc = client_init(&mqtt_client_toolset.mqtt_client);
@@ -133,12 +129,11 @@ void spotflow_mqtt_establish_mqtt()
 		if (rc < 0) {
 			LOG_ERR("Failed to prepare fds for mqtt client: %d", rc);
 			mqtt_abort(&mqtt_client_toolset.mqtt_client);
-			/* todo consider breaking whole loop and exiting
+			/* consider breaking whole loop and exiting
 			 * - most likely not recoverable */
 			k_sleep(K_MSEC(DEFAULT_GENERAL_TIMEOUT_MSEC));
 			continue;
 		}
-		/* todo check how to remove timeout - not really wait - maximum wait on socket */
 		if (poll_with_timeout(DEFAULT_GENERAL_TIMEOUT_MSEC)) {
 			rc = mqtt_input(&mqtt_client_toolset.mqtt_client);
 			if (rc < 0) {
@@ -165,11 +160,7 @@ void spotflow_mqtt_establish_mqtt()
 
 static int prepare_fds()
 {
-	/*todo consider removing - only tls is used*/
-	if (mqtt_client_toolset.mqtt_client.transport.type == MQTT_TRANSPORT_NON_SECURE) {
-		LOG_DBG("Using unsecure");
-		mqtt_client_toolset.fds[0].fd = mqtt_client_toolset.mqtt_client.transport.tcp.sock;
-	} else if (mqtt_client_toolset.mqtt_client.transport.type == MQTT_TRANSPORT_SECURE) {
+	if (mqtt_client_toolset.mqtt_client.transport.type == MQTT_TRANSPORT_SECURE) {
 		LOG_DBG("Using secure");
 		mqtt_client_toolset.fds[0].fd = mqtt_client_toolset.mqtt_client.transport.tls.sock;
 	} else {
