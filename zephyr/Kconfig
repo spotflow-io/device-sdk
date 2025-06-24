@@ -99,10 +99,10 @@ config SPOTFLOW_CBOR_LOG_MAX_LEN
 #         todo default value to be discussed
 config SPOTFLOW_MQTT_LOG_THREAD_PRIORITY
 	int "MQTT log thread priority"
-	default 3
 	help
 		Priority of the thread used to send logs to Spotflow server.
 		Increase this value if you experience issues with logs being sent.
+		If not defined, K_LOWEST_APPLICATION_THREAD_PRIO is used
 config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 	int
 	default 2560

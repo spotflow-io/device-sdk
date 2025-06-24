@@ -34,17 +34,25 @@ static void process_mqtt();
 
 static uint32_t messages_sent_counter = 0;
 
+#ifndef CONFIG_SPOTFLOW_MQTT_LOG_THREAD_PRIORITY
+#define SPOTFLOW_MQTT_LOG_THREAD_PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
+#else
+#define SPOTFLOW_MQTT_LOG_THREAD_PRIORITY CONFIG_SPOTFLOW_MQTT_LOG_THREAD_PRIORITY
+#endif
+
 K_THREAD_DEFINE(mqtt_log_thread_id,
 		CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE,
 		mqtt_thread,
 		NULL, NULL, NULL,
-		CONFIG_SPOTFLOW_MQTT_LOG_THREAD_PRIORITY,
+		SPOTFLOW_MQTT_LOG_THREAD_PRIORITY,
 		0, 0);
 
 void spotflow_start_mqtt(void)
 {
 	k_thread_start(mqtt_log_thread_id);
-	LOG_INF("Thread started");
+	LOG_DBG("Thread started with priority %d and stack size %d",
+		SPOTFLOW_MQTT_LOG_THREAD_PRIORITY,
+		CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE);
 }
 
 static void mqtt_thread(void)
