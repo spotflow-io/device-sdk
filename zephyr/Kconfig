@@ -96,13 +96,21 @@ config SPOTFLOW_CBOR_LOG_MAX_LEN
 		Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
 		Increase this value if you experience issues with logs being dropped because of buffer overflow.
 
-#         todo default value to be discussed
+config SPOTFLOW_MQTT_LOG_THREAD_CUSTOM_PRIORITY
+	bool "Use custom priority for MQTT log thread"
+	default n
+	help
+		Enable this option to use custom priority for the thread used to send logs to Spotflow server.
+		If disabled, the thread will use default K_LOWEST_APPLICATION_THREAD_PRIO.
+
 config SPOTFLOW_MQTT_LOG_THREAD_PRIORITY
 	int "MQTT log thread priority"
+	default 14
 	help
 		Priority of the thread used to send logs to Spotflow server.
 		Increase this value if you experience issues with logs being sent.
-		If not defined, K_LOWEST_APPLICATION_THREAD_PRIO is used
+		Defaults to default K_LOWEST_APPLICATION_THREAD_PRIO
+
 config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 	int
 	default 2560

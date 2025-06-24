@@ -31,7 +31,6 @@ struct mqtt_config {
 	struct mqtt_utf8 username;
 	struct mqtt_utf8 password;
 	struct mqtt_utf8 topic;
-	char* client_id;
 };
 
 struct mqtt_client_toolset {
@@ -55,7 +54,6 @@ static struct mqtt_config spotflow_mqtt_config = {
 	.username = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_DEVICE_ID),
 	.password = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_INGEST_KEY),
 	.topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CBOR_TOPIC),
-	.client_id = CONFIG_SPOTFLOW_DEVICE_ID
 };
 
 static struct mqtt_client_toolset mqtt_client_toolset = { .mqtt_connected = false };
@@ -192,8 +190,8 @@ static int client_init(struct mqtt_client* client)
 	/* MQTT client configuration (client ID is assigned by the broker) */
 	client->broker = &mqtt_client_toolset.broker;
 	client->evt_cb = mqtt_evt_handler;
-	/*client->client_id = MQTT_UTF8_LITERAL("");*/
-	client->client_id = MQTT_UTF8_LITERAL(spotflow_mqtt_config.client_id);
+	// client->client_id = MQTT_UTF8_LITERAL("");
+	client->client_id = spotflow_mqtt_config.username;
 	client->password = &spotflow_mqtt_config.password;
 	client->user_name = &spotflow_mqtt_config.username;
 	client->protocol_version = MQTT_VERSION_3_1_1;
