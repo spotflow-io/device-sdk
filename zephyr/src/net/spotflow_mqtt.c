@@ -190,8 +190,7 @@ static int client_init(struct mqtt_client* client)
 	/* MQTT client configuration (client ID is assigned by the broker) */
 	client->broker = &mqtt_client_toolset.broker;
 	client->evt_cb = mqtt_evt_handler;
-	// client->client_id = MQTT_UTF8_LITERAL("");
-	client->client_id = spotflow_mqtt_config.username;
+	client->client_id = MQTT_UTF8_LITERAL("");
 	client->password = &spotflow_mqtt_config.password;
 	client->user_name = &spotflow_mqtt_config.username;
 	client->protocol_version = MQTT_VERSION_3_1_1;
