@@ -1,9 +1,9 @@
-#include "cbor_spotflow.h"
+#include "spotflow_cbor.h"
 
 #include <zcbor_common.h>
 #include <zcbor_encode.h>
 
-#include "cbor_output_context_spotflow.h"
+#include "spotflow_cbor_output_context.h"
 #include "zephyr/logging/log.h"
 #include "zephyr/logging/log_core.h"
 #include "zephyr/logging/log_ctrl.h"

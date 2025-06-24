@@ -5,7 +5,7 @@
 #include <stdint.h>
 #include "zephyr/logging/log.h"
 
-#include "cbor_output_context_spotflow.h"
+#include "spotflow_cbor_output_context.h"
 
 #ifdef __cplusplus
 extern "C"

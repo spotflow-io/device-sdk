@@ -2,7 +2,7 @@
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/socket.h>
 
-#include "net/certs_spotflow.h"
+#include "net/spotflow_certs.h"
 
 LOG_MODULE_REGISTER(SPOTFLOW_TLS, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
@@ -33,7 +33,7 @@ int spotflow_tls_init(void) {
 }
 
 
-static int tls_certificate_add(unsigned char *cert, size_t cert_len, int tag) {
+static int tls_certificate_add(const unsigned char *cert, size_t cert_len, int tag) {
 	int err = tls_credential_add(tag, TLS_CREDENTIAL_CA_CERTIFICATE, cert, cert_len);
 	if (err == -EEXIST) {
 		/* already there – that's fine */

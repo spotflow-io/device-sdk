@@ -1,4 +1,4 @@
-﻿#include "cbor_output_context_spotflow.h"
+﻿#include "spotflow_cbor_output_context.h"
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(cbor_output_context_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);

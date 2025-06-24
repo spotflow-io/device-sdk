@@ -1,5 +1,5 @@
-﻿#ifndef CBOR_OUTPUT_CONTEXT_SPOTFLOW_H
-#define CBOR_OUTPUT_CONTEXT_SPOTFLOW_H
+﻿#ifndef SPOTFLOW_CBOR_OUTPUT_CONTEXT_H
+#define SPOTFLOW_CBOR_OUTPUT_CONTEXT_H
 
 #include <stdint.h>
 #include "zephyr/kernel.h"
@@ -25,4 +25,4 @@ void spotflow_cbor_output_context_free(struct spotflow_cbor_output_context *cont
 }
 #endif
 
-#endif /* CBOR_OUTPUT_CONTEXT_SPOTFLOW_H*/
+#endif /* SPOTFLOW_CBOR_OUTPUT_CONTEXT_H*/

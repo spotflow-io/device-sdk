@@ -3,9 +3,9 @@
 #include <zephyr/net/mqtt.h>
 #include <zephyr/kernel.h>
 
-#include "cbor_spotflow.h"
+#include "spotflow_cbor.h"
 #include "net/spotflow_processor.h"
-#include "cbor_output_context_spotflow.h"
+#include "spotflow_cbor_output_context.h"
 
 LOG_MODULE_REGISTER(log_backend_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
