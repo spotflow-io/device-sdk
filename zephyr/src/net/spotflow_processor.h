@@ -2,15 +2,13 @@
 #define SPOTFLOW_PROCESSOR_H
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 extern struct k_msgq g_spotflow_mqtt_msgq;
 
-struct spotflow_mqtt_msg
-{
-	uint8_t *payload;
+struct spotflow_mqtt_msg {
+	uint8_t* payload;
 	size_t len;
 };
 

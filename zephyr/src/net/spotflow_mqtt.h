@@ -4,8 +4,7 @@
 #include "net/spotflow_processor.h"
 
 #ifdef __cplusplus
-extern "C"
-{
+extern "C" {
 #endif
 
 void spotflow_mqtt_establish_mqtt();
@@ -13,7 +12,7 @@ void spotflow_mqtt_establish_mqtt();
 bool spotflow_mqtt_is_connected();
 
 int spotflow_mqtt_poll();
-int spotflow_mqtt_publish_cbor_log_msg(struct spotflow_mqtt_msg *msg);
+int spotflow_mqtt_publish_cbor_log_msg(struct spotflow_mqtt_msg* msg);
 void spotflow_mqtt_abort_mqtt();
 int spotflow_mqtt_send_live();
 
