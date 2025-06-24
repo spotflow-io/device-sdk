@@ -17,7 +17,6 @@
 #define DEFAULT_GENERAL_TIMEOUT_MSEC 500
 #define SPOTFLOW_MQTT_CBOR_TOPIC "ingest-cbor"
 
-
 #define RC_STR(rc) ((rc) == 0 ? "OK" : "ERROR")
 
 #define LOG_DBG_PRINT_RESULT(func, rc) LOG_DBG("%s: %d <%s>", (func), rc, RC_STR(rc))
@@ -73,7 +72,7 @@ int spotflow_mqtt_poll()
 	} else if (rc == 0) {
 		/* no data on socket, continue */
 		return 0;
-		/*this means that rc is positive -> there is pollfd structures that have selected events */
+		/* this means that rc is positive -> there is pollfd structures that have selected events */
 	} else if (mqtt_client_toolset.fds[0].revents & ZSOCK_POLLIN) {
 		/* there’s data on the TCP socket—parse it */
 		return mqtt_input(&mqtt_client_toolset.mqtt_client);
@@ -114,6 +113,7 @@ void spotflow_mqtt_establish_mqtt()
 			k_sleep(K_MSEC(DEFAULT_GENERAL_TIMEOUT_MSEC));
 			continue;
 		}
+
 		rc = mqtt_connect(&mqtt_client_toolset.mqtt_client);
 		if (rc < 0) {
 			LOG_DBG_PRINT_RESULT("mqtt_connect", rc);
@@ -132,6 +132,7 @@ void spotflow_mqtt_establish_mqtt()
 			k_sleep(K_MSEC(DEFAULT_GENERAL_TIMEOUT_MSEC));
 			continue;
 		}
+
 		if (poll_with_timeout(DEFAULT_GENERAL_TIMEOUT_MSEC)) {
 			rc = mqtt_input(&mqtt_client_toolset.mqtt_client);
 			if (rc < 0) {
@@ -177,15 +178,15 @@ static int client_init(struct mqtt_client* client)
 
 	LOG_DBG("Resolving DNS");
 	int rc = spotflow_conn_helper_resolve_hostname(spotflow_mqtt_config.host,
-							&spotflow_mqtt_config.server_addr);
+						       &spotflow_mqtt_config.server_addr);
 	if (rc < 0) {
 		LOG_ERR("Failed to resolve DNS for %s: %d", CONFIG_SPOTFLOW_SERVER_HOSTNAME, rc);
 		return rc;
 	}
 
 	spotflow_conn_helper_broker_set_addr_and_port(&mqtt_client_toolset.broker,
-						spotflow_mqtt_config.server_addr,
-						spotflow_mqtt_config.port);
+						      spotflow_mqtt_config.server_addr,
+						      spotflow_mqtt_config.port);
 
 	/* MQTT client configuration (client ID is assigned by the broker) */
 	client->broker = &mqtt_client_toolset.broker;

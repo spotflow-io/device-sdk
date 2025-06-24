@@ -10,12 +10,13 @@ static struct net_mgmt_event_callback net_mgmt_event_cb;
 static K_SEM_DEFINE(network_connected, 0, 1);
 
 static void l4_event_handler(struct net_mgmt_event_callback *cb,
-				uint32_t event,
-				struct net_if *iface);
+			     uint32_t event,
+			     struct net_if *iface);
 
 /* Query IP address for the broker URL */
 int spotflow_conn_helper_resolve_hostname(const char *hostname,
-					struct zsock_addrinfo **server_addr) {
+					  struct zsock_addrinfo **server_addr)
+{
 	int rc;
 	struct zsock_addrinfo hints = {
 		.ai_family = AF_INET,
@@ -28,7 +29,7 @@ int spotflow_conn_helper_resolve_hostname(const char *hostname,
 	}
 
 	rc = zsock_getaddrinfo(hostname, STRINGIFY(CONFIG_SPOTFLOW_SERVER_PORT), &hints,
-							server_addr);
+			       server_addr);
 	if (rc < 0) {
 		LOG_DBG("DNS not resolved for %s:%d", hostname, CONFIG_SPOTFLOW_SERVER_PORT);
 	} else {
@@ -38,8 +39,9 @@ int spotflow_conn_helper_resolve_hostname(const char *hostname,
 }
 
 void spotflow_conn_helper_broker_set_addr_and_port(struct sockaddr_storage *broker,
-						const struct zsock_addrinfo *server_addr,
-						int port) {
+						   const struct zsock_addrinfo *server_addr,
+						   int port)
+{
 	struct sockaddr_in *broker4 = (struct sockaddr_in *) broker;
 
 	broker4->sin_family = AF_INET;
@@ -63,14 +65,14 @@ static void l4_event_handler(struct net_mgmt_event_callback *cb, uint32_t event,
 {
 	switch (event)
 	{
-		case NET_EVENT_L4_CONNECTED:
-			LOG_DBG("Network connectivity established and IP address assigned");
-			/* LOG_DBG("Network connectivity established and IP address assigned, DNS server added"); */
-			k_sem_give(&network_connected);
-			break;
-		case NET_EVENT_L4_DISCONNECTED:
-			break;
-		default:
-			break;
+	case NET_EVENT_L4_CONNECTED:
+		LOG_DBG("Network connectivity established and IP address assigned");
+		/* LOG_DBG("Network connectivity established and IP address assigned, DNS server added"); */
+		k_sem_give(&network_connected);
+		break;
+	case NET_EVENT_L4_DISCONNECTED:
+		break;
+	default:
+		break;
 	}
 }

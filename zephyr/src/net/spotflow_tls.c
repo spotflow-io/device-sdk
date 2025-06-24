@@ -12,7 +12,8 @@ static int tls_certificate_add(const unsigned char *cert, size_t cert_len, int t
 
 static sec_tag_t m_sec_tags[] = {APP_CA_ISGROOTX1_CERT_TAG};
 
-void spotflow_tls_configure(const char *hostname, struct mqtt_sec_config *tls_config) {
+void spotflow_tls_configure(const char *hostname, struct mqtt_sec_config *tls_config)
+{
 	tls_config->peer_verify = TLS_PEER_VERIFY_REQUIRED;
 	tls_config->cipher_list = NULL;
 	tls_config->sec_tag_list = m_sec_tags;
@@ -20,7 +21,8 @@ void spotflow_tls_configure(const char *hostname, struct mqtt_sec_config *tls_co
 	tls_config->hostname = hostname;
 }
 
-int spotflow_tls_init(void) {
+int spotflow_tls_init(void)
+{
 	LOG_DBG("TLS init");
 	int err = tls_certificate_add(spotflow_isrgrootx1_der,
 		sizeof(spotflow_isrgrootx1_der),
@@ -32,8 +34,8 @@ int spotflow_tls_init(void) {
 	return err;
 }
 
-
-static int tls_certificate_add(const unsigned char *cert, size_t cert_len, int tag) {
+static int tls_certificate_add(const unsigned char *cert, size_t cert_len, int tag)
+{
 	int err = tls_credential_add(tag, TLS_CREDENTIAL_CA_CERTIFICATE, cert, cert_len);
 	if (err == -EEXIST) {
 		/* already there – that's fine */

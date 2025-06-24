@@ -10,12 +10,11 @@ int spotflow_cbor_output_context_init(struct spotflow_cbor_output_context **_con
 		= k_malloc(sizeof(struct spotflow_cbor_output_context));
 	__ASSERT_NO_MSG(_context != NULL);
 
-	(*_context) = context;
+	*_context = context;
 	return 0;
 }
 
-
-/*not used because output context is used for the whole lifetime of application*/
+/* not used because output context is used for the whole lifetime of application */
 void spotflow_cbor_output_context_free(struct spotflow_cbor_output_context *context) {
 	if (context != NULL) {
 		k_free(context);

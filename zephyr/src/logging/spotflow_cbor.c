@@ -8,7 +8,6 @@
 #include "zephyr/logging/log_core.h"
 #include "zephyr/logging/log_ctrl.h"
 
-
 LOG_MODULE_REGISTER(cbor_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
 /* optimized property keys */
@@ -22,7 +21,6 @@ LOG_MODULE_REGISTER(cbor_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL)
 #define KEY_DEVICE_UPTIME_MS 0x06
 
 #define ZCBOR_STATE_DEPTH 2
-
 struct message_metadata {
 	uint32_t severity;
 	uint32_t uptime_ms;
@@ -37,7 +35,6 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 static int get_formatted_message(struct spotflow_cbor_output_context *output_context,
 				uint8_t *package );
 static void extract_metadata(struct message_metadata* metadata, struct log_msg *log_msg);
-
 
 int spotflow_cbor_encode_message(struct log_msg *log_msg,
 			struct spotflow_cbor_output_context *output_context,
@@ -60,16 +57,16 @@ int spotflow_cbor_encode_message(struct log_msg *log_msg,
 	uint8_t *data = log_msg_get_data(msg, &dlen); */
 	get_formatted_message(output_context, package);
 
-	/*get message template*/
+	/* get message template */
 	struct cbprintf_package_hdr_ext *hdr = (struct cbprintf_package_hdr_ext *)package;
 	const char *message_template = hdr->fmt;
 
 	size_t cbor_len;
 	int rc = encode_cbor_spotflow(&metadata,
-				output_context->log_msg,
-				message_template,
-				output_context->cbor_buf,
-				&cbor_len);
+				      output_context->log_msg,
+				      message_template,
+				      output_context->cbor_buf,
+				      &cbor_len);
 	if (rc < 0) {
 		LOG_DBG("Failed to encode spotflow log message %d", rc);
 		return rc;
@@ -88,9 +85,6 @@ int spotflow_cbor_encode_message(struct log_msg *log_msg,
 	return 0;
 }
 
-
-
-
 static int cb_out(int c, void *output_ctx)
 {
 	__ASSERT(output_ctx != NULL, "output_ctx is NULL");
@@ -103,8 +97,10 @@ static int cb_out(int c, void *output_ctx)
 	ctx->log_msg[ctx->log_msg_ctr++] = (char)c;
 	return 0;
 }
+
 static int get_formatted_message(struct spotflow_cbor_output_context *output_context,
-				uint8_t *package ){
+				 uint8_t *package )
+{
 	__ASSERT(output_context != NULL, "output_context is NULL");
 	__ASSERT(package != NULL, "package is NULL");
 	output_context->log_msg_ctr = 0;
@@ -119,7 +115,7 @@ static int get_formatted_message(struct spotflow_cbor_output_context *output_con
 		LOG_DBG("cbprintf failed to format message: %d", rc);
 		return rc;
 	}
-	/* returning 0 because cbrpintf returns the number of characters printed */
+	/* returning 0 because cbprintf returns the number of characters printed */
 	return 0;
 }
 
@@ -146,27 +142,27 @@ static uint32_t level_to_severity_value(uint8_t lvl)
 	}
 }
 
-static void extract_metadata(struct message_metadata* metadata, struct log_msg *log_msg) {
+static void extract_metadata(struct message_metadata* metadata, struct log_msg *log_msg)
+{
 	/* get seconds from the start */
 	log_timestamp_t timestamp = log_msg_get_timestamp(log_msg);
 	/* convert ticks → microseconds since boot */
 	uint32_t us_since_boot = log_output_timestamp_to_us(timestamp);
 	metadata ->uptime_ms = us_since_boot / 1000U;
 
-	/*log level*/
+	/* log level */
 	uint8_t level = log_msg_get_level(log_msg);
-	metadata->severity=level_to_severity_value(level);
+	metadata->severity = level_to_severity_value(level);
 
-	/*source name*/
+	/* source name */
 	uint8_t domain_id = log_msg_get_domain(log_msg);
 	int16_t source_id = log_msg_get_source_id(log_msg);
 	const char *sname = source_id >= 0 ? log_source_name_get(domain_id, source_id) : "unknown";
 	metadata->source = sname;
-
 }
 
 static int encode_message_metadata_to_cbor(const struct message_metadata* metadata,
-				zcbor_state_t *state)
+					   zcbor_state_t *state)
 {
 	/* severity */
 	zcbor_uint32_put(state, KEY_SEVERITY);
@@ -175,7 +171,6 @@ static int encode_message_metadata_to_cbor(const struct message_metadata* metada
 	/* deviceUptimeMs */
 	zcbor_uint32_put(state, KEY_DEVICE_UPTIME_MS);
 	zcbor_uint32_put(state, metadata->uptime_ms);
-
 
 	/* labels → nested map with one element */
 	zcbor_uint32_put(state, KEY_LABELS);
@@ -242,4 +237,3 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 	*encoded_len = state->payload - buf;
 	return 0;
 }
-

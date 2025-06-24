@@ -9,7 +9,6 @@
 
 LOG_MODULE_REGISTER(log_backend_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
-
 struct spotflow_log_context {
 	struct spotflow_cbor_output_context *cbor_output_context;
 	size_t dropped_backend_count;
@@ -21,7 +20,7 @@ static struct spotflow_log_context spotflow_log_ctx;
 static void init(const struct log_backend *backend);
 
 static void process(const struct log_backend *backend,
-					union log_msg_generic *msg);
+		    union log_msg_generic *msg);
 
 static void panic(const struct log_backend *backend);
 
@@ -48,8 +47,8 @@ static int enqueue_log_msg(const struct spotflow_mqtt_msg *msg, struct spotflow_
 static void process_single_message_stats_update(struct spotflow_log_context *context, bool dropped);
 
 static void process_message_stats_update(struct spotflow_log_context *context,
-					uint32_t cnt,
-					bool dropped);
+					 uint32_t cnt,
+					 bool dropped);
 
 static void init(const struct log_backend *const backend) {
 	LOG_INF("Spotflow log backend initialized.");
@@ -67,7 +66,7 @@ static void init(const struct log_backend *const backend) {
 }
 
 static void process(const struct log_backend *const backend,
-					union log_msg_generic *msg) {
+		    union log_msg_generic *msg) {
 	struct log_msg *log_msg = &msg->log;
 	struct spotflow_log_context *ctx = backend->cb->ctx;
 	if (ctx == NULL) {
@@ -78,9 +77,9 @@ static void process(const struct log_backend *const backend,
 	uint8_t *cbor_data = NULL;
 	size_t cbor_data_len = 0;
 	int rc = spotflow_cbor_encode_message(log_msg,
-					ctx->cbor_output_context,
-					&cbor_data,
-					&cbor_data_len);
+					      ctx->cbor_output_context,
+					      &cbor_data,
+					      &cbor_data_len);
 
 	if (rc < 0) {
 		LOG_DBG("Failed to encode message: %d", rc);
@@ -89,7 +88,7 @@ static void process(const struct log_backend *const backend,
 
 	/* Allocate memory for the message structure */
 	struct spotflow_mqtt_msg *mqtt_msg = k_malloc(sizeof(struct spotflow_mqtt_msg));
-	if (!msg) {
+	if (!mqtt_msg) {
 		LOG_DBG("Failed to allocate memory for message");
 		k_free(cbor_data);
 		return;
@@ -115,7 +114,7 @@ static void panic(const struct log_backend *const backend) {
 }
 
 static void dropped(const struct log_backend *const backend, uint32_t cnt) {
-	/* message did not reached the process function, dropping by zephyr middleware. */
+	/* Message did not reached the process function, dropping by zephyr middleware. */
 	/* Currently, we do not distinguish between backend and middleware drops. */
 	struct spotflow_log_context *ctx = backend->cb->ctx;
 	process_message_stats_update(ctx, cnt, true);
@@ -158,7 +157,7 @@ static int drop_log_msg_from_queue(struct spotflow_log_context *ctx) {
 
 static inline void print_stat(const struct spotflow_log_context *context) {
 	LOG_INF("Total processed %" PRIu32 ", dropped %" PRIu32 " messages",
-			context->message_index, context->dropped_backend_count);
+		context->message_index, context->dropped_backend_count);
 }
 
 static inline void reset_stat(struct spotflow_log_context *context) {
@@ -172,8 +171,8 @@ static void process_single_message_stats_update(struct spotflow_log_context *con
 }
 
 static void process_message_stats_update(struct spotflow_log_context *context,
-					uint32_t cnt,
-					bool dropped) {
+					 uint32_t cnt,
+					 bool dropped) {
 	for (int i = 0; i < cnt; i++) {
 		context->message_index++;
 		if (dropped) {

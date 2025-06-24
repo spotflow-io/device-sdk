@@ -4,8 +4,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#ifndef __SPOTFLOW_CERTIFICATES_H__
-#define __SPOTFLOW_CERTIFICATES_H__
+#ifndef SPOTFLOW_CERTS_H
+#define SPOTFLOW_CERTS_H
 
 #ifdef __cplusplus
 extern "C"
@@ -138,4 +138,4 @@ unsigned char spotflow_isrgrootx1_der[] = {
 }
 #endif
 
-#endif /* __SPOTFLOW_CERTIFICATES_H__ */
+#endif /* SPOTFLOW_CERTS_H */

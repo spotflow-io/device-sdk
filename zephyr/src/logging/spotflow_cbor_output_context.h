@@ -18,7 +18,7 @@ struct spotflow_cbor_output_context {
 
 int spotflow_cbor_output_context_init(struct spotflow_cbor_output_context **_context);
 
-/*not used because output context is used for the whole lifetime of the application*/
+/* not used because output context is used for the whole lifetime of the application */
 void spotflow_cbor_output_context_free(struct spotflow_cbor_output_context *context);
 
 #ifdef __cplusplus

@@ -18,7 +18,7 @@ menuconfig SPOTFLOW
 	select DNS_RESOLVER
 	imply NET_SOCKETS_SOCKOPT_TLS
 	help
-	Enables Zephyr integration with Spotflow observability platform.
+		Enables Zephyr integration with Spotflow observability platform.
 
 if SPOTFLOW
 
@@ -53,8 +53,6 @@ config SPOTFLOW_SERVER_PORT
 	depends on SPOTFLOW
 	default 8883
 
-
-
 if LOG_BACKEND_SPOTFLOW
 
 config SPOTFLOW_DEVICE_ID
@@ -62,6 +60,7 @@ config SPOTFLOW_DEVICE_ID
 	help
 		Device ID is a unique identifier for
 		your device in Spotflow Observability platform
+
 config SPOTFLOW_INGEST_KEY
 	string "Password device will use to connect to Spotflow observability platform"
 	help
@@ -82,13 +81,15 @@ config SPOTFLOW_LOG_BACKEND_QUEUE_SIZE
 		Size of the queue used by Spotflow logging backend to store logs
 		before sending them to the server.
 		Increase this value if you experience issues with logs being dropped.
+
 config SPOTFLOW_LOG_BUFFER_SIZE
 	int "Size of Spotflow log buffer"
 	default 512
 	help
 		Size of the buffer used by Spotflow logging backend to store logs before serialization.
-		Make this at least as big as your longest expected log line
+		Make this at least as big as your longest expected log line.
 		Increase this value if you experience issues with logs being dropped because of buffer overflow.
+
 config SPOTFLOW_CBOR_LOG_MAX_LEN
 	int "Size of Spotflow CBOR log buffer"
 	default 1024
@@ -123,7 +124,7 @@ config SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL
 	default LOG_DEFAULT_LEVEL
 	range 0 4
 	help
-		Sets log level for all Spotflow logging modules. All logs are debug by default
+		Sets log level for all Spotflow logging modules. All logs are debug by default.
 		Levels are:
 		- 0 OFF, do not write
 		- 1 ERROR, only write SYS_LOG_ERR
@@ -131,8 +132,6 @@ config SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL
 		- 3 INFO, write SYS_LOG_INF in addition to previous level
 		- 4 DEBUG, write SYS_LOG_DBG in addition to previous level
 
-
 endif #LOG_BACKEND_SPOTFLOW
 
 endif #SPOTFLOW
-

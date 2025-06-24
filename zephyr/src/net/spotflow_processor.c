@@ -11,8 +11,6 @@
 
 #define APP_CONNECT_TIMEOUT_MS 10000
 
-
-
 #define LOG_DBG_PRINT_RESULT(func, rc) \
 LOG_DBG("%s: %d <%s>", (func), rc, RC_STR(rc))
 
@@ -22,15 +20,14 @@ LOG_MODULE_REGISTER(spotflow_processor, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_L
  * Alignment of the message queue's ring buffer is not necessary,
  * setting q_align to 1 is sufficient.*/
 K_MSGQ_DEFINE(g_spotflow_mqtt_msgq,
-		sizeof(struct spotflow_mqtt_msg *),
-		CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE,
-		1);
+	      sizeof(struct spotflow_mqtt_msg *),
+	      CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE,
+	      1);
 
 static struct k_poll_event events[1];
 
 static void mqtt_thread(void);
 static void process_mqtt();
-
 
 static uint32_t messages_sent_counter = 0;
 
@@ -72,14 +69,13 @@ static void mqtt_thread(void)
 
 		/* set up k_poll on msgq */
 		k_poll_event_init(&events[0],
-					K_POLL_TYPE_MSGQ_DATA_AVAILABLE,
-					K_POLL_MODE_NOTIFY_ONLY,
-					&g_spotflow_mqtt_msgq);
+				  K_POLL_TYPE_MSGQ_DATA_AVAILABLE,
+				  K_POLL_MODE_NOTIFY_ONLY,
+				  &g_spotflow_mqtt_msgq);
 
 		process_mqtt();
 	}
 }
-
 
 void process_mqtt()
 {
