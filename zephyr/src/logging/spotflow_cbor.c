@@ -50,8 +50,6 @@ int spotflow_cbor_encode_message(struct log_msg* log_msg,
 	https://docs.zephyrproject.org/latest/services/formatted_output.html#cbprintf-package-format */
 	size_t plen;
 	uint8_t* package = log_msg_get_package(log_msg, &plen);
-	/* data typically contains hexdump
-	uint8_t *data = log_msg_get_data(msg, &dlen); */
 	get_formatted_message(output_context, package);
 
 	/* get message template */
