@@ -101,9 +101,9 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 		LOG_DBG("Unable to put message in queue, dropping");
 		k_free(mqtt_msg->payload);
 		k_free(mqtt_msg);
-		process_single_message_stats_update(ctx, true);
+		process_single_message_stats_update(ctx, true /* dropped */);
 	} else {
-		process_single_message_stats_update(ctx, false);
+		process_single_message_stats_update(ctx, false /* dropped */);
 	}
 }
 
