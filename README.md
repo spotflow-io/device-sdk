@@ -29,6 +29,7 @@ manifest:
     projects:
     - name: spotflow
       path: modules/lib/spotflow
+      revision: main
       url: https://github.com/spotflow-io/device-sdk
 ```
 
