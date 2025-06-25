@@ -8,6 +8,11 @@ send your logs to the Spotflow observability platform.
 Device SDK is integrated with the Zephyr as a module that contains the Spotflow Logging backend
 that seamlessly integrates with the Zephyr logging subsystem.
 
+Our solution was tested on following Zephyr boards (more are coming soon):
+* [FRDM-RW612](https://www.nxp.com/design/microcontrollers/arm-cortex-m/rw6xx-rtos-ready-wireless-mcus:FRDM-RW612)
+* [Nordic NRF7002DK](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK)
+* [ESP32-C3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c3/esp32-c3-devkitc-02/index.html)
+
 ## Getting Started
 
 Register and get your Ingest key at [Spotflow](https://spotflow.io/).
@@ -15,7 +20,6 @@ Register and get your Ingest key at [Spotflow](https://spotflow.io/).
 Follow the Quickstart guide that is available in our portal after registration.
 
 Alternatively, you can check sample applications in the [samples](zephyr/samples).
-The sample was tested on NXP board FRDM-RW612 and Nordic board NRF7002DK.
 The device SDK is ment to be used as
 a [Zephyr module](https://docs.zephyrproject.org/latest/develop/modules.html).
 You can add it to your Zephyr project by adding the following line to your `west.yml`:
