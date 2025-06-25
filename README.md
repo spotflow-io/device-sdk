@@ -61,4 +61,6 @@ flowchart LR
 ```
 
 ## Feedback
-Any comments, suggestions, or issues. Create a Github issue or contact us at hello@spotflow.io, [LinkedIn](https://www.linkedin.com/company/spotflow/) or [Discord](https://discord.gg/yw8rAvGZBx)
+Any comments, suggestions, or issues are welcome.
+Create a Github issue or contact us at hello@spotflow.io,
+[LinkedIn](https://www.linkedin.com/company/spotflow/) or [Discord](https://discord.gg/yw8rAvGZBx).
