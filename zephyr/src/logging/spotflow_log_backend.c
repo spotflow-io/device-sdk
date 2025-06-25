@@ -117,7 +117,7 @@ static void dropped(const struct log_backend* const backend, uint32_t cnt)
 	/* Message did not reached the process function, dropping by zephyr middleware. */
 	/* Currently, we do not distinguish between backend and middleware drops. */
 	struct spotflow_log_context* ctx = backend->cb->ctx;
-	process_message_stats_update(ctx, cnt, true);
+	process_message_stats_update(ctx, cnt, true /* dropped */);
 }
 
 static int drop_log_msg_from_queue(struct spotflow_log_context* ctx);
