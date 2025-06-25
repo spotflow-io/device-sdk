@@ -49,10 +49,10 @@ flowchart LR
 
 ```mermaid
 ---
-title: Spotflow Log Backend flow
+title: Spotflow Logging Backend flow
 ---
 flowchart LR
-    A[Zephyr logging] --> B[Spotflow Log Backend]
+    A[Zephyr logging] --> B[Spotflow Logging Backend]
     B --> C[Spotflow Mqtt Broker]
     C --> D[Encode CBOR]
     D --> E[Log message Queue]
