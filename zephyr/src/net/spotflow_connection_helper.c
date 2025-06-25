@@ -62,7 +62,6 @@ static void l4_event_handler(struct net_mgmt_event_callback* cb, uint32_t event,
 	switch (event) {
 	case NET_EVENT_L4_CONNECTED:
 		LOG_DBG("Network connectivity established and IP address assigned");
-		/* LOG_DBG("Network connectivity established and IP address assigned, DNS server added"); */
 		k_sem_give(&network_connected);
 		break;
 	case NET_EVENT_L4_DISCONNECTED:
