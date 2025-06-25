@@ -92,3 +92,7 @@ max_line_length = 75
 [Kconfig*]
 indent_style = tab
 indent_size = 8
+
+# allow longer lines in md files - links, etc.
+[*.md]
+max_line_length = 300
