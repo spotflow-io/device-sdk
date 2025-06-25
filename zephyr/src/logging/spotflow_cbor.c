@@ -108,7 +108,7 @@ static int get_formatted_message(struct spotflow_cbor_output_context* output_con
 	return 0;
 }
 
-/* ; Integer severity values */
+/* Integer severity values */
 /* debug-severity = 30 */
 /* info-severity = 40 */
 /* warning-severity = 50 */
