@@ -9,11 +9,6 @@ concurrency:
   group: ${{ github.ref }}-${{ github.workflow }}
   cancel-in-progress: true
 
-#env:
-#  APPLY_FIXES: all
-#  APPLY_FIXES_EVENT: pull_request
-#  APPLY_FIXES_MODE: commit
-
 jobs:
   megalinter:
     runs-on: ubuntu-latest
