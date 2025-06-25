@@ -9,7 +9,9 @@ int spotflow_cbor_output_context_init(struct spotflow_cbor_output_context** _con
 
 	struct spotflow_cbor_output_context* context =
 	    k_malloc(sizeof(struct spotflow_cbor_output_context));
-	__ASSERT_NO_MSG(_context != NULL);
+	if (context == NULL) {
+		return -ENOMEM;
+	}
 
 	*_context = context;
 	return 0;

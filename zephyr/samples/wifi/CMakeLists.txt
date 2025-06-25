@@ -1,7 +1,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 cmake_minimum_required(VERSION 3.20.0)
-# Debug: show exactly what search paths Zephyr will use
 
 # TODO document in readme
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/credentials.conf")
