@@ -48,6 +48,8 @@ static void process_message_stats_update(struct spotflow_log_context* context, u
 
 static void init(const struct log_backend* const backend)
 {
+	LOG_DBG("Initializing spotflow logging backend");
+	
 	__ASSERT(backend->cb->ctx != NULL, "Spotflow log backend context is NULL");
 	struct spotflow_log_context* ctx = backend->cb->ctx;
 	int rc = spotflow_cbor_output_context_init(&ctx->cbor_output_context);
