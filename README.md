@@ -5,7 +5,7 @@ Device SDK for Spotflow embedded observability platform.
 This SDK provides a set of tools and libraries for [Zephyr RTOS](https://www.zephyrproject.org/) to
 send your logs to the Spotflow observability platform.
 
-Device SDK is integrated with the Zephyr as a module that contains the Spotflow Logging backend
+Device SDK is integrated with the Zephyr as a module that contains the Spotflow logging backend
 that seamlessly integrates with the Zephyr logging subsystem.
 
 Our solution was tested on following Zephyr boards (more are coming soon):
