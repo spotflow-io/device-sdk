@@ -144,12 +144,12 @@ static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
 		struct spotflow_mqtt_msg* old_msg = (struct spotflow_mqtt_msg*)old;
 		k_free(old_msg->payload);
 		k_free(old_msg);
+
 		/* not optimal, in edge case dropped_backend_count could overflow
 		but it is unlikely because message_index was already increased when added to buffer,
 		only statistic, keeping it as is */
 		ctx->dropped_backend_count++;
 		LOG_DBG("Dropped oldest message");
-		return rc;
 	}
 	return rc;
 }
