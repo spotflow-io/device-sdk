@@ -275,7 +275,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		}
 		LOG_DBG("PUBREC packet id: %u", evt->param.pubrec.message_id);
 		const struct mqtt_pubrel_param rel_param = { .message_id =
-								evt->param.pubrec.message_id };
+								 evt->param.pubrec.message_id };
 		err = mqtt_publish_qos2_release(client, &rel_param);
 		if (err != 0) {
 			LOG_ERR("Failed to send MQTT PUBREL: %d", err);

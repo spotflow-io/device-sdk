@@ -10,21 +10,20 @@
 LOG_MODULE_REGISTER(log_backend_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
 struct spotflow_log_context {
-	struct spotflow_cbor_output_context *cbor_output_context;
+	struct spotflow_cbor_output_context* cbor_output_context;
 	size_t dropped_backend_count;
 	size_t message_index;
 };
 
 static struct spotflow_log_context spotflow_log_ctx;
 
-static void init(const struct log_backend *backend);
+static void init(const struct log_backend* backend);
 
-static void process(const struct log_backend *backend,
-		    union log_msg_generic *msg);
+static void process(const struct log_backend* backend, union log_msg_generic* msg);
 
-static void panic(const struct log_backend *backend);
+static void panic(const struct log_backend* backend);
 
-static void dropped(const struct log_backend *backend, uint32_t cnt);
+static void dropped(const struct log_backend* backend, uint32_t cnt);
 
 static const struct log_backend_api log_backend_spotflow_api = {
 	.init = init,
@@ -36,27 +35,25 @@ static const struct log_backend_api log_backend_spotflow_api = {
 
 #ifdef CONFIG_LOG_BACKEND_SPOTFLOW
 /* can be autostarted because there is message queue where messages are stored */
-LOG_BACKEND_DEFINE(log_backend_spotflow,
-					log_backend_spotflow_api,
-					true /* autostart */,
-					&spotflow_log_ctx);
+LOG_BACKEND_DEFINE(log_backend_spotflow, log_backend_spotflow_api, true /* autostart */,
+		   &spotflow_log_ctx);
 #endif /* CONFIG_LOG_BACKEND_SPOTFLOW */
 
-static int enqueue_log_msg(const struct spotflow_mqtt_msg *msg, struct spotflow_log_context *ctx);
+static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg, struct spotflow_log_context* ctx);
 
-static void process_single_message_stats_update(struct spotflow_log_context *context, bool dropped);
+static void process_single_message_stats_update(struct spotflow_log_context* context, bool dropped);
 
-static void process_message_stats_update(struct spotflow_log_context *context,
-					 uint32_t cnt,
+static void process_message_stats_update(struct spotflow_log_context* context, uint32_t cnt,
 					 bool dropped);
 
-static void init(const struct log_backend *const backend) {
+static void init(const struct log_backend* const backend)
+{
 	LOG_INF("Spotflow log backend initialized.");
 	__ASSERT(backend->cb->ctx != NULL, "Spotflow log backend context is NULL");
-	struct spotflow_log_context *ctx = backend->cb->ctx;
+	struct spotflow_log_context* ctx = backend->cb->ctx;
 	int rc = spotflow_cbor_output_context_init(&ctx->cbor_output_context);
 	__ASSERT(result == 0, "Failed to initialize spotflow output context");
-	if (rc< 0) {
+	if (rc < 0) {
 		LOG_ERR("Failed to initialize spotflow output context: %d", rc);
 		return;
 	}
@@ -65,20 +62,18 @@ static void init(const struct log_backend *const backend) {
 	spotflow_start_mqtt();
 }
 
-static void process(const struct log_backend *const backend,
-		    union log_msg_generic *msg) {
-	struct log_msg *log_msg = &msg->log;
-	struct spotflow_log_context *ctx = backend->cb->ctx;
+static void process(const struct log_backend* const backend, union log_msg_generic* msg)
+{
+	struct log_msg* log_msg = &msg->log;
+	struct spotflow_log_context* ctx = backend->cb->ctx;
 	if (ctx == NULL) {
 		LOG_DBG("No spotflow log context");
 		return;
 	}
 
-	uint8_t *cbor_data = NULL;
+	uint8_t* cbor_data = NULL;
 	size_t cbor_data_len = 0;
-	int rc = spotflow_cbor_encode_message(log_msg,
-					      ctx->cbor_output_context,
-					      &cbor_data,
+	int rc = spotflow_cbor_encode_message(log_msg, ctx->cbor_output_context, &cbor_data,
 					      &cbor_data_len);
 
 	if (rc < 0) {
@@ -87,7 +82,7 @@ static void process(const struct log_backend *const backend,
 	}
 
 	/* Allocate memory for the message structure */
-	struct spotflow_mqtt_msg *mqtt_msg = k_malloc(sizeof(struct spotflow_mqtt_msg));
+	struct spotflow_mqtt_msg* mqtt_msg = k_malloc(sizeof(struct spotflow_mqtt_msg));
 	if (!mqtt_msg) {
 		LOG_DBG("Failed to allocate memory for message");
 		k_free(cbor_data);
@@ -109,21 +104,24 @@ static void process(const struct log_backend *const backend,
 	}
 }
 
-static void panic(const struct log_backend *const backend) {
+static void panic(const struct log_backend* const backend)
+{
 	ARG_UNUSED(backend);
 }
 
-static void dropped(const struct log_backend *const backend, uint32_t cnt) {
+static void dropped(const struct log_backend* const backend, uint32_t cnt)
+{
 	/* Message did not reached the process function, dropping by zephyr middleware. */
 	/* Currently, we do not distinguish between backend and middleware drops. */
-	struct spotflow_log_context *ctx = backend->cb->ctx;
+	struct spotflow_log_context* ctx = backend->cb->ctx;
 	process_message_stats_update(ctx, cnt, true);
 }
 
-static int drop_log_msg_from_queue(struct spotflow_log_context *ctx);
+static int drop_log_msg_from_queue(struct spotflow_log_context* ctx);
 
 /* Helper that will drop & free the oldest if queue is full */
-static int enqueue_log_msg(const struct spotflow_mqtt_msg *msg, struct spotflow_log_context *ctx) {
+static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg, struct spotflow_log_context* ctx)
+{
 	int rc = k_msgq_put(&g_spotflow_mqtt_msgq, &msg, K_NO_WAIT);
 	if (rc == -ENOMSG) {
 		/* queue full: grab the oldest pointer, free it */
@@ -138,11 +136,12 @@ static int enqueue_log_msg(const struct spotflow_mqtt_msg *msg, struct spotflow_
 	return rc;
 }
 
-static int drop_log_msg_from_queue(struct spotflow_log_context *ctx) {
-	char *old;
+static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
+{
+	char* old;
 	int rc = k_msgq_get(&g_spotflow_mqtt_msgq, &old, K_NO_WAIT);
 	if (rc == 0) {
-		struct spotflow_mqtt_msg *old_msg = (struct spotflow_mqtt_msg *) old;
+		struct spotflow_mqtt_msg* old_msg = (struct spotflow_mqtt_msg*)old;
 		k_free(old_msg->payload);
 		k_free(old_msg);
 		/* not optimal, in edge case dropped_backend_count could overflow
@@ -155,24 +154,26 @@ static int drop_log_msg_from_queue(struct spotflow_log_context *ctx) {
 	return rc;
 }
 
-static inline void print_stat(const struct spotflow_log_context *context) {
-	LOG_INF("Total processed %" PRIu32 ", dropped %" PRIu32 " messages",
-		context->message_index, context->dropped_backend_count);
+static inline void print_stat(const struct spotflow_log_context* context)
+{
+	LOG_INF("Total processed %" PRIu32 ", dropped %" PRIu32 " messages", context->message_index,
+		context->dropped_backend_count);
 }
 
-static inline void reset_stat(struct spotflow_log_context *context) {
+static inline void reset_stat(struct spotflow_log_context* context)
+{
 	context->message_index = 0;
 	context->dropped_backend_count = 0;
 }
 
-static void process_single_message_stats_update(struct spotflow_log_context *context,
-						bool dropped) {
+static void process_single_message_stats_update(struct spotflow_log_context* context, bool dropped)
+{
 	process_message_stats_update(context, 1, dropped);
 }
 
-static void process_message_stats_update(struct spotflow_log_context *context,
-					 uint32_t cnt,
-					 bool dropped) {
+static void process_message_stats_update(struct spotflow_log_context* context, uint32_t cnt,
+					 bool dropped)
+{
 	for (int i = 0; i < cnt; i++) {
 		context->message_index++;
 		if (dropped) {
