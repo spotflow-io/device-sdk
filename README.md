@@ -9,7 +9,7 @@ Device SDK is integrated with the Zephyr as a module that contains the Spotflow 
 that seamlessly integrates with the Zephyr logging subsystem.
 
 Our solution was tested on following Zephyr boards (more are coming soon):
-* [FRDM-RW612](https://www.nxp.com/design/microcontrollers/arm-cortex-m/rw6xx-rtos-ready-wireless-mcus:FRDM-RW612)
+* [NXP FRDM-RW612](https://www.nxp.com/design/microcontrollers/arm-cortex-m/rw6xx-rtos-ready-wireless-mcus:FRDM-RW612)
 * [Nordic NRF7002DK](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK)
 * [ESP32-C3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c3/esp32-c3-devkitc-02/index.html)
 
