@@ -1,6 +1,7 @@
 menuconfig SPOTFLOW
 	bool "Enable Spotflow Observability"
 	default n
+	select HWINFO
 	select MBEDTLS
 	select MBEDTLS_TLS_LIBRARY if NRF_SECURITY
 	select MQTT_LIB
@@ -62,14 +63,16 @@ if LOG_BACKEND_SPOTFLOW
 config SPOTFLOW_DEVICE_ID
 	string "Device ID device will use to connect to Spotflow observability platform"
 	help
-		Device ID is a unique identifier for
-		your device in Spotflow Observability platform
+		Device ID is a unique identifier for your device in Spotflow observability
+		platform. If empty, the hexadecimal representation of the result of
+		hwinfo_get_device_id(...) will be used. You can provide the device ID
+		in the code by defining the function char* spotflow_override_device_id().
 
 config SPOTFLOW_INGEST_KEY
 	string "Password device will use to connect to Spotflow observability platform"
 	help
 		Ingest key is a secret key used to authenticate your device
-		It can be found in Spotflow Observability platform
+		It can be found in Spotflow observability platform
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW
 	int "Additional heap size required by Spotflow"
