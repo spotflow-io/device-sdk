@@ -6,9 +6,10 @@
 #include <zephyr/net/socket.h>
 #include <stdint.h>
 
-#include "spotflow_connection_helper.h"
-#include "net/spotflow_tls.h"
+#include "net/spotflow_connection_helper.h"
+#include "net/spotflow_device_id.h"
 #include "net/spotflow_processor.h"
+#include "net/spotflow_tls.h"
 
 /* 80 bytes is just password itself */
 /* should at least match MBEDTLS_SSL_MAX_CONTENT_LEN - default is 4096 */
@@ -27,13 +28,13 @@ struct mqtt_config {
 	char* host;
 	int port;
 	struct zsock_addrinfo* server_addr;
-	struct mqtt_utf8 username;
 	struct mqtt_utf8 password;
 	struct mqtt_utf8 topic;
 };
 
 struct mqtt_client_toolset {
 	struct mqtt_client mqtt_client;
+	struct mqtt_utf8 username;
 	struct sockaddr_storage broker;
 	struct zsock_pollfd fds[1];
 	int nfds;
@@ -50,7 +51,6 @@ static struct mqtt_config spotflow_mqtt_config = {
 	.host = CONFIG_SPOTFLOW_SERVER_HOSTNAME,
 	.port = CONFIG_SPOTFLOW_SERVER_PORT,
 	.server_addr = NULL,
-	.username = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_DEVICE_ID),
 	.password = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_INGEST_KEY),
 	.topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CBOR_TOPIC),
 };
@@ -74,7 +74,7 @@ int spotflow_mqtt_poll()
 		return 0;
 		/* this means that rc is positive -> there is pollfd structures that have selected events */
 	} else if (mqtt_client_toolset.fds[0].revents & ZSOCK_POLLIN) {
-		/* there’s data on the TCP socket—parse it */
+		/* there's data on the TCP socket—parse it */
 		return mqtt_input(&mqtt_client_toolset.mqtt_client);
 	} else {
 		LOG_DBG("Unexpected poll zsock_poll returned positive but fds nor readable");
@@ -188,12 +188,15 @@ static int client_init(struct mqtt_client* client)
 						      spotflow_mqtt_config.server_addr,
 						      spotflow_mqtt_config.port);
 
+	char* device_id = spotflow_get_device_id();
+	mqtt_client_toolset.username = (struct mqtt_utf8){ .utf8 = device_id, .size = strlen(device_id) };
+
 	/* MQTT client configuration (client ID is assigned by the broker) */
 	client->broker = &mqtt_client_toolset.broker;
 	client->evt_cb = mqtt_evt_handler;
 	client->client_id = MQTT_UTF8_LITERAL("");
 	client->password = &spotflow_mqtt_config.password;
-	client->user_name = &spotflow_mqtt_config.username;
+	client->user_name = &mqtt_client_toolset.username;
 	client->protocol_version = MQTT_VERSION_3_1_1;
 	client->clean_session = true;
 

@@ -1,6 +1,7 @@
 menuconfig SPOTFLOW
 	bool "Enable Spotflow Observability"
 	default n
+	select HWINFO
 	select MBEDTLS
 	select MBEDTLS_TLS_LIBRARY if NRF_SECURITY
 	select MQTT_LIB
