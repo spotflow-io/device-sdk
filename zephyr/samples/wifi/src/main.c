@@ -5,6 +5,12 @@
 
 LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 
+/* Uncomment this function to provide your own device ID in runtime */
+/*char* spotflow_override_device_id()
+{
+	return "my_nrf7002dk_test";
+}*/
+
 int main(void)
 {
 	LOG_INF("Starting Spotflow logging example");
