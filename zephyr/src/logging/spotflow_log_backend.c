@@ -9,7 +9,8 @@
 
 LOG_MODULE_REGISTER(log_backend_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
-struct spotflow_log_context {
+struct spotflow_log_context
+{
 	struct spotflow_cbor_output_context* cbor_output_context;
 	size_t dropped_backend_count;
 	size_t message_index;
@@ -36,7 +37,7 @@ static const struct log_backend_api log_backend_spotflow_api = {
 #ifdef CONFIG_LOG_BACKEND_SPOTFLOW
 /* can be autostarted because there is message queue where messages are stored */
 LOG_BACKEND_DEFINE(log_backend_spotflow, log_backend_spotflow_api, true /* autostart */,
-		   &spotflow_log_ctx);
+                   &spotflow_log_ctx);
 #endif /* CONFIG_LOG_BACKEND_SPOTFLOW */
 
 static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg, struct spotflow_log_context* ctx);
@@ -44,7 +45,7 @@ static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg, struct spotflow_
 static void process_single_message_stats_update(struct spotflow_log_context* context, bool dropped);
 
 static void process_message_stats_update(struct spotflow_log_context* context, uint32_t cnt,
-					 bool dropped);
+                                         bool dropped);
 
 static void init(const struct log_backend* const backend)
 {
@@ -76,8 +77,10 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 
 	uint8_t* cbor_data = NULL;
 	size_t cbor_data_len = 0;
-	int rc = spotflow_cbor_encode_message(log_msg, ctx->cbor_output_context, &cbor_data,
-					      &cbor_data_len);
+	int rc = spotflow_cbor_encode_message(log_msg,
+	                                      ctx->message_index,
+	                                      ctx->cbor_output_context, &cbor_data,
+	                                      &cbor_data_len);
 
 	if (rc < 0) {
 		LOG_DBG("Failed to encode message: %d", rc);
@@ -152,7 +155,6 @@ static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
 		but it is unlikely because message_index was already increased when added to buffer,
 		only statistic, keeping it as is */
 		ctx->dropped_backend_count++;
-		LOG_DBG("Dropped oldest message");
 	}
 	return rc;
 }
@@ -160,7 +162,7 @@ static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
 static inline void print_stat(const struct spotflow_log_context* context)
 {
 	LOG_INF("Total processed %" PRIu32 ", dropped %" PRIu32 " messages", context->message_index,
-		context->dropped_backend_count);
+	        context->dropped_backend_count);
 }
 
 static inline void reset_stat(struct spotflow_log_context* context)
@@ -175,7 +177,7 @@ static void process_single_message_stats_update(struct spotflow_log_context* con
 }
 
 static void process_message_stats_update(struct spotflow_log_context* context, uint32_t cnt,
-					 bool dropped)
+                                         bool dropped)
 {
 	for (int i = 0; i < cnt; i++) {
 		context->message_index++;
