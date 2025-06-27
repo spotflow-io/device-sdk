@@ -189,7 +189,8 @@ static int client_init(struct mqtt_client* client)
 						      spotflow_mqtt_config.port);
 
 	char* device_id = spotflow_get_device_id();
-	mqtt_client_toolset.username = (struct mqtt_utf8){ .utf8 = device_id, .size = strlen(device_id) };
+	mqtt_client_toolset.username =
+	    (struct mqtt_utf8){ .utf8 = device_id, .size = strlen(device_id) };
 
 	/* MQTT client configuration (client ID is assigned by the broker) */
 	client->broker = &mqtt_client_toolset.broker;
