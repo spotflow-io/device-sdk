@@ -44,12 +44,12 @@ config MAIN_STACK_SIZE
 	default 4096 if SPOTFLOW
 
 config SPOTFLOW_SERVER_HOSTNAME
-	string
+	string "Hostname of Spotflow observability platform"
 	depends on SPOTFLOW
 	default "mqtt.spotflow.io"
 
 config SPOTFLOW_SERVER_PORT
-	int
+	int "Port of Spotflow observability platform"
 	depends on SPOTFLOW
 	default 8883
 
