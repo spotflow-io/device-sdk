@@ -19,11 +19,14 @@ LOG_MODULE_REGISTER(cbor_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL)
 #define KEY_SEVERITY 0x04
 #define KEY_LABELS 0x05
 #define KEY_DEVICE_UPTIME_MS 0x06
+#define KEY_SEQUENCE_NUMBER 0x0D
 
 #define ZCBOR_STATE_DEPTH 2
+
 struct message_metadata {
 	uint32_t severity;
 	uint32_t uptime_ms;
+	size_t sequence_number;
 	const char* source;
 };
 
@@ -32,9 +35,10 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 				uint8_t buf[], size_t* encoded_len);
 static int get_formatted_message(struct spotflow_cbor_output_context* output_context,
 				 uint8_t* package);
-static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg);
+static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg,
+			     size_t sequence_number);
 
-int spotflow_cbor_encode_message(struct log_msg* log_msg,
+int spotflow_cbor_encode_message(struct log_msg* log_msg, size_t sequence_number,
 				 struct spotflow_cbor_output_context* output_context,
 				 uint8_t** cbor_data, size_t* cbor_data_len)
 {
@@ -44,7 +48,7 @@ int spotflow_cbor_encode_message(struct log_msg* log_msg,
 	__ASSERT(cbor_data_len != NULL, "cbor_data_len is NULL");
 
 	struct message_metadata metadata;
-	extract_metadata(&metadata, log_msg);
+	extract_metadata(&metadata, log_msg, sequence_number);
 
 	/* contains cbprint package as defined there
 	https://docs.zephyrproject.org/latest/services/formatted_output.html#cbprintf-package-format */
@@ -130,8 +134,11 @@ static uint32_t level_to_severity_value(uint8_t lvl)
 	}
 }
 
-static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg)
+static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg,
+			     size_t sequence_number)
 {
+	metadata->sequence_number = sequence_number;
+
 	/* get seconds from the start */
 	log_timestamp_t timestamp = log_msg_get_timestamp(log_msg);
 	/* convert ticks → microseconds since boot */
@@ -152,6 +159,8 @@ static void extract_metadata(struct message_metadata* metadata, struct log_msg* 
 static int encode_message_metadata_to_cbor(const struct message_metadata* metadata,
 					   zcbor_state_t* state)
 {
+	zcbor_uint32_put(state, KEY_SEQUENCE_NUMBER);
+	zcbor_uint32_put(state, metadata->sequence_number);
 	/* severity */
 	zcbor_uint32_put(state, KEY_SEVERITY);
 	zcbor_uint32_put(state, metadata->severity);
