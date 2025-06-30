@@ -152,7 +152,8 @@ static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
 		but it is unlikely because message_index was already increased when added to buffer,
 		only statistic, keeping it as is */
 		ctx->dropped_backend_count++;
-		LOG_DBG("Dropped oldest message");
+		/* currently not logged because it is messing up the output significantly */
+		/*LOG_DBG("Dropped oldest message");*/
 	}
 	return rc;
 }
