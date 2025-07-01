@@ -78,7 +78,7 @@ static void wifi_event_handler(struct net_mgmt_event_callback* cb, uint32_t mgmt
 int connect_to_wifi(void)
 {
 	if (!sta_iface) {
-		LOG_INF("STA: interface no initialized");
+		LOG_ERR("STA: interface not initialized");
 		return -EIO;
 	}
 
