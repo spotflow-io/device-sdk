@@ -3,7 +3,7 @@
 
 #include "wifi.h"
 
-LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_DBG);
 
 int main(void)
 {
