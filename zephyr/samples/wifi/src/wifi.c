@@ -24,6 +24,8 @@ static struct net_mgmt_event_callback cb;
 static void wifi_event_handler(struct net_mgmt_event_callback* cb, uint32_t mgmt_event,
 			       struct net_if* iface)
 {
+	LOG_INF("Received Wi-Fi management event: %d", mgmt_event);
+
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_CONNECT_RESULT: {
 		struct wifi_status* result = (struct wifi_status*)cb->info;
