@@ -2,7 +2,6 @@
 #include <zephyr/logging/log.h>
 
 #include "wifi.h"
-#include <zephyr/net_buf.h>
 
 LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 
