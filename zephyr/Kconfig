@@ -32,16 +32,20 @@ config LOG_BACKEND_SPOTFLOW
 	help
 		Enable sending logs to Spotflow cloud.
 
-config MBEDTLS_SSL_MAX_CONTENT_LEN
-	int
+configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
 	default 4096 if SPOTFLOW
 
-config MBEDTLS_MPI_MAX_SIZE
+if NRF_SECURITY
+configdefault MBEDTLS_MPI_MAX_SIZE
 	int
-	default 512 if SPOTFLOW && NRF_SECURITY
+	default 512 if SPOTFLOW
+endif #NRF_SECURITY
 
-config MAIN_STACK_SIZE
+configdefault MAIN_STACK_SIZE
 	default 4096 if SPOTFLOW
+
+configdefault ZVFS_OPEN_MAX
+	default 32 if SPOTFLOW
 
 config SPOTFLOW_SERVER_HOSTNAME
 	string "Hostname of Spotflow observability platform"
