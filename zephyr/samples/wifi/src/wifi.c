@@ -3,7 +3,7 @@
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/dhcpv4_server.h>
 
-LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_DBG);
+LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_INF);
 
 #define MACSTR "%02X:%02X:%02X:%02X:%02X:%02X"
 
