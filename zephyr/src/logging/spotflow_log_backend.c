@@ -76,8 +76,8 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 
 	uint8_t* cbor_data = NULL;
 	size_t cbor_data_len = 0;
-	int rc = spotflow_cbor_encode_message(log_msg, ctx->cbor_output_context, &cbor_data,
-					      &cbor_data_len);
+	int rc = spotflow_cbor_encode_message(log_msg, ctx->message_index, ctx->cbor_output_context,
+					      &cbor_data, &cbor_data_len);
 
 	if (rc < 0) {
 		LOG_DBG("Failed to encode message: %d", rc);
@@ -152,7 +152,6 @@ static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
 		but it is unlikely because message_index was already increased when added to buffer,
 		only statistic, keeping it as is */
 		ctx->dropped_backend_count++;
-		LOG_DBG("Dropped oldest message");
 	}
 	return rc;
 }
