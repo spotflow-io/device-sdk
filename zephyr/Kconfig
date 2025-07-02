@@ -47,6 +47,18 @@ configdefault MAIN_STACK_SIZE
 configdefault ZVFS_OPEN_MAX
 	default 32 if SPOTFLOW
 
+# generally better to use separate heap for mbedtls so
+# there is a dedicated heap for TLS operations without fragmentation
+configdefault MBEDTLS_ENABLE_HEAP
+	default y if SPOTFLOW
+
+if MBEDTLS_ENABLE_HEAP
+# recommended size for mbedtls heap is 32kB
+# to be able to verify whole Lets Encrypt certificate chain
+configdefault MBEDTLS_HEAP_SIZE
+	default 32768
+endif # MBEDTLS_ENABLE_HEAP
+
 config SPOTFLOW_SERVER_HOSTNAME
 	string "Hostname of Spotflow observability platform"
 	depends on SPOTFLOW
