@@ -10,6 +10,7 @@ LOG_MODULE_REGISTER(spotflow_device_id, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_L
 
 /* Hexadecimal representation of the Zephyr device ID and a null terminator */
 static char spotflow_generated_device_id_buffer[(2 * ZEPHYR_DEVICE_ID_MAX_LENGTH) + 1];
+static bool device_id_generated = false;
 
 static char* cached_device_id = NULL;
 
@@ -46,7 +47,7 @@ char* spotflow_get_device_id()
 
 static void spotflow_generate_device_id()
 {
-	if (strlen(spotflow_generated_device_id_buffer) > 0) {
+	if (device_id_generated) {
 		return;
 	}
 
@@ -65,4 +66,6 @@ static void spotflow_generate_device_id()
 	for (int i = 0; i < ret; i++) {
 		snprintk(spotflow_generated_device_id_buffer + (2 * i), 3, "%02X", device_id[i]);
 	}
+
+	device_id_generated = true;
 }
