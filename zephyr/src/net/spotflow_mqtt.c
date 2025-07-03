@@ -51,7 +51,7 @@ static struct mqtt_config spotflow_mqtt_config = {
 	.host = CONFIG_SPOTFLOW_SERVER_HOSTNAME,
 	.port = CONFIG_SPOTFLOW_SERVER_PORT,
 	.server_addr = NULL,
-	.username = {0},
+	.username = { 0 },
 	.password = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_INGEST_KEY),
 	.topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CBOR_TOPIC),
 };
