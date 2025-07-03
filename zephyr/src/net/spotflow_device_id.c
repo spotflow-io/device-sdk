@@ -9,37 +9,16 @@
 LOG_MODULE_REGISTER(spotflow_device_id, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
 /* Hexadecimal representation of the Zephyr device ID and a null terminator */
-char spotflow_generated_device_id_buffer[(2 * ZEPHYR_DEVICE_ID_MAX_LENGTH) + 1];
+static char spotflow_generated_device_id_buffer[(2 * ZEPHYR_DEVICE_ID_MAX_LENGTH) + 1];
 
-char* cached_device_id = NULL;
+static char* cached_device_id = NULL;
 
 char* __attribute__((weak)) spotflow_override_device_id()
 {
 	return NULL;
 }
 
-void spotflow_generate_device_id()
-{
-	if (strlen(spotflow_generated_device_id_buffer) > 0) {
-		return;
-	}
-
-	uint8_t device_id[ZEPHYR_DEVICE_ID_MAX_LENGTH];
-
-	ssize_t ret = hwinfo_get_device_id(device_id, ARRAY_SIZE(device_id));
-
-	if (ret <= 0) {
-		LOG_ERR("Failed to get Zephyr device ID (%d), using default", (int)ret);
-
-		strncpy(spotflow_generated_device_id_buffer, "default_device_id",
-			sizeof(spotflow_generated_device_id_buffer));
-		return;
-	}
-
-	for (int i = 0; i < ret; i++) {
-		snprintk(spotflow_generated_device_id_buffer + (2 * i), 3, "%02X", device_id[i]);
-	}
-}
+static void spotflow_generate_device_id();
 
 char* spotflow_get_device_id()
 {
@@ -63,4 +42,27 @@ char* spotflow_get_device_id()
 	LOG_INF("Using Spotflow device ID: %s", cached_device_id);
 
 	return cached_device_id;
+}
+
+static void spotflow_generate_device_id()
+{
+	if (strlen(spotflow_generated_device_id_buffer) > 0) {
+		return;
+	}
+
+	uint8_t device_id[ZEPHYR_DEVICE_ID_MAX_LENGTH];
+
+	ssize_t ret = hwinfo_get_device_id(device_id, ARRAY_SIZE(device_id));
+
+	if (ret <= 0) {
+		LOG_ERR("Failed to get Zephyr device ID (%d), using default", (int)ret);
+
+		strncpy(spotflow_generated_device_id_buffer, "default_device_id",
+			sizeof(spotflow_generated_device_id_buffer));
+		return;
+	}
+
+	for (int i = 0; i < ret; i++) {
+		snprintk(spotflow_generated_device_id_buffer + (2 * i), 3, "%02X", device_id[i]);
+	}
 }
