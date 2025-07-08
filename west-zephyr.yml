@@ -1,0 +1,13 @@
+﻿manifest:
+  remotes:
+    - name: zephyrproject-rtos
+      url-base: https://github.com/zephyrproject-rtos/zephyr
+  projects:
+    - name: zephyr
+      remote: zephyrproject-rtos
+      revision: v4.1.0
+      west-commands: scripts/west-commands.yml
+      import: true
+
+  self:
+    path: modules/lib/spotflow
