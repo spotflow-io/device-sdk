@@ -23,10 +23,12 @@ Follow the Quickstart guide that is available in our portal after registration u
 [//]: # (TODO: Update revision)
 ```bash
 mkdir spotflow-zephyr
-python -m venv .\spotflow-zephyr\.venv
-.\spotflow-zephyr\.venv\Scripts\Activate.ps1
+python -m venv ./spotflow-zephyr/.venv
+./spotflow-zephyr/.venv/Scripts/Activate.ps1
 pip install west
 west init -m https://github.com/spotflow-io/device-sdk --mr feature/pinned_zephyr --mf west-zephyr.yml spotflow-zephyr
+cd ./spotflow-zephyr
+west update
 ```
 
 Alternatively, you can check sample applications in the [samples](zephyr/samples).

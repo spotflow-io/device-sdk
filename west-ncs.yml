@@ -1,0 +1,12 @@
+﻿manifest:
+  remotes:
+    - name: nrf-connect
+      url-base: http://github.com/nrfconnect
+  projects:
+    - name: sdk-nrf
+      remote: zephyrproject-rtos
+      revision: v3.0.2
+      import: true
+
+  self:
+    path: modules/lib/spotflow
