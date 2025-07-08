@@ -17,7 +17,17 @@ Our solution was tested on following Zephyr boards (more are coming soon):
 
 Register and get your Ingest key at [Spotflow](https://spotflow.io/).
 
-Follow the Quickstart guide that is available in our portal after registration.
+Follow the Quickstart guide that is available in our portal after registration using west init with our manifest:
+
+
+[//]: # (TODO: Update revision)
+```bash
+mkdir spotflow-zephyr
+python -m venv .\spotflow-zephyr\.venv
+.\spotflow-zephyr\.venv\Scripts\Activate.ps1
+pip install west
+west init -m https://github.com/spotflow-io/device-sdk --mr feature/pinned_zephyr --mf west-zephyr.yml spotflow-zephyr
+```
 
 Alternatively, you can check sample applications in the [samples](zephyr/samples).
 The device SDK is ment to be used as
