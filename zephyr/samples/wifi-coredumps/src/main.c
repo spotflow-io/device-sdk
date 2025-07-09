@@ -33,5 +33,8 @@ int main(void)
 		k_sleep(K_SECONDS(2));
 	}
 
+	LOG_INF("Going to crash the system");
+	k_panic();
+
 	return 0;
 }

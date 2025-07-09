@@ -32,6 +32,16 @@ config LOG_BACKEND_SPOTFLOW
 	help
 		Enable sending logs to Spotflow cloud.
 
+config CORE_DUMPS_SPOTFLOW
+	bool "Enable core dumps upload to Spotflow"
+	default n
+	depends on SPOTFLOW
+	select DEBUG_COREDUMP
+	select DEBUG_COREDUMP_BACKEND_FLASH_PARTITION
+	help
+		Enable sending core dumps to Spotflow observability platform.
+		This will increase the size of the heap, so make sure you have enough memory available.
+
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
 	default 4096 if SPOTFLOW
 
