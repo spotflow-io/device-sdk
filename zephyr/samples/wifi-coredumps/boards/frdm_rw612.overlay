@@ -1,0 +1,10 @@
+/* external flash chip - winbond - to more information
+	  zephyr\boards\nxp\frdm_rw612\frdm_rw612_common.dtsi*/
+&w25q512jvfiq {
+	partitions {
+		coredump_partition: partition@3fc0000 {
+			label = "coredump-partition";
+			reg   = <0x03FC0000 0x00040000>; /* last 256 KiB of 64 MiB flash */
+		};
+	};
+};

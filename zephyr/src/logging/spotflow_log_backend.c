@@ -33,11 +33,11 @@ static const struct log_backend_api log_backend_spotflow_api = {
 	/* .sync_string and .sync_hexdump can be added if you use IMMEDIATE mode */
 };
 
-#ifdef CONFIG_LOG_BACKEND_SPOTFLOW
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 /* can be autostarted because there is message queue where messages are stored */
 LOG_BACKEND_DEFINE(log_backend_spotflow, log_backend_spotflow_api, true /* autostart */,
 		   &spotflow_log_ctx);
-#endif /* CONFIG_LOG_BACKEND_SPOTFLOW */
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 
 static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg, struct spotflow_log_context* ctx);
 
