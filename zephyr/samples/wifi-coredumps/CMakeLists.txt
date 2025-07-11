@@ -9,7 +9,7 @@ endif()
 
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(wifi)
+project(wifi-core-dumps)
 
 target_sources(app PRIVATE
         src/main.c
