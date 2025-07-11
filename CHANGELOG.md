@@ -6,9 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+
 ### Changed
 * Used mbedtls heap by default to prevent heap fragmentation and certificate chain validation issues
-
+* Changed KConfig option LOG_BACKEND_SPOTFLOW SPOTFLOW_LOG_BACKEND to match other options
 ## [0.2.0] - 2025-07-01
 ### Added
 * Added propagation of the message sequence number to the message metadata

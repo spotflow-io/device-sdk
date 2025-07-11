@@ -22,7 +22,7 @@ menuconfig SPOTFLOW
 
 if SPOTFLOW
 
-config LOG_BACKEND_SPOTFLOW
+config SPOTFLOW_LOG_BACKEND
 	bool "Spotflow logging backend"
 	default y if SPOTFLOW
 	depends on LOG
@@ -32,15 +32,15 @@ config LOG_BACKEND_SPOTFLOW
 	help
 		Enable sending logs to Spotflow cloud.
 
-config CORE_DUMPS_SPOTFLOW
+config SPOTFLOW_CORE_DUMPS
 	bool "Enable core dumps upload to Spotflow"
 	default n
 	depends on SPOTFLOW
 	select DEBUG_COREDUMP
-	select DEBUG_COREDUMP_BACKEND_FLASH_PARTITION
+	select FLASH
+# 	depends on DEBUG_COREDUMP_BACKEND_FLASH_PARTITION
 	help
 		Enable sending core dumps to Spotflow observability platform.
-		This will increase the size of the heap, so make sure you have enough memory available.
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
 	default 4096 if SPOTFLOW
@@ -79,8 +79,6 @@ config SPOTFLOW_SERVER_PORT
 	depends on SPOTFLOW
 	default 8883
 
-if LOG_BACKEND_SPOTFLOW
-
 config SPOTFLOW_DEVICE_ID
 	string "Device ID device will use to connect to Spotflow observability platform"
 	help
@@ -93,9 +91,11 @@ config SPOTFLOW_INGEST_KEY
 		Ingest key is a secret key used to authenticate your device
 		It can be found in Spotflow Observability platform
 
+if SPOTFLOW_LOG_BACKEND
+
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW
 	int "Additional heap size required by Spotflow"
-	default 6144 if LOG_BACKEND_SPOTFLOW
+	default 6144 if SPOTFLOW_LOG_BACKEND
 	help
 		Additional heap size required by Spotflow logging backend.
 		Increase this value if you experience issues with logs being sent.
@@ -158,6 +158,12 @@ config SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL
 		- 3 INFO, write SYS_LOG_INF in addition to previous level
 		- 4 DEBUG, write SYS_LOG_DBG in addition to previous level
 
-endif #LOG_BACKEND_SPOTFLOW
+endif #SPOTFLOW_LOG_BACKEND
+# spotflow uses Zephyr's coredump subsystem to upload core dumps
+choice DEBUG_COREDUMP_BACKEND
+	default DEBUG_COREDUMP_BACKEND_FLASH_PARTITION if SPOTFLOW_CORE_DUMPS
+endchoice
+
+# endif #SPOTFLOW_CORE_DUMPS
 
 endif #SPOTFLOW

@@ -4,18 +4,12 @@
 #include "wifi.h"
 #include "zephyr/debug/coredump.h"
 
+#include <zephyr/sys/reboot.h>
+#include <zephyr/fatal.h>   /* for k_sys_fatal_error_handler */
+#include <zephyr/logging/log_ctrl.h>
+
 LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 
-void dump_coredump()
-{
-	/* … */
-	unsigned int reason = K_ERR_KERNEL_OOPS; /* or K_ERR_KERNEL_PANIC, etc. */
-	const struct arch_esf* esf = NULL; /* no exception context */
-	struct k_thread* thr = k_current_get(); /* dump the current thread */
-
-	coredump(reason, esf, thr);
-	/* Note: after this the dump will be emitted but your code keeps running */
-}
 
 int main(void)
 {
@@ -26,15 +20,29 @@ int main(void)
 
 	init_wifi();
 	connect_to_wifi();
-	LOG_INF("going to dump coredump");
-	dump_coredump();
 	for (int i = 0; i < 20; i++) {
 		LOG_INF("Hello from Zephyr to Spotflow: %d", i);
 		k_sleep(K_SECONDS(2));
+		if (i == 5) {
+			LOG_ERR("Simulating a crash at iteration %d", i);
+			k_panic();
+			// Simulate a crash to trigger coredump
+		}
 	}
 
 	LOG_INF("Going to crash the system");
-	k_panic();
+
 
 	return 0;
+}
+
+FUNC_NORETURN void k_sys_fatal_error_handler(unsigned int reason,
+				      const struct arch_esf *esf)
+{
+	ARG_UNUSED(esf);
+
+	LOG_PANIC();
+	LOG_ERR("Halting system");
+	sys_reboot(SYS_REBOOT_COLD);
+	CODE_UNREACHABLE;
 }
