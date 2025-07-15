@@ -22,7 +22,7 @@
 
 #define LOG_DBG_PRINT_RESULT(func, rc) LOG_DBG("%s: %d <%s>", (func), rc, RC_STR(rc))
 
-LOG_MODULE_REGISTER(spotflow_mqtt, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
 struct mqtt_config {
 	char* host;
@@ -64,8 +64,8 @@ static uint8_t tx_buffer[APP_MQTT_BUFFER_SIZE];
 
 int spotflow_mqtt_poll()
 {
-	/* 1) Network I/O: wait up to 1 000 ms for socket readability */
-	int rc = zsock_poll(mqtt_client_toolset.fds, 1, 1000);
+	/* 1) Network I/O: wait up to 10 ms for socket readability */
+	int rc = zsock_poll(mqtt_client_toolset.fds, 1, 10);
 	/* rc = 0 means time out, negative mean error */
 	if (rc < 0) {
 		LOG_DBG("zsock_poll() returned error %d,errno: %d", rc, errno);
@@ -231,13 +231,15 @@ static int poll_with_timeout(int timeout)
 	return ret;
 }
 
-int spotflow_mqtt_publish_cbor_log_msg(struct spotflow_mqtt_msg* msg)
+int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len)
 {
 	struct mqtt_publish_param param;
-	param.message.topic.qos = MQTT_QOS_1_AT_LEAST_ONCE;
+	/* using lowest guarantee because handling puback (for better guarantees)
+	 * is not implemented now */
+	param.message.topic.qos = MQTT_QOS_0_AT_MOST_ONCE;
 	param.message.topic.topic = spotflow_mqtt_config.topic;
-	param.message.payload.data = msg->payload;
-	param.message.payload.len = msg->len;
+	param.message.payload.data = payload;
+	param.message.payload.len = len;
 	param.message_id = sys_rand16_get();
 	param.dup_flag = 0U;
 	param.retain_flag = 0U;

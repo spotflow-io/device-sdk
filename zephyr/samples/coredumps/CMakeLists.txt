@@ -2,16 +2,16 @@
 
 cmake_minimum_required(VERSION 3.20.0)
 
-# TODO document in readme
 if (EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/credentials.conf")
     list(APPEND EXTRA_CONF_FILE "${CMAKE_CURRENT_SOURCE_DIR}/credentials.conf")
 endif()
 
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(wifi-logs)
+project(coredumps)
+
+add_subdirectory(../common ${CMAKE_CURRENT_BINARY_DIR}/common)
 
 target_sources(app PRIVATE
         src/main.c
-        src/wifi.c
 )

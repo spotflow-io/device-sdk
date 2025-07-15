@@ -5,12 +5,12 @@
 extern "C" {
 #endif
 
-extern struct k_msgq g_spotflow_mqtt_msgq;
+#if CONFIG_SPOTFLOW_MQTT_THREAD_CUSTOM_PRIORITY
+#define SPOTFLOW_MQTT_THREAD_PRIORITY CONFIG_SPOTFLOW_MQTT_THREAD_PRIORITY
+#else
+#define SPOTFLOW_MQTT_THREAD_PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
+#endif
 
-struct spotflow_mqtt_msg {
-	uint8_t* payload;
-	size_t len;
-};
 
 void spotflow_start_mqtt(void);
 

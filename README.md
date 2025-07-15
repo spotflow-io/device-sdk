@@ -13,6 +13,9 @@ Our solution was tested on the following Zephyr boards (more are coming soon):
 * [Nordic NRF7002DK](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK)
 * [ESP32-C3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c3/esp32-c3-devkitc-02/index.html)
 
+We currently support Zephyr v4.1.0 and  nRF Connect SDK v3.0.0, v3.0.1 and v3.0.2.
+For more information, check [Spotflow](https://app.spotflow.io/) or [Spotflow documentation](https://docs.spotflow.io/).
+
 ## Getting Started
 
 Register and get your Ingest key at [Spotflow](https://spotflow.io/signup).
@@ -37,6 +40,8 @@ manifest:
 
 ### Architecture
 
+#### Logging
+
 ```mermaid
 ---
 title: Main log flow
@@ -44,21 +49,29 @@ title: Main log flow
 flowchart LR
     A[User Code] --> B[Zephyr RTOS]
     B --> C[Spotflow Logging Backend]
-    C --> D[Spotflow Mqtt Broker]
+    C -- QoS 0 --> D[Spotflow Mqtt Broker]
     D --> E[Spotflow Observability Platform]
 ```
+Currently, the Spotflow backend uses MQTT QoS 0 only.
 
 ```mermaid
 ---
-title: Spotflow Logging Backend flow
+title: Spotflow Data Flow
 ---
 flowchart LR
+    processor[Spotflow Backend Processor]
+
     A[Zephyr logging] --> B[Spotflow Logging Backend]
-    B --> C[Spotflow Mqtt Broker]
-    C --> D[Encode CBOR]
+    B --> D[Encode CBOR]
     D --> E[Log message Queue]
-    E --> F[Processor]
-    F --> G[Send to MQTT]
+
+    O[Extract Coredump] --> P[Coredumps Backend]
+    P[Coredumps Backend] --> Q[Encode CBOR]
+    Q --> R[Coredumps message Queue]
+    R --> processor
+
+    E --> processor
+    processor --> G[Send to MQTT]
 ```
 
 ### Build ID

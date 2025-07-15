@@ -1,0 +1,25 @@
+&wifi {
+	status = "okay";
+};
+
+/*removing scratch partition because we do not use it
+zephyr\dts\common\espressif\partitions_0x0_default_4M.dtsi*/
+/* most likely after 4.1.0 removed */
+/delete-node/ &scratch_partition;
+/delete-node/ &coredump_partition;
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/* reserve 128 KB at top of 4 MB flash for core dumps */
+		/*128 - because we got 124 from deleted scratch partition
+		* and 4 from previous coredump partition */
+		coredump_partition: partition@3e0000{
+			label = "coredump-partition";
+			reg = <0x3e0000 DT_SIZE_K(128)>;
+		};
+	};
+};

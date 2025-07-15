@@ -1,0 +1,56 @@
+config SPOTFLOW_COREDUMPS
+	bool "Enable core dumps upload to Spotflow"
+	default n
+	select DEBUG_COREDUMP
+	select FLASH
+	select REBOOT
+	help
+		Enable sending core dumps to Spotflow observability platform.
+
+
+if SPOTFLOW_COREDUMPS
+
+# spotflow uses Zephyr's coredump subsystem to upload core dumps
+choice DEBUG_COREDUMP_BACKEND
+	default DEBUG_COREDUMP_BACKEND_FLASH_PARTITION if SPOTFLOW_COREDUMPS
+endchoice
+
+config SPOTFLOW_PROCESSING_BACKEND_COREDUMPS_LEVEL
+	int "Spotflow library core dumps log level"
+	default LOG_DEFAULT_LEVEL
+	range 0 4
+	help
+		Sets log level for Spotflow Coredump module. All logs are debug by default.
+		Levels are:
+		- 0 OFF, do not write
+		- 1 ERROR, only write SYS_LOG_ERR
+		- 2 WARNING, write SYS_LOG_WRN in addition to previous level
+		- 3 INFO, write SYS_LOG_INF in addition to previous level
+		- 4 DEBUG, write SYS_LOG_DBG in addition to previous level
+
+config SPOTFLOW_COREDUMP_CHUNK_SIZE
+	int "Size of Spotflow coredump chunk"
+	default 1024
+	help
+		Size of the buffer used by Spotflow Coredump backend to store coredump chunks.
+		Increase this value if you experience issues with coredumps being dropped
+		because of buffer overflow.
+		Should be smaller than SPOTFLOW_CBOR_LOG_MAX_LEN.
+
+
+config SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE
+	int "Size of Spotflow log backend queue"
+	default 16
+	help
+		Size of the queue used by Spotflow Coredump backend to store logs
+		before sending them to the server.
+		Increase this value if you experience issues with logs being dropped.
+
+config SPOTFLOW_USE_DEFAULT_REBOOT_HANDLER
+    bool "Use default Spotflow reboot handler"
+    default y
+    help
+        Use the default Zephyr reboot handler to reset the system after a fata error.
+        If disabled, you will need to implement your own reboot handler.
+        Please, make sure you reboot the device and call LOG_PANIC() in your handler
+endif #SPOTFLOW_COREDUMPS
