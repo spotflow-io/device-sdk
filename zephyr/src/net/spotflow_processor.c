@@ -58,6 +58,7 @@ static void mqtt_thread(void)
 	while (true) {
 		spotflow_mqtt_establish_mqtt();
 
+
 		/* set up k_poll on msgq */
 		k_poll_event_init(&events[0], K_POLL_TYPE_MSGQ_DATA_AVAILABLE,
 				  K_POLL_MODE_NOTIFY_ONLY, &g_spotflow_mqtt_msgq);
