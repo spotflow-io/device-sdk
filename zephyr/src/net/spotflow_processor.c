@@ -8,6 +8,7 @@
 #include "spotflow_mqtt.h"
 #include "spotflow_connection_helper.h"
 #include "spotflow_tls.h"
+#include "coredumps/spotflow_coredump_backend.h"
 
 #define APP_CONNECT_TIMEOUT_MS 10000
 
@@ -58,6 +59,8 @@ static void mqtt_thread(void)
 	while (true) {
 		spotflow_mqtt_establish_mqtt();
 
+		/*todo consider moving to separate thread/use message queue, ??*/
+		process_existing_coredump();
 
 		/* set up k_poll on msgq */
 		k_poll_event_init(&events[0], K_POLL_TYPE_MSGQ_DATA_AVAILABLE,
