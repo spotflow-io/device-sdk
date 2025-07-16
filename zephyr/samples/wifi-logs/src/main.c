@@ -2,6 +2,7 @@
 #include <zephyr/logging/log.h>
 
 #include "wifi.h"
+#include "zephyr/debug/coredump.h"
 
 LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 
