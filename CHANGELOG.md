@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 * Obtaining device ID from Zephyr if not provided in Kconfig
 * Support for overriding device ID in code
+
+## [0.3.0] - 2025-07-09
 ### Changed
 * Used mbedtls heap by default to prevent heap fragmentation and certificate chain validation issues
 
