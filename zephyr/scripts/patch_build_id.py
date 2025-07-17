@@ -7,7 +7,6 @@ from elftools.elf.sections import Symbol
 from elftools.elf.constants import SH_FLAGS
 
 
-# TODO: Create an argument out of this (and maybe also from those below)
 SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME = "bindesc_entry_spotflow_build_id"
 
 BUILD_ID_HEADER_SIZE = 4
