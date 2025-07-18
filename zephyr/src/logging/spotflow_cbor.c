@@ -80,6 +80,10 @@ int spotflow_cbor_encode_message(struct log_msg* log_msg, size_t sequence_number
 	*cbor_data = data;
 	return 0;
 }
+int spotflow_cbor_encode_core_dump_no_chunking()
+{
+ return 0;
+}
 
 static int cb_out(int c, void* output_ctx)
 {
