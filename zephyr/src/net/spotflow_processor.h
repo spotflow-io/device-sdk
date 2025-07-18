@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-extern struct k_msgq g_spotflow_mqtt_msgq;
-
 struct spotflow_mqtt_msg {
 	uint8_t* payload;
 	size_t len;

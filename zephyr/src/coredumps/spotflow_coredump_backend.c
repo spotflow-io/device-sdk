@@ -12,21 +12,22 @@ void process_existing_coredump()
 	 * coredump data, or perform any other necessary operations.
 	 */
 	LOG_INF("Processing existing coredump...");
-	/* 1. Do we have a dump? */
+	/* Check if there is a dump */
 	int has = coredump_query(COREDUMP_QUERY_HAS_STORED_DUMP, NULL);
 	if (has <= 0) {
 		LOG_INF("No coredump in flash (or error %d)", has);
 		return;
 	}
+	/*TODO send initial empty chunk */
 
-	/* 2. How big is it? */
+	/* Get the size of dump */
 	int dump_size = coredump_query(COREDUMP_QUERY_GET_STORED_DUMP_SIZE, NULL);
 	if (dump_size <= 0) {
 		LOG_ERR("Invalid dump size %d", dump_size);
 		return;
 	}
 
-	/* 3. Allocate a buffer and copy it off flash */
+	/* Allocate a buffer and copy it off flash */
 	uint8_t *buf = k_malloc(dump_size);
 	if (!buf) {
 		LOG_ERR("OOM allocating %d bytes", dump_size);

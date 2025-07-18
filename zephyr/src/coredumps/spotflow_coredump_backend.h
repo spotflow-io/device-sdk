@@ -1,7 +1,3 @@
-//
-// Created by Jan on 7/15/2025.
-//
-
 #ifndef SPOTFLOW_COREDUMP_BACKEND_H
 #define SPOTFLOW_COREDUMP_BACKEND_H
 
@@ -10,6 +6,7 @@ extern "C" {
 #endif
 
 	void process_existing_coredump();
+	void trigger_queue_fill();
 #ifdef __cplusplus
 }
 #endif
