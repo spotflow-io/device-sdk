@@ -5,6 +5,17 @@
 
 LOG_MODULE_REGISTER(spotflow_coredump_backend, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
+K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_mqtt_msg*),
+	      CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE, 1);
+
+#ifdef CONFIG_SPOTFLOW_CORE_DUMPS
+/*Triggering init routine on start to prepare first chunks to the core dump queue*/
+
+#endif /*CONFIG_SPOTFLOW_CORE_DUMPS*/
+
+/*todo we use optimistic approach - device reboot after all chunks fit into buffer but before
+ * sending, chunks might be lost.
+ */
 void process_existing_coredump()
 {
 	/* This function is a placeholder for processing existing coredumps.

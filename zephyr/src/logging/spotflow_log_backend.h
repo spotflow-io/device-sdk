@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-extern struct k_msgq g_spotflow_logs_mqtt_msgq;
+extern struct k_msgq g_spotflow_logs_msgq;
 
 #ifdef __cplusplus
 }

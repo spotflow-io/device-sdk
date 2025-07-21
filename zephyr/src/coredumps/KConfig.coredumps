@@ -1,0 +1,19 @@
+config SPOTFLOW_CORE_DUMPS
+	bool "Enable core dumps upload to Spotflow"
+	default n
+	select DEBUG_COREDUMP
+	select FLASH
+# 	depends on DEBUG_COREDUMP_BACKEND_FLASH_PARTITION
+	help
+		Enable sending core dumps to Spotflow observability platform.
+
+
+if SPOTFLOW_CORE_DUMPS
+
+# spotflow uses Zephyr's coredump subsystem to upload core dumps
+choice DEBUG_COREDUMP_BACKEND
+	default DEBUG_COREDUMP_BACKEND_FLASH_PARTITION if SPOTFLOW_CORE_DUMPS
+endchoice
+
+
+endif #SPOTFLOW_CORE_DUMPS

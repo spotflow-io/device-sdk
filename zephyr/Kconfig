@@ -1,6 +1,8 @@
 menuconfig SPOTFLOW
 	bool "Enable Spotflow Observability"
 	default n
+# 	used by both Coredumps and Logging
+	select ZCBOR
 	select MBEDTLS
 	select MBEDTLS_TLS_LIBRARY if NRF_SECURITY
 	select MQTT_LIB
@@ -22,25 +24,8 @@ menuconfig SPOTFLOW
 
 if SPOTFLOW
 
-config SPOTFLOW_LOG_BACKEND
-	bool "Spotflow logging backend"
-	default y if SPOTFLOW
-	depends on LOG
-	depends on SPOTFLOW
-	select LOG_OUTPUT
-	select ZCBOR
-	help
-		Enable sending logs to Spotflow cloud.
-
-config SPOTFLOW_CORE_DUMPS
-	bool "Enable core dumps upload to Spotflow"
-	default n
-	depends on SPOTFLOW
-	select DEBUG_COREDUMP
-	select FLASH
-# 	depends on DEBUG_COREDUMP_BACKEND_FLASH_PARTITION
-	help
-		Enable sending core dumps to Spotflow observability platform.
+rsource "src/logging/KConfig.logging"
+rsource "src/coredumps/KConfig.coredumps"
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
 	default 4096 if SPOTFLOW
@@ -91,46 +76,15 @@ config SPOTFLOW_INGEST_KEY
 		Ingest key is a secret key used to authenticate your device
 		It can be found in Spotflow Observability platform
 
-if SPOTFLOW_LOG_BACKEND
 
-config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW
-	int "Additional heap size required by Spotflow"
-	default 6144 if SPOTFLOW_LOG_BACKEND
-	help
-		Additional heap size required by Spotflow logging backend.
-		Increase this value if you experience issues with logs being sent.
-
-config SPOTFLOW_LOG_BACKEND_QUEUE_SIZE
-	int "Size of Spotflow log backend queue"
-	default 64
-	help
-		Size of the queue used by Spotflow logging backend to store logs
-		before sending them to the server.
-		Increase this value if you experience issues with logs being dropped.
-
-config SPOTFLOW_LOG_BUFFER_SIZE
-	int "Size of Spotflow log buffer"
-	default 512
-	help
-		Size of the buffer used by Spotflow logging backend to store logs before serialization.
-		Make this at least as big as your longest expected log line.
-		Increase this value if you experience issues with logs being dropped because of buffer overflow.
-
-config SPOTFLOW_CBOR_LOG_MAX_LEN
-	int "Size of Spotflow CBOR log buffer"
-	default 1024
-	help
-		Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
-		Increase this value if you experience issues with logs being dropped because of buffer overflow.
-
-config SPOTFLOW_MQTT_LOG_THREAD_CUSTOM_PRIORITY
+config SPOTFLOW_MQTT_THREAD_CUSTOM_PRIORITY
 	bool "Use custom priority for MQTT log thread"
 	default n
 	help
 		Enable this option to use custom priority for the thread used to send logs to Spotflow server.
 		If disabled, the thread will use default K_LOWEST_APPLICATION_THREAD_PRIO.
 
-config SPOTFLOW_MQTT_LOG_THREAD_PRIORITY
+config SPOTFLOW_MQTT_THREAD_PRIORITY
 	int "MQTT log thread priority"
 	default 14
 	help
@@ -145,25 +99,7 @@ config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 		Size of the stack used by the Spotflow processing thread.
 		Increase this value if you experience issues with logs/tls handshake.
 
-config SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL
-	int "Spotflow library log level"
-	default LOG_DEFAULT_LEVEL
-	range 0 4
-	help
-		Sets log level for all Spotflow logging modules. All logs are debug by default.
-		Levels are:
-		- 0 OFF, do not write
-		- 1 ERROR, only write SYS_LOG_ERR
-		- 2 WARNING, write SYS_LOG_WRN in addition to previous level
-		- 3 INFO, write SYS_LOG_INF in addition to previous level
-		- 4 DEBUG, write SYS_LOG_DBG in addition to previous level
 
-endif #SPOTFLOW_LOG_BACKEND
-# spotflow uses Zephyr's coredump subsystem to upload core dumps
-choice DEBUG_COREDUMP_BACKEND
-	default DEBUG_COREDUMP_BACKEND_FLASH_PARTITION if SPOTFLOW_CORE_DUMPS
-endchoice
 
-# endif #SPOTFLOW_CORE_DUMPS
 
 endif #SPOTFLOW
