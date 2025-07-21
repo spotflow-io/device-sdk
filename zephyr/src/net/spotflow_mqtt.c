@@ -189,7 +189,7 @@ static int client_init(struct mqtt_client* client)
 						      spotflow_mqtt_config.server_addr,
 						      spotflow_mqtt_config.port);
 
-	char* device_id = spotflow_get_device_id();
+	const char* device_id = spotflow_get_device_id();
 	spotflow_mqtt_config.username =
 	    (struct mqtt_utf8){ .utf8 = device_id, .size = strlen(device_id) };
 

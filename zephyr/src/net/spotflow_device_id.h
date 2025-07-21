@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-char* spotflow_get_device_id();
+const char* spotflow_get_device_id();
 
 #ifdef __cplusplus
 }

@@ -8,34 +8,34 @@
 
 LOG_MODULE_REGISTER(spotflow_device_id, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
-/* Hexadecimal representation of the Zephyr device ID and a null terminator */
+/* Hexadecimal representation of the Zephyr device ID (two characters per byte)
+ * and a null terminator
+ */
 static char spotflow_generated_device_id_buffer[(2 * ZEPHYR_DEVICE_ID_MAX_LENGTH) + 1];
-static bool device_id_generated = false;
+static const char* cached_device_id = NULL;
 
-static char* cached_device_id = NULL;
-
-char* __attribute__((weak)) spotflow_override_device_id()
+__attribute__((weak)) const char* spotflow_override_device_id()
 {
 	return NULL;
 }
 
 static void spotflow_generate_device_id();
 
-char* spotflow_get_device_id()
+const char* spotflow_get_device_id()
 {
 	if (cached_device_id != NULL) {
 		return cached_device_id;
 	}
 
-	char* device_id = spotflow_override_device_id();
+	const char* device_id = spotflow_override_device_id();
 
 	if (device_id == NULL) {
-		device_id = CONFIG_SPOTFLOW_DEVICE_ID;
-	}
-
-	if (strlen(device_id) == 0) {
-		spotflow_generate_device_id();
-		device_id = spotflow_generated_device_id_buffer;
+		if (strlen(device_id) > 0) {
+			device_id = CONFIG_SPOTFLOW_DEVICE_ID;
+		} else {
+			spotflow_generate_device_id();
+			device_id = spotflow_generated_device_id_buffer;
+		}
 	}
 
 	cached_device_id = device_id;
@@ -47,10 +47,6 @@ char* spotflow_get_device_id()
 
 static void spotflow_generate_device_id()
 {
-	if (device_id_generated) {
-		return;
-	}
-
 	uint8_t device_id[ZEPHYR_DEVICE_ID_MAX_LENGTH];
 
 	ssize_t ret = hwinfo_get_device_id(device_id, ARRAY_SIZE(device_id));
@@ -63,9 +59,12 @@ static void spotflow_generate_device_id()
 		return;
 	}
 
+	/* Convert the Zephyr device ID to its hexadecimal representation */
 	for (int i = 0; i < ret; i++) {
+		/* Each byte is converted to two characters and a null terminator.
+		 * Each null terminator apart from the last one is overwritten by the
+		 * first character of the next byte.
+		 */
 		snprintk(spotflow_generated_device_id_buffer + (2 * i), 3, "%02X", device_id[i]);
 	}
-
-	device_id_generated = true;
 }
