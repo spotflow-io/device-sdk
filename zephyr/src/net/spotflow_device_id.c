@@ -30,7 +30,7 @@ const char* spotflow_get_device_id()
 	const char* device_id = spotflow_override_device_id();
 
 	if (device_id == NULL) {
-		if (strlen(device_id) > 0) {
+		if (strlen(CONFIG_SPOTFLOW_DEVICE_ID) > 0) {
 			device_id = CONFIG_SPOTFLOW_DEVICE_ID;
 		} else {
 			spotflow_generate_device_id();
