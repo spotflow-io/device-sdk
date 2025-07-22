@@ -28,6 +28,7 @@ static struct k_poll_event core_dumps_poll_event;
 static void mqtt_thread(void);
 static void process_mqtt();
 static void init_logs_polling();
+static void init_core_dumps();
 static void init_core_dumps_polling();
 
 static uint32_t messages_sent_counter = 0;
@@ -44,13 +45,15 @@ K_THREAD_DEFINE(mqtt_log_thread_id, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 void spotflow_start_mqtt(void)
 {
 	k_thread_start(mqtt_log_thread_id);
-	LOG_DBG("Thread started with priority %d and stack size %d",
-		SPOTFLOW_MQTT_THREAD_PRIORITY, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE);
+	LOG_DBG("Thread started with priority %d and stack size %d", SPOTFLOW_MQTT_THREAD_PRIORITY,
+		CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE);
 }
 
 static void mqtt_thread(void)
 {
 	LOG_INF("Starting Spotflow processing thread");
+
+	init_core_dumps();
 
 	wait_for_network();
 
@@ -70,6 +73,10 @@ static void mqtt_thread(void)
 }
 
 #ifdef CONFIG_SPOTFLOW_CORE_DUMPS
+static void init_core_dumps()
+{
+
+}
 static void init_core_dumps_polling()
 {
 	/* set up k_poll on msgq */
@@ -88,7 +95,7 @@ static int poll_and_process_enqueued_coredump_chunks()
 	k_poll(&core_dumps_poll_event, 1, K_NO_WAIT); /* polls events[0] */
 	if (core_dumps_poll_event.state == K_POLL_STATE_MSGQ_DATA_AVAILABLE) {
 		/*TODO core dumps are using best afford approach - if connection is dropped when transmitting
-		 * core dump chunk will be lost
+		 * core dump chunk will be lost, change to peak
 		 */
 		if (k_msgq_get(&g_spotflow_core_dumps_msgq, &msg_ptr, K_NO_WAIT) == 0) {
 			rc = spotflow_mqtt_publish_cbor_msg(msg_ptr);
@@ -106,11 +113,12 @@ static int poll_and_process_enqueued_coredump_chunks()
 		}
 		core_dumps_poll_event.state = K_POLL_STATE_NOT_READY;
 		return 1;
-	}else {
+	} else {
 		return 0;
 	}
 }
 #else
+static inline init_core_dumps() {}
 static inline void init_core_dumps_polling() {}
 static inline int poll_and_process_enqueued_coredump_chunks()
 {

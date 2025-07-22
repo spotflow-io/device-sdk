@@ -15,5 +15,25 @@ choice DEBUG_COREDUMP_BACKEND
 	default DEBUG_COREDUMP_BACKEND_FLASH_PARTITION if SPOTFLOW_CORE_DUMPS
 endchoice
 
+config SPOTFLOW_PROCESSING_BACKEND_COREDUMPS_LEVEL
+	int "Spotflow library core dumps log level"
+	default LOG_DEFAULT_LEVEL
+	range 0 4
+	help
+		Sets log level for all Spotflow logging modules. All logs are debug by default.
+		Levels are:
+		- 0 OFF, do not write
+		- 1 ERROR, only write SYS_LOG_ERR
+		- 2 WARNING, write SYS_LOG_WRN in addition to previous level
+		- 3 INFO, write SYS_LOG_INF in addition to previous level
+		- 4 DEBUG, write SYS_LOG_DBG in addition to previous level
+
+config SPOTFLOW_COREDUMP_CHUNK_SIZE
+    int "Size of Spotflow coredump chunk"
+    default 1024
+    help
+        Size of the buffer used by Spotflow logging backend to store coredump chunks.
+        Increase this value if you experience issues with coredumps being dropped because of buffer overflow.
+        Should be smaller than SPOTFLOW_CBOR_LOG_MAX_LEN
 
 endif #SPOTFLOW_CORE_DUMPS

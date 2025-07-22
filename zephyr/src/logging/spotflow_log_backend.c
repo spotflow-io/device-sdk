@@ -82,7 +82,7 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 
 	uint8_t* cbor_data = NULL;
 	size_t cbor_data_len = 0;
-	int rc = spotflow_cbor_encode_message(log_msg, ctx->message_index, ctx->cbor_output_context,
+	int rc = spotflow_cbor_encode_log(log_msg, ctx->message_index, ctx->cbor_output_context,
 					      &cbor_data, &cbor_data_len);
 
 	if (rc < 0) {

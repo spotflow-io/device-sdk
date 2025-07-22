@@ -21,6 +21,7 @@ LOG_MODULE_REGISTER(cbor_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL)
 #define KEY_DEVICE_UPTIME_MS 0x06
 #define KEY_SEQUENCE_NUMBER 0x0D
 
+
 #define ZCBOR_STATE_DEPTH 2
 
 struct message_metadata {
@@ -38,9 +39,11 @@ static int get_formatted_message(struct spotflow_cbor_output_context* output_con
 static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg,
 			     size_t sequence_number);
 
-int spotflow_cbor_encode_message(struct log_msg* log_msg, size_t sequence_number,
-				 struct spotflow_cbor_output_context* output_context,
-				 uint8_t** cbor_data, size_t* cbor_data_len)
+
+
+int spotflow_cbor_encode_log(struct log_msg* log_msg, size_t sequence_number,
+			     struct spotflow_cbor_output_context* output_context,
+			     uint8_t** cbor_data, size_t* cbor_data_len)
 {
 	__ASSERT(log_msg != NULL, "log_msg is NULL");
 	__ASSERT(output_context != NULL, "output_context is NULL");
@@ -82,7 +85,7 @@ int spotflow_cbor_encode_message(struct log_msg* log_msg, size_t sequence_number
 }
 int spotflow_cbor_encode_core_dump_no_chunking()
 {
- return 0;
+	return 0;
 }
 
 static int cb_out(int c, void* output_ctx)
@@ -203,6 +206,7 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 
 	/* messageType: "LOG" */
 	zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
+	/*todo can be changed to 0x00*/
 	zcbor_tstr_put_lit(state, "LOG");
 
 	int rc = encode_message_metadata_to_cbor(metadata, state);

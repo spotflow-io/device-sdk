@@ -40,6 +40,8 @@ config SPOTFLOW_CBOR_LOG_MAX_LEN
 		Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
 		Increase this value if you experience issues with logs being dropped because of buffer overflow.
 
+
+
 config SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL
 	int "Spotflow library log level"
 	default LOG_DEFAULT_LEVEL
