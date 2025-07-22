@@ -10,11 +10,13 @@ zephyr_include_directories(
         src
 )
 
-# FIXME: Not working, because we cannot insert the step before the generation of
-# merged.hex. Therefore, we'll have to patch that as well.
-if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID)
-    # Prepend patching the .elf file with the build ID to post-build commands so
-    # that the build ID is contained in the binary image.
+# Prepend patching the .elf and .hex files with the build ID to post-build commands so
+# that the build ID is contained in the binary image. It's insufficient to patch just
+# the .elf file, because Zephyr's extra post-build commands are inserted after the
+# generation of the .hex and .bin files.
+#
+# TODO: Patch the .bin file as well.
+if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID) 
     get_filename_component(
         spotflow_patch_build_id_script
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/patch_build_id.py
@@ -32,6 +34,7 @@ if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID)
                 ${PYTHON_EXECUTABLE}
                 ${spotflow_patch_build_id_script}
                 ${CMAKE_BINARY_DIR}/zephyr/${CONFIG_KERNEL_BIN_NAME}.elf
+                ${CMAKE_BINARY_DIR}/zephyr/${CONFIG_KERNEL_BIN_NAME}.hex
             ${PROPERTY_EXTRA_POST_BUILD_COMMANDS}
     )
 endif()

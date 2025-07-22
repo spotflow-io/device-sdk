@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 
 import sys
+import os
 import hashlib
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import Symbol
 from elftools.elf.constants import SH_FLAGS
+from intelhex import IntelHex
 
 
 SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME = "bindesc_entry_spotflow_build_id"
@@ -13,15 +15,18 @@ BUILD_ID_HEADER_SIZE = 4
 BUILD_ID_VALUE_SIZE = 20
 
 
-def generate_and_patch_build_id(filepath):
-    with open(filepath, 'rb+') as file_stream:
+def generate_and_patch_build_id(elf_filepath, hex_filepath):
+    with open(elf_filepath, 'rb+') as file_stream:
         elffile = ELFFile(file_stream)
 
         bindesc_build_id_symbol = find_bindesc_build_id_symbol(elffile)
 
         build_id = generate_build_id(elffile, bindesc_build_id_symbol)
 
-        patch_build_id(elffile, bindesc_build_id_symbol, build_id)
+        patch_build_id_elf(elffile, bindesc_build_id_symbol, build_id)
+        
+        if hex_filepath:
+            patch_build_id_hex(hex_filepath, bindesc_build_id_symbol, build_id)
 
 
 def find_bindesc_build_id_symbol(elffile: ELFFile) -> Symbol:
@@ -67,13 +72,14 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
             hash_builder.update(data)
             print("updated hash")
 
-    return hash_builder.digest()
-
-
-def patch_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_id: bytes):
+    build_id = hash_builder.digest()
     assert len(build_id) == BUILD_ID_VALUE_SIZE
     assert bindesc_build_id_symbol["st_size"] == BUILD_ID_HEADER_SIZE + BUILD_ID_VALUE_SIZE
 
+    return build_id
+
+
+def patch_build_id_elf(elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_id: bytes):
     for section in elffile.iter_sections():
         section_file_offset = section["sh_offset"]
         section_rom_start = section["sh_addr"]
@@ -83,15 +89,39 @@ def patch_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_id: 
         if section_rom_start <= symbol_rom_start < section_rom_end:
             build_id_file_offset = section_file_offset + (symbol_rom_start - section_rom_start) + BUILD_ID_HEADER_SIZE
 
-            print(f"Writing build id '{build_id}' to file offset: {build_id_file_offset}")
+            print(f"Patching build id '{build_id.hex()}' into ELF file at offset: {build_id_file_offset}")
             elffile.stream.seek(build_id_file_offset)
             elffile.stream.write(build_id)
 
             break
 
 
+def patch_build_id_hex(hex_filepath: str, bindesc_build_id_symbol: Symbol, build_id: bytes):
+    target_address = bindesc_build_id_symbol["st_value"] + BUILD_ID_HEADER_SIZE
+    
+    print(f"Patching build id '{build_id.hex()}' into HEX file at address: 0x{target_address:08x}")
+    
+    intel_hex = IntelHex(hex_filepath)
+    
+    for i, byte_value in enumerate(build_id):
+        intel_hex[target_address + i] = byte_value
+    
+    intel_hex.write_hex_file(hex_filepath)
+
+
 def main():
-    generate_and_patch_build_id(sys.argv[1])
+    if len(sys.argv) < 2:
+        print("Usage: patch_build_id.py <elf_file> [hex_file]")
+        sys.exit(1)
+    
+    elf_filepath = sys.argv[1]
+    hex_filepath = sys.argv[2] if len(sys.argv) > 2 else None
+    
+    if hex_filepath and not os.path.exists(hex_filepath):
+        print(f"HEX file '{hex_filepath}' does not exist, skipping HEX patching")
+        hex_filepath = None
+    
+    generate_and_patch_build_id(elf_filepath, hex_filepath)
 
 if __name__ == "__main__":
     main()
