@@ -90,11 +90,13 @@ void process_mqtt()
 						rc);
 					spotflow_mqtt_abort_mqtt();
 					/* Free the message buffer before breaking */
+					k_free(msg_ptr->payload);
 					k_free(msg_ptr);
 					break;
 				}
 
 				messages_sent_counter++;
+				k_free(msg_ptr->payload);
 				k_free(msg_ptr);
 				if (messages_sent_counter % 100 == 0) {
 					LOG_INF("Sent %" PRIu32 " messages", messages_sent_counter);
