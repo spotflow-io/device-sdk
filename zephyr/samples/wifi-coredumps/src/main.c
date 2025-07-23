@@ -40,41 +40,12 @@ int main(void)
 
 	init_wifi();
 	connect_to_wifi();
-	check_coredump();
 	for (int i = 0; i < 20; i++) {
 		LOG_INF("Hello from Zephyr to Spotflow: %d", i);
 		k_sleep(K_SECONDS(2));
 	}
 
 	return 0;
-}
-
-void check_coredump()
-{
-	int ret;
-
-	/* 1) Do we have a dump in flash? */
-	ret = coredump_query(COREDUMP_QUERY_HAS_STORED_DUMP, NULL);
-	if (ret < 0) {
-		LOG_ERR("coredump_query(HAS): %d", ret);
-		return;
-	}
-	if (ret != 1) {
-		LOG_INF("No coredump stored, recieved %d", ret);
-		return;
-	}else {
-		LOG_INF("Coredump found successfully");
-	}
-
-	/* 2) How big is it? */
-	ret = coredump_query(COREDUMP_QUERY_GET_STORED_DUMP_SIZE, NULL);
-	if (ret < 0) {
-		LOG_ERR("coredump_query(SIZE): %d", ret);
-		return;
-	}
-
-	LOG_INF("Found coredump of %d	 bytes", ret);
-
 }
 
 
@@ -114,7 +85,7 @@ static int prepare_button()
 	gpio_init_callback(&button_cb_data, button_pressed, BIT(button.pin));
 	gpio_add_callback(button.port, &button_cb_data);
 
-	LOG_INF("Set up button at %s pin %d", button.port->name, button.pin);
+	LOG_DBG("Set up button at %s pin %d", button.port->name, button.pin);
 	return 0;
 
 }

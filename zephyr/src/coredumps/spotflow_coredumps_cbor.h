@@ -9,12 +9,9 @@
 extern "C" {
 #endif
 
-inline int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_data_len,
+int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_data_len,
 					 int chunk_ordinal, uint32_t core_dump_id, bool last_chunk,
-					 uint8_t** cbor_data, size_t* cbor_data_len)
-{
-}
-
+					 uint8_t** cbor_data, size_t* cbor_data_len);
 #ifdef __cplusplus
 }
 #endif

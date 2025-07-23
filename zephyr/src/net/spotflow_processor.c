@@ -28,7 +28,6 @@ static struct k_poll_event core_dumps_poll_event;
 static void mqtt_thread(void);
 static void process_mqtt();
 static void init_logs_polling();
-static void init_core_dumps();
 static void init_core_dumps_polling();
 
 static uint32_t messages_sent_counter = 0;
@@ -53,8 +52,6 @@ static void mqtt_thread(void)
 {
 	LOG_INF("Starting Spotflow processing thread");
 
-	init_core_dumps();
-
 	wait_for_network();
 
 	spotflow_tls_init();
@@ -73,10 +70,6 @@ static void mqtt_thread(void)
 }
 
 #ifdef CONFIG_SPOTFLOW_CORE_DUMPS
-static void init_core_dumps()
-{
-
-}
 static void init_core_dumps_polling()
 {
 	/* set up k_poll on msgq */
@@ -105,10 +98,12 @@ static int poll_and_process_enqueued_coredump_chunks()
 					rc);
 				spotflow_mqtt_abort_mqtt();
 				/* Free the message buffer before breaking */
+				k_free(msg_ptr->payload);
 				k_free(msg_ptr);
 				return rc;
 			}
 			LOG_DBG("Sent coredump chunk with size %zu bytes", msg_ptr->len);
+			k_free(msg_ptr->payload);
 			k_free(msg_ptr);
 		}
 		core_dumps_poll_event.state = K_POLL_STATE_NOT_READY;
@@ -118,7 +113,6 @@ static int poll_and_process_enqueued_coredump_chunks()
 	}
 }
 #else
-static inline init_core_dumps() {}
 static inline void init_core_dumps_polling() {}
 static inline int poll_and_process_enqueued_coredump_chunks()
 {
@@ -151,11 +145,13 @@ static int poll_and_process_enqueued_logs()
 					rc);
 				spotflow_mqtt_abort_mqtt();
 				/* Free the message buffer before breaking */
+				k_free(msg_ptr->payload);
 				k_free(msg_ptr);
 				return rc;
 			}
 
 			messages_sent_counter++;
+			k_free(msg_ptr->payload);
 			k_free(msg_ptr);
 			if (messages_sent_counter % 100 == 0) {
 				LOG_INF("Sent %" PRIu32 " messages", messages_sent_counter);

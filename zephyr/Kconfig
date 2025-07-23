@@ -24,8 +24,8 @@ menuconfig SPOTFLOW
 
 if SPOTFLOW
 
-rsource "src/logging/KConfig.logging"
-rsource "src/coredumps/KConfig.coredumps"
+rsource "src/logging/KConfig"
+rsource "src/coredumps/KConfig"
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
 	default 4096 if SPOTFLOW

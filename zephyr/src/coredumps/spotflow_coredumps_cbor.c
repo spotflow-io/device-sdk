@@ -5,8 +5,7 @@
 #include "zephyr/sys/__assert.h"
 #include "zephyr/logging/log.h"
 
-
-LOG_MODULE_REGISTER(cbor_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_REGISTER(spotflow_coredumps_cbor, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
 #define KEY_MESSAGE_TYPE 0x00
 #define KEY_COREDUMP_ID 0x09
@@ -23,7 +22,7 @@ LOG_MODULE_REGISTER(cbor_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL)
 #define ZCBOR_COREDUMPS_OVERHEAD 100
 
 
-uint8_t buffer [CONFIG_SPOTFLOW_CBOR_COREDUMP_MAX_LEN + ZCBOR_COREDUMPS_OVERHEAD];
+uint8_t buffer [CONFIG_SPOTFLOW_CBOR_COREDUMP_CHUNK_MAX_LEN + ZCBOR_COREDUMPS_OVERHEAD];
 
 /*add code for init message*/
 int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_data_len,

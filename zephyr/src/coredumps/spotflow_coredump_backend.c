@@ -1,4 +1,4 @@
-#include "coredumps/spotflow_cbor.h"
+#include "coredumps/spotflow_coredumps_cbor.h"
 #include "net/spotflow_processor.h"
 #include "zephyr/random/random.h"
 
@@ -8,8 +8,9 @@
 
 LOG_MODULE_REGISTER(spotflow_coredump_backend, CONFIG_SPOTFLOW_PROCESSING_BACKEND_COREDUMPS_LEVEL);
 
+/*todo consider delayed start*/
 K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_mqtt_msg*),
-	      CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE, 1);
+	      CONFIG_SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE, 1);
 
 /* thread state */
 /*todo stack size*/
@@ -17,10 +18,13 @@ K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_mqtt_msg*),
 /*todo parametrize thread priority*/
 #define THREAD_PRIO K_LOWEST_APPLICATION_THREAD_PRIO
 
-static K_THREAD_STACK_DEFINE(spotflow_thread_stack, STACK_SIZE);
-static struct k_thread spotflow_thread_data;
+static void spotflow_coredump_thread(void);
 
-static struct coredump_info {
+K_THREAD_DEFINE(coredumps_thread_id, STACK_SIZE, spotflow_coredump_thread, NULL,
+		NULL, NULL, THREAD_PRIO, 0, 0);
+
+
+struct coredump_info {
 	size_t size;
 	off_t offset;
 	int chunk_ordinal;
@@ -28,7 +32,6 @@ static struct coredump_info {
 	uint8_t buffer[CONFIG_SPOTFLOW_COREDUMP_CHUNK_SIZE];
 };
 
-static struct k_work fill_work;
 static struct coredump_info coredump_info;
 
 /* blocks forever until space is available */
@@ -38,14 +41,25 @@ static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg)
 	return rc;
 }
 
-static void spotflow_coredump_thread(struct k_work* fill_work)
+static void spotflow_coredump_thread(void)
 {
+	LOG_DBG("Processing existing coredump...");
+	/* Check if there is a dump */
+	int has = coredump_query(COREDUMP_QUERY_HAS_STORED_DUMP, NULL);
+	if (has <= 0) {
+		LOG_INF("No coredump in flash. rc: %d", has);
+		return;
+	}
+
+	k_thread_start(coredumps_thread_id);
 	/* Get the size of dump */
 	int dump_size = coredump_query(COREDUMP_QUERY_GET_STORED_DUMP_SIZE, NULL);
 	if (dump_size <= 0) {
 		LOG_ERR("Invalid dump size %d", dump_size);
 		return;
 	}
+
+	LOG_DBG("Detected core dump with size: %d", dump_size);
 	coredump_info.size = dump_size;
 	coredump_info.offset = 0;
 	coredump_info.chunk_ordinal = 0;
@@ -122,64 +136,9 @@ static void spotflow_coredump_thread(struct k_work* fill_work)
 	coredump_cmd(COREDUMP_CMD_ERASE_STORED_DUMP, NULL);
 }
 
-void init_core_dumps()
-{
-	LOG_DBG("Processing existing coredump...");
-	/* Check if there is a dump */
-	int has = coredump_query(COREDUMP_QUERY_HAS_STORED_DUMP, NULL);
-	if (has <= 0) {
-		LOG_INF("No coredump in flash (or error %d)", has);
-		return;
-	}
 
-	k_thread_create(&spotflow_thread_data, spotflow_thread_stack, STACK_SIZE,
-			spotflow_coredump_thread, NULL, NULL, NULL, THREAD_PRIO, 0, K_NO_WAIT);
-}
 
-void trigger_queue_fill()
-{
-	LOG_DBG("triggering queue fill");
-	k_work_submit(&fill_work);
-}
 
 /*todo we use optimistic approach - device reboot after all chunks fit into buffer but before
  * sending, chunks might be lost.
  */
-void process_existing_coredump()
-{
-	/* This function is a placeholder for processing existing coredumps.
-	 * It can be implemented to read from a storage medium, analyze the
-	 * coredump data, or perform any other necessary operations.
-	 */
-
-	/*TODO send initial empty chunk */
-
-	/* Allocate a buffer and copy it off flash */
-	uint8_t* buf = k_malloc(dump_size);
-	if (!buf) {
-		LOG_ERR("OOM allocating %d bytes", dump_size);
-		return;
-	}
-	struct coredump_cmd_copy_arg arg = {
-		.offset = 0,
-		.buffer = buf,
-		.length = dump_size,
-	};
-	int copied = coredump_cmd(COREDUMP_CMD_COPY_STORED_DUMP, &arg);
-	if (copied != dump_size) {
-		LOG_ERR("Failed to copy dump (%d)", copied);
-		k_free(buf);
-		return;
-	}
-
-	/* 4. Send it out — here we use a hex‑dump over the log backend */
-	for (int off = 0; off < dump_size; off += 16) {
-		size_t chunk = MIN(16, dump_size - off);
-		LOG_HEXDUMP_INF(buf + off, chunk, "CoreDump");
-	}
-
-	/* 5. Erase it so next crash can be saved */
-	coredump_cmd(COREDUMP_CMD_ERASE_STORED_DUMP, NULL);
-
-	k_free(buf);
-}

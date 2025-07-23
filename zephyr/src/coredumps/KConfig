@@ -36,4 +36,17 @@ config SPOTFLOW_COREDUMP_CHUNK_SIZE
         Increase this value if you experience issues with coredumps being dropped because of buffer overflow.
         Should be smaller than SPOTFLOW_CBOR_LOG_MAX_LEN
 
+config SPOTFLOW_CBOR_COREDUMP_CHUNK_MAX_LEN
+    int "Size of Spotflow coredump coredump chunk"
+    default 1200
+    help
+        TODO
+
+config SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE
+	int "Size of Spotflow log backend queue"
+	default 16
+	help
+		Size of the queue used by Spotflow logging backend to store logs
+		before sending them to the server.
+		Increase this value if you experience issues with logs being dropped.
 endif #SPOTFLOW_CORE_DUMPS
