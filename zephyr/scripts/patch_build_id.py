@@ -5,6 +5,7 @@ import os
 import hashlib
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import Symbol
+from elftools.elf.segments import Segment
 from elftools.elf.constants import SH_FLAGS
 from intelhex import IntelHex
 
@@ -15,7 +16,7 @@ BUILD_ID_HEADER_SIZE = 4
 BUILD_ID_VALUE_SIZE = 20
 
 
-def generate_and_patch_build_id(elf_filepath, hex_filepath):
+def generate_and_patch_build_id(elf_filepath, hex_filepath, bin_filepath=None):
     with open(elf_filepath, 'rb+') as file_stream:
         elffile = ELFFile(file_stream)
 
@@ -27,6 +28,9 @@ def generate_and_patch_build_id(elf_filepath, hex_filepath):
         
         if hex_filepath:
             patch_build_id_hex(hex_filepath, bindesc_build_id_symbol, build_id)
+            
+        if bin_filepath:
+            patch_build_id_bin(bin_filepath, elffile, bindesc_build_id_symbol, build_id)
 
 
 def find_bindesc_build_id_symbol(elffile: ELFFile) -> Symbol:
@@ -89,7 +93,7 @@ def patch_build_id_elf(elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_
         if section_rom_start <= symbol_rom_start < section_rom_end:
             build_id_file_offset = section_file_offset + (symbol_rom_start - section_rom_start) + BUILD_ID_HEADER_SIZE
 
-            print(f"Patching build id '{build_id.hex()}' into ELF file at offset: {build_id_file_offset}")
+            print(f"Patching build id '{build_id.hex()}' into ELF file at offset: 0x{build_id_file_offset:08x}")
             elffile.stream.seek(build_id_file_offset)
             elffile.stream.write(build_id)
 
@@ -109,19 +113,55 @@ def patch_build_id_hex(hex_filepath: str, bindesc_build_id_symbol: Symbol, build
     intel_hex.write_hex_file(hex_filepath)
 
 
+def patch_build_id_bin(bin_filepath: str, elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_id: bytes):
+    # The content of the binary file starts at the base address of the ELF file
+    base_address = find_base_address(elffile)
+
+    symbol_address = bindesc_build_id_symbol["st_value"]
+
+    build_id_file_offset = symbol_address - base_address + BUILD_ID_HEADER_SIZE
+
+    print(f"Patching build id '{build_id.hex()}' into BIN file at offset: 0x{build_id_file_offset:08x}")
+    
+    with open(bin_filepath, 'r+b') as bin_file:
+        bin_file.seek(build_id_file_offset)
+        bin_file.write(build_id)
+
+
+def find_base_address(elffile: ELFFile) -> int:
+    base_address = None
+    
+    # Find the lowest base address of a loadable segment
+    for segment in elffile.iter_segments():
+        if segment['p_type'] == 'PT_LOAD':
+            vaddr = segment['p_vaddr']
+            if base_address is None or vaddr < base_address:
+                base_address = vaddr
+    
+    if base_address is None:
+        raise Exception("No loadable segments found in ELF file")
+    
+    return base_address
+
+
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: patch_build_id.py <elf_file> [hex_file]")
+    if len(sys.argv) < 4:
+        print("Usage: patch_build_id.py <elf_file> <hex_file> <bin_file>")
         sys.exit(1)
     
     elf_filepath = sys.argv[1]
-    hex_filepath = sys.argv[2] if len(sys.argv) > 2 else None
+    hex_filepath = sys.argv[2]
+    bin_filepath = sys.argv[3]
     
     if hex_filepath and not os.path.exists(hex_filepath):
         print(f"HEX file '{hex_filepath}' does not exist, skipping HEX patching")
         hex_filepath = None
     
-    generate_and_patch_build_id(elf_filepath, hex_filepath)
+    if bin_filepath and not os.path.exists(bin_filepath):
+        print(f"BIN file '{bin_filepath}' does not exist, skipping BIN patching")
+        bin_filepath = None
+    
+    generate_and_patch_build_id(elf_filepath, hex_filepath, bin_filepath)
 
 if __name__ == "__main__":
     main()

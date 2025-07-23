@@ -10,12 +10,10 @@ zephyr_include_directories(
         src
 )
 
-# Prepend patching the .elf and .hex files with the build ID to post-build commands so
-# that the build ID is contained in the binary image. It's insufficient to patch just
-# the .elf file, because Zephyr's extra post-build commands are inserted after the
-# generation of the .hex and .bin files.
-#
-# TODO: Patch the .bin file as well.
+# Prepend patching the .elf, .hex, and .bin files with the build ID to post-build commands
+# so that the build ID is contained in the binary image. It's insufficient to patch just
+# the .elf file, because Zephyr's extra post-build commands are inserted after the generation
+# of the .hex and .bin files.
 if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID) 
     get_filename_component(
         spotflow_patch_build_id_script
@@ -35,6 +33,7 @@ if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID)
                 ${spotflow_patch_build_id_script}
                 ${CMAKE_BINARY_DIR}/zephyr/${CONFIG_KERNEL_BIN_NAME}.elf
                 ${CMAKE_BINARY_DIR}/zephyr/${CONFIG_KERNEL_BIN_NAME}.hex
+                ${CMAKE_BINARY_DIR}/zephyr/${CONFIG_KERNEL_BIN_NAME}.bin
             ${PROPERTY_EXTRA_POST_BUILD_COMMANDS}
     )
 endif()
