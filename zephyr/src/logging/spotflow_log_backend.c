@@ -9,6 +9,12 @@
 
 LOG_MODULE_REGISTER(log_backend_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
 
+/* https://docs.zephyrproject.org/apidoc/latest/group__msgq__apis.html
+ * Alignment of the message queue's ring buffer is not necessary,
+ * setting q_align to 1 is sufficient.*/
+K_MSGQ_DEFINE(g_spotflow_logs_msgq, sizeof(struct spotflow_mqtt_msg*),
+	      CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE, 1);
+
 struct spotflow_log_context {
 	struct spotflow_cbor_output_context* cbor_output_context;
 	size_t dropped_backend_count;
@@ -33,11 +39,11 @@ static const struct log_backend_api log_backend_spotflow_api = {
 	/* .sync_string and .sync_hexdump can be added if you use IMMEDIATE mode */
 };
 
-#ifdef CONFIG_LOG_BACKEND_SPOTFLOW
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 /* can be autostarted because there is message queue where messages are stored */
 LOG_BACKEND_DEFINE(log_backend_spotflow, log_backend_spotflow_api, true /* autostart */,
 		   &spotflow_log_ctx);
-#endif /* CONFIG_LOG_BACKEND_SPOTFLOW */
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 
 static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg, struct spotflow_log_context* ctx);
 
@@ -76,7 +82,7 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 
 	uint8_t* cbor_data = NULL;
 	size_t cbor_data_len = 0;
-	int rc = spotflow_cbor_encode_message(log_msg, ctx->message_index, ctx->cbor_output_context,
+	int rc = spotflow_cbor_encode_log(log_msg, ctx->message_index, ctx->cbor_output_context,
 					      &cbor_data, &cbor_data_len);
 
 	if (rc < 0) {
@@ -125,13 +131,13 @@ static int drop_log_msg_from_queue(struct spotflow_log_context* ctx);
 /* Helper that will drop & free the oldest if queue is full */
 static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg, struct spotflow_log_context* ctx)
 {
-	int rc = k_msgq_put(&g_spotflow_mqtt_msgq, &msg, K_NO_WAIT);
+	int rc = k_msgq_put(&g_spotflow_logs_msgq, &msg, K_NO_WAIT);
 	if (rc == -ENOMSG) {
 		/* queue full: grab the oldest pointer, free it */
 		rc = drop_log_msg_from_queue(ctx);
 		if (rc == 0) {
 			/* now there should be room for the new one */
-			rc = k_msgq_put(&g_spotflow_mqtt_msgq, &msg, K_NO_WAIT);
+			rc = k_msgq_put(&g_spotflow_logs_msgq, &msg, K_NO_WAIT);
 		} else {
 			LOG_DBG("Failed to get message from queue %d", rc);
 		}
@@ -142,7 +148,7 @@ static int enqueue_log_msg(const struct spotflow_mqtt_msg* msg, struct spotflow_
 static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
 {
 	char* old;
-	int rc = k_msgq_get(&g_spotflow_mqtt_msgq, &old, K_NO_WAIT);
+	int rc = k_msgq_get(&g_spotflow_logs_msgq, &old, K_NO_WAIT);
 	if (rc == 0) {
 		struct spotflow_mqtt_msg* old_msg = (struct spotflow_mqtt_msg*)old;
 		k_free(old_msg->payload);

@@ -226,7 +226,7 @@ static int poll_with_timeout(int timeout)
 	return ret;
 }
 
-int spotflow_mqtt_publish_cbor_log_msg(struct spotflow_mqtt_msg* msg)
+int spotflow_mqtt_publish_cbor_msg(struct spotflow_mqtt_msg* msg)
 {
 	struct mqtt_publish_param param;
 	param.message.topic.qos = MQTT_QOS_1_AT_LEAST_ONCE;
@@ -238,7 +238,6 @@ int spotflow_mqtt_publish_cbor_log_msg(struct spotflow_mqtt_msg* msg)
 	param.retain_flag = 0U;
 	return mqtt_publish(&mqtt_client_toolset.mqtt_client, &param);
 }
-
 static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* evt)
 {
 	int err;

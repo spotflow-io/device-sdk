@@ -1,0 +1,1 @@
+CMakeLists.txt not found in C:\Users\Jan\Spotflow\testing-zephyr\v4.1.0\zephyrproject\modules\lib\spotflow-observability\zephyr\samples\wifi Select CMakeLists.txt
