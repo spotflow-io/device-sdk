@@ -5,7 +5,6 @@ import os
 import hashlib
 from elftools.elf.elffile import ELFFile
 from elftools.elf.sections import Symbol
-from elftools.elf.segments import Segment
 from elftools.elf.constants import SH_FLAGS
 from intelhex import IntelHex
 
@@ -58,10 +57,8 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
     hash_builder = hashlib.sha1()
 
     for section in elffile.iter_sections():
-        print(section.name, "...", sep="", end="")
 
         if section["sh_flags"] & SH_FLAGS.SHF_ALLOC == 0:
-            print("not allocated, skipping")
             continue
 
         data = section.data()
@@ -69,12 +66,18 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
         section_end = section_start + section["sh_size"]
         symbol_start = bindesc_build_id_symbol["st_value"]
 
+        hash_builder.update(section_start.to_bytes(8, byteorder='little'))
+
         if section_start <= symbol_start < section_end:
-            # TODO: Skip just the content of the symbol (those 20 bytes), not the whole section
-            print("section with build id symbol, skipping hash update")
+            symbol_start_offset = symbol_start - section_start
+            build_id_start_offset = symbol_start_offset + BUILD_ID_HEADER_SIZE
+            build_id_end_offset = build_id_start_offset + BUILD_ID_VALUE_SIZE
+
+            # The build ID itself is not part of the hash, so we skip it
+            hash_builder.update(data[:build_id_start_offset])
+            hash_builder.update(data[build_id_end_offset:])
         else:
             hash_builder.update(data)
-            print("updated hash")
 
     build_id = hash_builder.digest()
     assert len(build_id) == BUILD_ID_VALUE_SIZE
@@ -154,11 +157,9 @@ def main():
     bin_filepath = sys.argv[3]
     
     if hex_filepath and not os.path.exists(hex_filepath):
-        print(f"HEX file '{hex_filepath}' does not exist, skipping HEX patching")
         hex_filepath = None
     
     if bin_filepath and not os.path.exists(bin_filepath):
-        print(f"BIN file '{bin_filepath}' does not exist, skipping BIN patching")
         bin_filepath = None
     
     generate_and_patch_build_id(elf_filepath, hex_filepath, bin_filepath)
