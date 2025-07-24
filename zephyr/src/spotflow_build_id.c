@@ -1,4 +1,5 @@
 #include <zephyr/bindesc.h>
+
 #include "spotflow_build_id.h"
 
 BINDESC_BYTES_DEFINE(spotflow_build_id, CONFIG_SPOTFLOW_BINDESC_ID_BUILD_ID,

@@ -89,7 +89,7 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
             build_id_start_offset = symbol_start_offset + BUILD_ID_HEADER_SIZE
             build_id_end_offset = build_id_start_offset + BUILD_ID_VALUE_SIZE
 
-            # The build ID itself is not part of the hash, so we skip it
+            # The build ID itself cannot take part in the hash
             hash_builder.update(data[:build_id_start_offset])
             hash_builder.update(data[build_id_end_offset:])
         else:
