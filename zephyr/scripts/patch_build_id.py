@@ -140,7 +140,8 @@ def patch_build_id_parsed_elf(
             build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
 
             print(
-                f"Patching build ID '{build_id.hex()}' into ELF file '{elf_filepath}' at offset: 0x{build_id_file_offset:08x}"
+                f"Patching build ID '{build_id.hex()}' into ELF file '{elf_filepath}' at offset: "
+                f"0x{build_id_file_offset:08x}"
             )
             elffile.stream.seek(build_id_file_offset)
             elffile.stream.write(build_id)
@@ -165,7 +166,8 @@ def patch_build_id_hex(
     build_id_address = symbol_address + BUILD_ID_HEADER_SIZE
 
     print(
-        f"Patching build ID '{build_id.hex()}' into HEX file '{hex_filepath}' at address: 0x{build_id_address:08x}"
+        f"Patching build ID '{build_id.hex()}' into HEX file '{hex_filepath}' at address: "
+        f"0x{build_id_address:08x}"
     )
 
     for i, byte_value in enumerate(build_id):
@@ -197,7 +199,8 @@ def patch_build_id_bin(
         build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
 
         print(
-            f"Patching build ID '{build_id.hex()}' into BIN file '{bin_filepath}' at offset: 0x{build_id_file_offset:08x}"
+            f"Patching build ID '{build_id.hex()}' into BIN file '{bin_filepath}' at offset: "
+            f"0x{build_id_file_offset:08x}"
         )
 
         bin_file.seek(build_id_file_offset)
