@@ -2,6 +2,10 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/dhcpv4_server.h>
+#include "version_helper.h"
+#include <zephyr/kernel_version.h>
+#include <version.h>
+
 
 LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_INF);
 
@@ -15,17 +19,22 @@ LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_INF);
 #define WIFI_SSID CONFIG_NET_WIFI_SSID
 #define WIFI_PSK CONFIG_NET_WIFI_PASSWORD
 
+/* to provide backward compatibility for zephyr < 4.2.0 */
+
 static struct net_if* sta_iface;
 
 static struct wifi_connect_req_params sta_config;
 
 static struct net_mgmt_event_callback cb;
 
-static void wifi_event_handler(struct net_mgmt_event_callback* cb, uint32_t mgmt_event,
+static void wifi_event_handler(struct net_mgmt_event_callback* cb,
+#if  SPOTFLOW_ZEPHYR_VERSION_GE(4,2)
+			       uint64_t mgmt_event,
+#else
+			       uint32_t mgmt_event,
+#endif
 			       struct net_if* iface)
 {
-	LOG_INF("Received Wi-Fi management event: %d", mgmt_event);
-
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_CONNECT_RESULT: {
 		struct wifi_status* result = (struct wifi_status*)cb->info;
