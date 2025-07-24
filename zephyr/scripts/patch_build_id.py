@@ -18,7 +18,7 @@ BUILD_ID_HEADER_SIZE = len(BUILD_ID_HEADER_VALUE)
 BUILD_ID_VALUE_SIZE = 20
 
 
-def generate_and_patch_build_id(elf_filepath, hex_filepath, bin_filepath=None):
+def generate_and_patch_build_id(elf_filepath: str, other_filepaths: list[str]):
     with open(elf_filepath, 'rb+') as file_stream:
         elffile = ELFFile(file_stream)
 
@@ -26,13 +26,19 @@ def generate_and_patch_build_id(elf_filepath, hex_filepath, bin_filepath=None):
 
         build_id = generate_build_id(elffile, bindesc_build_id_symbol)
 
-        patch_build_id_elf(elffile, bindesc_build_id_symbol, build_id)
-        
-        if hex_filepath:
-            patch_build_id_hex(hex_filepath, bindesc_build_id_symbol, build_id)
-            
-        if bin_filepath:
-            patch_build_id_bin(bin_filepath, elffile, bindesc_build_id_symbol, build_id)
+        patch_build_id_elf(elffile, elf_filepath, bindesc_build_id_symbol, build_id)
+
+        for filepath in other_filepaths:
+            if not os.path.exists(filepath):
+                # It is easier to check it here than in CMake
+                continue
+
+            if filepath.endswith('.hex'):
+                patch_build_id_hex(filepath, bindesc_build_id_symbol, build_id)
+            elif filepath.endswith('.bin'):
+                patch_build_id_bin(filepath, elffile, bindesc_build_id_symbol, build_id)
+            else:
+                raise Exception(f"Unsupported file type: {filepath}")
 
 
 def find_bindesc_build_id_symbol(elffile: ELFFile) -> Symbol:
@@ -87,7 +93,7 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
     return build_id
 
 
-def patch_build_id_elf(elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_id: bytes):
+def patch_build_id_elf(elffile: ELFFile, elf_filepath: str, bindesc_build_id_symbol: Symbol, build_id: bytes):
     for section in elffile.iter_sections():
         section_file_offset = section["sh_offset"]
         section_rom_start = section["sh_addr"]
@@ -104,7 +110,7 @@ def patch_build_id_elf(elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_
 
             build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
 
-            print(f"Patching build id '{build_id.hex()}' into ELF file at offset: 0x{build_id_file_offset:08x}")
+            print(f"Patching build ID '{build_id.hex()}' into ELF file '{elf_filepath}' at offset: 0x{build_id_file_offset:08x}")
             elffile.stream.seek(build_id_file_offset)
             elffile.stream.write(build_id)
 
@@ -121,7 +127,7 @@ def patch_build_id_hex(hex_filepath: str, bindesc_build_id_symbol: Symbol, build
 
     build_id_address = symbol_address + BUILD_ID_HEADER_SIZE
 
-    print(f"Patching build id '{build_id.hex()}' into HEX file at address: 0x{build_id_address:08x}")
+    print(f"Patching build ID '{build_id.hex()}' into HEX file '{hex_filepath}' at address: 0x{build_id_address:08x}")
 
     for i, byte_value in enumerate(build_id):
         intel_hex[build_id_address + i] = byte_value
@@ -144,7 +150,7 @@ def patch_build_id_bin(bin_filepath: str, elffile: ELFFile, bindesc_build_id_sym
 
         build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
 
-        print(f"Patching build id '{build_id.hex()}' into BIN file at offset: 0x{build_id_file_offset:08x}")
+        print(f"Patching build ID '{build_id.hex()}' into BIN file '{bin_filepath}' at offset: 0x{build_id_file_offset:08x}")
     
         bin_file.seek(build_id_file_offset)
         bin_file.write(build_id)
@@ -167,21 +173,15 @@ def find_base_address(elffile: ELFFile) -> int:
 
 
 def main():
-    if len(sys.argv) < 4:
-        print("Usage: patch_build_id.py <elf_file> <hex_file> <bin_file>")
+    if len(sys.argv) < 2:
+        print("Usage: patch_build_id.py <elf_file> [<other_file>...]")
+        print("Recognized file extensions: .bin, .elf, .hex")
         sys.exit(1)
-    
+
     elf_filepath = sys.argv[1]
-    hex_filepath = sys.argv[2]
-    bin_filepath = sys.argv[3]
+    other_filepaths = sys.argv[2:]
     
-    if hex_filepath and not os.path.exists(hex_filepath):
-        hex_filepath = None
-    
-    if bin_filepath and not os.path.exists(bin_filepath):
-        bin_filepath = None
-    
-    generate_and_patch_build_id(elf_filepath, hex_filepath, bin_filepath)
+    generate_and_patch_build_id(elf_filepath, other_filepaths)
 
 if __name__ == "__main__":
     main()
