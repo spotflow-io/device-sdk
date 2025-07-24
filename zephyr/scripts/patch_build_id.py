@@ -11,7 +11,10 @@ from intelhex import IntelHex
 
 SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME = "bindesc_entry_spotflow_build_id"
 
-BUILD_ID_HEADER_SIZE = 4
+# Binary descriptor ID is 0x5f0, type is bytes, and length is 20
+BUILD_ID_HEADER_VALUE = b"\xf0\x25\x14\x00"
+
+BUILD_ID_HEADER_SIZE = len(BUILD_ID_HEADER_VALUE)
 BUILD_ID_VALUE_SIZE = 20
 
 
@@ -48,8 +51,6 @@ def find_bindesc_build_id_symbol(elffile: ELFFile) -> Symbol:
     if len(symbol) > 1:
         raise Exception(f"Symbol '{SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME}' found multiple times")
 
-    # TODO: Consider also checking the right format of the binary descriptor (tag and length, see
-    #       https://docs.zephyrproject.org/latest/services/binary_descriptors/index.html)
     return symbol[0]
 
 
@@ -94,7 +95,14 @@ def patch_build_id_elf(elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_
         symbol_rom_start = bindesc_build_id_symbol["st_value"]
 
         if section_rom_start <= symbol_rom_start < section_rom_end:
-            build_id_file_offset = section_file_offset + (symbol_rom_start - section_rom_start) + BUILD_ID_HEADER_SIZE
+            symbol_file_offset = section_file_offset + (symbol_rom_start - section_rom_start)
+
+            elffile.stream.seek(symbol_file_offset)
+            header = elffile.stream.read(BUILD_ID_HEADER_SIZE)
+            if header != BUILD_ID_HEADER_VALUE:
+                raise Exception(f"Invalid build ID binary descriptor header: {header.hex()}")
+
+            build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
 
             print(f"Patching build id '{build_id.hex()}' into ELF file at offset: 0x{build_id_file_offset:08x}")
             elffile.stream.seek(build_id_file_offset)
@@ -104,14 +112,19 @@ def patch_build_id_elf(elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_
 
 
 def patch_build_id_hex(hex_filepath: str, bindesc_build_id_symbol: Symbol, build_id: bytes):
-    target_address = bindesc_build_id_symbol["st_value"] + BUILD_ID_HEADER_SIZE
-    
-    print(f"Patching build id '{build_id.hex()}' into HEX file at address: 0x{target_address:08x}")
-    
     intel_hex = IntelHex(hex_filepath)
-    
+
+    symbol_address = bindesc_build_id_symbol["st_value"]
+    header = intel_hex[symbol_address:symbol_address + BUILD_ID_HEADER_SIZE].tobinarray().tobytes()
+    if header != BUILD_ID_HEADER_VALUE:
+        raise Exception(f"Invalid build ID binary descriptor header: {header.hex()}")
+
+    build_id_address = symbol_address + BUILD_ID_HEADER_SIZE
+
+    print(f"Patching build id '{build_id.hex()}' into HEX file at address: 0x{build_id_address:08x}")
+
     for i, byte_value in enumerate(build_id):
-        intel_hex[target_address + i] = byte_value
+        intel_hex[build_id_address + i] = byte_value
     
     intel_hex.write_hex_file(hex_filepath)
 
@@ -120,13 +133,19 @@ def patch_build_id_bin(bin_filepath: str, elffile: ELFFile, bindesc_build_id_sym
     # The content of the binary file starts at the base address of the ELF file
     base_address = find_base_address(elffile)
 
-    symbol_address = bindesc_build_id_symbol["st_value"]
-
-    build_id_file_offset = symbol_address - base_address + BUILD_ID_HEADER_SIZE
-
-    print(f"Patching build id '{build_id.hex()}' into BIN file at offset: 0x{build_id_file_offset:08x}")
-    
     with open(bin_filepath, 'r+b') as bin_file:
+        symbol_address = bindesc_build_id_symbol["st_value"]
+        symbol_file_offset = symbol_address - base_address
+
+        bin_file.seek(symbol_file_offset)
+        header = bin_file.read(BUILD_ID_HEADER_SIZE)
+        if header != BUILD_ID_HEADER_VALUE:
+            raise Exception(f"Invalid build ID binary descriptor header: {header.hex()}")
+
+        build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
+
+        print(f"Patching build id '{build_id.hex()}' into BIN file at offset: 0x{build_id_file_offset:08x}")
+    
         bin_file.seek(build_id_file_offset)
         bin_file.write(build_id)
 
