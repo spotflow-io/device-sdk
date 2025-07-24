@@ -61,6 +61,38 @@ flowchart LR
     F --> G[Send to MQTT]
 ```
 
+### Build ID
+
+In order to match core dumps with symbol files, our Zephyr module provides a piece of information called build ID.
+The build ID is computed as a hash of the bytes loaded to the device; therefore, it uniquely identifies the firmware image.
+Our Zephyr module adds a build command that computes the build ID and patches it into the `.elf` file as the following [binary descriptor](https://docs.zephyrproject.org/latest/services/binary_descriptors/index.html):
+
+- **ID**: `0x5f0`
+- **Type**: `bytes`
+- **Length**: `20`
+
+You can retrieve the build ID from the `.elf` file using the following command:
+
+```bash
+west bindesc custom_search BYTES 0x5f0 zephyr.elf
+```
+
+Because Zephyr doesn't allow to insert a post-build command between the compilation of `zephyr.elf` and the generation of derived files such as `zephyr.hex` and `zephyr.bin`, our build command patches these files as well.
+In particular, the files with the following extensions are patched:
+
+- `.elf`
+- `.hex`
+- `.bin`
+- `.strip`
+- `.exe` when **not** targeting [native simulator](https://docs.zephyrproject.org/latest/boards/native/native_sim/doc/index.html) (it's just a copy of the `.elf` file)
+
+The files with the following extensions (and others that might be introduced in the future) are **not** patched, so the build IDs stored in them are filled with zeros:
+
+- `.lst` (assembly listing)
+- `.uf2`
+- `.s19`
+- `.exe` when targeting [native simulator](https://docs.zephyrproject.org/latest/boards/native/native_sim/doc/index.html)
+
 ## Feedback
 Any comments, suggestions, or issues are welcome.
 Create a Github issue or contact us at hello@spotflow.io,
