@@ -19,21 +19,23 @@ BUILD_ID_VALUE_SIZE = 20
 
 
 def generate_and_patch_build_id(elf_filepath: str, other_filepaths: list[str]):
-    with open(elf_filepath, 'rb+') as file_stream:
-        elffile = ELFFile(file_stream)
+    with open(elf_filepath, 'rb+') as elf_stream:
+        elffile = ELFFile(elf_stream)
 
         bindesc_build_id_symbol = find_bindesc_build_id_symbol(elffile)
 
         build_id = generate_build_id(elffile, bindesc_build_id_symbol)
 
-        patch_build_id_elf(elffile, elf_filepath, bindesc_build_id_symbol, build_id)
+        patch_build_id_parsed_elf(elffile, elf_filepath, bindesc_build_id_symbol, build_id)
 
         for filepath in other_filepaths:
             if not os.path.exists(filepath):
                 # It is easier to check it here than in CMake
                 continue
 
-            if filepath.endswith('.hex'):
+            if filepath.endswith('.elf') or filepath.endswith('.exe') or filepath.endswith('.strip'):
+                patch_build_id_elf(filepath, bindesc_build_id_symbol, build_id)
+            elif filepath.endswith('.hex'):
                 patch_build_id_hex(filepath, bindesc_build_id_symbol, build_id)
             elif filepath.endswith('.bin'):
                 patch_build_id_bin(filepath, elffile, bindesc_build_id_symbol, build_id)
@@ -93,7 +95,13 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
     return build_id
 
 
-def patch_build_id_elf(elffile: ELFFile, elf_filepath: str, bindesc_build_id_symbol: Symbol, build_id: bytes):
+def patch_build_id_elf(elf_filepath: str, bindesc_build_id_symbol: Symbol, build_id: bytes):
+    with open(elf_filepath, 'rb+') as elf_stream:
+        elffile = ELFFile(elf_stream)
+        patch_build_id_parsed_elf(elffile, elf_filepath, bindesc_build_id_symbol, build_id)
+
+
+def patch_build_id_parsed_elf(elffile: ELFFile, elf_filepath: str, bindesc_build_id_symbol: Symbol, build_id: bytes):
     for section in elffile.iter_sections():
         section_file_offset = section["sh_offset"]
         section_rom_start = section["sh_addr"]
