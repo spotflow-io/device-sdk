@@ -14,7 +14,7 @@ zephyr_include_directories(
 # so that the build ID is contained in the binary image. It's insufficient to patch just
 # the .elf file, because Zephyr's extra post-build commands are inserted after the generation
 # of the .hex and .bin files.
-if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID) 
+if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID)
     get_filename_component(
         spotflow_patch_build_id_script
         ${CMAKE_CURRENT_SOURCE_DIR}/scripts/patch_build_id.py
@@ -34,10 +34,15 @@ if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID)
         ${CMAKE_BINARY_DIR}/zephyr/${CONFIG_KERNEL_BIN_NAME}.strip
     )
     if(NOT CONFIG_NATIVE_LIBRARY)
-        # The .exe file is just a copy of the .elf file unless targeting native simulator (unsupported)
-        list(APPEND POTENTIALLY_PATCHED_FILES ${CMAKE_BINARY_DIR}/zephyr/${CONFIG_KERNEL_BIN_NAME}.exe)
+        # The .exe file is just a copy of the .elf file unless targeting native simulator
+        # (currently unsupported)
+        list(
+            APPEND
+            POTENTIALLY_PATCHED_FILES
+            ${CMAKE_BINARY_DIR}/zephyr/${CONFIG_KERNEL_BIN_NAME}.exe
+        )
     endif()
-    
+
     set_property(
         GLOBAL
         PROPERTY extra_post_build_commands
