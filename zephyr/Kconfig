@@ -129,7 +129,6 @@ config SPOTFLOW_MQTT_LOG_THREAD_PRIORITY
 	help
 		Priority of the thread used to send logs to Spotflow server.
 		Increase this value if you experience issues with logs being sent.
-		Defaults to default K_LOWEST_APPLICATION_THREAD_PRIO
 
 config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 	int "Size of Spotflow processing thread stack"
