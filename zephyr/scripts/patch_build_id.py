@@ -74,6 +74,7 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
     hash_builder = hashlib.sha1()
 
     for section in elffile.iter_sections():
+        # Only include sections that will be loaded to the device memory
         if section["sh_flags"] & SH_FLAGS.SHF_ALLOC == 0:
             continue
 
@@ -82,6 +83,8 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
         section_end = section_start + section["sh_size"]
         symbol_start = bindesc_build_id_symbol["st_value"]
 
+        # The section address is included in the hash because loading the same data into a
+        # different memory address would yield a different memory content
         hash_builder.update(section_start.to_bytes(8, byteorder="little"))
 
         if section_start <= symbol_start < section_end:

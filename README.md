@@ -67,7 +67,7 @@ In order to match core dumps with symbol files, our Zephyr module provides a pie
 The build ID is computed as a hash of the bytes loaded to the device; therefore, it uniquely identifies the firmware image.
 Our Zephyr module adds a build command that computes the build ID and patches it into the `.elf` file as the following [binary descriptor](https://docs.zephyrproject.org/latest/services/binary_descriptors/index.html):
 
-- **ID**: `0x5f0`
+- **ID**: `0x5f0` (`5f` resembles `sf` - **S**pot**f**low, `0` stands for our first binary descriptor ID)
 - **Type**: `bytes`
 - **Length**: `20`
 
