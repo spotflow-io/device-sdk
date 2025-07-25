@@ -1,3 +1,4 @@
+#include <zephyr/bindesc.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
