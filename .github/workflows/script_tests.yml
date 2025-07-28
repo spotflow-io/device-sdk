@@ -19,5 +19,8 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Install Python packages
+        run: pip install -r ./zephyr/scripts/requirements.txt
+
       - name: Run pytest
-        run: pytest ./spotflow/zephyr/scripts/tests
+        run: pytest ./zephyr/scripts/tests
