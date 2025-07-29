@@ -68,7 +68,7 @@ def test_patch_build_id():
         assert elf_bytes == expected_elf_filepath.read_bytes()
 
         expected_hex_bytes = expected_hex_filepath.read_bytes()
-        # assert hex_bytes == expected_hex_bytes
+        assert hex_bytes == expected_hex_bytes
 
         assert bin_bytes == expected_bin_filepath.read_bytes()
         assert strip_bytes == expected_strip_filepath.read_bytes()
