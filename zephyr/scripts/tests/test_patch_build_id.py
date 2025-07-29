@@ -30,15 +30,15 @@ def test_patch_build_id():
         assert strip_filepath.exists()
         assert exe_filepath.exists()
 
-        # patch_build_id.generate_and_patch_build_id(
-        #     str(elf_filepath),
-        #     [
-        #         str(hex_filepath),
-        #         str(bin_filepath),
-        #         str(strip_filepath),
-        #         str(exe_filepath),
-        #     ],
-        # )
+        patch_build_id.generate_and_patch_build_id(
+            str(elf_filepath),
+            [
+                str(hex_filepath),
+                str(bin_filepath),
+                str(strip_filepath),
+                str(exe_filepath),
+            ],
+        )
 
         # elf_bytes = elf_filepath.read_bytes()
         # hex_bytes = hex_filepath.read_bytes()
