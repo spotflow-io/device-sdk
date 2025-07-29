@@ -11,7 +11,7 @@ import patch_build_id
 def test_patch_build_id():
     with tempfile.TemporaryDirectory() as temp_dir_str:
         temp_dir = Path(temp_dir_str)
-        
+
         test_dir = Path(__file__).parent
         inputs_dir = test_dir / "patch_build_id" / "inputs"
         outputs_dir = test_dir / "patch_build_id" / "outputs"
@@ -32,7 +32,12 @@ def test_patch_build_id():
 
         patch_build_id.generate_and_patch_build_id(
             str(elf_filepath),
-            [str(hex_filepath), str(bin_filepath), str(strip_filepath), str(exe_filepath)],
+            [
+                str(hex_filepath),
+                str(bin_filepath),
+                str(strip_filepath),
+                str(exe_filepath),
+            ],
         )
 
         elf_bytes = elf_filepath.read_bytes()
@@ -55,7 +60,9 @@ def test_patch_build_id():
         assert exe_bytes[0x260 : 0x260 + len(expected_build_id)] == expected_build_id
 
         intel_hex = IntelHex(str(hex_filepath))
-        assert intel_hex.tobinstr(0x8160, size=len(expected_build_id)) == expected_build_id
+        assert (
+            intel_hex.tobinstr(0x8160, size=len(expected_build_id)) == expected_build_id
+        )
 
         # Check that nothing else was changed
         assert elf_bytes == expected_elf_filepath.read_bytes()
