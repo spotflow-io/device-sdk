@@ -159,14 +159,4 @@ config SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL
 
 endif #LOG_BACKEND_SPOTFLOW
 
-if SPOTFLOW_GENERATE_BUILD_ID
-
-config SPOTFLOW_BINDESC_ID_BUILD_ID
-	hex
-	default 0x5f0
-	help
-		ID of the binary descriptor used to embed build ID.
-
-endif #SPOTFLOW_GENERATE_BUILD_ID
-
 endif #SPOTFLOW
