@@ -66,7 +66,7 @@ def test_patch_build_id():
 
         # Check that nothing else was changed
         assert elf_bytes == expected_elf_filepath.read_bytes()
-        assert hex_bytes == expected_hex_filepath.read_bytes()
-        # assert bin_bytes == expected_bin_filepath.read_bytes()
-        # assert strip_bytes == expected_strip_filepath.read_bytes()
-        # assert exe_bytes == expected_exe_filepath.read_bytes()
+        # assert hex_bytes == expected_hex_filepath.read_bytes()
+        assert bin_bytes == expected_bin_filepath.read_bytes()
+        assert strip_bytes == expected_strip_filepath.read_bytes()
+        assert exe_bytes == expected_exe_filepath.read_bytes()
