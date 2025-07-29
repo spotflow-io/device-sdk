@@ -40,17 +40,17 @@ def test_patch_build_id():
             ],
         )
 
-        # elf_bytes = elf_filepath.read_bytes()
-        # hex_bytes = hex_filepath.read_bytes()
-        # bin_bytes = bin_filepath.read_bytes()
-        # strip_bytes = strip_filepath.read_bytes()
-        # exe_bytes = exe_filepath.read_bytes()
+        elf_bytes = elf_filepath.read_bytes()
+        hex_bytes = hex_filepath.read_bytes()
+        bin_bytes = bin_filepath.read_bytes()
+        strip_bytes = strip_filepath.read_bytes()
+        exe_bytes = exe_filepath.read_bytes()
 
-        # expected_elf_filepath = outputs_dir / "zephyr.elf"
-        # expected_hex_filepath = outputs_dir / "zephyr.hex"
-        # expected_bin_filepath = outputs_dir / "zephyr.bin"
-        # expected_strip_filepath = outputs_dir / "zephyr.strip"
-        # expected_exe_filepath = outputs_dir / "zephyr.exe"
+        expected_elf_filepath = outputs_dir / "zephyr.elf"
+        expected_hex_filepath = outputs_dir / "zephyr.hex"
+        expected_bin_filepath = outputs_dir / "zephyr.bin"
+        expected_strip_filepath = outputs_dir / "zephyr.strip"
+        expected_exe_filepath = outputs_dir / "zephyr.exe"
 
         # expected_build_id = bytes.fromhex("f9931dd776ccc422a576d80eaed1c0fcca8f0331")
 
