@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-import tempfile
+import filecmp
 import shutil
+import tempfile
 from intelhex import IntelHex
 from pathlib import Path
 
@@ -41,16 +42,9 @@ def test_patch_build_id():
         )
 
         elf_bytes = elf_filepath.read_bytes()
-        hex_bytes = hex_filepath.read_bytes()
         bin_bytes = bin_filepath.read_bytes()
         strip_bytes = strip_filepath.read_bytes()
         exe_bytes = exe_filepath.read_bytes()
-
-        expected_elf_filepath = outputs_dir / "zephyr.elf"
-        expected_hex_filepath = outputs_dir / "zephyr.hex"
-        expected_bin_filepath = outputs_dir / "zephyr.bin"
-        expected_strip_filepath = outputs_dir / "zephyr.strip"
-        expected_exe_filepath = outputs_dir / "zephyr.exe"
 
         expected_build_id = bytes.fromhex("f9931dd776ccc422a576d80eaed1c0fcca8f0331")
 
@@ -64,12 +58,15 @@ def test_patch_build_id():
             intel_hex.tobinstr(0x8160, size=len(expected_build_id)) == expected_build_id
         )
 
+        expected_elf_filepath = outputs_dir / "zephyr.elf"
+        expected_hex_filepath = outputs_dir / "zephyr.hex"
+        expected_bin_filepath = outputs_dir / "zephyr.bin"
+        expected_strip_filepath = outputs_dir / "zephyr.strip"
+        expected_exe_filepath = outputs_dir / "zephyr.exe"
+
         # Check that nothing else was changed
-        assert elf_bytes == expected_elf_filepath.read_bytes()
-
-        expected_hex_bytes = expected_hex_filepath.read_bytes()
-        assert hex_bytes == expected_hex_bytes
-
-        # assert bin_bytes == expected_bin_filepath.read_bytes()
-        # assert strip_bytes == expected_strip_filepath.read_bytes()
-        # assert exe_bytes == expected_exe_filepath.read_bytes()
+        assert filecmp.cmp(elf_filepath, expected_elf_filepath)
+        assert filecmp.cmp(hex_filepath, expected_hex_filepath)
+        assert filecmp.cmp(bin_filepath, expected_bin_filepath)
+        assert filecmp.cmp(strip_filepath, expected_strip_filepath)
+        assert filecmp.cmp(exe_filepath, expected_exe_filepath)
