@@ -20,6 +20,11 @@ jobs:
           fetch-depth: 0
           lfs: true
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.4"
+
       - name: Install Python packages
         run: pip install -r ./zephyr/scripts/requirements.txt
 
