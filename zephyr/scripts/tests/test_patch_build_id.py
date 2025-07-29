@@ -46,17 +46,14 @@ def test_patch_build_id():
         strip_bytes = strip_filepath.read_bytes()
         exe_bytes = exe_filepath.read_bytes()
 
-        expected_build_id = bytes.fromhex("f9931dd776ccc422a576d80eaed1c0fcca8f0331")
+        hex_bytes = IntelHex(str(hex_filepath)).tobinstr()
 
+        expected_build_id = bytes.fromhex("f9931dd776ccc422a576d80eaed1c0fcca8f0331")
         assert elf_bytes[0x260 : 0x260 + len(expected_build_id)] == expected_build_id
+        assert hex_bytes[0x160 : 0x160 + len(expected_build_id)] == expected_build_id
         assert bin_bytes[0x160 : 0x160 + len(expected_build_id)] == expected_build_id
         assert strip_bytes[0x260 : 0x260 + len(expected_build_id)] == expected_build_id
         assert exe_bytes[0x260 : 0x260 + len(expected_build_id)] == expected_build_id
-
-        intel_hex = IntelHex(str(hex_filepath))
-        assert (
-            intel_hex.tobinstr(0x8160, size=len(expected_build_id)) == expected_build_id
-        )
 
         expected_elf_filepath = outputs_dir / "zephyr.elf"
         expected_hex_filepath = outputs_dir / "zephyr.hex"
@@ -64,9 +61,12 @@ def test_patch_build_id():
         expected_strip_filepath = outputs_dir / "zephyr.strip"
         expected_exe_filepath = outputs_dir / "zephyr.exe"
 
+        # Not comparing byte by byte because the files can have different line endings
+        expected_hex_bytes = IntelHex(str(expected_hex_filepath)).tobinstr()
+
         # Check that nothing else was changed
         assert filecmp.cmp(elf_filepath, expected_elf_filepath)
-        assert filecmp.cmp(hex_filepath, expected_hex_filepath)
+        assert hex_bytes == expected_hex_bytes
         assert filecmp.cmp(bin_filepath, expected_bin_filepath)
         assert filecmp.cmp(strip_filepath, expected_strip_filepath)
         assert filecmp.cmp(exe_filepath, expected_exe_filepath)
