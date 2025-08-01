@@ -33,6 +33,15 @@ config LOG_BACKEND_SPOTFLOW
 	help
 		Enable sending logs to Spotflow cloud.
 
+config SPOTFLOW_GENERATE_BUILD_ID
+	bool "Generate build ID"
+	default y
+	select BINDESC
+	select BINDESC_DEFINE
+	help
+		Generate build ID and embed it as a binary descriptor.
+		Build ID allows to match core dumps with the original .elf file.
+
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
 	default 4096 if SPOTFLOW
 
