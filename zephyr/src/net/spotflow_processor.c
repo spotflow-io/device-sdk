@@ -103,21 +103,7 @@ static void process_mqtt()
 			break;
 		}
 
-				messages_sent_counter++;
-				k_free(msg_ptr);
-				if (messages_sent_counter % 100 == 0) {
-					LOG_INF("Sent %" PRIu32 " messages", messages_sent_counter);
-				}
-				if (messages_sent_counter == UINT32_MAX) {
-					LOG_INF("Sent %" PRIu32 " messages. Reset.",
-						messages_sent_counter);
-					messages_sent_counter = 0; /* reset counter */
-				}
-			}
-			events[0].state = K_POLL_STATE_NOT_READY;
-		}
-		/* -- Finally, let the MQTT library do any keep‐alive or retry logic. */
-
+		/* -- Let the MQTT library do any keep‐alive or retry logic. */
 		rc = spotflow_mqtt_send_live();
 		if (rc < 0) {
 			LOG_DBG("mqtt_live() returned error %d → reconnecting", rc);

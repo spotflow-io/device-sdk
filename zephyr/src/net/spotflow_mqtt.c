@@ -8,7 +8,6 @@
 
 #include "net/spotflow_connection_helper.h"
 #include "net/spotflow_device_id.h"
-#include "net/spotflow_processor.h"
 #include "net/spotflow_tls.h"
 
 /* 80 bytes is just password itself */

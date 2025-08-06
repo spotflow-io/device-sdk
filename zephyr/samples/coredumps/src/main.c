@@ -37,7 +37,7 @@ int main(void)
 	init_wifi();
 	connect_to_wifi();
 	int i = 0;
-	while (true){
+	while (true) {
 		LOG_INF("Hello from Zephyr to Spotflow: %d", i++);
 		k_sleep(K_SECONDS(2));
 	}

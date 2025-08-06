@@ -11,7 +11,6 @@ extern "C" {
 #define SPOTFLOW_MQTT_THREAD_PRIORITY K_LOWEST_APPLICATION_THREAD_PRIO
 #endif
 
-
 void spotflow_start_mqtt(void);
 
 #ifdef __cplusplus
