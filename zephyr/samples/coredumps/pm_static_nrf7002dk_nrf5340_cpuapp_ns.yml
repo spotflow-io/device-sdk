@@ -1,0 +1,19 @@
+app:
+  address: 0x8000
+  end_address: 0xf0000
+  region: flash_primary
+  size: 0xe8000
+coredump_partition:
+  address: 0xf0000
+  end_address: 0x100000
+  region: flash_primary
+  size: 0x10000
+tfm_nonsecure:
+  address: 0x8000
+  end_address: 0x100000
+  orig_span: &id003
+  - app
+  - coredump_partition
+  region: flash_primary
+  size: 0xf8000
+  span: *id003
