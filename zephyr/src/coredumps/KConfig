@@ -32,11 +32,7 @@ config SPOTFLOW_COREDUMP_CHUNK_SIZE
 	int "Size of Spotflow coredump chunk"
 	default 1024
 	help
-		Size of the buffer used by Spotflow Coredump backend to store coredump chunks.
-		Increase this value if you experience issues with coredumps being dropped
-		because of buffer overflow.
-		Should be smaller than SPOTFLOW_CBOR_LOG_MAX_LEN.
-
+		Size of the coredump chunk used by Spotflow Coredump backend.
 
 config SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE
 	int "Size of Spotflow log backend queue"
@@ -44,13 +40,12 @@ config SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE
 	help
 		Size of the queue used by Spotflow Coredump backend to store logs
 		before sending them to the server.
-		Increase this value if you experience issues with logs being dropped.
 
 config SPOTFLOW_USE_DEFAULT_REBOOT_HANDLER
     bool "Use default Spotflow reboot handler"
     default y
     help
-        Use the default Zephyr reboot handler to reset the system after a fata error.
+        Use the default Zephyr reboot handler to reset the system after a fatal error.
         If disabled, you will need to implement your own reboot handler.
-        Please, make sure you reboot the device and call LOG_PANIC() in your handler
+        Please, make sure you reboot the device and call LOG_PANIC() in your handler.
 endif #SPOTFLOW_COREDUMPS
