@@ -38,8 +38,8 @@ config SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE
 	int "Size of Spotflow log backend queue"
 	default 16
 	help
-		Size of the queue used by Spotflow Coredump backend to store logs
-		before sending them to the server.
+		Size of the queue used by Spotflow Coredump backend to store coredump
+		chunks before sending them to the server.
 
 config SPOTFLOW_USE_DEFAULT_REBOOT_HANDLER
     bool "Use default Spotflow reboot handler"
