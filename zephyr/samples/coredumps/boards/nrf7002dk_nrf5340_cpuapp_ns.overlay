@@ -1,13 +1,11 @@
+/delete-node/ &storage_partition;
+
 &flash0 {
         partitions {
-		/* Leave half of the storage partition (16KB) for the core dump */
-		storage_partition: partition@f8000 {
-			label = "storage";
-			reg = <0x000f8000 0x00004000>;
-		};
-                coredump_partition: partition@fc000 {
+		/* Replace unused storage partition (32 KiB) by core dump partition*/
+                coredump_partition: partition@f8000 {
                         label = "coredump-partition";
-                        reg = <0x000fc000 0x00004000>;
+                        reg = <0x000f8000 0x00008000>;
                 };
 	};
 };
