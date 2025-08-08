@@ -1,0 +1,30 @@
+/*GPIO not available in 4.1.0, adding based on commit
+https://github.com/zephyrproject-rtos/zephyr/commit/2df6b7fd2dea95105b3598c41fecbd7089fab080*/
+#include <zephyr/dt-bindings/input/input-event-codes.h>
+/ {
+	aliases {
+		/* make an alias so we can refer to “sw0” in code */
+		sw0 = &user_button_0;
+	};
+
+	gpio_keys {
+		compatible = "gpio-keys";
+		user_button_0: button_0 {
+			label = "User SW2";
+			gpios = <&hsgpio0 11 (GPIO_ACTIVE_LOW | GPIO_PULL_UP)>;
+			zephyr,code = <INPUT_KEY_0>;
+			status = "okay";
+		};
+	};
+};
+
+/* external flash chip - winbond - to more information
+	  zephyr\boards\nxp\frdm_rw612\frdm_rw612_common.dtsi*/
+&w25q512jvfiq {
+	partitions {
+		coredump_partition: partition@3f00000 {
+			label = "coredump-partition";
+			reg   = <0x03F00000 DT_SIZE_M(1)>; /* last 1MB of 64 MB flash */
+		};
+	};
+};

@@ -7,3 +7,4 @@ external
 modules/*west
 **/credentials.conf
 /.vscode/
+**/cmake-build-debug/*
