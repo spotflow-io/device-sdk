@@ -1,13 +1,13 @@
 app:
   address: 0x8000
-  end_address: 0xf8000
+  end_address: 0xf0000
   region: flash_primary
-  size: 0xf0000
+  size: 0xe8000
 coredump_partition:
-  address: 0xf8000
+  address: 0xf0000
   end_address: 0x100000
   region: flash_primary
-  size: 0x8000
+  size: 0x10000
 tfm_nonsecure:
   address: 0x8000
   end_address: 0x100000
