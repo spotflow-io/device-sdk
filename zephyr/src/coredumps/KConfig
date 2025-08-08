@@ -35,7 +35,7 @@ config SPOTFLOW_COREDUMP_CHUNK_SIZE
 		Size of the coredump chunk used by Spotflow Coredump backend.
 
 config SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE
-	int "Size of Spotflow log backend queue"
+	int "Size of Spotflow coredump backend queue"
 	default 16
 	help
 		Size of the queue used by Spotflow Coredump backend to store coredump
