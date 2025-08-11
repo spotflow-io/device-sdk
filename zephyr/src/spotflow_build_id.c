@@ -12,25 +12,25 @@ BINDESC_BYTES_DEFINE(spotflow_build_id, SPOTFLOW_BINDESC_ID_BUILD_ID,
 
 int spotflow_build_id_get(const uint8_t** build_id, uint16_t* build_id_len)
 {
-    const uint8_t* id_bytes = BINDESC_GET_BYTES(spotflow_build_id);
-    const uint16_t id_len = BINDESC_GET_SIZE(spotflow_build_id);
+	const uint8_t* id_bytes = BINDESC_GET_BYTES(spotflow_build_id);
+	const uint16_t id_len = BINDESC_GET_SIZE(spotflow_build_id);
 
-    bool is_all_zero = true;
-    for (uint16_t i = 0; i < id_len; i++) {
-        if (id_bytes[i] != 0) {
-            is_all_zero = false;
-            break;
-        }
-    }
+	bool is_all_zero = true;
+	for (uint16_t i = 0; i < id_len; i++) {
+		if (id_bytes[i] != 0) {
+			is_all_zero = false;
+			break;
+		}
+	}
 
-    /* Return error if the build ID was not patched (all zeroes) */
-    if (is_all_zero) {
-        *build_id = NULL;
-        *build_id_len = 0;
-        return -ENOSYS;
-    }
+	/* Return error if the build ID was not patched (all zeroes) */
+	if (is_all_zero) {
+		*build_id = NULL;
+		*build_id_len = 0;
+		return -ENOSYS;
+	}
 
-    *build_id = id_bytes;
-    *build_id_len = id_len;
-    return 0;
+	*build_id = id_bytes;
+	*build_id_len = id_len;
+	return 0;
 }

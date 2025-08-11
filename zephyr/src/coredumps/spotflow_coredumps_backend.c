@@ -132,8 +132,8 @@ static void spotflow_coredump_thread(void)
 		size_t cbor_data_len = 0;
 		rc = spotflow_cbor_encode_coredump(
 		    coredump_info.buffer, copied, coredump_info.chunk_ordinal,
-		    coredump_info.coredump_id, is_last_chunk, build_id, build_id_len,
-		    &cbor_data, &cbor_data_len);
+		    coredump_info.coredump_id, is_last_chunk, build_id, build_id_len, &cbor_data,
+		    &cbor_data_len);
 
 		if (rc < 0) {
 			LOG_DBG("Failed to encode core dump message: %d", rc);
