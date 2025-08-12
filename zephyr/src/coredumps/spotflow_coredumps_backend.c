@@ -1,5 +1,6 @@
 #include "spotflow_coredumps_backend.h"
 
+#include "spotflow_build_id.h"
 #include "coredumps/spotflow_coredumps_cbor.h"
 #include "net/spotflow_processor.h"
 #include "zephyr/random/random.h"
@@ -113,11 +114,25 @@ static void spotflow_coredump_thread(void)
 			LOG_DBG("Processing last chunk of coredump");
 		}
 
+		const uint8_t* build_id = NULL;
+		uint16_t build_id_len = 0;
+
+#ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
+		/* Only the first chunk contains the build ID */
+		if (coredump_info.chunk_ordinal == 0) {
+			int build_id_rc = spotflow_build_id_get(&build_id, &build_id_len);
+			if (build_id_rc != 0) {
+				LOG_DBG("Failed to get build ID for core dump: %d", build_id_rc);
+			}
+		}
+#endif
+
 		uint8_t* cbor_data = NULL;
 		size_t cbor_data_len = 0;
 		rc = spotflow_cbor_encode_coredump(
 		    coredump_info.buffer, copied, coredump_info.chunk_ordinal,
-		    coredump_info.coredump_id, is_last_chunk, &cbor_data, &cbor_data_len);
+		    coredump_info.coredump_id, is_last_chunk, build_id, build_id_len, &cbor_data,
+		    &cbor_data_len);
 
 		if (rc < 0) {
 			LOG_DBG("Failed to encode core dump message: %d", rc);
