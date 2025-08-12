@@ -114,18 +114,17 @@ static void spotflow_coredump_thread(void)
 			LOG_DBG("Processing last chunk of coredump");
 		}
 
-#ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
-		const uint8_t* build_id;
-		uint16_t build_id_len;
-		int build_id_rc = spotflow_build_id_get(&build_id, &build_id_len);
-		if (build_id_rc != 0) {
-			LOG_DBG("Failed to get build ID for core dump: %d", build_id_rc);
-			build_id = NULL;
-			build_id_len = 0;
-		}
-#else
 		const uint8_t* build_id = NULL;
 		uint16_t build_id_len = 0;
+
+#ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
+		/* Only the first chunk contains the build ID */
+		if (coredump_info.chunk_ordinal == 0) {
+			int build_id_rc = spotflow_build_id_get(&build_id, &build_id_len);
+			if (build_id_rc != 0) {
+				LOG_DBG("Failed to get build ID for core dump: %d", build_id_rc);
+			}
+		}
 #endif
 
 		uint8_t* cbor_data = NULL;
