@@ -1,10 +1,10 @@
-#include "spotflow_build_id.h"
-#include "net/spotflow_session_metadata.h"
-#include "net/spotflow_mqtt.h"
-
 #include <zcbor_encode.h>
 
 #include <zephyr/logging/log.h>
+
+#include "spotflow_build_id.h"
+#include "net/spotflow_session_metadata.h"
+#include "net/spotflow_mqtt.h"
 
 #define MAX_KEY_COUNT 2
 
@@ -13,7 +13,7 @@
 
 #define SESSION_METADATA_MESSAGE_TYPE 1
 
-/* Expecting at most TODO, adding a safety margin */
+/* Expecting at most 26 bytes, adding a safety margin */
 #define MAX_CBOR_SIZE 32
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
