@@ -39,7 +39,7 @@ int spotflow_session_metadata_send(void)
 	size_t cbor_data_len = 0;
 
 	rc = cbor_encode_session_metadata(build_id, build_id_len, buffer, sizeof(buffer),
-					      &cbor_data_len);
+					  &cbor_data_len);
 	if (rc < 0) {
 		LOG_DBG("Failed to encode session metadata: %d", rc);
 		return rc;
