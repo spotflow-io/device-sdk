@@ -5,9 +5,10 @@
 #include <string.h>
 
 #include "net/spotflow_processor.h"
-#include "spotflow_mqtt.h"
-#include "spotflow_connection_helper.h"
-#include "spotflow_tls.h"
+#include "net/spotflow_mqtt.h"
+#include "net/spotflow_connection_helper.h"
+#include "net/spotflow_session_metadata.h"
+#include "net/spotflow_tls.h"
 
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 #include "coredumps/spotflow_coredumps_net.h"
@@ -88,9 +89,16 @@ static int process_coredumps_or_logs()
 
 static void process_mqtt()
 {
+	int rc;
+	rc = spotflow_session_metadata_send();
+	if (rc < 0) {
+		LOG_DBG("Failed to send session metadata, aborting MQTT: %d", rc);
+		spotflow_mqtt_abort_mqtt();
+		return;
+	}
+
 	/*  INNER LOOP: perform normal MQTT I/O until an error occurs. */
 	while (spotflow_mqtt_is_connected()) {
-		int rc;
 		rc = spotflow_mqtt_poll();
 		if (rc < 0) {
 			spotflow_mqtt_abort_mqtt();
