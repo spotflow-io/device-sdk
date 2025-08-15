@@ -42,7 +42,7 @@ def generate_and_patch_build_id(elf_filepath: str, other_filepaths: list[str]):
             ):
                 patch_build_id_elf(filepath, bindesc_build_id_symbol, build_id)
             elif filepath.endswith(".hex"):
-                patch_build_id_hex(filepath, bindesc_build_id_symbol, build_id)
+                patch_build_id_hex(filepath, elffile, bindesc_build_id_symbol, build_id)
             elif filepath.endswith(".bin"):
                 patch_build_id_bin(filepath, elffile, bindesc_build_id_symbol, build_id)
             else:
@@ -154,11 +154,15 @@ def patch_build_id_parsed_elf(
 
 
 def patch_build_id_hex(
-    hex_filepath: str, bindesc_build_id_symbol: Symbol, build_id: bytes
+    hex_filepath: str, elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_id: bytes
 ):
     intel_hex = IntelHex(hex_filepath)
 
-    symbol_address = bindesc_build_id_symbol["st_value"]
+    symbol_vaddr = bindesc_build_id_symbol["st_value"]
+
+    # Convert virtual address to physical address for binary file
+    symbol_address = convert_vaddr_to_paddr(elffile, symbol_vaddr)
+
     header = (
         intel_hex[symbol_address : symbol_address + BUILD_ID_HEADER_SIZE]
         .tobinarray()
@@ -193,8 +197,11 @@ def patch_build_id_bin(
     base_address = find_base_address(elffile)
 
     with open(bin_filepath, "r+b") as bin_file:
-        symbol_address = bindesc_build_id_symbol["st_value"]
-        symbol_file_offset = symbol_address - base_address
+        symbol_vaddr = bindesc_build_id_symbol["st_value"]
+        
+        # Convert virtual address to physical address for binary file
+        symbol_paddr = convert_vaddr_to_paddr(elffile, symbol_vaddr)
+        symbol_file_offset = symbol_paddr - base_address
 
         bin_file.seek(symbol_file_offset)
         header = bin_file.read(BUILD_ID_HEADER_SIZE)
@@ -215,15 +222,34 @@ def patch_build_id_bin(
         bin_file.write(build_id)
 
 
+def convert_vaddr_to_paddr(elffile: ELFFile, vaddr: int) -> int:
+    """Convert a virtual address to physical address by finding the containing segment."""
+    for segment in elffile.iter_segments():
+        if segment["p_type"] == "PT_LOAD":
+            seg_vaddr = segment["p_vaddr"]
+            seg_paddr = segment["p_paddr"]
+            seg_size = segment["p_memsz"]
+            
+            # Check if the virtual address falls within this segment
+            if seg_vaddr <= vaddr < seg_vaddr + seg_size:
+                # Calculate offset within the segment
+                offset = vaddr - seg_vaddr
+                # Convert to physical address
+                return seg_paddr + offset
+    
+    # If no segment found, assume 1:1 mapping (common in embedded systems)
+    return vaddr
+
+
 def find_base_address(elffile: ELFFile) -> int:
     base_address = None
 
     # Find the lowest base address of a loadable segment
     for segment in elffile.iter_segments():
         if segment["p_type"] == "PT_LOAD":
-            vaddr = segment["p_vaddr"]
-            if base_address is None or vaddr < base_address:
-                base_address = vaddr
+            paddr = segment["p_paddr"]
+            if base_address is None or paddr < base_address:
+                base_address = paddr
 
     if base_address is None:
         raise Exception("No loadable segments found in ELF file")
