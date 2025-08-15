@@ -73,22 +73,19 @@ def find_bindesc_build_id_symbol_vaddr(elffile: ELFFile) -> int:
 
 
 def convert_vaddr_to_paddr(elffile: ELFFile, vaddr: int) -> int:
-    """Convert a virtual address to physical address by finding the containing segment."""
     for segment in elffile.iter_segments():
         if segment["p_type"] == "PT_LOAD":
             seg_vaddr = segment["p_vaddr"]
             seg_paddr = segment["p_paddr"]
             seg_size = segment["p_memsz"]
 
-            # Check if the virtual address falls within this segment
             if seg_vaddr <= vaddr < seg_vaddr + seg_size:
-                # Calculate offset within the segment
                 offset = vaddr - seg_vaddr
-                # Convert to physical address
                 return seg_paddr + offset
 
-    # If no segment found, assume 1:1 mapping (common in embedded systems)
-    return vaddr
+    raise Exception(
+        f"Virtual address 0x{vaddr:08x} not found in any segment of ELF file"
+    )
 
 
 def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
