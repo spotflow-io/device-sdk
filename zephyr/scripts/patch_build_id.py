@@ -137,7 +137,8 @@ def patch_build_id_parsed_elf(
             header = elffile.stream.read(BUILD_ID_HEADER_SIZE)
             if header != BUILD_ID_HEADER_VALUE:
                 raise Exception(
-                    f"Invalid build ID binary descriptor header: {header.hex()}"
+                    f"Invalid build ID binary descriptor header at offset "
+                    f"0x{symbol_file_offset:08x}: {header.hex()}"
                 )
 
             build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
@@ -164,7 +165,10 @@ def patch_build_id_hex(
         .tobytes()
     )
     if header != BUILD_ID_HEADER_VALUE:
-        raise Exception(f"Invalid build ID binary descriptor header: {header.hex()}")
+        raise Exception(
+            f"Invalid build ID binary descriptor header at address "
+            f"0x{symbol_address:08x}: {header.hex()}"
+        )
 
     build_id_address = symbol_address + BUILD_ID_HEADER_SIZE
 
@@ -196,7 +200,8 @@ def patch_build_id_bin(
         header = bin_file.read(BUILD_ID_HEADER_SIZE)
         if header != BUILD_ID_HEADER_VALUE:
             raise Exception(
-                f"Invalid build ID binary descriptor header: {header.hex()}"
+                f"Invalid build ID binary descriptor header at offset "
+                f"0x{symbol_file_offset:08x}: {header.hex()}"
             )
 
         build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
