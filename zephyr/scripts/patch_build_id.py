@@ -62,9 +62,7 @@ def find_bindesc_build_id_symbol_vaddr(elffile: ELFFile) -> int:
         raise Exception(f"Symbol '{SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME}' not found")
 
     if len(symbols) > 1:
-        raise Exception(
-            f"Symbol '{SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME}' found multiple times"
-        )
+        raise Exception(f"Symbol '{SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME}' found multiple times")
 
     symbol = symbols[0]
     assert symbol["st_size"] == BUILD_ID_HEADER_SIZE + BUILD_ID_VALUE_SIZE
@@ -83,9 +81,7 @@ def convert_vaddr_to_paddr(elffile: ELFFile, vaddr: int) -> int:
                 offset = vaddr - seg_vaddr
                 return seg_paddr + offset
 
-    raise Exception(
-        f"Virtual address 0x{vaddr:08x} not found in any segment of ELF file"
-    )
+    raise Exception(f"Virtual address 0x{vaddr:08x} not found in any segment of ELF file")
 
 
 def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
@@ -107,9 +103,7 @@ def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
         if section_start_vaddr <= bindesc_symbol_vaddr < section_end_vaddr:
             symbol_section_offset = bindesc_symbol_vaddr - section_start_vaddr
             build_id_section_start_offset = symbol_section_offset + BUILD_ID_HEADER_SIZE
-            build_id_section_end_offset = (
-                build_id_section_start_offset + BUILD_ID_VALUE_SIZE
-            )
+            build_id_section_end_offset = build_id_section_start_offset + BUILD_ID_VALUE_SIZE
 
             # The build ID itself cannot take part in the hash
             hash_builder.update(data[:build_id_section_start_offset])
@@ -161,9 +155,7 @@ def patch_build_id_parsed_elf(
     elffile.stream.write(build_id)
 
 
-def find_section_containing_vaddr(
-    elffile: ELFFile, bindesc_symbol_vaddr: int
-) -> Section:
+def find_section_containing_vaddr(elffile: ELFFile, bindesc_symbol_vaddr: int) -> Section:
     for section in elffile.iter_sections():
         section_start_vaddr = section["sh_addr"]
         section_end_vaddr = section_start_vaddr + section["sh_size"]

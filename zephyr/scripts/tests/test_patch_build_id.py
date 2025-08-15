@@ -92,20 +92,14 @@ def test_patch_build_id_esp32():
         assert elf_filepath.exists()
         assert bin_filepath.exists()
 
-        patch_build_id.generate_and_patch_build_id(
-            str(elf_filepath), [str(bin_filepath)]
-        )
+        patch_build_id.generate_and_patch_build_id(str(elf_filepath), [str(bin_filepath)])
 
         elf_bytes = elf_filepath.read_bytes()
         bin_bytes = bin_filepath.read_bytes()
 
         expected_build_id = bytes.fromhex("bd82337de7372dbde80d5db2aaa0c36edeb2fa97")
-        assert (
-            elf_bytes[0x808EC : 0x808EC + len(expected_build_id)] == expected_build_id
-        )
-        assert (
-            bin_bytes[0x80BFC : 0x80BFC + len(expected_build_id)] == expected_build_id
-        )
+        assert elf_bytes[0x808EC : 0x808EC + len(expected_build_id)] == expected_build_id
+        assert bin_bytes[0x80BFC : 0x80BFC + len(expected_build_id)] == expected_build_id
 
         read_build_id = get_build_id_from_elf(elf_filepath)
         assert read_build_id == expected_build_id
@@ -129,9 +123,7 @@ def get_build_id_from_elf(elf_filepath: Path) -> bytes:
     with open(elf_filepath, "rb") as elf_stream:
         elffile = ELFFile(elf_stream)
 
-        bindesc_symbol_vaddr = patch_build_id.find_bindesc_build_id_symbol_vaddr(
-            elffile
-        )
+        bindesc_symbol_vaddr = patch_build_id.find_bindesc_build_id_symbol_vaddr(elffile)
 
         section = patch_build_id.find_section_containing_vaddr(elffile, bindesc_symbol_vaddr)
 
