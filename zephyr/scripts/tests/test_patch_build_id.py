@@ -4,7 +4,6 @@ import filecmp
 import shutil
 import tempfile
 from elftools.elf.elffile import ELFFile
-from elftools.elf.sections import Section, Symbol
 from intelhex import IntelHex
 from pathlib import Path
 
@@ -94,16 +93,19 @@ def test_patch_build_id_esp32():
         assert bin_filepath.exists()
 
         patch_build_id.generate_and_patch_build_id(
-            str(elf_filepath),
-            [ str(bin_filepath) ]
+            str(elf_filepath), [str(bin_filepath)]
         )
 
         elf_bytes = elf_filepath.read_bytes()
         bin_bytes = bin_filepath.read_bytes()
 
         expected_build_id = bytes.fromhex("bd82337de7372dbde80d5db2aaa0c36edeb2fa97")
-        assert elf_bytes[0x808ec : 0x808ec + len(expected_build_id)] == expected_build_id
-        assert bin_bytes[0x80bfc : 0x80bfc + len(expected_build_id)] == expected_build_id
+        assert (
+            elf_bytes[0x808EC : 0x808EC + len(expected_build_id)] == expected_build_id
+        )
+        assert (
+            bin_bytes[0x80BFC : 0x80BFC + len(expected_build_id)] == expected_build_id
+        )
 
         read_build_id = get_build_id_from_elf(elf_filepath)
         assert read_build_id == expected_build_id
@@ -127,13 +129,14 @@ def get_build_id_from_elf(elf_filepath: Path) -> bytes:
     with open(elf_filepath, "rb") as elf_stream:
         elffile = ELFFile(elf_stream)
 
-        symbol = patch_build_id.find_bindesc_build_id_symbol(elffile)
+        bindesc_symbol_vaddr = patch_build_id.find_bindesc_build_id_symbol_vaddr(
+            elffile
+        )
 
-        section = find_section_containing_symbol(elffile, symbol)
+        section = patch_build_id.find_section_containing_vaddr(elffile, bindesc_symbol_vaddr)
 
         section_start_vaddr = section["sh_addr"]
-        symbol_vaddr = symbol["st_value"]
-        symbol_offset_in_section = symbol_vaddr - section_start_vaddr
+        symbol_offset_in_section = bindesc_symbol_vaddr - section_start_vaddr
 
         section_file_offset = section["sh_offset"]
         symbol_file_offset = section_file_offset + symbol_offset_in_section
@@ -143,20 +146,9 @@ def get_build_id_from_elf(elf_filepath: Path) -> bytes:
 
             build_id_header = elf_stream.read(patch_build_id.BUILD_ID_HEADER_SIZE)
             if build_id_header != patch_build_id.BUILD_ID_HEADER_VALUE:
-                raise Exception(f"Invalid build ID binary descriptor header at offset "
-                                f"0x{symbol_file_offset:08x}: {build_id_header.hex()}")
+                raise Exception(
+                    f"Invalid build ID binary descriptor header at offset "
+                    f"0x{symbol_file_offset:08x}: {build_id_header.hex()}"
+                )
 
             return elf_stream.read(patch_build_id.BUILD_ID_VALUE_SIZE)
-
-
-def find_section_containing_symbol(elffile: ELFFile, symbol: Symbol) -> Section:
-    symbol_vaddr = symbol["st_value"]
-
-    for section in elffile.iter_sections():
-        section_start_vaddr = section["sh_addr"]
-        section_end_vaddr = section_start_vaddr + section["sh_size"]
-
-        if section_start_vaddr <= symbol_vaddr < section_end_vaddr:
-            return section
-
-    raise Exception(f"Symbol {symbol['st_name']} not found in any section of ELF file")

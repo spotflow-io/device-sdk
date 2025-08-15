@@ -4,7 +4,7 @@ import sys
 import os
 import hashlib
 from elftools.elf.elffile import ELFFile
-from elftools.elf.sections import Symbol
+from elftools.elf.sections import Section, Symbol
 from elftools.elf.constants import SH_FLAGS
 from intelhex import IntelHex
 
@@ -22,13 +22,12 @@ def generate_and_patch_build_id(elf_filepath: str, other_filepaths: list[str]):
     with open(elf_filepath, "rb+") as elf_stream:
         elffile = ELFFile(elf_stream)
 
-        bindesc_build_id_symbol = find_bindesc_build_id_symbol(elffile)
+        bindesc_symbol_vaddr = find_bindesc_build_id_symbol_vaddr(elffile)
+        bindesc_symbol_paddr = convert_vaddr_to_paddr(elffile, bindesc_symbol_vaddr)
 
-        build_id = generate_build_id(elffile, bindesc_build_id_symbol)
+        build_id = generate_build_id(elffile, bindesc_symbol_vaddr)
 
-        patch_build_id_parsed_elf(
-            elffile, elf_filepath, bindesc_build_id_symbol, build_id
-        )
+        patch_build_id_parsed_elf(elffile, elf_filepath, bindesc_symbol_vaddr, build_id)
 
         for filepath in other_filepaths:
             if not os.path.exists(filepath):
@@ -40,16 +39,16 @@ def generate_and_patch_build_id(elf_filepath: str, other_filepaths: list[str]):
                 or filepath.endswith(".exe")
                 or filepath.endswith(".strip")
             ):
-                patch_build_id_elf(filepath, bindesc_build_id_symbol, build_id)
+                patch_build_id_elf(filepath, bindesc_symbol_vaddr, build_id)
             elif filepath.endswith(".hex"):
-                patch_build_id_hex(filepath, elffile, bindesc_build_id_symbol, build_id)
+                patch_build_id_hex(filepath, bindesc_symbol_paddr, build_id)
             elif filepath.endswith(".bin"):
-                patch_build_id_bin(filepath, elffile, bindesc_build_id_symbol, build_id)
+                patch_build_id_bin(filepath, elffile, bindesc_symbol_paddr, build_id)
             else:
                 raise Exception(f"Unsupported file type: {filepath}")
 
 
-def find_bindesc_build_id_symbol(elffile: ELFFile) -> Symbol:
+def find_bindesc_build_id_symbol_vaddr(elffile: ELFFile) -> int:
     symbol = None
 
     symbol_table = elffile.get_section_by_name(".symtab")
@@ -57,20 +56,42 @@ def find_bindesc_build_id_symbol(elffile: ELFFile) -> Symbol:
         symbol_table = elffile.get_section_by_name(".dynsym")
 
     if symbol_table is not None:
-        symbol = symbol_table.get_symbol_by_name(SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME)
+        symbols = symbol_table.get_symbol_by_name(SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME)
 
-    if symbol is None:
+    if symbols is None:
         raise Exception(f"Symbol '{SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME}' not found")
 
-    if len(symbol) > 1:
+    if len(symbols) > 1:
         raise Exception(
             f"Symbol '{SPOTFLOW_BINDESC_BUILD_ID_SYMBOL_NAME}' found multiple times"
         )
 
-    return symbol[0]
+    symbol = symbols[0]
+    assert symbol["st_size"] == BUILD_ID_HEADER_SIZE + BUILD_ID_VALUE_SIZE
+
+    return symbol["st_value"]
 
 
-def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
+def convert_vaddr_to_paddr(elffile: ELFFile, vaddr: int) -> int:
+    """Convert a virtual address to physical address by finding the containing segment."""
+    for segment in elffile.iter_segments():
+        if segment["p_type"] == "PT_LOAD":
+            seg_vaddr = segment["p_vaddr"]
+            seg_paddr = segment["p_paddr"]
+            seg_size = segment["p_memsz"]
+
+            # Check if the virtual address falls within this segment
+            if seg_vaddr <= vaddr < seg_vaddr + seg_size:
+                # Calculate offset within the segment
+                offset = vaddr - seg_vaddr
+                # Convert to physical address
+                return seg_paddr + offset
+
+    # If no segment found, assume 1:1 mapping (common in embedded systems)
+    return vaddr
+
+
+def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
     hash_builder = hashlib.sha1()
 
     for section in elffile.iter_sections():
@@ -79,102 +100,104 @@ def generate_build_id(elffile: ELFFile, bindesc_build_id_symbol: Symbol):
             continue
 
         data = section.data()
-        section_start = section["sh_addr"]
-        section_end = section_start + section["sh_size"]
-        symbol_start = bindesc_build_id_symbol["st_value"]
+        section_start_vaddr = section["sh_addr"]
+        section_end_vaddr = section_start_vaddr + section["sh_size"]
 
         # The section address is included in the hash because loading the same data into a
         # different memory address would yield a different memory content
-        hash_builder.update(section_start.to_bytes(8, byteorder="little"))
+        hash_builder.update(section_start_vaddr.to_bytes(8, byteorder="little"))
 
-        if section_start <= symbol_start < section_end:
-            symbol_start_offset = symbol_start - section_start
-            build_id_start_offset = symbol_start_offset + BUILD_ID_HEADER_SIZE
-            build_id_end_offset = build_id_start_offset + BUILD_ID_VALUE_SIZE
+        if section_start_vaddr <= bindesc_symbol_vaddr < section_end_vaddr:
+            symbol_section_offset = bindesc_symbol_vaddr - section_start_vaddr
+            build_id_section_start_offset = symbol_section_offset + BUILD_ID_HEADER_SIZE
+            build_id_section_end_offset = (
+                build_id_section_start_offset + BUILD_ID_VALUE_SIZE
+            )
 
             # The build ID itself cannot take part in the hash
-            hash_builder.update(data[:build_id_start_offset])
-            hash_builder.update(data[build_id_end_offset:])
+            hash_builder.update(data[:build_id_section_start_offset])
+            hash_builder.update(data[build_id_section_end_offset:])
         else:
             hash_builder.update(data)
 
     build_id = hash_builder.digest()
     assert len(build_id) == BUILD_ID_VALUE_SIZE
-    assert (
-        bindesc_build_id_symbol["st_size"] == BUILD_ID_HEADER_SIZE + BUILD_ID_VALUE_SIZE
-    )
 
     return build_id
 
 
-def patch_build_id_elf(
-    elf_filepath: str, bindesc_build_id_symbol: Symbol, build_id: bytes
-):
+def patch_build_id_elf(elf_filepath: str, bindesc_symbol_vaddr: int, build_id: bytes):
     with open(elf_filepath, "rb+") as elf_stream:
         elffile = ELFFile(elf_stream)
-        patch_build_id_parsed_elf(
-            elffile, elf_filepath, bindesc_build_id_symbol, build_id
-        )
+        patch_build_id_parsed_elf(elffile, elf_filepath, bindesc_symbol_vaddr, build_id)
 
 
 def patch_build_id_parsed_elf(
     elffile: ELFFile,
     elf_filepath: str,
-    bindesc_build_id_symbol: Symbol,
+    bindesc_symbol_vaddr: int,
     build_id: bytes,
 ):
+    section = find_section_containing_vaddr(elffile, bindesc_symbol_vaddr)
+
+    section_start_vaddr = section["sh_addr"]
+    section_file_offset = section["sh_offset"]
+
+    symbol_section_offset = bindesc_symbol_vaddr - section_start_vaddr
+    symbol_file_offset = section_file_offset + symbol_section_offset
+
+    elffile.stream.seek(symbol_file_offset)
+    header = elffile.stream.read(BUILD_ID_HEADER_SIZE)
+    if header != BUILD_ID_HEADER_VALUE:
+        raise Exception(
+            f"Invalid build ID binary descriptor header at offset "
+            f"0x{symbol_file_offset:08x}: {header.hex()}"
+        )
+
+    build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
+
+    print(
+        f"Patching build ID '{build_id.hex()}' into ELF file '{elf_filepath}' at offset: "
+        f"0x{build_id_file_offset:08x}"
+    )
+    elffile.stream.seek(build_id_file_offset)
+    elffile.stream.write(build_id)
+
+
+def find_section_containing_vaddr(
+    elffile: ELFFile, bindesc_symbol_vaddr: int
+) -> Section:
     for section in elffile.iter_sections():
-        section_file_offset = section["sh_offset"]
-        section_rom_start = section["sh_addr"]
-        section_rom_end = section_rom_start + section["sh_size"]
-        symbol_rom_start = bindesc_build_id_symbol["st_value"]
+        section_start_vaddr = section["sh_addr"]
+        section_end_vaddr = section_start_vaddr + section["sh_size"]
 
-        if section_rom_start <= symbol_rom_start < section_rom_end:
-            symbol_section_offset = symbol_rom_start - section_rom_start
-            symbol_file_offset = section_file_offset + symbol_section_offset
+        if section_start_vaddr <= bindesc_symbol_vaddr < section_end_vaddr:
+            return section
 
-            elffile.stream.seek(symbol_file_offset)
-            header = elffile.stream.read(BUILD_ID_HEADER_SIZE)
-            if header != BUILD_ID_HEADER_VALUE:
-                raise Exception(
-                    f"Invalid build ID binary descriptor header at offset "
-                    f"0x{symbol_file_offset:08x}: {header.hex()}"
-                )
-
-            build_id_file_offset = symbol_file_offset + BUILD_ID_HEADER_SIZE
-
-            print(
-                f"Patching build ID '{build_id.hex()}' into ELF file '{elf_filepath}' at offset: "
-                f"0x{build_id_file_offset:08x}"
-            )
-            elffile.stream.seek(build_id_file_offset)
-            elffile.stream.write(build_id)
-
-            break
+    raise Exception(
+        f"Symbol with virtual address 0x{bindesc_symbol_vaddr:08x} not found in any section of ELF file"
+    )
 
 
 def patch_build_id_hex(
-    hex_filepath: str, elffile: ELFFile, bindesc_build_id_symbol: Symbol, build_id: bytes
+    hex_filepath: str,
+    bindesc_symbol_paddr: int,
+    build_id: bytes,
 ):
     intel_hex = IntelHex(hex_filepath)
 
-    symbol_vaddr = bindesc_build_id_symbol["st_value"]
-
-    # Convert virtual address to physical address for binary file
-    symbol_address = convert_vaddr_to_paddr(elffile, symbol_vaddr)
-
     header = (
-        intel_hex[symbol_address : symbol_address + BUILD_ID_HEADER_SIZE]
+        intel_hex[bindesc_symbol_paddr : bindesc_symbol_paddr + BUILD_ID_HEADER_SIZE]
         .tobinarray()
         .tobytes()
     )
     if header != BUILD_ID_HEADER_VALUE:
         raise Exception(
             f"Invalid build ID binary descriptor header at address "
-            f"0x{symbol_address:08x}: {header.hex()}"
+            f"0x{bindesc_symbol_paddr:08x}: {header.hex()}"
         )
 
-    build_id_address = symbol_address + BUILD_ID_HEADER_SIZE
+    build_id_address = bindesc_symbol_paddr + BUILD_ID_HEADER_SIZE
 
     print(
         f"Patching build ID '{build_id.hex()}' into HEX file '{hex_filepath}' at address: "
@@ -190,18 +213,14 @@ def patch_build_id_hex(
 def patch_build_id_bin(
     bin_filepath: str,
     elffile: ELFFile,
-    bindesc_build_id_symbol: Symbol,
+    bindesc_symbol_paddr: int,
     build_id: bytes,
 ):
     # The content of the binary file starts at the base address of the ELF file
     base_address = find_base_address(elffile)
 
     with open(bin_filepath, "r+b") as bin_file:
-        symbol_vaddr = bindesc_build_id_symbol["st_value"]
-        
-        # Convert virtual address to physical address for binary file
-        symbol_paddr = convert_vaddr_to_paddr(elffile, symbol_vaddr)
-        symbol_file_offset = symbol_paddr - base_address
+        symbol_file_offset = bindesc_symbol_paddr - base_address
 
         bin_file.seek(symbol_file_offset)
         header = bin_file.read(BUILD_ID_HEADER_SIZE)
@@ -220,25 +239,6 @@ def patch_build_id_bin(
 
         bin_file.seek(build_id_file_offset)
         bin_file.write(build_id)
-
-
-def convert_vaddr_to_paddr(elffile: ELFFile, vaddr: int) -> int:
-    """Convert a virtual address to physical address by finding the containing segment."""
-    for segment in elffile.iter_segments():
-        if segment["p_type"] == "PT_LOAD":
-            seg_vaddr = segment["p_vaddr"]
-            seg_paddr = segment["p_paddr"]
-            seg_size = segment["p_memsz"]
-            
-            # Check if the virtual address falls within this segment
-            if seg_vaddr <= vaddr < seg_vaddr + seg_size:
-                # Calculate offset within the segment
-                offset = vaddr - seg_vaddr
-                # Convert to physical address
-                return seg_paddr + offset
-    
-    # If no segment found, assume 1:1 mapping (common in embedded systems)
-    return vaddr
 
 
 def find_base_address(elffile: ELFFile) -> int:
