@@ -175,7 +175,8 @@ def find_section_containing_vaddr(
             return section
 
     raise Exception(
-        f"Symbol with virtual address 0x{bindesc_symbol_vaddr:08x} not found in any section of ELF file"
+        f"Symbol with virtual address 0x{bindesc_symbol_vaddr:08x} not found "
+        "in any section of ELF file"
     )
 
 
