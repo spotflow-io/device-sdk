@@ -17,6 +17,11 @@ BUILD_ID_HEADER_VALUE = b"\xf0\x25\x14\x00"
 BUILD_ID_HEADER_SIZE = len(BUILD_ID_HEADER_VALUE)
 BUILD_ID_VALUE_SIZE = 20
 
+# Segment flags
+PF_X=(1 << 0)	#/* Segment is executable */
+PF_W=(1 << 1)	#/* Segment is writable */
+PF_R=(1 << 2)	#/* Segment is readable */
+
 
 def generate_and_patch_build_id(elf_filepath: str, other_filepaths: list[str]):
     with open(elf_filepath, "rb+") as elf_stream:
@@ -238,12 +243,16 @@ def find_base_address(elffile: ELFFile) -> int:
     for segment in elffile.iter_segments():
         if segment["p_type"] == "PT_LOAD":
             paddr = segment["p_paddr"]
+            writable = segment["p_flags"] & PF_W == 0
+            # skip segments that have no file size -> they exist only in RAM memory .bss/.noinit
+            # skip segments that are writable .data, .ramfunc overlay
+            if segment["p_filesz"] == 0 or writable:
+                continue
             if base_address is None or paddr < base_address:
                 base_address = paddr
 
     if base_address is None:
         raise Exception("No loadable segments found in ELF file")
-
     return base_address
 
 
