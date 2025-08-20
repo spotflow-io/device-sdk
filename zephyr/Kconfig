@@ -31,8 +31,9 @@ rsource "src/coredumps/KConfig"
 config SPOTFLOW_GENERATE_BUILD_ID
 	bool "Generate build ID"
 	default y
-	select BINDESC
-	select BINDESC_DEFINE
+	# Use binary descriptors when possible
+	select BINDESC if ARCH_SUPPORTS_ROM_START || ARCH_POSIX
+	select BINDESC_DEFINE if ARCH_SUPPORTS_ROM_START || ARCH_POSIX
 	help
 		Generate build ID and embed it as a binary descriptor.
 		Build ID allows to match core dumps with the original .elf file.

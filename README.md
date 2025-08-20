@@ -90,6 +90,9 @@ You can retrieve the build ID from the `.elf` file using the following command:
 west bindesc custom_search BYTES 0x5f0 zephyr.elf
 ```
 
+> **Note:** If the architecture of the device doesn't support binary descriptors (notably, ESP32), retrieving the build ID from the `.elf` file is more complex.
+> In this case, it's necessary to use the symbol table, see the function `get_build_id_from_elf` in script tests.
+
 Because Zephyr doesn't allow to insert a post-build command between the compilation of `zephyr.elf` and the generation of derived files such as `zephyr.hex` and `zephyr.bin`, our build command patches these files as well.
 In particular, the files with the following extensions are patched:
 
