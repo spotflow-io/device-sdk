@@ -210,7 +210,6 @@ def patch_build_id_bin(
 
     with open(bin_filepath, "r+b") as bin_file:
         symbol_file_offset = bindesc_symbol_paddr - base_address
-        print(f"Symbol file offset: 0x{symbol_file_offset:08x}, base address: 0x{base_address:08x}, bindesc_symbol_paddr: 0x{bindesc_symbol_paddr:08x}")
         bin_file.seek(symbol_file_offset)
         header = bin_file.read(BUILD_ID_HEADER_SIZE)
         if header != BUILD_ID_HEADER_VALUE:
