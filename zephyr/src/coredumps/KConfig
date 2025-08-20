@@ -31,8 +31,11 @@ config SPOTFLOW_PROCESSING_BACKEND_COREDUMPS_LEVEL
 config SPOTFLOW_COREDUMP_CHUNK_SIZE
 	int "Size of Spotflow coredump chunk"
 	default 1024
+	range 128 921600
 	help
 		Size of the coredump chunk used by Spotflow Coredump backend.
+		Should not be larger than 900 KiB because Spotflow cloud backend
+		expects coredump chunks to be less than 1 MiB including metadata.
 
 config SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE
 	int "Size of Spotflow coredump backend queue"
