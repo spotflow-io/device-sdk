@@ -17,12 +17,6 @@ BUILD_ID_HEADER_VALUE = b"\xf0\x25\x14\x00"
 BUILD_ID_HEADER_SIZE = len(BUILD_ID_HEADER_VALUE)
 BUILD_ID_VALUE_SIZE = 20
 
-# Segment flags
-PF_X=(1 << 0)	#/* Segment is executable */
-PF_W=(1 << 1)	#/* Segment is writable */
-PF_R=(1 << 2)	#/* Segment is readable */
-
-
 def generate_and_patch_build_id(elf_filepath: str, other_filepaths: list[str]):
     with open(elf_filepath, "rb+") as elf_stream:
         elffile = ELFFile(elf_stream)
@@ -216,7 +210,7 @@ def patch_build_id_bin(
 
     with open(bin_filepath, "r+b") as bin_file:
         symbol_file_offset = bindesc_symbol_paddr - base_address
-
+        print(f"Symbol file offset: 0x{symbol_file_offset:08x}, base address: 0x{base_address:08x}, bindesc_symbol_paddr: 0x{bindesc_symbol_paddr:08x}")
         bin_file.seek(symbol_file_offset)
         header = bin_file.read(BUILD_ID_HEADER_SIZE)
         if header != BUILD_ID_HEADER_VALUE:
@@ -243,10 +237,10 @@ def find_base_address(elffile: ELFFile) -> int:
     for segment in elffile.iter_segments():
         if segment["p_type"] == "PT_LOAD":
             paddr = segment["p_paddr"]
-            writable = segment["p_flags"] & PF_W == 0
             # skip segments that have no file size -> they exist only in RAM memory .bss/.noinit
-            # skip segments that are writable .data, .ramfunc overlay
-            if segment["p_filesz"] == 0 or writable:
+            # we should not skip segments that are writable .data, .ramfunc overlay, etc. because
+            # they are valid and used in ESP32 binary
+            if segment["p_filesz"] == 0:
                 continue
             if base_address is None or paddr < base_address:
                 base_address = paddr
