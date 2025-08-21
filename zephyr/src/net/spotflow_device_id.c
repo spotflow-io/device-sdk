@@ -6,7 +6,7 @@
 /* Should be safe upper bound - used, for example, in Zephyr Shell */
 #define ZEPHYR_DEVICE_ID_MAX_LENGTH 16
 
-LOG_MODULE_REGISTER(spotflow_device_id, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_REGISTER(spotflow_device_id, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 /* Hexadecimal representation of the Zephyr device ID (two characters per byte)
  * and a null terminator

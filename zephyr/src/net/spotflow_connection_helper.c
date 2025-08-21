@@ -2,7 +2,7 @@
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/socket.h>
 
-LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #define L4_EVENT_MASK (NET_EVENT_DNS_SERVER_ADD | NET_EVENT_L4_DISCONNECTED)
 

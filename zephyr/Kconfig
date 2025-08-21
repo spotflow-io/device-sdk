@@ -89,6 +89,19 @@ config SPOTFLOW_INGEST_KEY
 		Ingest key is a secret key used to authenticate your device
 		It can be found in Spotflow observability platform
 
+config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
+	int "Spotflow SDK backend level"
+	default LOG_DEFAULT_LEVEL
+	range 0 4
+	help
+		Sets default log level for all Spotflow components.
+		Defaults to LOG_DEFAULT_LEVEL.
+		Levels are:
+		- 0 OFF, do not write
+		- 1 ERROR, only write LOG_ERR
+		- 2 WARNING, write LOG_WRN in addition to previous level
+		- 3 INFO, write LOG_INF in addition to previous level
+		- 4 DEBUG, write LOG_DBG in addition to previous level
 
 config SPOTFLOW_MQTT_THREAD_CUSTOM_PRIORITY
 	bool "Use custom priority for MQTT log thread"

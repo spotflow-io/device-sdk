@@ -5,7 +5,7 @@
 #include "zephyr/sys/__assert.h"
 #include "zephyr/logging/log.h"
 
-LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL);
 
 #define MAX_KEY_COUNT 8
 
@@ -25,7 +25,7 @@ LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEV
 /* Should be approximately 47 bytes (including build ID), putting 64 to be safe */
 #define ZCBOR_COREDUMPS_OVERHEAD 64
 
-uint8_t buffer[CONFIG_SPOTFLOW_COREDUMP_CHUNK_SIZE + ZCBOR_COREDUMPS_OVERHEAD];
+uint8_t buffer[CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE + ZCBOR_COREDUMPS_OVERHEAD];
 
 int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_data_len,
 				  int chunk_ordinal, uint32_t core_dump_id, bool last_chunk,

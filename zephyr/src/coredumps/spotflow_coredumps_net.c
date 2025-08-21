@@ -3,7 +3,7 @@
 #include "net/spotflow_mqtt.h"
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_PROCESSING_BACKEND_COREDUMPS_LEVEL);
+LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL);
 
 static struct k_poll_event core_dumps_poll_event;
 void spotflow_init_core_dumps_polling()

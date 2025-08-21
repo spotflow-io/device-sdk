@@ -9,7 +9,7 @@
 #include "net/spotflow_processor.h"
 #include "spotflow_cbor_output_context.h"
 
-LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
 /* https://docs.zephyrproject.org/apidoc/latest/group__msgq__apis.html
  * Alignment of the message queue's ring buffer is not necessary,

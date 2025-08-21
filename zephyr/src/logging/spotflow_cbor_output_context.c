@@ -1,7 +1,7 @@
 ﻿#include "spotflow_cbor_output_context.h"
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
 int spotflow_cbor_output_context_init(struct spotflow_cbor_output_context** _context)
 {

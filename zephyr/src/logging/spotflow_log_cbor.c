@@ -8,7 +8,7 @@
 #include "zephyr/logging/log_core.h"
 #include "zephyr/logging/log_ctrl.h"
 
-LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
 /* optimized property keys */
 #define KEY_MESSAGE_TYPE 0x00

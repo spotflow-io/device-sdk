@@ -3,7 +3,7 @@
 #include "net/spotflow_mqtt.h"
 #include "zephyr/logging/log.h"
 
-LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
 static uint32_t messages_sent_counter = 0;
 static struct k_poll_event logs_poll_event;
