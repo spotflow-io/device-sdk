@@ -40,17 +40,18 @@ config SPOTFLOW_CBOR_LOG_MAX_LEN
 		Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
 		Increase this value if you experience issues with logs being dropped because of buffer overflow.
 
-config SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL
-	int "Spotflow library log level"
-	default LOG_DEFAULT_LEVEL
+config SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL
+	int "Spotflow SDK log component log level"
+	default SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	range 0 4
 	help
-		Sets log level for all Spotflow logging modules. All logs are debug by default.
+		Sets log level for Spotflow log component.
+		Defaults to SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL.
 		Levels are:
 		- 0 OFF, do not write
-		- 1 ERROR, only write SYS_LOG_ERR
-		- 2 WARNING, write SYS_LOG_WRN in addition to previous level
-		- 3 INFO, write SYS_LOG_INF in addition to previous level
-		- 4 DEBUG, write SYS_LOG_DBG in addition to previous level
+		- 1 ERROR, only write LOG_ERR
+		- 2 WARNING, write LOG_WRN in addition to previous level
+		- 3 INFO, write LOG_INF in addition to previous level
+		- 4 DEBUG, write LOG_DBG in addition to previous level
 
 endif #SPOTFLOW_LOG_BACKEND

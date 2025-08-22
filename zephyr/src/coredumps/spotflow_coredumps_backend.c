@@ -9,7 +9,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/debug/coredump.h>
 
-LOG_MODULE_REGISTER(spotflow_coredump, CONFIG_SPOTFLOW_PROCESSING_BACKEND_COREDUMPS_LEVEL);
+LOG_MODULE_REGISTER(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL);
 
 K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_mqtt_coredumps_msg*),
 	      CONFIG_SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE, 1);
@@ -37,7 +37,7 @@ struct coredump_info {
 	off_t offset;
 	int chunk_ordinal;
 	uint32_t coredump_id;
-	uint8_t buffer[CONFIG_SPOTFLOW_COREDUMP_CHUNK_SIZE];
+	uint8_t buffer[CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE];
 };
 
 static struct coredump_info coredump_info;
@@ -86,8 +86,8 @@ static void spotflow_coredump_thread(void)
 	while (coredump_info.offset < coredump_info.size) {
 		size_t remaining_size = coredump_info.size - coredump_info.offset;
 		size_t chunk_length;
-		if (remaining_size >= CONFIG_SPOTFLOW_COREDUMP_CHUNK_SIZE) {
-			chunk_length = CONFIG_SPOTFLOW_COREDUMP_CHUNK_SIZE;
+		if (remaining_size >= CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE) {
+			chunk_length = CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE;
 		} else {
 			chunk_length = remaining_size;
 		}

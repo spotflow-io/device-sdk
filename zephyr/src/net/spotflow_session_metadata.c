@@ -16,7 +16,7 @@
 /* Expecting at most 26 bytes, adding a safety margin */
 #define MAX_CBOR_SIZE 32
 
-LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
 					uint8_t* buffer, size_t buffer_len, size_t* cbor_data_len);
