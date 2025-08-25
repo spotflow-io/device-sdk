@@ -10,7 +10,7 @@ config SPOTFLOW_LOG_BACKEND
 
 if SPOTFLOW_LOG_BACKEND
 
-config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW
+config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_LOGGING
 	int "Additional heap size required by Spotflow"
 	default 6144 if SPOTFLOW_LOG_BACKEND
 	help
@@ -19,7 +19,7 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW
 
 config SPOTFLOW_LOG_BACKEND_QUEUE_SIZE
 	int "Size of Spotflow log backend queue"
-	default 64
+	default 16
 	help
 		Size of the queue used by Spotflow logging backend to store logs
 		before sending them to the server.
