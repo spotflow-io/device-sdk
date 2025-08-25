@@ -4,7 +4,7 @@
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-#define L4_EVENT_MASK (NET_EVENT_DNS_SERVER_ADD | NET_EVENT_L4_DISCONNECTED)
+#define L4_EVENT_MASK (NET_EVENT_L4_CONNECTED | NET_EVENT_DNS_SERVER_ADD  | NET_EVENT_L4_DISCONNECTED)
 
 static struct net_mgmt_event_callback net_mgmt_event_cb;
 static K_SEM_DEFINE(network_connected, 0, 1);
@@ -24,6 +24,7 @@ int spotflow_conn_helper_resolve_hostname(const char* hostname, struct zsock_add
 		zsock_freeaddrinfo(*server_addr);
 		*server_addr = NULL;
 	}
+
 
 	rc = zsock_getaddrinfo(hostname, STRINGIFY(CONFIG_SPOTFLOW_SERVER_PORT), &hints,
 			       server_addr);

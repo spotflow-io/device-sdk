@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Obtaining device ID from Zephyr if not provided in Kconfig
 * Support for overriding device ID in code
 * Computing build ID and sending it in session metadata and core dumps
+* Added sample for Ethernet on FRDM_RW612
 
 ### Changed
 * Changed KConfig option LOG_BACKEND_SPOTFLOW SPOTFLOW_LOG_BACKEND to match other options
