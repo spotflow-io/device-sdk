@@ -28,7 +28,14 @@ config SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL
 		- 2 WARNING, write LOG_WRN in addition to previous level
 		- 3 INFO, write LOG_INF in addition to previous level
 		- 4 DEBUG, write LOG_DBG in addition to previous level
-
+config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_COREDUMPS
+	int "Additional heap size required by Spotflow"
+	default 18432 if SPOTFLOW_COREDUMPS
+	help
+		Additional heap size required by Spotflow coredumps backend.
+		Increase this value if you experience issues with allocation of
+		memory for coredumps.
+		Default SPOTFLOW_COREDUMPS_CHUNK_SIZE*SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE+2KiB.
 config SPOTFLOW_COREDUMPS_CHUNK_SIZE
 	int "Size of Spotflow coredump chunk"
 	default 1024
