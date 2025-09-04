@@ -1,4 +1,4 @@
-#include "spotflow_cbor.h"
+#include "spotflow_log_cbor.h"
 
 #include <zcbor_common.h>
 #include <zcbor_encode.h>
@@ -8,10 +8,11 @@
 #include "zephyr/logging/log_core.h"
 #include "zephyr/logging/log_ctrl.h"
 
-LOG_MODULE_REGISTER(cbor_spotflow, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
 /* optimized property keys */
 #define KEY_MESSAGE_TYPE 0x00
+#define LOGS_MESSAGE_TYPE 0x00
 #define KEY_BODY 0x01
 #define KEY_BODY_TEMPLATE 0x02
 /* (unused for now) */
@@ -38,9 +39,9 @@ static int get_formatted_message(struct spotflow_cbor_output_context* output_con
 static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg,
 			     size_t sequence_number);
 
-int spotflow_cbor_encode_message(struct log_msg* log_msg, size_t sequence_number,
-				 struct spotflow_cbor_output_context* output_context,
-				 uint8_t** cbor_data, size_t* cbor_data_len)
+int spotflow_cbor_encode_log(struct log_msg* log_msg, size_t sequence_number,
+			     struct spotflow_cbor_output_context* output_context,
+			     uint8_t** cbor_data, size_t* cbor_data_len)
 {
 	__ASSERT(log_msg != NULL, "log_msg is NULL");
 	__ASSERT(output_context != NULL, "output_context is NULL");
@@ -190,16 +191,18 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 	/* zcbor supports state arrays; we need 2 states for nested array */
 	zcbor_state_t state[ZCBOR_STATE_DEPTH];
 
+	bool succ;
+
 	/* init for encode: 1 root item */
 	/* using instead of ZCBOR_STATE_E because we need multiple state because of nested array */
 	zcbor_new_encode_state(state, ZCBOR_STATE_DEPTH, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1);
 
 	/* start outer map with 6 key/value pairs */
-	zcbor_map_start_encode(state, 6);
+	succ = zcbor_map_start_encode(state, 6);
 
 	/* messageType: "LOG" */
-	zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
-	zcbor_tstr_put_lit(state, "LOG");
+	succ = succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
+	succ = succ && zcbor_uint32_put(state, LOGS_MESSAGE_TYPE);
 
 	int rc = encode_message_metadata_to_cbor(metadata, state);
 	if (rc < 0) {
@@ -209,15 +212,15 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 	}
 
 	/* body */
-	zcbor_uint32_put(state, KEY_BODY);
-	zcbor_tstr_put_term(state, formatted_message, SIZE_MAX);
+	succ = succ && zcbor_uint32_put(state, KEY_BODY);
+	succ = succ && zcbor_tstr_put_term(state, formatted_message, SIZE_MAX);
 
 	/* bodyTemplate */
-	zcbor_uint32_put(state, KEY_BODY_TEMPLATE);
-	zcbor_tstr_put_term(state, message_template, SIZE_MAX);
+	succ = succ && zcbor_uint32_put(state, KEY_BODY_TEMPLATE);
+	succ = succ && zcbor_tstr_put_term(state, message_template, SIZE_MAX);
 
 	/* finish cbor */
-	bool succ = zcbor_map_end_encode(state, 6);
+	succ = succ && zcbor_map_end_encode(state, 6);
 
 	if (succ != true) {
 		LOG_DBG("Failed to encode cbor: %d", zcbor_peek_error(state));

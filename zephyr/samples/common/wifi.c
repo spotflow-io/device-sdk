@@ -37,7 +37,7 @@ static void wifi_event_handler(struct net_mgmt_event_callback* cb,
 {
 	switch (mgmt_event) {
 	case NET_EVENT_WIFI_CONNECT_RESULT: {
-		struct wifi_status* result = (struct wifi_status*)cb->info;
+		const struct wifi_status* result = (struct wifi_status*)cb->info;
 
 		if (result->status == 0) {
 			LOG_INF("Connected to %s", WIFI_SSID);

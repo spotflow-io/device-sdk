@@ -3,11 +3,8 @@
 #include <zephyr/net/socket.h>
 #include <version_helper.h>
 
-LOG_MODULE_REGISTER(spotflow_connection_helper, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-// #define L4_EVENT_MASK (NET_EVENT_DNS_SERVER_ADD | NET_EVENT_L4_DISCONNECTED)
-
-/* we want DNS_ADD, L4_CONNECTED *and* L4_DISCONNECTED */
 #define L4_EVENT_MASK \
 	(NET_EVENT_DNS_SERVER_ADD | NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
@@ -32,8 +29,9 @@ int spotflow_conn_helper_resolve_hostname(const char* hostname, struct zsock_add
 					.ai_socktype = SOCK_STREAM,
 					.ai_protocol = 0 };
 
-	if (server_addr != NULL) {
+	if (*server_addr != NULL) {
 		zsock_freeaddrinfo(*server_addr);
+		*server_addr = NULL;
 	}
 
 	rc = zsock_getaddrinfo(hostname, STRINGIFY(CONFIG_SPOTFLOW_SERVER_PORT), &hints,

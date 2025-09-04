@@ -1,8 +1,10 @@
 .venv/
 external
 **/build*/
+*.pyc
 .vscode/compile_commands.json
 .idea
 modules/*west
 **/credentials.conf
 /.vscode/
+**/cmake-build-debug/*

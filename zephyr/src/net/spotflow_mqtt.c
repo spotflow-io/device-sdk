@@ -6,9 +6,9 @@
 #include <zephyr/net/socket.h>
 #include <stdint.h>
 
-#include "spotflow_connection_helper.h"
+#include "net/spotflow_connection_helper.h"
+#include "net/spotflow_device_id.h"
 #include "net/spotflow_tls.h"
-#include "net/spotflow_processor.h"
 
 /* 80 bytes is just password itself */
 /* should at least match MBEDTLS_SSL_MAX_CONTENT_LEN - default is 4096 */
@@ -21,7 +21,7 @@
 
 #define LOG_DBG_PRINT_RESULT(func, rc) LOG_DBG("%s: %d <%s>", (func), rc, RC_STR(rc))
 
-LOG_MODULE_REGISTER(spotflow_mqtt, CONFIG_SPOTFLOW_PROCESSING_BACKEND_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 struct mqtt_config {
 	char* host;
@@ -50,7 +50,7 @@ static struct mqtt_config spotflow_mqtt_config = {
 	.host = CONFIG_SPOTFLOW_SERVER_HOSTNAME,
 	.port = CONFIG_SPOTFLOW_SERVER_PORT,
 	.server_addr = NULL,
-	.username = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_DEVICE_ID),
+	.username = { 0 },
 	.password = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_INGEST_KEY),
 	.topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CBOR_TOPIC),
 };
@@ -63,8 +63,8 @@ static uint8_t tx_buffer[APP_MQTT_BUFFER_SIZE];
 
 int spotflow_mqtt_poll()
 {
-	/* 1) Network I/O: wait up to 1 000 ms for socket readability */
-	int rc = zsock_poll(mqtt_client_toolset.fds, 1, 1000);
+	/* 1) Network I/O: wait up to 10 ms for socket readability */
+	int rc = zsock_poll(mqtt_client_toolset.fds, 1, 10);
 	/* rc = 0 means time out, negative mean error */
 	if (rc < 0) {
 		LOG_DBG("zsock_poll() returned error %d,errno: %d", rc, errno);
@@ -74,7 +74,7 @@ int spotflow_mqtt_poll()
 		return 0;
 		/* this means that rc is positive -> there is pollfd structures that have selected events */
 	} else if (mqtt_client_toolset.fds[0].revents & ZSOCK_POLLIN) {
-		/* there’s data on the TCP socket—parse it */
+		/* there's data on the TCP socket—parse it */
 		return mqtt_input(&mqtt_client_toolset.mqtt_client);
 	} else {
 		LOG_DBG("Unexpected poll zsock_poll returned positive but fds nor readable");
@@ -188,6 +188,10 @@ static int client_init(struct mqtt_client* client)
 						      spotflow_mqtt_config.server_addr,
 						      spotflow_mqtt_config.port);
 
+	const char* device_id = spotflow_get_device_id();
+	spotflow_mqtt_config.username =
+	    (struct mqtt_utf8){ .utf8 = device_id, .size = strlen(device_id) };
+
 	/* MQTT client configuration (client ID is assigned by the broker) */
 	client->broker = &mqtt_client_toolset.broker;
 	client->evt_cb = mqtt_evt_handler;
@@ -226,13 +230,15 @@ static int poll_with_timeout(int timeout)
 	return ret;
 }
 
-int spotflow_mqtt_publish_cbor_log_msg(struct spotflow_mqtt_msg* msg)
+int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len)
 {
 	struct mqtt_publish_param param;
-	param.message.topic.qos = MQTT_QOS_1_AT_LEAST_ONCE;
+	/* using lowest guarantee because handling puback (for better guarantees)
+	 * is not implemented now */
+	param.message.topic.qos = MQTT_QOS_0_AT_MOST_ONCE;
 	param.message.topic.topic = spotflow_mqtt_config.topic;
-	param.message.payload.data = msg->payload;
-	param.message.payload.len = msg->len;
+	param.message.payload.data = payload;
+	param.message.payload.len = len;
 	param.message_id = sys_rand16_get();
 	param.dup_flag = 0U;
 	param.retain_flag = 0U;
