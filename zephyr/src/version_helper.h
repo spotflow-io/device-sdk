@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 #define SPOTFLOW_ZEPHYR_VERSION_GE(major, minor) \
-	((KERNEL_VERSION_MAJOR > (major)) || \
+	((KERNEL_VERSION_MAJOR > (major)) ||     \
 	 (KERNEL_VERSION_MAJOR == (major) && KERNEL_VERSION_MINOR >= (minor)))
 
 #ifdef __cplusplus

@@ -6,7 +6,6 @@
 #include <zephyr/kernel_version.h>
 #include <version.h>
 
-
 LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_INF);
 
 #define MACSTR "%02X:%02X:%02X:%02X:%02X:%02X"
@@ -28,7 +27,7 @@ static struct wifi_connect_req_params sta_config;
 static struct net_mgmt_event_callback cb;
 
 static void wifi_event_handler(struct net_mgmt_event_callback* cb,
-#if  SPOTFLOW_ZEPHYR_VERSION_GE(4,2)
+#if SPOTFLOW_ZEPHYR_VERSION_GE(4, 2)
 			       uint64_t mgmt_event,
 #else
 			       uint32_t mgmt_event,

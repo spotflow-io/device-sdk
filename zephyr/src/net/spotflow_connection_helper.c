@@ -66,8 +66,7 @@ void wait_for_network()
 	k_sem_take(&network_connected, K_FOREVER);
 }
 
-static void l4_event_handler(struct net_mgmt_event_callback* cb,
-			     mgmt_evt_t                      mgmt_event,
+static void l4_event_handler(struct net_mgmt_event_callback* cb, mgmt_evt_t mgmt_event,
 			     struct net_if* iface)
 {
 	LOG_DBG("Network event: %llu", mgmt_event);
