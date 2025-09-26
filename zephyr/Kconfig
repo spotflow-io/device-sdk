@@ -123,6 +123,7 @@ config SPOTFLOW_MQTT_THREAD_PRIORITY
 
 config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 	int "Size of Spotflow processing thread stack"
+	default 3072 if DEBUG_OPTIMIZATIONS
 	default 2560
 	help
 		Size of the stack used by the Spotflow processing thread.
