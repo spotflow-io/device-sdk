@@ -1,5 +1,3 @@
-#include "esp32_8M.dtsi"
-
 &wifi {
 	status = "okay";
 };
