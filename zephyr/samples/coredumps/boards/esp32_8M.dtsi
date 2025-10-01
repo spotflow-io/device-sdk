@@ -1,6 +1,6 @@
-//zephyr\dts\common\espressif\partitions_0x0_default_4M.dtsi*/
-//redefining coredump partition to be 1MB at the end of 8MB flash
-
+/* Redefining coredump partition to be 1MB at the end of 8MB flash, see:
+ * zephyr/dts/common/espressif/partitions_0x0_default_4M.dtsi
+ */
 
 /delete-node/ &coredump_partition;
 
