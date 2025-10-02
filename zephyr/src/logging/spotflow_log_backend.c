@@ -8,6 +8,7 @@
 #include "spotflow_log_cbor.h"
 #include "net/spotflow_processor.h"
 #include "spotflow_cbor_output_context.h"
+#include "spotflow_log_filter.h"
 
 LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
@@ -80,6 +81,10 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 	struct spotflow_log_context* ctx = backend->cb->ctx;
 	if (ctx == NULL) {
 		LOG_DBG("No spotflow log context");
+		return;
+	}
+
+	if (!spotflow_log_filter_allow_msg(log_msg)) {
 		return;
 	}
 

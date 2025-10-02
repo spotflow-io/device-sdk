@@ -54,4 +54,18 @@ config SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL
 		- 3 INFO, write LOG_INF in addition to previous level
 		- 4 DEBUG, write LOG_DBG in addition to previous level
 
+config SPOTFLOW_DEFAULT_SENT_LOG_LEVEL
+	int "Spotflow default sent log level"
+	default LOG_MAX_LEVEL
+	range 0 LOG_MAX_LEVEL
+	help
+		Filters the logs sent to Spotflow cloud according to their severity level.
+		Defaults to LOG_MAX_LEVEL.
+		Levels are:
+		- 0 OFF, do not send
+		- 1 ERROR, send LOG_ERR
+		- 2 WARNING, send LOG_WRN in addition to previous level
+		- 3 INFO, send LOG_INF in addition to previous level
+		- 4 DEBUG, send LOG_DBG in addition to previous level
+
 endif #SPOTFLOW_LOG_BACKEND
