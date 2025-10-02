@@ -1,0 +1,39 @@
+dependencies:
+  espressif/cbor:
+    component_hash: 37b68b0730fb9a0b71334e4cc41b7de443fc2069152fdedcfe63dac8eb94a73a
+    dependencies:
+    - name: idf
+      require: private
+      version: '>=5.0'
+    source:
+      registry_url: https://components.espressif.com/
+      type: service
+    version: 0.6.1~3
+  idf:
+    source:
+      type: idf
+    version: 5.5.1
+  protocol_examples_common:
+    dependencies: []
+    source:
+      path: /home/noor/esp/v5.5.1/esp-idf/examples/common_components/protocol_examples_common
+      type: local
+    version: '*'
+  spotflow:
+    component_hash: 2a2c799a1ed8bae09477bfc81323c3c397a5db44a8af614890b6e7826e87be95
+    dependencies:
+    - name: idf
+      version: '>=5.0'
+    - name: espressif/cbor
+      version: ^0.6.1~3
+    source:
+      git: https://github.com/noorhaq/device-sdk.git
+      path: esp_idf/spotflow
+      type: git
+    version: 003388f4a12dd91d939ba018e71525fe0c1ab015
+direct_dependencies:
+- protocol_examples_common
+- spotflow
+manifest_hash: b66a8f420fefad62f135034ecc0f2b5cc8599f4d5c86a8ed208342611e535e62
+target: esp32
+version: 2.0.0
