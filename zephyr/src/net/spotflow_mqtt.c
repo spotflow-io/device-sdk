@@ -6,6 +6,7 @@
 #include <zephyr/net/socket.h>
 #include <stdint.h>
 
+#include "net/spotflow_mqtt.h"
 #include "net/spotflow_connection_helper.h"
 #include "net/spotflow_device_id.h"
 #include "net/spotflow_tls.h"
@@ -14,8 +15,12 @@
 /* should at least match MBEDTLS_SSL_MAX_CONTENT_LEN - default is 4096 */
 #define APP_MQTT_BUFFER_SIZE 4096
 
+/* Maximum size of the payload of C2D messages */
+#define C2D_PAYLOAD_BUFFER_SIZE 32
+
 #define DEFAULT_GENERAL_TIMEOUT_MSEC 500
 #define SPOTFLOW_MQTT_CBOR_TOPIC "ingest-cbor"
+#define SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC "config-cbor-c2d"
 
 #define RC_STR(rc) ((rc) == 0 ? "OK" : "ERROR")
 
@@ -60,6 +65,9 @@ static struct mqtt_client_toolset mqtt_client_toolset = { .mqtt_connected = fals
 /* Buffers for MQTT client. */
 static uint8_t rx_buffer[APP_MQTT_BUFFER_SIZE];
 static uint8_t tx_buffer[APP_MQTT_BUFFER_SIZE];
+
+/* Buffer for C2D messages */
+static uint8_t c2d_payload_buffer[C2D_PAYLOAD_BUFFER_SIZE];
 
 int spotflow_mqtt_poll()
 {
@@ -230,6 +238,24 @@ static int poll_with_timeout(int timeout)
 	return ret;
 }
 
+int spotflow_mqtt_request_config_subscription()
+{
+	struct mqtt_topic topics[] = {
+		{
+		    .topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC),
+		    .qos = MQTT_QOS_0_AT_MOST_ONCE,
+		},
+	};
+
+	struct mqtt_subscription_list param = {
+		.list = topics,
+		.list_count = ARRAY_SIZE(topics),
+		.message_id = sys_rand16_get(),
+	};
+
+	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
+}
+
 int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len)
 {
 	struct mqtt_publish_param param;
@@ -247,7 +273,7 @@ int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len)
 
 static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* evt)
 {
-	int err;
+	int ret;
 	switch (evt->type) {
 	case MQTT_EVT_SUBACK:
 		LOG_DBG("SUBACK packet id: %u", evt->param.suback.message_id);
@@ -282,9 +308,9 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		LOG_DBG("PUBREC packet id: %u", evt->param.pubrec.message_id);
 		const struct mqtt_pubrel_param rel_param = { .message_id =
 								 evt->param.pubrec.message_id };
-		err = mqtt_publish_qos2_release(client, &rel_param);
-		if (err != 0) {
-			LOG_ERR("Failed to send MQTT PUBREL: %d", err);
+		ret = mqtt_publish_qos2_release(client, &rel_param);
+		if (ret < 0) {
+			LOG_ERR("Failed to send MQTT PUBREL: %d", ret);
 		}
 		break;
 	case MQTT_EVT_PUBCOMP:
@@ -293,6 +319,21 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 			break;
 		}
 		LOG_DBG("PUBCOMP packet id: %u", evt->param.pubcomp.message_id);
+		break;
+	case MQTT_EVT_PUBLISH:
+		if (evt->result != 0) {
+			LOG_ERR("MQTT PUBLISH decode error: %d", evt->result);
+			break;
+		}
+		LOG_DBG("PUBLISH packet id: %u", evt->param.publish.message_id);
+
+		ret = mqtt_read_publish_payload(client, c2d_payload_buffer,
+						sizeof(c2d_payload_buffer));
+		if (ret < 0) {
+			LOG_ERR("Failed to read PUBLISH payload: %d", ret);
+			break;
+		}
+		spotflow_mqtt_handle_publish_callback(c2d_payload_buffer, ret);
 		break;
 	default:
 		break;

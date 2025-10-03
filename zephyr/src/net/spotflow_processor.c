@@ -4,6 +4,7 @@
 #include <zephyr/net/socket.h>
 #include <string.h>
 
+#include "logging/spotflow_log_filter.h"
 #include "net/spotflow_processor.h"
 #include "net/spotflow_mqtt.h"
 #include "net/spotflow_connection_helper.h"
@@ -97,6 +98,11 @@ static void process_mqtt()
 		return;
 	}
 
+	rc = spotflow_mqtt_request_config_subscription();
+	if (rc < 0) {
+		LOG_WRN("Failed to request subscription to configuration topic: %d", rc);
+	}
+
 	/*  INNER LOOP: perform normal MQTT I/O until an error occurs. */
 	while (spotflow_mqtt_is_connected()) {
 		rc = spotflow_mqtt_poll();
@@ -118,5 +124,13 @@ static void process_mqtt()
 			spotflow_mqtt_abort_mqtt();
 			break;
 		}
+	}
+}
+
+void spotflow_mqtt_handle_publish_callback(uint8_t* payload, size_t len)
+{
+	int rc = spotflow_log_filter_update_from_c2d_message(payload, len);
+	if (rc < 0) {
+		LOG_WRN("Failed to update log filter from C2D message: %d", rc);
 	}
 }
