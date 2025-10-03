@@ -48,8 +48,8 @@ int spotflow_log_filter_update_from_c2d_message(uint8_t* payload, size_t len)
 	}
 
 	if (message_type != UPDATE_LOG_SEVERITY_MESSAGE_TYPE) {
-		LOG_DBG("Skipping message with type %d (expected %d)", 
-			message_type, UPDATE_LOG_SEVERITY_MESSAGE_TYPE);
+		LOG_DBG("Skipping message with type %d (expected %d)", message_type,
+			UPDATE_LOG_SEVERITY_MESSAGE_TYPE);
 		return 0;
 	}
 
@@ -60,15 +60,15 @@ int spotflow_log_filter_update_from_c2d_message(uint8_t* payload, size_t len)
 	uint64_t configuration_version;
 	success = success && zcbor_uint32_expect(state, KEY_CONFIGURATION_VERSION);
 	success = success && zcbor_uint64_decode(state, &configuration_version);
-	
+
 	if (!success) {
 		LOG_ERR("Failed to decode message content");
 		return -EINVAL;
 	}
-	
+
 	uint8_t log_level = spotflow_cbor_convert_severity_to_log_level(minimal_severity);
 	sent_log_level = log_level;
 	LOG_DBG("Updated sent log level to %d", log_level);
-	
+
 	return 0;
 }
