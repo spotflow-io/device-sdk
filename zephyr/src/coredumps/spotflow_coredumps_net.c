@@ -29,7 +29,7 @@ int spotflow_poll_and_process_enqueued_coredump_chunks()
 	if (core_dumps_poll_event.state == K_POLL_STATE_MSGQ_DATA_AVAILABLE) {
 		/* Peek at the next core‐dump chunk without removing it */
 		if (k_msgq_peek(&g_spotflow_core_dumps_msgq, &msg_ptr) == 0) {
-			rc = spotflow_mqtt_publish_cbor_msg(msg_ptr->payload, msg_ptr->len);
+			rc = spotflow_mqtt_publish_ingest_cbor_msg(msg_ptr->payload, msg_ptr->len);
 			if (rc < 0) {
 				LOG_DBG("Failed to publish cbor core dump message rc: %d -> "
 					"aborting mqtt connection",
