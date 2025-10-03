@@ -27,6 +27,7 @@ LOG_MODULE_REGISTER(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static void mqtt_thread(void);
 static void process_mqtt();
+static int init_config_updating();
 
 K_THREAD_DEFINE(mqtt_thread_id, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE, mqtt_thread, NULL,
 		NULL, NULL, SPOTFLOW_MQTT_THREAD_PRIORITY, 0, 0);
@@ -93,14 +94,14 @@ static void process_mqtt()
 	int rc;
 	rc = spotflow_session_metadata_send();
 	if (rc < 0) {
-		LOG_DBG("Failed to send session metadata, aborting MQTT: %d", rc);
+		LOG_WRN("Failed to send session metadata, aborting MQTT: %d", rc);
 		spotflow_mqtt_abort_mqtt();
 		return;
 	}
 
-	rc = spotflow_mqtt_request_config_subscription();
+	rc = init_config_updating();
 	if (rc < 0) {
-		LOG_WRN("Failed to request subscription to configuration topic: %d", rc);
+		LOG_WRN("Failed to initialize configuration updating: %d", rc);
 	}
 
 	/*  INNER LOOP: perform normal MQTT I/O until an error occurs. */
@@ -127,10 +128,49 @@ static void process_mqtt()
 	}
 }
 
+/* FIXME: Both functions should be moved to a separate module (lower level of abstraction) */
+
+static int init_config_updating()
+{
+	uint8_t buffer[SPOTFLOW_CONFIG_RESPONSE_MAX_LENGTH];
+	int rc = spotflow_log_filter_encode_report_cbor(buffer, sizeof(buffer), NULL);
+	if (rc < 0) {
+		LOG_DBG("Failed to encode initial configuration report message: %d", rc);
+		return rc;
+	}
+
+	rc = spotflow_mqtt_publish_config_cbor_msg(buffer, sizeof(buffer));
+	if (rc < 0) {
+		LOG_DBG("Failed to publish initial configuration report message: %d", rc);
+		return rc;
+	}
+
+	rc = spotflow_mqtt_request_config_subscription();
+	if (rc < 0) {
+		LOG_DBG("Failed to request subscription to configuration topic: %d", rc);
+		return rc;
+	}
+
+	return 0;
+}
+
 void spotflow_mqtt_handle_publish_callback(uint8_t* payload, size_t len)
 {
-	int rc = spotflow_log_filter_update_from_c2d_message(payload, len);
+	uint64_t configuration_version = 0;
+
+	int rc = spotflow_log_filter_update_from_c2d_message(payload, len, &configuration_version);
 	if (rc < 0) {
 		LOG_WRN("Failed to update log filter from C2D message: %d", rc);
+	}
+
+	uint8_t buffer[SPOTFLOW_CONFIG_RESPONSE_MAX_LENGTH];
+	rc = spotflow_log_filter_encode_report_cbor(buffer, sizeof(buffer), &configuration_version);
+	if (rc < 0) {
+		LOG_WRN("Failed to encode configuration report message: %d", rc);
+	}
+
+	rc = spotflow_mqtt_publish_config_cbor_msg(buffer, sizeof(buffer));
+	if (rc < 0) {
+		LOG_WRN("Failed to publish configuration report message: %d", rc);
 	}
 }

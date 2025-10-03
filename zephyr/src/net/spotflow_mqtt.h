@@ -14,7 +14,8 @@ bool spotflow_mqtt_is_connected();
 
 int spotflow_mqtt_poll();
 int spotflow_mqtt_request_config_subscription();
-int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len);
+int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len);
+int spotflow_mqtt_publish_config_cbor_msg(uint8_t* payload, size_t len);
 void spotflow_mqtt_abort_mqtt();
 int spotflow_mqtt_send_live();
 

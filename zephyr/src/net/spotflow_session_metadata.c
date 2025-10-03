@@ -45,7 +45,7 @@ int spotflow_session_metadata_send(void)
 		return rc;
 	}
 
-	return spotflow_mqtt_publish_cbor_msg(buffer, cbor_data_len);
+	return spotflow_mqtt_publish_ingest_cbor_msg(buffer, cbor_data_len);
 }
 
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
