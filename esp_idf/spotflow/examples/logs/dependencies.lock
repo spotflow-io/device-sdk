@@ -20,7 +20,7 @@ dependencies:
       type: local
     version: '*'
   spotflow:
-    component_hash: 2a2c799a1ed8bae09477bfc81323c3c397a5db44a8af614890b6e7826e87be95
+    component_hash: 830fef9f79db5f0f4beb15084565b8fef376afd9b632704a44674f9a09dec45f
     dependencies:
     - name: idf
       version: '>=5.0'
@@ -30,10 +30,10 @@ dependencies:
       git: https://github.com/noorhaq/device-sdk.git
       path: esp_idf/spotflow
       type: git
-    version: 003388f4a12dd91d939ba018e71525fe0c1ab015
+    version: 815e1b663813816db8a6c342a1ae81fb9d02635b
 direct_dependencies:
 - protocol_examples_common
 - spotflow
-manifest_hash: b66a8f420fefad62f135034ecc0f2b5cc8599f4d5c86a8ed208342611e535e62
+manifest_hash: c21d2d9240c37ac7d6cb53190cd2ca257b3df7079fb4ae8bba5ed26bc55f4410
 target: esp32
 version: 2.0.0
