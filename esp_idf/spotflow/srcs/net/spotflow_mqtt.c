@@ -11,10 +11,14 @@ static const uint8_t mqtt_spotflow_io_pem_start[]  = "-----BEGIN CERTIFICATE----
 #else
 extern const uint8_t mqtt_spotflow_io_pem_start[]   asm("_binary_mqtt_spotflow_io_pem_start");
 #endif
-extern const uint8_t mqtt_spotflow_io_pem_end[]   asm("_binary_mqtt_spotflow_io_pem_end");
 
 /**
+ * @brief MQTT Event handler for the mqtt events.
  * 
+ * @param handler_args 
+ * @param base 
+ * @param event_id 
+ * @param event_data 
  */
 static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_t event_id, void *event_data)
 {
