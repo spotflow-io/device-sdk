@@ -13,10 +13,10 @@ int spotflow_log_backend(const char *fmt, va_list args)
     char *log_severity = NULL;
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         switch (buffer[0]) {
+            case 'E': log_severity = "ERROR"; break;
+            case 'W': log_severity = "WARNING"; break;
             case 'I': log_severity = "INFO"; break;
             case 'D': log_severity = "DEBUG"; break;
-            case 'W': log_severity = "WARNING"; break;
-            case 'E': log_severity = "ERROR"; break;
             case 'V': log_severity = "VERBOSE"; break;
             default: log_severity = "NONE"; break;
         }
@@ -33,10 +33,10 @@ int spotflow_log_backend(const char *fmt, va_list args)
     uint8_t log_severity = 0;
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         switch (buffer[0]) {
+            case 'E': log_severity = 0x3C; break; //Error
+            case 'W': log_severity = 0x32; break; //Warning
             case 'I': log_severity = 0x28;  break; //Info
             case 'D': log_severity = 0x1E; break; //Debug
-            case 'W': log_severity = 0x32; break; //Warning
-            case 'E': log_severity = 0x3C; break; //Error
             case 'V': log_severity = 0x28; break; //Verbose right now set to info
             default: log_severity = 0x0; break; //In case no log type set it to 0, unknown level
         }
