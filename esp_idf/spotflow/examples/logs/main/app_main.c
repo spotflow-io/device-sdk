@@ -41,7 +41,6 @@ void app_main(void)
 
     spotflow_init();
 
-    mqtt_app_start();
     int test_num = 25;
     while(1)
     {
