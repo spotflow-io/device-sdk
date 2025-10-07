@@ -3,6 +3,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_stats.h>
+#include <zephyr/sys/mem_stats.h>
+#include <zephyr/sys/sys_heap.h>
+#include <zephyr/kernel/thread_stack.h>
 
 #include "../../common/wifi.h"
 
@@ -31,6 +34,55 @@ static void capture_network_stats()
 	}
 }
 
+// extern struct sys_heap z_heap_runtime_stats;
+extern struct sys_heap _system_heap; // declared by Zephyr if k_malloc() is used
+
+static void capture_heap_stats()
+{
+	struct sys_memory_stats stats;
+
+	if (sys_heap_runtime_stats_get(&_system_heap, &stats) == 0) {
+		LOG_DBG("Heap free: %zu bytes", stats.free_bytes);
+		LOG_DBG("Heap allocated: %zu bytes", stats.allocated_bytes);
+	}
+
+}
+
+static void thread_info_cb(const struct k_thread *thread, void *user_data)
+{
+	ARG_UNUSED(user_data);
+
+	// struct k_thread_stack_info info;
+
+	size_t unused, size = thread->stack_info.size;
+	if (k_thread_stack_space_get(thread, &unused) == 0) {
+		size_t used = size - unused;
+		const char *tname;
+
+		tname = k_thread_name_get((k_tid_t)thread);
+
+		if (tname == NULL) {
+			static char buf[32];
+			snprintk(buf, sizeof(buf), "%p", (void *)thread);
+			tname = buf;
+		}
+		// LOG_INF("%p (%s):\tunused %zu\tusage %zu / %zu (%u %%)",
+		// 	thread, tname, unused, size - unused, size,
+		// 	pcnt);
+
+		// unsigned int pcnt = ((size - unused) * 100U) / size;
+		LOG_DBG("Thread: %s, Stack size: %zu, Used: %zu", tname, size, used);
+		// LOG_DBG("  ", used);
+		// LOG_DBG("  Unused:     %zu\n", unused);
+	}
+}
+
+static void capture_threads_stacks()
+{
+	k_thread_foreach(thread_info_cb, NULL);
+
+}
+
 int main(void)
 {
 	LOG_INF("Starting Spotflow logging example");
@@ -43,6 +95,8 @@ int main(void)
 
 	while (1) {
 		capture_network_stats();
+		capture_threads_stacks();
+		capture_heap_stats();
 		// metrics_capture(&s);
 		// metrics_log(&s);
 		k_sleep(K_SECONDS(5));
