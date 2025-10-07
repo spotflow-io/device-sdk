@@ -4,4 +4,4 @@ dependencies:
   spotflow:
     git: https://github.com/noorhaq/device-sdk.git
     path: esp_idf/spotflow
-    version: 815e1b663813816db8a6c342a1ae81fb9d02635b
+    version: feature/esp_idf_v5
