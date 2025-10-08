@@ -41,7 +41,7 @@ void app_main(void)
 
     spotflow_init();
 
-    int test_num = 25;
+    int test_num = 1;
     while(1)
     {
         if(mqtt_connected)

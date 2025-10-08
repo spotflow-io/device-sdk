@@ -21,48 +21,10 @@ int spotflow_log_backend(const char *fmt, va_list args)
     }
     len++; // Increasing the size of len to include the null terminator
     len = vsnprintf(buffer, len, fmt, args);
-
 #if CONFIG_USE_JSON_PAYLOAD
-    char *log_severity = NULL;
-    if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
-        switch (buffer[0]) {
-            case 'E': log_severity = "ERROR"; break;
-            case 'W': log_severity = "WARNING"; break;
-            case 'I': log_severity = "INFO"; break;
-            case 'D': log_severity = "DEBUG"; break;
-            case 'V': log_severity = "VERBOSE"; break;
-            default: log_severity = "NONE"; break;
-        }
-
-        if(mqtt_connected)
-        {
-            const char *clog_json = log_json(buffer, log_severity);
-            esp_mqtt_client_publish(client, "ingest-json", clog_json , 0, 1, 0);
-            // SPOTFLOW_LOG( "%s\n", clog_json);
-            free(clog_json);
-        }
-    }
+    log_json_send(buffer);
 #else
-    uint8_t log_severity = 0;
-    if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
-        switch (buffer[0]) {
-            case 'E': log_severity = 0x3C; break; //Error
-            case 'W': log_severity = 0x32; break; //Warning
-            case 'I': log_severity = 0x28;  break; //Info
-            case 'D': log_severity = 0x1E; break; //Debug
-            case 'V': log_severity = 0x28; break; //Verbose right now set to info
-            default: log_severity = 0x0; break; //In case no log type set it to 0, unknown level
-        }
-
-        if(mqtt_connected)
-        {
-            size_t len;
-            uint8_t *clog_cbor = log_cbor(buffer, log_severity, &len);
-            esp_mqtt_client_publish(client, "ingest-cbor", (const char*)clog_cbor , len, 1, 0);
-            free(clog_cbor);
-        }
-    }
-
+    log_cbor_send(buffer);
 #endif
     // Optionally, call original log output to keep default behavior
     if (original_vprintf) {

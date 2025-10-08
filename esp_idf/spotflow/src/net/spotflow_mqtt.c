@@ -4,7 +4,7 @@
 static const char *TAG = "spotflow_mqtt";
 
 esp_mqtt_client_handle_t client = NULL;
-bool mqtt_connected = false;
+volatile bool mqtt_connected = false;
 
 #if CONFIG_BROKER_CERTIFICATE_OVERRIDDEN == 1
 static const uint8_t mqtt_spotflow_io_pem_start[]  = "-----BEGIN CERTIFICATE-----\n" CONFIG_BROKER_CERTIFICATE_OVERRIDE "\n-----END CERTIFICATE-----";

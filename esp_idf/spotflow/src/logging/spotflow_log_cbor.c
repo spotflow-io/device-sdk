@@ -78,3 +78,31 @@ uint8_t* log_cbor(char* body, uint8_t severity, size_t *out_len)
 
     return buf;
 }
+
+/**
+ * @brief Form and send the CBOR parameters
+ * 
+ * @param buffer 
+ */
+void log_cbor_send(char* buffer)
+{
+    uint8_t log_severity = 0;
+    if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
+        switch (buffer[0]) {
+            case 'E': log_severity = 0x3C; break; //Error
+            case 'W': log_severity = 0x32; break; //Warning
+            case 'I': log_severity = 0x28;  break; //Info
+            case 'D': log_severity = 0x1E; break; //Debug
+            case 'V': log_severity = 0x1E; break; //Verbose right now set to debug
+            default: log_severity = 0x0; break; //In case no log type set it to 0, unknown level
+        }
+
+        if(mqtt_connected)
+        {
+            size_t len;
+            uint8_t *clog_cbor = log_cbor(buffer, log_severity, &len);
+            esp_mqtt_client_publish(client, "ingest-cbor", (const char*)clog_cbor , len, 1, 0);
+            free(clog_cbor);
+        }
+    }
+}
