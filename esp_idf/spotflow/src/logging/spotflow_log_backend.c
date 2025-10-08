@@ -108,13 +108,12 @@ int spotflow_log_backend(const char *fmt, va_list args)
     log_json_send(buffer, metadata.severity);
 #else
     log_cbor_send(fmt, buffer, log_severity, &metadata);
-
 #endif
+
+    free(buffer);
     // Optionally, call original log output to keep default behavior
     if (original_vprintf) {
         return original_vprintf(fmt, args);
     }
-
-    free(buffer);
     return len;
 }
