@@ -1,16 +1,88 @@
 #include "logging/spotflow_log_backend.h"
 
+#ifndef CONFIG_USE_JSON_PAYLOAD
+    #include "logging/spotflow_log_cbor.h"
+#else
+    #include "logging/spotflow_log_json.h"
+#endif
 static const char *TAG = "spotflow_testing";
 #include <stdarg.h>
 
+
 int spotflow_log_backend(const char *fmt, va_list args)
 {   
-    printf("%s\n", fmt);
+    int log_seq_arg = 0;
+    static size_t sequence = 0;
+    struct message_metadata metadata = {0};
+    sequence++;
+
     int len = vsnprintf(NULL, 0, fmt, args);  // Get the required length
-    
-    char log_sevirity = va_arg(args, int);
-    unsigned long time = va_arg(args, unsigned long);
-    const char *tag = va_arg(args, const char *);
+
+    char log_severity = fmt[0];
+    for(const char *p = fmt; *p || *p == ':'; p++)
+    {
+        if (*p != '%') continue;  // skip until '%'
+        p++; // move past '%'
+        if (*p == '%') continue; // skip literal "%%"
+
+        // Handle length modifiers like 'l'
+        bool is_long = false;
+        if (*p == 'l') {
+            is_long = true;
+            p++;  // move to actual specifier, e.g. 'u', 'd'
+        }
+
+        switch (*p) {
+            case 'd': {
+                if(log_seq_arg == 1)
+                {
+                    metadata.uptime_ms = va_arg(args, int);
+                    log_seq_arg++;
+                }
+                break;
+            }
+            case 'i': {
+                if(log_seq_arg == 1)
+                {
+                    metadata.uptime_ms = va_arg(args, int);
+                }
+                break;
+            }
+            case 'u': {
+                if(log_seq_arg == 0)
+                {
+                    log_seq_arg++; //Log issue
+                }
+                if (is_long && log_seq_arg == 1) {
+                    metadata.uptime_ms = va_arg(args, unsigned long);
+                    log_seq_arg++;
+                } else if (log_seq_arg == 1){
+                    unsigned int val = va_arg(args, unsigned int);
+                    log_seq_arg++;
+                }
+                break;
+            }
+            case 's': {
+                if(log_seq_arg == 2)
+                {
+                    metadata.source = va_arg(args, const char *);
+                    log_seq_arg++;
+                }
+                break;
+            }
+            case 'c': {
+                    if(log_seq_arg == 0)
+                    {
+                        metadata.severity =  va_arg(args, int);
+                        log_seq_arg++;
+                    }
+                break;
+            }
+            default:
+                break;
+        }
+
+    }
 
     char *separator = strchr(fmt, ':');
     if (separator != NULL) {
@@ -18,7 +90,6 @@ int spotflow_log_backend(const char *fmt, va_list args)
         fmt = separator + 2;
     }
 
-    printf("After %s\n", fmt);
     // If the len is smaller than 0 or if the log is bigger than the set buffer size.
     if (len < 0 || len > CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         SPOTFLOW_LOG("Spotflow Log buffer not enough. Increase size to incorporate long messages.");
@@ -34,14 +105,16 @@ int spotflow_log_backend(const char *fmt, va_list args)
 
     len = vsnprintf(buffer, len+1, fmt, args);
 #if CONFIG_USE_JSON_PAYLOAD
-    log_json_send(buffer, log_sevirity);
+    log_json_send(buffer, metadata.severity);
 #else
-    log_cbor_send(buffer, log_sevirity);
+    log_cbor_send(fmt, buffer, log_severity, &metadata);
+
 #endif
     // Optionally, call original log output to keep default behavior
     if (original_vprintf) {
         return original_vprintf(fmt, args);
     }
 
+    free(buffer);
     return len;
 }

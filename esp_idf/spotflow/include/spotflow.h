@@ -22,12 +22,6 @@
 #include "net/spotflow_mqtt.h"
 #include "logging/spotflow_log_backend.h"
 
-#ifndef CONFIG_USE_JSON_PAYLOAD
-    #include "logging/spotflow_log_cbor.h"
-#else
-    #include "logging/spotflow_log_json.h"
-#endif
-
 extern vprintf_like_t original_vprintf;
 void spotflow_init(void);
 

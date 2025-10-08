@@ -14,6 +14,18 @@
 #define KEY_DEVICE_UPTIME_MS 0x06
 #define KEY_SEQUENCE_NUMBER 0x0D
 
+
+void print_cbor_hex(const uint8_t *buf, size_t len)
+{
+    printf("CBOR buffer (%zu bytes):\n", len);
+    for (size_t i = 0; i < len; i++) {
+        printf("%02X ", buf[i]);  // print each byte as 2-digit hex
+        if ((i + 1) % 16 == 0)    // 16 bytes per line
+            printf("\n");
+    }
+    printf("\n");
+}
+
 /**
  * @brief To create the message format for logs in CBOR format
  * 
@@ -22,11 +34,13 @@
  * @param out_len 
  * @return uint8_t* 
  */
-uint8_t* log_cbor(char* body, uint8_t severity, size_t *out_len)
+uint8_t* log_cbor(char *fem, char* body, uint8_t severity, size_t *out_len, struct message_metadata *metadata)
 {
     // Buffer to create array to cointain several items
     CborEncoder array_encoder;
     CborEncoder map_encoder;
+    CborEncoder labels_encoder;
+
     uint8_t *buf = malloc(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN);
     if (!buf) {
         SPOTFLOW_LOG("Failed to allocate CBOR buffer");
@@ -40,16 +54,9 @@ uint8_t* log_cbor(char* body, uint8_t severity, size_t *out_len)
         body[body_len - 1] = '\0';
     }
 
-    
-    uint32_t uptime_ms = esp_log_timestamp();
-
-    // Get device timestamp (UNIX epoch in ms)
-    struct timespec ts;
-    clock_gettime(CLOCK_REALTIME, &ts);
-    uint64_t timestamp_ms = (uint64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 
     cbor_encoder_init(&array_encoder, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 0);
-    cbor_encoder_create_map(&array_encoder, &map_encoder, 4); // {
+    cbor_encoder_create_map(&array_encoder, &map_encoder, 7); // {
     // Get device uptime in milliseconds since boot
     /* messageType: "LOG" */
     cbor_encode_uint(&map_encoder, KEY_MESSAGE_TYPE);
@@ -62,14 +69,38 @@ uint8_t* log_cbor(char* body, uint8_t severity, size_t *out_len)
     cbor_encode_uint(&map_encoder, severity);
 
     cbor_encode_uint(&map_encoder, KEY_BODY_TEMPLATE);
-    cbor_encode_text_stringz(&map_encoder, "");
+    cbor_encode_text_stringz(&map_encoder, fem);
+    //------------Metadata
+
+    cbor_encode_uint(&map_encoder, KEY_SEQUENCE_NUMBER);
+    cbor_encode_uint(&map_encoder, metadata->sequence_number);
+
+    cbor_encode_uint(&map_encoder, KEY_DEVICE_UPTIME_MS);
+    cbor_encode_uint(&map_encoder, metadata->uptime_ms);
+
+
+    // labels → nested map with one element
+    cbor_encode_uint(&map_encoder, KEY_LABELS);
+    cbor_encoder_create_map(&map_encoder, &labels_encoder, 1); // {
+    // // key: source (full string name inside labels map) 
+    cbor_encode_text_stringz(&labels_encoder, "source" );
+    if (metadata->source && metadata->source[0] != '\0') 
+    {
+        cbor_encode_text_stringz(&labels_encoder, metadata->source);
+    } 
+    else 
+    {
+        SPOTFLOW_LOG("Source is missing or empty\n");
+        cbor_encode_text_stringz(&labels_encoder, "");
+    }
+    
+    cbor_encoder_close_container(&map_encoder, &labels_encoder); // }
 
     cbor_encoder_close_container(&array_encoder, &map_encoder); // }
     // Allocate buffer for JSON string (adjust size as needed)
     
     *out_len = cbor_encoder_get_buffer_size(&array_encoder, buf);
-    SPOTFLOW_LOG("encoded buffer size %d", *out_len);
-
+    // print_cbor_hex(buf, *out_len);
     return buf;
 }
 
@@ -78,7 +109,7 @@ uint8_t* log_cbor(char* body, uint8_t severity, size_t *out_len)
  * 
  * @param buffer 
  */
-void log_cbor_send(char* buffer, char log_severity)
+void log_cbor_send(char *fmt, char* buffer, char log_severity, struct message_metadata *metadata)
 {
     int len = strlen(buffer);
     uint8_t severity = 0;
@@ -95,7 +126,7 @@ void log_cbor_send(char* buffer, char log_severity)
         if(mqtt_connected)
         {
             size_t len;
-            uint8_t *clog_cbor = log_cbor(buffer, severity, &len);
+            uint8_t *clog_cbor = log_cbor(fmt, buffer, severity, &len, metadata);
             esp_mqtt_client_publish(client, "ingest-cbor", (const char*)clog_cbor , len, 1, 0);
             free(clog_cbor);
         }
