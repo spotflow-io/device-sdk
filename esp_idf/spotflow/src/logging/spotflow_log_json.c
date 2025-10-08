@@ -69,7 +69,7 @@ void log_json_send(char* buffer,char log_sevirity)
             default: severity = "NONE"; break;
         }
 
-        if(mqtt_connected)
+        if(atomic_load(&mqtt_connected))
         {
             const char *clog_json = log_json(buffer, severity);
             esp_mqtt_client_publish(client, "ingest-json", clog_json , 0, 1, 0);

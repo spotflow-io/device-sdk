@@ -4,7 +4,7 @@
 static const char *TAG = "spotflow_mqtt";
 
 esp_mqtt_client_handle_t client = NULL;
-volatile bool mqtt_connected = false;
+atomic_bool mqtt_connected = ATOMIC_VAR_INIT(false);
 
 #if CONFIG_BROKER_CERTIFICATE_OVERRIDDEN == 1
 static const uint8_t mqtt_spotflow_io_pem_start[]  = "-----BEGIN CERTIFICATE-----\n" CONFIG_BROKER_CERTIFICATE_OVERRIDE "\n-----END CERTIFICATE-----";
@@ -25,11 +25,11 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     // ESP_LOGD(TAG, "Event dispatched from event loop base=%s, event_id=%" PRIi32, base, event_id);
     esp_mqtt_event_handle_t event = event_data;
     // esp_mqtt_client_handle_t client = event->client;
-    int msg_id;
+    // int msg_id;
     switch ((esp_mqtt_event_id_t)event_id) {
     case MQTT_EVENT_CONNECTED:
         SPOTFLOW_LOG("MQTT_EVENT_CONNECTED");
-        mqtt_connected = true;
+        atomic_store(&mqtt_connected, true);
         // esp_mqtt_client_subscribe(client, "ingest-json", 1);
         // msg_id = esp_mqtt_client_subscribe(client, "ingest-json", 1);
         // ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
@@ -37,18 +37,18 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
         break;
     case MQTT_EVENT_DISCONNECTED:
         SPOTFLOW_LOG( "MQTT_EVENT_DISCONNECTED");
-        mqtt_connected = false;
+        atomic_store(&mqtt_connected, false);
         break;
 
     case MQTT_EVENT_SUBSCRIBED:
         // ESP_LOGI(TAG, "MQTT_EVENT_SUBSCRIBED, msg_id=%d", event->msg_id);
         break;
     case MQTT_EVENT_UNSUBSCRIBED:
-        SPOTFLOW_LOG("MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
-        mqtt_connected = false;
+        // SPOTFLOW_LOG("MQTT_EVENT_UNSUBSCRIBED, msg_id=%d", event->msg_id);
+        // atomic_store(&mqtt_connected, false);
         break;
     case MQTT_EVENT_PUBLISHED:
-        SPOTFLOW_LOG("MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
+        // SPOTFLOW_LOG("MQTT_EVENT_PUBLISHED, msg_id=%d", event->msg_id);
         SPOTFLOW_LOG("Message published. \n\n");
         break;
     case MQTT_EVENT_DATA:
