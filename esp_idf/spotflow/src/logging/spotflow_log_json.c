@@ -57,7 +57,7 @@ char* log_json(char* body, const char* severity)
 void log_json_send(char* buffer,char log_sevirity)
 {
     char *severity = NULL;
-     int len = strlen(buffer);
+    int len = strlen(buffer);
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         switch (buffer[0]) {
             case 'E': severity = "ERROR"; break;
@@ -71,7 +71,7 @@ void log_json_send(char* buffer,char log_sevirity)
 
         if(mqtt_connected)
         {
-            const char *clog_json = log_json(buffer, log_severity);
+            const char *clog_json = log_json(buffer, severity);
             esp_mqtt_client_publish(client, "ingest-json", clog_json , 0, 1, 0);
             // SPOTFLOW_LOG( "%s\n", clog_json);
             free(clog_json);
