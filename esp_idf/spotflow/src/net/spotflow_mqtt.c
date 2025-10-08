@@ -9,7 +9,7 @@ atomic_bool mqtt_connected = ATOMIC_VAR_INIT(false);
 #if CONFIG_BROKER_CERTIFICATE_OVERRIDDEN == 1
 static const uint8_t mqtt_spotflow_io_pem_start[]  = "-----BEGIN CERTIFICATE-----\n" CONFIG_BROKER_CERTIFICATE_OVERRIDE "\n-----END CERTIFICATE-----";
 #else
-extern const uint8_t mqtt_spotflow_io_pem_start[]   asm("_binary_mqtt_spotflow_io_pem_start");
+extern const uint8_t mqtt_spotflow_io_pem_start[]   asm("_binary_x1_root_pem_start");
 #endif
 
 /**

@@ -2,4 +2,4 @@ idf_component_register(SRCS "src/net/spotflow_mqtt.c" "src/logging/spotflow_log_
                     PRIV_REQUIRES mqtt esp_partition nvs_flash esp_netif app_update
                     INCLUDE_DIRS "include"
                     REQUIRES cbor
-                    EMBED_TXTFILES mqtt_spotflow_io.pem)
+                    EMBED_TXTFILES x1_root.pem)
