@@ -33,12 +33,6 @@ uint8_t* log_cbor(char* body, uint8_t severity, size_t *out_len)
         return NULL;
     }
     
-    char *separator = strchr(body, ':');
-    if (separator != NULL) {
-        // Start the body from the character after the colon
-        body = separator + 2;
-    }
-
     int body_len = strlen(body);
 
     // Check if the last character is a newline and remove it
@@ -84,24 +78,24 @@ uint8_t* log_cbor(char* body, uint8_t severity, size_t *out_len)
  * 
  * @param buffer 
  */
-void log_cbor_send(char* buffer)
+void log_cbor_send(char* buffer, char log_severity)
 {
-    uint8_t log_severity = 0;
-     int len = strlen(buffer);
+    int len = strlen(buffer);
+    uint8_t severity = 0;
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
-        switch (buffer[0]) {
-            case 'E': log_severity = 0x3C; break; //Error
-            case 'W': log_severity = 0x32; break; //Warning
-            case 'I': log_severity = 0x28;  break; //Info
-            case 'D': log_severity = 0x1E; break; //Debug
-            case 'V': log_severity = 0x1E; break; //Verbose right now set to debug
-            default: log_severity = 0x0; break; //In case no log type set it to 0, unknown level
+        switch (log_severity) {
+            case 'E': severity = 0x3C; break; //Error
+            case 'W': severity = 0x32; break; //Warning
+            case 'I': severity = 0x28;  break; //Info
+            case 'D': severity = 0x1E; break; //Debug
+            case 'V': severity = 0x1E; break; //Verbose right now set to debug
+            default: severity = 0x0; break; //In case no log type set it to 0, unknown level
         }
 
         if(mqtt_connected)
         {
             size_t len;
-            uint8_t *clog_cbor = log_cbor(buffer, log_severity, &len);
+            uint8_t *clog_cbor = log_cbor(buffer, severity, &len);
             esp_mqtt_client_publish(client, "ingest-cbor", (const char*)clog_cbor , len, 1, 0);
             free(clog_cbor);
         }

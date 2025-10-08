@@ -54,19 +54,19 @@ char* log_json(char* body, const char* severity)
  * 
  * @param buffer 
  */
-void log_json_send(char* buffer)
+void log_json_send(char* buffer,char log_sevirity)
 {
-    char *log_severity = NULL;
-    int len = strlen(buffer);
+    char *severity = NULL;
+     int len = strlen(buffer);
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         switch (buffer[0]) {
-            case 'E': log_severity = "ERROR"; break;
-            case 'W': log_severity = "WARNING"; break;
-            case 'I': log_severity = "INFO"; break;
-            case 'D': log_severity = "DEBUG"; break;
-            case 'V': log_severity = "DEBUG"; break;
+            case 'E': severity = "ERROR"; break;
+            case 'W': severity = "WARNING"; break;
+            case 'I': severity = "INFO"; break;
+            case 'D': severity = "DEBUG"; break;
+            case 'V': severity = "DEBUG"; break;
             // case 'V': log_severity = "VERBOSE"; break;
-            default: log_severity = "NONE"; break;
+            default: severity = "NONE"; break;
         }
 
         if(mqtt_connected)
