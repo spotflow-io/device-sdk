@@ -4,13 +4,13 @@ static const char *TAG = "spotflow_testing";
 #include <stdarg.h>
 
 int spotflow_log_backend(const char *fmt, va_list args)
-{
+{   
+    printf("%s\n", fmt);
     int len = vsnprintf(NULL, 0, fmt, args);  // Get the required length
     
+    char log_sevirity = va_arg(args, int);
     unsigned long time = va_arg(args, unsigned long);
     const char *tag = va_arg(args, const char *);
-
-    char log_sevirity = fmt[0]; //Getting the log_Sevirity
 
     char *separator = strchr(fmt, ':');
     if (separator != NULL) {
@@ -18,6 +18,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
         fmt = separator + 2;
     }
 
+    printf("After %s\n", fmt);
     // If the len is smaller than 0 or if the log is bigger than the set buffer size.
     if (len < 0 || len > CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         SPOTFLOW_LOG("Spotflow Log buffer not enough. Increase size to incorporate long messages.");
