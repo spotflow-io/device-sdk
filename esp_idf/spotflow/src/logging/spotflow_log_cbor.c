@@ -87,6 +87,7 @@ uint8_t* log_cbor(char* body, uint8_t severity, size_t *out_len)
 void log_cbor_send(char* buffer)
 {
     uint8_t log_severity = 0;
+     int len = strlen(buffer);
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         switch (buffer[0]) {
             case 'E': log_severity = 0x3C; break; //Error

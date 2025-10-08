@@ -57,6 +57,7 @@ char* log_json(char* body, const char* severity)
 void log_json_send(char* buffer)
 {
     char *log_severity = NULL;
+    int len = strlen(buffer);
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         switch (buffer[0]) {
             case 'E': log_severity = "ERROR"; break;
