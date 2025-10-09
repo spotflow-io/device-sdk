@@ -4,6 +4,7 @@
 #include <zephyr/net/mqtt.h>
 #include <zephyr/random/random.h>
 #include <zephyr/net/socket.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #include "net/spotflow_mqtt.h"
@@ -46,6 +47,7 @@ struct mqtt_client_toolset {
 	struct zsock_pollfd fds[1];
 	int nfds;
 	bool mqtt_connected;
+	spotflow_mqtt_message_cb c2d_message_callback;
 };
 
 static int client_init(struct mqtt_client* client);
@@ -53,6 +55,7 @@ static int poll_with_timeout(int timeout);
 static int prepare_fds();
 static int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len, struct mqtt_utf8 topic);
 static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* evt);
+static bool utf8_equals(const struct mqtt_utf8* str1, const struct mqtt_utf8* str2);
 static void clear_fds(void);
 
 static struct mqtt_config spotflow_mqtt_config = {
@@ -119,6 +122,8 @@ int spotflow_mqtt_send_live()
 
 void spotflow_mqtt_establish_mqtt()
 {
+	mqtt_client_toolset.c2d_message_callback = NULL;
+
 	/* infinitely try to connect to mqtt broker */
 	while (!mqtt_client_toolset.mqtt_connected) {
 		int rc;
@@ -244,8 +249,10 @@ static int poll_with_timeout(int timeout)
 	return ret;
 }
 
-int spotflow_mqtt_request_config_subscription()
+int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback)
 {
+	mqtt_client_toolset.c2d_message_callback = callback;
+
 	struct mqtt_topic topics[] = {
 		{
 		    .topic = spotflow_mqtt_config.config_c2d_topic,
@@ -292,6 +299,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 	int ret;
 	switch (evt->type) {
 	case MQTT_EVT_SUBACK:
+		// TODO: Confirm config sub in DBG message
 		LOG_DBG("SUBACK packet id: %u", evt->param.suback.message_id);
 		break;
 	case MQTT_EVT_UNSUBACK:
@@ -343,17 +351,28 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		}
 		LOG_DBG("PUBLISH packet id: %u", evt->param.publish.message_id);
 
-		ret = mqtt_read_publish_payload(client, c2d_payload_buffer,
-						sizeof(c2d_payload_buffer));
-		if (ret < 0) {
-			LOG_ERR("Failed to read PUBLISH payload: %d", ret);
-			break;
+		/* The actual topic name is longer to distinguish between different devices */
+		if (mqtt_client_toolset.c2d_message_callback &&
+		    utf8_starts_with(&evt->param.publish.message.topic.topic,
+				     &spotflow_mqtt_config.config_c2d_topic)) {
+			ret = mqtt_read_publish_payload(client, c2d_payload_buffer,
+							sizeof(c2d_payload_buffer));
+			if (ret < 0) {
+				LOG_ERR("Failed to read PUBLISH payload: %d", ret);
+				break;
+			}
+
+			mqtt_client_toolset.c2d_message_callback(c2d_payload_buffer, ret);
 		}
-		spotflow_mqtt_handle_publish_callback(c2d_payload_buffer, ret);
 		break;
 	default:
 		break;
 	}
+}
+
+static bool utf8_starts_with(const struct mqtt_utf8* str, const struct mqtt_utf8* prefix)
+{
+	return str->size >= prefix->size && memcmp(str->utf8, prefix->utf8, prefix->size) == 0;
 }
 
 static void clear_fds(void)

@@ -5,10 +5,10 @@
 #include <zephyr/net/mqtt.h>
 #include <zephyr/kernel.h>
 
-#include "spotflow_log_cbor.h"
+#include "logging/spotflow_log_cbor.h"
+#include "logging/spotflow_cbor_output_context.h"
+#include "net/spotflow_config.h"
 #include "net/spotflow_processor.h"
-#include "spotflow_cbor_output_context.h"
-#include "spotflow_log_filter.h"
 
 LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
@@ -84,7 +84,7 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 		return;
 	}
 
-	if (!spotflow_log_filter_allow_msg(log_msg)) {
+	if (log_msg_get_level(log_msg) > spotflow_config_get_sent_log_level()) {
 		return;
 	}
 

@@ -8,19 +8,18 @@
 extern "C" {
 #endif
 
+typedef void (*spotflow_mqtt_message_cb)(uint8_t* payload, size_t len);
+
 void spotflow_mqtt_establish_mqtt();
 
 bool spotflow_mqtt_is_connected();
 
 int spotflow_mqtt_poll();
-int spotflow_mqtt_request_config_subscription();
+int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback);
 int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len);
 int spotflow_mqtt_publish_config_cbor_msg(uint8_t* payload, size_t len);
 void spotflow_mqtt_abort_mqtt();
 int spotflow_mqtt_send_live();
-
-/* To be implemented in another module */
-void spotflow_mqtt_handle_publish_callback(uint8_t* payload, size_t len);
 
 #ifdef __cplusplus
 }
