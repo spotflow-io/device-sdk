@@ -48,6 +48,7 @@ struct mqtt_client_toolset {
 	int nfds;
 	bool mqtt_connected;
 	spotflow_mqtt_message_cb c2d_message_callback;
+	uint16_t c2d_sub_message_id;
 };
 
 static int client_init(struct mqtt_client* client);
@@ -123,6 +124,7 @@ int spotflow_mqtt_send_live()
 void spotflow_mqtt_establish_mqtt()
 {
 	mqtt_client_toolset.c2d_message_callback = NULL;
+	mqtt_client_toolset.c2d_sub_message_id = 0;
 
 	/* infinitely try to connect to mqtt broker */
 	while (!mqtt_client_toolset.mqtt_connected) {
@@ -299,8 +301,10 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 	int ret;
 	switch (evt->type) {
 	case MQTT_EVT_SUBACK:
-		// TODO: Confirm config sub in DBG message
 		LOG_DBG("SUBACK packet id: %u", evt->param.suback.message_id);
+		if (evt->param.suback.message_id == mqtt_client_toolset.c2d_sub_message_id) {
+			LOG_DBG("Subscription to desired configuration topic acknowledged");
+		}
 		break;
 	case MQTT_EVT_UNSUBACK:
 		LOG_DBG("UNSUBACK packet id: %u", evt->param.suback.message_id);
