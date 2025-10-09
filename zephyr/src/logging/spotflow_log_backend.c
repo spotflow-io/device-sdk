@@ -70,6 +70,8 @@ static void init(const struct log_backend* const backend)
 	ctx->dropped_backend_count = 0;
 	ctx->message_index = 0;
 
+	spotflow_config_init();
+
 	spotflow_start_mqtt();
 
 	LOG_INF("Spotflow logging backend initialized.");
