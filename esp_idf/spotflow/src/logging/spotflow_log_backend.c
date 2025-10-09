@@ -15,6 +15,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
     static size_t sequence = 0;
     struct message_metadata metadata = {0};
     sequence++;
+    metadata.sequence_number = sequence;
 
     int len = vsnprintf(NULL, 0, fmt, args);  // Get the required length
 
