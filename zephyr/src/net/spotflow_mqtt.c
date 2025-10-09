@@ -55,7 +55,7 @@ static int poll_with_timeout(int timeout);
 static int prepare_fds();
 static int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len, struct mqtt_utf8 topic);
 static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* evt);
-static bool utf8_equals(const struct mqtt_utf8* str1, const struct mqtt_utf8* str2);
+static bool utf8_starts_with(const struct mqtt_utf8* str, const struct mqtt_utf8* prefix);
 static void clear_fds(void);
 
 static struct mqtt_config spotflow_mqtt_config = {
