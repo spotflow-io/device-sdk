@@ -17,4 +17,6 @@ void spotflow_init(void)
     original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
 
     mqtt_app_start(); // Calling the mqtt_start from the init function.
+
+    queue_init(); //Initilize the queue
 }

@@ -21,6 +21,7 @@
 
 #include "net/spotflow_mqtt.h"
 #include "logging/spotflow_log_backend.h"
+#include "logging/spotflow_log_queue.h"
 
 extern vprintf_like_t original_vprintf;
 void spotflow_init(void);

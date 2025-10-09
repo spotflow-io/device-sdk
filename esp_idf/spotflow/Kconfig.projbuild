@@ -70,5 +70,8 @@ menu "Spotflow"
     config SPOTFLOW_DEBUG_MESSAGE_TERMINAL
         bool "To view the logs on the spotflow side to view any errors while debugging"
         default n
-        
+    
+    config SPOTFLOW_MESSAGE_QUEUE_SIZE
+        int "Number of messages to retain in case of disconnection"
+        default 5
 endmenu

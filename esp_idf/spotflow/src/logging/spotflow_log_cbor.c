@@ -1,5 +1,6 @@
 
 #include "logging/spotflow_log_cbor.h"
+#include "logging/spotflow_log_queue.h"
 #include "cbor.h"
 
 /* optimized property keys */
@@ -123,12 +124,24 @@ void log_cbor_send(char *fmt, char* buffer, char log_severity, struct message_me
             default: severity = 0x0; break; //In case no log type set it to 0, unknown level
         }
 
-        if(mqtt_connected)
+        size_t len;
+        uint8_t *clog_cbor = log_cbor(fmt, buffer, severity, &len, metadata);
+
+        queue_push((const char*) clog_cbor, len);
+
+        if(atomic_load(&mqtt_connected))
         {
-            size_t len;
-            uint8_t *clog_cbor = log_cbor(fmt, buffer, severity, &len, metadata);
-            esp_mqtt_client_publish(client, "ingest-cbor", (const char*)clog_cbor , len, 1, 0);
-            free(clog_cbor);
+            char *queue_buffer = malloc(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN);
+
+            while (queue_read(queue_buffer) != -1)
+            {
+                esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1, 0); // Treat it as a NULL terminated string
+            }
+
+            free(queue_buffer);  
         }
+
+        free(clog_cbor);
+        
     }
 }
