@@ -268,6 +268,8 @@ int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback)
 		.message_id = sys_rand16_get(),
 	};
 
+	mqtt_client_toolset.c2d_sub_message_id = param.message_id;
+
 	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
 }
 
