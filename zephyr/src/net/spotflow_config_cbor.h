@@ -13,16 +13,16 @@ extern "C" {
 struct spotflow_config_desired_msg {
 	bool contains_minimal_log_severity : 1;
 	uint32_t minimal_log_severity;
-	uint64_t config_version;
+	uint64_t desired_config_version;
 };
 
 struct spotflow_config_reported_msg {
 	bool contains_minimal_log_severity : 1;
 	bool contains_compiled_minimal_log_severity : 1;
-	bool contains_config_version : 1;
+	bool contains_acked_desired_config_version : 1;
 	uint32_t minimal_log_severity;
 	uint32_t compiled_minimal_log_severity;
-	uint64_t config_version;
+	uint64_t acked_desired_config_version;
 };
 
 int spotflow_config_cbor_decode_desired(uint8_t* payload, size_t len,

@@ -17,7 +17,8 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 #define KEY_MESSAGE_TYPE 0x00
 #define KEY_MINIMAL_SEVERITY 0x10
 #define KEY_COMPILED_MINIMAL_SEVERITY 0x11
-#define KEY_CONFIGURATION_VERSION 0x12
+#define KEY_DESIRED_CONFIGURATION_VERSION 0x12
+#define KEY_ACKNOWLEDGED_DESIRED_CONFIGURATION_VERSION 0x13
 
 #define UPDATE_DESIRED_CONFIGURATION_MESSAGE_TYPE 0x03
 #define UPDATE_REPORTED_CONFIGURATION_MESSAGE_TYPE 0x04
@@ -51,12 +52,12 @@ int spotflow_config_cbor_decode_desired(uint8_t* payload, size_t len,
 		success = success && zcbor_uint32_decode(state, &key);
 	}
 
-	if (success && key != KEY_CONFIGURATION_VERSION) {
-		LOG_ERR("Configuration version key not found");
+	if (success && key != KEY_DESIRED_CONFIGURATION_VERSION) {
+		LOG_ERR("Desired configuration version key not found");
 		return -EINVAL;
 	}
 
-	success = success && zcbor_uint64_decode(state, &msg->config_version);
+	success = success && zcbor_uint64_decode(state, &msg->desired_config_version);
 
 	if (!success) {
 		LOG_ERR("Failed to decode desired configuration message: %d",
@@ -92,9 +93,10 @@ int spotflow_config_cbor_encode_reported(struct spotflow_config_reported_msg* ms
 		success = success && zcbor_uint32_put(state, msg->compiled_minimal_log_severity);
 	}
 
-	if (msg->contains_config_version) {
-		success = success && zcbor_uint32_put(state, KEY_CONFIGURATION_VERSION);
-		success = success && zcbor_uint64_put(state, msg->config_version);
+	if (msg->contains_acked_desired_config_version) {
+		success = success &&
+		    zcbor_uint32_put(state, KEY_ACKNOWLEDGED_DESIRED_CONFIGURATION_VERSION);
+		success = success && zcbor_uint64_put(state, msg->acked_desired_config_version);
 	}
 
 	success = success && zcbor_map_end_encode(state, MAX_KEY_COUNT);
