@@ -9,6 +9,7 @@
 #include "logging/spotflow_log_cbor.h"
 #include "logging/spotflow_cbor_output_context.h"
 #include "net/spotflow_config.h"
+#include "net/spotflow_config_options.h"
 #include "net/spotflow_processor.h"
 
 LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
@@ -60,12 +61,14 @@ static void process_message_stats_update(struct spotflow_log_context* context, u
 void spotflow_log_backend_try_set_runtime_filter(uint32_t level)
 {
 #if CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
+
 	for (uint16_t s = 0; s < log_src_cnt_get(0); s++) {
 		log_filter_set(&log_backend_spotflow, 0, s, level);
 	}
 
 	LOG_INF("Runtime filter set to %d for all sources", level);
-#endif
+
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING */
 }
 
 static void init(const struct log_backend* const backend)
