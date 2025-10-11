@@ -119,7 +119,8 @@ static int get_formatted_message(struct spotflow_cbor_output_context* output_con
 /* warning-severity = 50 */
 /* error-severity = 60 */
 /* critical-severity = 70 */
-static uint32_t level_to_severity_value(uint8_t lvl)
+
+uint32_t spotflow_cbor_convert_log_level_to_severity(uint8_t lvl)
 {
 	switch (lvl) {
 	case LOG_LEVEL_ERR:
@@ -132,6 +133,23 @@ static uint32_t level_to_severity_value(uint8_t lvl)
 		return 30;
 	default:
 		return 0; /* unknown level */
+	}
+}
+
+uint8_t spotflow_cbor_convert_severity_to_log_level(uint32_t severity)
+{
+	switch (severity) {
+	case 70:
+	case 60:
+		return LOG_LEVEL_ERR;
+	case 50:
+		return LOG_LEVEL_WRN;
+	case 40:
+		return LOG_LEVEL_INF;
+	case 30:
+		return LOG_LEVEL_DBG;
+	default:
+		return LOG_LEVEL_DBG;
 	}
 }
 
@@ -148,7 +166,7 @@ static void extract_metadata(struct message_metadata* metadata, struct log_msg* 
 
 	/* log level */
 	uint8_t level = log_msg_get_level(log_msg);
-	metadata->severity = level_to_severity_value(level);
+	metadata->severity = spotflow_cbor_convert_log_level_to_severity(level);
 
 	/* source name */
 	uint8_t domain_id = log_msg_get_domain(log_msg);
