@@ -83,7 +83,10 @@ static int settings_direct_load_callback(const char* key, size_t len, settings_r
 
 void spotflow_config_persistence_try_init() {}
 
-void spotflow_config_persistence_try_load(struct spotflow_config_persisted_settings* settings) {}
+void spotflow_config_persistence_try_load(struct spotflow_config_persisted_settings* settings)
+{
+	*settings = (struct spotflow_config_persisted_settings){ 0 };
+}
 
 void spotflow_config_persistence_try_save(struct spotflow_config_persisted_settings* settings) {}
 
