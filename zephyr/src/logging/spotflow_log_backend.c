@@ -1,7 +1,8 @@
 #include "spotflow_log_backend.h"
 
-#include <zephyr/logging/log_backend.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/logging/log_backend.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <zephyr/net/mqtt.h>
 #include <zephyr/kernel.h>
 
@@ -55,6 +56,17 @@ static void process_single_message_stats_update(struct spotflow_log_context* con
 
 static void process_message_stats_update(struct spotflow_log_context* context, uint32_t cnt,
 					 bool dropped);
+
+void spotflow_log_backend_try_set_runtime_filter(uint32_t level)
+{
+#if CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
+	for (uint16_t s = 0; s < log_src_cnt_get(0); s++) {
+		log_filter_set(&log_backend_spotflow, 0, s, level);
+	}
+
+	LOG_INF("Runtime filter set to %d for all sources", level);
+#endif
+}
 
 static void init(const struct log_backend* const backend)
 {

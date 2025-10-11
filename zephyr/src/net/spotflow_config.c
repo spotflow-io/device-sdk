@@ -4,6 +4,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
 
+#include "logging/spotflow_log_backend.h"
 #include "logging/spotflow_log_cbor.h"
 #include "net/spotflow_config.h"
 #include "net/spotflow_config_cbor.h"
@@ -23,6 +24,7 @@ static int settings_direct_load_callback(const char* key, size_t len, settings_r
 					 void* cb_arg, void* param);
 #endif
 
+static void set_sent_log_level(uint8_t level);
 static void add_log_severity_to_reported_msg(struct spotflow_config_reported_msg* reported_msg);
 static void handle_desired_msg(uint8_t* payload, size_t len);
 
@@ -33,6 +35,9 @@ uint8_t spotflow_config_get_sent_log_level()
 
 void spotflow_config_init()
 {
+	/* Ensure that the update to the runtime filter is applied */
+	set_sent_log_level(sent_log_level);
+
 #if CONFIG_SPOTFLOW_SETTINGS
 
 	int ret = settings_subsys_init();
@@ -72,8 +77,9 @@ static int settings_direct_load_callback(const char* key, size_t len, settings_r
 			return ret;
 		}
 
-		sent_log_level = persisted_sent_log_level;
 		LOG_DBG("Persisted sent log level loaded: %d", persisted_sent_log_level);
+
+		set_sent_log_level(persisted_sent_log_level);
 	}
 
 	return 0;
@@ -83,7 +89,7 @@ static int settings_direct_load_callback(const char* key, size_t len, settings_r
 int spotflow_config_init_session()
 {
 	struct spotflow_config_reported_msg reported_msg = {
-		.contains_config_version = false,
+		.contains_acked_desired_config_version = false,
 	};
 	add_log_severity_to_reported_msg(&reported_msg);
 
@@ -109,6 +115,15 @@ int spotflow_config_init_session()
 	return 0;
 }
 
+static void set_sent_log_level(uint8_t level)
+{
+	uint8_t orig_level = sent_log_level;
+	sent_log_level = level;
+	LOG_INF("Updated sent log level to %d (was %d)", level, orig_level);
+
+	spotflow_log_backend_try_set_runtime_filter(level);
+}
+
 static void add_log_severity_to_reported_msg(struct spotflow_config_reported_msg* reported_msg)
 {
 	reported_msg->contains_minimal_log_severity = true;
@@ -130,18 +145,15 @@ static void handle_desired_msg(uint8_t* payload, size_t len)
 	}
 
 	struct spotflow_config_reported_msg reported_msg = {
-		.contains_config_version = true,
-		.config_version = desired_msg.config_version,
+		.contains_acked_desired_config_version = true,
+		.acked_desired_config_version = desired_msg.desired_config_version,
 	};
 
 	if (desired_msg.contains_minimal_log_severity) {
-		uint8_t orig_sent_log_level = sent_log_level;
 		uint8_t new_sent_log_level =
 		    spotflow_cbor_convert_severity_to_log_level(desired_msg.minimal_log_severity);
 
-		sent_log_level = new_sent_log_level;
-		LOG_INF("Updated sent log level to %d (was %d)", new_sent_log_level,
-			orig_sent_log_level);
+		set_sent_log_level(new_sent_log_level);
 
 #if CONFIG_SPOTFLOW_SETTINGS
 		rc = settings_save_one(SPOTFLOW_SETTINGS_PATH_SENT_LOG_LEVEL, &new_sent_log_level,
