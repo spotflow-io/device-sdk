@@ -1,5 +1,7 @@
 
 #include "net/spotflow_mqtt.h"
+#include "esp_mac.h"
+#include "esp_system.h"
 
 static const char *TAG = "spotflow_mqtt";
 
@@ -81,12 +83,21 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
 
 void mqtt_app_start(void)
 {
+
+    static char device_id[32]; // For saving the device ID
+    uint8_t mac[6]; //The Mac Address string
+    esp_read_mac(mac, ESP_MAC_WIFI_STA); // Read the mac Address
+    snprintf(device_id, sizeof(device_id), "%s",
+            strlen(CONFIG_SPOTFLOW_DEVICE_ID) ? CONFIG_SPOTFLOW_DEVICE_ID :
+            ({ static char tmp[32]; snprintf(tmp, sizeof(tmp), "%02X%02X%02X%02X%02X%02X",
+                                                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); tmp; }));  // Check if CONFIG_SPOTFLOW_DEVICE_ID is empty if no then copy the device ID, if yes then generate it.
+
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
             .address.uri = CONFIG_SPOTFLOW_SERVER_HOSTNAME,
             .verification.certificate = (const char *)mqtt_spotflow_io_pem_start
         },
-        .credentials.username = (const char *)CONFIG_SPOTFLOW_DEVICE_ID,
+        .credentials.username = device_id,
         .credentials.authentication.password = (const char *)CONFIG_SPOTFLOW_INGEST_KEY
     };
 

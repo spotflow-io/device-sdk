@@ -12,7 +12,7 @@ menu "Spotflow"
             Device ID is a unique identifier for your device in Spotflow observability
             platform. If empty, the hexadecimal representation of the result of
             hwinfo_get_device_id(...) will be used. You can provide the device ID
-            in the code by defining the function char* spotflow_override_device_id().
+            in the code by defining the function char* spotflow_override_device_id(). Keep it less than 32 characters.
 
     config SPOTFLOW_INGEST_KEY
         string "Password device will use to connect to Spotflow observability platform"
