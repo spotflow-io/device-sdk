@@ -5,7 +5,7 @@
 #else
     #include "logging/spotflow_log_json.h"
 #endif
-static const char *TAG = "spotflow_testing";
+// static const char *TAG = "spotflow_testing"; // Currently the Spotflow_LOG doesn't support tags
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>

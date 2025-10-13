@@ -9,26 +9,26 @@ mqd_t write_descr;
  */
 void queue_push(const char *msg, size_t len)
 {
-    if (mq_send(write_descr, msg, len, 0) < 0) {
-        if (errno == EAGAIN) {
+    if (mq_send(write_descr, msg, len, 0) < 0) { // Check if their is no error while writing to the queue buffer.
+        if (errno == EAGAIN) {                  // In case the Queue Buffer is full remove the oldest message
             // queue full — remove oldest message
-            char dropped[CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN];
-            ssize_t len = mq_receive(write_descr, dropped, sizeof(dropped), NULL);
+            char dropped[CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN]; //Create a temporary array of msg size.
+            ssize_t len = mq_receive(write_descr, dropped, sizeof(dropped), NULL); //Read the message to empty the queue buffer on top and drop it.
             if (len >= 0) {
                 dropped[len] = '\0';
-                SPOTFLOW_LOG( "Queue full — dropped oldest: %s \n", dropped);
+                SPOTFLOW_LOG( "Queue full — dropped oldest: %s \n", dropped); // Drop logicS
 
                 // retry send after dropping
-                if (mq_send(write_descr, msg, len, 0) == -1) {
-                    SPOTFLOW_LOG( "mq_send failed after drop: errno=%d\n", errno);
+                if (mq_send(write_descr, msg, len, 0) == -1) {  // Retry adding the message on top of the queue
+                    SPOTFLOW_LOG( "mq_send failed after drop: errno=%d\n", errno); // In case of error do not add this log.
                 } else {
-                    SPOTFLOW_LOG( "Added new message after drop: %s\n", msg);
+                    SPOTFLOW_LOG( "Added new message after drop: %s\n", msg); // Successfully added the log
                 }
             } else {
-                SPOTFLOW_LOG( "mq_receive failed: errno=%d\n", errno);
+                SPOTFLOW_LOG( "mq_receive failed: errno=%d\n", errno);  // If reading the message is failed due to some reason.
             }
         } else {
-            SPOTFLOW_LOG( "mq_send failed: errno=%d\n", errno);
+            SPOTFLOW_LOG( "mq_send failed: errno=%d\n", errno); // If the message add to queue is failed due to any reason other than Queue full.
         }
     } else {
         SPOTFLOW_LOG( "Added: %02X \n", msg[strlen(msg)]);

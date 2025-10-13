@@ -16,7 +16,7 @@
 #define KEY_SEQUENCE_NUMBER 0x0D
 
 
-void print_cbor_hex(const uint8_t *buf, size_t len)
+static void print_cbor_hex(const uint8_t *buf, size_t len)
 {
     printf("CBOR buffer (%zu bytes):\n", len);
     for (size_t i = 0; i < len; i++) {
@@ -35,7 +35,7 @@ void print_cbor_hex(const uint8_t *buf, size_t len)
  * @param out_len 
  * @return uint8_t* 
  */
-uint8_t* log_cbor(char *fem, char* body, uint8_t severity, size_t *out_len, struct message_metadata *metadata)
+uint8_t* log_cbor(const char *fem, char* body,const uint8_t severity, size_t *out_len, const struct message_metadata *metadata)
 {
     // Buffer to create array to cointain several items
     CborEncoder array_encoder;
@@ -110,7 +110,7 @@ uint8_t* log_cbor(char *fem, char* body, uint8_t severity, size_t *out_len, stru
  * 
  * @param buffer 
  */
-void log_cbor_send(char *fmt, char* buffer, char log_severity, struct message_metadata *metadata)
+void log_cbor_send(const char *fmt, char* buffer,const char log_severity,const struct message_metadata *metadata)
 {
     int len = strlen(buffer);
     uint8_t severity = 0;
@@ -133,7 +133,7 @@ void log_cbor_send(char *fmt, char* buffer, char log_severity, struct message_me
         {
             char *queue_buffer = malloc(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN);
 
-            while (queue_read(queue_buffer) != -1)
+            while (queue_read(queue_buffer) != -1 && atomic_load(&mqtt_connected)) //Check if mqtt disconnect event is not generated.
             {
                 esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1, 0); // Treat it as a NULL terminated string
             }
