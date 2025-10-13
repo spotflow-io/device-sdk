@@ -3,7 +3,7 @@
 #include "esp_mac.h"
 #include "esp_system.h"
 
-static const char *TAG = "spotflow_mqtt";
+// static const char *TAG = "spotflow_mqtt";
 
 esp_mqtt_client_handle_t client = NULL;
 atomic_bool mqtt_connected = ATOMIC_VAR_INIT(false);

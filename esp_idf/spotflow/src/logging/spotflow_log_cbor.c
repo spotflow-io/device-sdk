@@ -15,17 +15,22 @@
 #define KEY_DEVICE_UPTIME_MS 0x06
 #define KEY_SEQUENCE_NUMBER 0x0D
 
-
-static void print_cbor_hex(const uint8_t *buf, size_t len)
-{
-    printf("CBOR buffer (%zu bytes):\n", len);
-    for (size_t i = 0; i < len; i++) {
-        printf("%02X ", buf[i]);  // print each byte as 2-digit hex
-        if ((i + 1) % 16 == 0)    // 16 bytes per line
-            printf("\n");
-    }
-    printf("\n");
-}
+/**
+ * @brief Debugging Function not to be used in Production
+ * 
+ * @param buf 
+ * @param len 
+ */
+// static void print_cbor_hex(const uint8_t *buf, size_t len)
+// {
+//     printf("CBOR buffer (%zu bytes):\n", len);
+//     for (size_t i = 0; i < len; i++) {
+//         printf("%02X ", buf[i]);  // print each byte as 2-digit hex
+//         if ((i + 1) % 16 == 0)    // 16 bytes per line
+//             printf("\n");
+//     }
+//     printf("\n");
+// }
 
 /**
  * @brief To create the message format for logs in CBOR format
@@ -110,7 +115,7 @@ uint8_t* log_cbor(const char *fem, char* body,const uint8_t severity, size_t *ou
  * 
  * @param buffer 
  */
-void log_cbor_send(const char *fmt, char* buffer,const char log_severity,const struct message_metadata *metadata)
+void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const struct message_metadata *metadata)
 {
     int len = strlen(buffer);
     uint8_t severity = 0;

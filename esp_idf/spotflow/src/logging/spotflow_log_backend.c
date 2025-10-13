@@ -122,7 +122,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
 
     len = vsnprintf(buffer, len+1, fmt_copy, args_copy);
 #if CONFIG_USE_JSON_PAYLOAD
-    log_json_send(buffer, metadata.severity);
+    log_json_send(fmt_copy, buffer, log_severity, &metadata);
 #else
     log_cbor_send(fmt_copy, buffer, log_severity, &metadata);
 #endif

@@ -3,6 +3,6 @@
 
 #include "spotflow.h"
 
-char* log_json(char* body, const char* severity);
-void log_json_send(char* buffer,char log_sevirity);
+char* log_json(const char *fem, char* body, const char* severity, size_t *out_len, const struct message_metadata *metadata);
+void log_json_send(const char *fmt, char* buffer, const char log_severity, const struct message_metadata *metadata);
 #endif
