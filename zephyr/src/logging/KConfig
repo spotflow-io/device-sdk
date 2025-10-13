@@ -61,7 +61,7 @@ config SPOTFLOW_DEFAULT_SENT_LOG_LEVEL
 	help
 		Filters the logs sent to Spotflow cloud according to their severity level.
 		This is the default value that can be dynamically overridden from the cloud.
-		Defaults to LOG_MAX_LEVEL.
+		Defaults to LOG_MAX_LEVEL, i.e. the maximal (minimal severity) compiled-in level.
 		Levels are:
 		- 0 OFF, do not send
 		- 1 ERROR, send LOG_ERR

@@ -48,9 +48,9 @@ void spotflow_config_persistence_try_save(struct spotflow_config_persisted_setti
 		    settings_save_one(SPOTFLOW_SETTINGS_PATH_SENT_LOG_LEVEL,
 				      &settings->sent_log_level, sizeof(settings->sent_log_level));
 		if (rc < 0) {
-			LOG_ERR("Failed to persist updated sent log level setting: %d", rc);
+			LOG_ERR("Failed to persist sent log level setting: %d", rc);
 		} else {
-			LOG_DBG("Updated sent log level setting persisted");
+			LOG_DBG("Sent log level setting persisted: %d", settings->sent_log_level);
 		}
 	}
 }
