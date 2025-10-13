@@ -7,7 +7,9 @@
 #endif
 static const char *TAG = "spotflow_testing";
 #include <stdarg.h>
-
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 int spotflow_log_backend(const char *fmt, va_list args)
 {   
@@ -17,10 +19,21 @@ int spotflow_log_backend(const char *fmt, va_list args)
     sequence++;
     metadata.sequence_number = sequence;
 
-    int len = vsnprintf(NULL, 0, fmt, args);  // Get the required length
+    // Copy fmt so we can modify it safely 
+    char *fmt_copy = strdup(fmt);
+    if (!fmt_copy) {
+        SPOTFLOW_LOG("Memory allocation failed for fmt copy.");
+        return 0;
+    }
 
-    char log_severity = fmt[0];
-    for(const char *p = fmt; *p || *p == ':'; p++)
+    // Create a copy of va_list args
+    va_list args_copy;
+    va_copy(args_copy, args);
+
+    int len = vsnprintf(NULL, 0, fmt_copy, args_copy);  // Get the required length
+
+    char log_severity = fmt_copy[0];
+    for(const char *p = fmt_copy; *p || *p == ':'; p++)
     {
         if (*p != '%') continue;  // skip until '%'
         p++; // move past '%'
@@ -37,7 +50,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
             case 'd': {
                 if(log_seq_arg == 1)
                 {
-                    metadata.uptime_ms = va_arg(args, int);
+                    metadata.uptime_ms = va_arg(args_copy, int);
                     log_seq_arg++;
                 }
                 break;
@@ -45,7 +58,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
             case 'i': {
                 if(log_seq_arg == 1)
                 {
-                    metadata.uptime_ms = va_arg(args, int);
+                    metadata.uptime_ms = va_arg(args_copy, int);
                 }
                 break;
             }
@@ -55,10 +68,10 @@ int spotflow_log_backend(const char *fmt, va_list args)
                     log_seq_arg++; //Log issue
                 }
                 if (is_long && log_seq_arg == 1) {
-                    metadata.uptime_ms = va_arg(args, unsigned long);
+                    metadata.uptime_ms = va_arg(args_copy, unsigned long);
                     log_seq_arg++;
                 } else if (log_seq_arg == 1){
-                    unsigned int val = va_arg(args, unsigned int);
+                    unsigned int val = va_arg(args_copy, unsigned int);
                     log_seq_arg++;
                 }
                 break;
@@ -66,7 +79,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
             case 's': {
                 if(log_seq_arg == 2)
                 {
-                    metadata.source = va_arg(args, const char *);
+                    metadata.source = va_arg(args_copy, const char *);
                     log_seq_arg++;
                 }
                 break;
@@ -74,7 +87,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
             case 'c': {
                     if(log_seq_arg == 0)
                     {
-                        metadata.severity =  va_arg(args, int);
+                        metadata.severity =  va_arg(args_copy, int);
                         log_seq_arg++;
                     }
                 break;
@@ -85,10 +98,10 @@ int spotflow_log_backend(const char *fmt, va_list args)
 
     }
 
-    char *separator = strchr(fmt, ':');
+    char *separator = strchr(fmt_copy, ':');
     if (separator != NULL) {
         // Start the body from the character after the colon
-        fmt = separator + 2;
+        fmt_copy = separator + 2;
     }
 
     // If the len is smaller than 0 or if the log is bigger than the set buffer size.
@@ -104,11 +117,11 @@ int spotflow_log_backend(const char *fmt, va_list args)
         return 0;
     }
 
-    len = vsnprintf(buffer, len+1, fmt, args);
+    len = vsnprintf(buffer, len+1, fmt_copy, args_copy);
 #if CONFIG_USE_JSON_PAYLOAD
     log_json_send(buffer, metadata.severity);
 #else
-    log_cbor_send(fmt, buffer, log_severity, &metadata);
+    log_cbor_send(fmt_copy, buffer, log_severity, &metadata);
 #endif
 
     free(buffer);
