@@ -98,6 +98,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
 
     }
 
+    char *fmt_copy_1 = fmt_copy; // Just a location for the original memory to free later.
     char *separator = strchr(fmt_copy, ':');
     if (separator != NULL) {
         // Start the body from the character after the colon
@@ -107,6 +108,8 @@ int spotflow_log_backend(const char *fmt, va_list args)
     // If the len is smaller than 0 or if the log is bigger than the set buffer size.
     if (len < 0 || len > CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         SPOTFLOW_LOG("Spotflow Log buffer not enough. Increase size to incorporate long messages.");
+        va_end(args_copy);
+        free(fmt_copy_1);
         return 0;
     }
 
@@ -125,6 +128,8 @@ int spotflow_log_backend(const char *fmt, va_list args)
 #endif
 
     free(buffer);
+    va_end(args_copy);
+    free(fmt_copy_1);
     // Optionally, call original log output to keep default behavior
     if (original_vprintf) {
         return original_vprintf(fmt, args);
