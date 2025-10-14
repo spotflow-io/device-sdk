@@ -18,6 +18,13 @@
 #define KEY_DEVICE_UPTIME_MS 0x06
 #define KEY_SEQUENCE_NUMBER 0x0D
 
+typedef enum {
+    LOG_SEVERITY_ERROR = 0x3C,  // Error
+    LOG_SEVERITY_WARN  = 0x32,  // Warn
+    LOG_SEVERITY_INFO  = 0x28,  // Info
+    LOG_SEVERITY_DEBUG = 0x1E,  // Debug
+} LogSeverity;
+
 /**
  * @brief Debugging Function not to be used in Production
  * 
@@ -124,11 +131,11 @@ void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const
     uint8_t severity = 0;
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         switch (log_severity) {
-            case 'E': severity = 0x3C; break; //Error
-            case 'W': severity = 0x32; break; //Warning
-            case 'I': severity = 0x28;  break; //Info
-            case 'D': severity = 0x1E; break; //Debug
-            case 'V': severity = 0x1E; break; //Verbose right now set to debug
+            case 'E': severity = LOG_SEVERITY_ERROR; break; //Error
+            case 'W': severity = LOG_SEVERITY_WARN; break; //Warning
+            case 'I': severity = LOG_SEVERITY_INFO;  break; //Info
+            case 'D': severity = LOG_SEVERITY_DEBUG; break; //Debug
+            case 'V': severity = LOG_SEVERITY_DEBUG; break; //Verbose right now set to debug
             default: severity = 0x0; break; //In case no log type set it to 0, unknown level
         }
 
