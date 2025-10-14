@@ -120,7 +120,7 @@ uint8_t* log_cbor(const char *log_template, char* body,const uint8_t severity, s
  */
 void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const struct message_metadata *metadata)
 {
-    int len = strlen(buffer);
+    size_t len = strlen(buffer);
     uint8_t severity = 0;
     if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
         switch (log_severity) {
@@ -132,8 +132,7 @@ void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const
             default: severity = 0x0; break; //In case no log type set it to 0, unknown level
         }
 
-        size_t len;
-        uint8_t *clog_cbor = log_cbor(fmt, buffer, severity, &len, metadata);
+        uint8_t *clog_cbor = log_cbor(fmt, buffer, severity, &len, metadata); // It reuses the length
 
         queue_push((const char*) clog_cbor, len);
 
@@ -141,7 +140,7 @@ void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const
         {
             char *queue_buffer = malloc(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN);
 
-            while (queue_read(queue_buffer) != -1 && atomic_load(&mqtt_connected)) //Check if mqtt disconnect event is not generated.
+            while ((len = queue_read(queue_buffer)) != -1 && atomic_load(&mqtt_connected)) //Check if mqtt disconnect event is not generated.
             {
                 esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , len, 1, 0); // Sending MQTT message the CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN provides the buffer length
             }
