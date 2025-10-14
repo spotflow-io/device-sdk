@@ -140,7 +140,7 @@ void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const
 
             while (queue_read(queue_buffer) != -1 && atomic_load(&mqtt_connected)) //Check if mqtt disconnect event is not generated.
             {
-                esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1, 0); // Treat it as a NULL terminated string
+                esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1, 0); // Sending MQTT message the CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN provides the buffer length
             }
 
             free(queue_buffer);  
