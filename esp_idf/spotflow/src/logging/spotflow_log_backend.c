@@ -1,10 +1,12 @@
-#include "logging/spotflow_log_backend.h"
-#include "logging/spotflow_log_cbor.h"
-// static const char *TAG = "spotflow_testing"; // Currently the Spotflow_LOG doesn't support tags
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#include "spotflow.h"
+#include "logging/spotflow_log_backend.h"
+#include "logging/spotflow_log_cbor.h"
+// static const char *TAG = "spotflow_testing"; // Currently the Spotflow_LOG doesn't support tags
 
 int spotflow_log_backend(const char *fmt, va_list args)
 {   

@@ -1,5 +1,19 @@
 
+#include <stdio.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <stdbool.h>
+#include <pthread.h>
+#include <mqueue.h>
+#include <string.h>
+#include <errno.h>
+#include <stdlib.h>
+
+#include "logging/spotflow_log_backend.h"
 #include "logging/spotflow_log_queue.h"
+#include "logging/spotflow_log_cbor.h"
+#include "spotflow.h"
 
 mqd_t write_descr;
 /**
@@ -13,16 +27,16 @@ void queue_push(const char *msg, size_t len)
         if (errno == EAGAIN) {                  // In case the Queue Buffer is full remove the oldest message
             // queue full — remove oldest message
             char dropped[CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN]; //Create a temporary array of msg size.
-            ssize_t len = mq_receive(write_descr, dropped, sizeof(dropped), NULL); //Read the message to empty the queue buffer on top and drop it.
-            if (len >= 0) {
-                dropped[len] = '\0';
-                SPOTFLOW_LOG( "Queue full — dropped oldest: %s \n", dropped); // Drop logicS
+            ssize_t len_dropped = mq_receive(write_descr, dropped, sizeof(dropped), NULL); //Read the message to empty the queue buffer on top and drop it.
+            if (len_dropped >= 0) {
+                SPOTFLOW_LOG( "Queue full — dropped oldest Msg. \n"); // Drop logicS
+                print_cbor_hex((const uint8_t *)dropped, len_dropped);
 
                 // retry send after dropping
                 if (mq_send(write_descr, msg, len, 0) == -1) {  // Retry adding the message on top of the queue
                     SPOTFLOW_LOG( "mq_send failed after drop: errno=%d\n", errno); // In case of error do not add this log.
                 } else {
-                    SPOTFLOW_LOG( "Added new message after drop: %s\n", msg); // Successfully added the log
+                    SPOTFLOW_LOG( "Added new message after drop.\n"); // Successfully added the log
                 }
             } else {
                 SPOTFLOW_LOG( "mq_receive failed: errno=%d\n", errno);  // If reading the message is failed due to some reason.
@@ -31,7 +45,8 @@ void queue_push(const char *msg, size_t len)
             SPOTFLOW_LOG( "mq_send failed: errno=%d\n", errno); // If the message add to queue is failed due to any reason other than Queue full.
         }
     } else {
-        SPOTFLOW_LOG( "Added: %02X \n", msg[strlen(msg)]);
+        SPOTFLOW_LOG( "Added: ");
+        print_cbor_hex((const uint8_t *)msg, len);
     }
 }
 
@@ -45,11 +60,8 @@ void queue_push(const char *msg, size_t len)
 int queue_read(char *buffer)
 {
     ssize_t bytes_read;
-    bytes_read = mq_receive(write_descr, buffer, 1024, NULL);
+    bytes_read = mq_receive(write_descr, buffer, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, NULL);
     if (bytes_read >= 0) {
-        // buffer[bytes_read] = '\0';
-        // printf("Message: %s \n", buffer);
-        //  SPOTFLOW_LOG("%02X ", buffer[bytes_read]);
         return bytes_read;
     } else {
         if (errno == EAGAIN) {

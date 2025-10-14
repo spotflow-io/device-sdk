@@ -1,4 +1,6 @@
 
+#include "spotflow.h"
+#include "logging/spotflow_log_backend.h"
 #include "logging/spotflow_log_cbor.h"
 #include "logging/spotflow_log_queue.h"
 #include "cbor.h"
@@ -21,16 +23,16 @@
  * @param buf 
  * @param len 
  */
-// static void print_cbor_hex(const uint8_t *buf, size_t len)
-// {
-//     printf("CBOR buffer (%zu bytes):\n", len);
-//     for (size_t i = 0; i < len; i++) {
-//         printf("%02X ", buf[i]);  // print each byte as 2-digit hex
-//         if ((i + 1) % 16 == 0)    // 16 bytes per line
-//             printf("\n");
-//     }
-//     printf("\n");
-// }
+void print_cbor_hex(const uint8_t *buf, size_t len)
+{
+    SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
+    for (size_t i = 0; i < len; i++) {
+        SPOTFLOW_LOG("%02X ", buf[i]);  // print each byte as 2-digit hex
+        if ((i + 1) % 16 == 0)    // 16 bytes per line
+            SPOTFLOW_LOG("\n");
+    }
+    SPOTFLOW_LOG("\n");
+}
 
 /**
  * @brief To create the message format for logs in CBOR format
@@ -40,7 +42,7 @@
  * @param out_len 
  * @return uint8_t* 
  */
-uint8_t* log_cbor(const char *fem, char* body,const uint8_t severity, size_t *out_len, const struct message_metadata *metadata)
+uint8_t* log_cbor(const char *log_template, char* body,const uint8_t severity, size_t *out_len, const struct message_metadata *metadata)
 {
     // Buffer to create array to cointain several items
     CborEncoder array_encoder;
@@ -75,7 +77,7 @@ uint8_t* log_cbor(const char *fem, char* body,const uint8_t severity, size_t *ou
     cbor_encode_uint(&map_encoder, severity);
 
     cbor_encode_uint(&map_encoder, KEY_BODY_TEMPLATE);
-    cbor_encode_text_stringz(&map_encoder, fem);
+    cbor_encode_text_stringz(&map_encoder, log_template);
     //------------Metadata
 
     cbor_encode_uint(&map_encoder, KEY_SEQUENCE_NUMBER);
@@ -140,7 +142,7 @@ void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const
 
             while (queue_read(queue_buffer) != -1 && atomic_load(&mqtt_connected)) //Check if mqtt disconnect event is not generated.
             {
-                esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1, 0); // Sending MQTT message the CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN provides the buffer length
+                esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , len, 1, 0); // Sending MQTT message the CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN provides the buffer length
             }
 
             free(queue_buffer);  

@@ -1,8 +1,6 @@
 #ifndef SPOTFLOW_LOG_H
 #define SPOTFLOW_LOG_H
 
-#include "spotflow.h"
-
 struct message_metadata{
 	uint8_t severity;
 	unsigned long uptime_ms;
