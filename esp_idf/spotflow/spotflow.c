@@ -1,10 +1,6 @@
 #include <stdio.h>
 #include "spotflow.h"
-
-#ifndef CONFIG_USE_JSON_PAYLOAD
-    #include "cbor.h"
-#endif
-
+#include "cbor.h"
 
 vprintf_like_t original_vprintf = NULL;
 
@@ -28,6 +24,5 @@ void spotflow_init(void)
 
     Spotflow_Todo(); //Checking for unused set Configs.
     mqtt_app_start(); // Calling the mqtt_start from the init function.
-
     queue_init(); //Initilize the queue
 }

@@ -32,9 +32,6 @@ static void mqtt_event_handler(void *handler_args, esp_event_base_t base, int32_
     case MQTT_EVENT_CONNECTED:
         SPOTFLOW_LOG("MQTT_EVENT_CONNECTED");
         atomic_store(&mqtt_connected, true);
-        // esp_mqtt_client_subscribe(client, "ingest-json", 1);
-        // msg_id = esp_mqtt_client_subscribe(client, "ingest-json", 1);
-        // ESP_LOGI(TAG, "sent subscribe successful, msg_id=%d", msg_id);
 
         break;
     case MQTT_EVENT_DISCONNECTED:

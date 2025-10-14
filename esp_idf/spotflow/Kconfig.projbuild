@@ -31,13 +31,6 @@ menu "Spotflow"
         bool
         default y if BROKER_CERTIFICATE_OVERRIDE != ""
 
-    
-    config USE_JSON_PAYLOAD
-        bool "Use json payload instead of cbor"
-        default n
-        help
-            By default cbor format is used. If json format is required this can be set to use instead of cbor.
-    
     config SPOTFLOW_GENERATE_BUILD_ID
 	bool "Generate build ID"
 	default n

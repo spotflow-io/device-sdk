@@ -1,10 +1,5 @@
 #include "logging/spotflow_log_backend.h"
-
-#ifndef CONFIG_USE_JSON_PAYLOAD
-    #include "logging/spotflow_log_cbor.h"
-#else
-    #include "logging/spotflow_log_json.h"
-#endif
+#include "logging/spotflow_log_cbor.h"
 // static const char *TAG = "spotflow_testing"; // Currently the Spotflow_LOG doesn't support tags
 #include <stdarg.h>
 #include <stdio.h>
@@ -121,11 +116,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
     }
 
     len = vsnprintf(buffer, len+1, fmt_copy, args_copy);
-#if CONFIG_USE_JSON_PAYLOAD
-    log_json_send(fmt_copy, buffer, log_severity, &metadata);
-#else
     log_cbor_send(fmt_copy, buffer, log_severity, &metadata);
-#endif
 
     free(buffer);
     va_end(args_copy);
