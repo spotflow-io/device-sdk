@@ -1,7 +1,10 @@
-
-#include "net/spotflow_mqtt.h"
 #include "esp_mac.h"
 #include "esp_system.h"
+#include "esp_event.h"
+#include "spotflow.h"
+#include "esp_tls.h"
+#include "logging/spotflow_log_backend.h"
+#include "net/spotflow_mqtt.h"
 
 // static const char *TAG = "spotflow_mqtt";
 

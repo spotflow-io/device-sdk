@@ -3,6 +3,7 @@
 #include "logging/spotflow_log_backend.h"
 #include "logging/spotflow_log_cbor.h"
 #include "logging/spotflow_log_queue.h"
+#include "net/spotflow_mqtt.h"
 #include "cbor.h"
 
 /* optimized property keys */

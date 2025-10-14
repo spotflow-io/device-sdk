@@ -1,6 +1,12 @@
 #include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <string.h>
+#include "net/spotflow_mqtt.h"
+#include "logging/spotflow_log_backend.h"
+#include "logging/spotflow_log_queue.h"
+
 #include "spotflow.h"
-#include "cbor.h"
 
 vprintf_like_t original_vprintf = NULL;
 
