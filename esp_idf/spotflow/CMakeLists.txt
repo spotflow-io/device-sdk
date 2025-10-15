@@ -10,5 +10,5 @@ set(SRCS
 idf_component_register( SRCS ${SRCS}   
                         PRIV_REQUIRES mqtt esp_partition nvs_flash esp_netif app_update
                         INCLUDE_DIRS "include"
-                        REQUIRES cbor rt
+                        REQUIRES cbor
                         EMBED_TXTFILES x1_root.pem)

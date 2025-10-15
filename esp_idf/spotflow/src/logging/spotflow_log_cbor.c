@@ -141,7 +141,7 @@ void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const
 
         uint8_t *clog_cbor = log_cbor(fmt, buffer, severity, &len, metadata); // It reuses the length
 
-        queue_push((const char*) clog_cbor, len);
+        queue_push(clog_cbor, len);
         free(clog_cbor);
         
     }

@@ -1,10 +1,14 @@
 #ifndef SPOTFLOW_LOG_QUEUE_H
 #define SPOTFLOW_LOG_QUEUE_H
 
-void queue_push(const char *msg, size_t len);
+typedef struct {
+    uint8_t *ptr;
+    size_t len;
+} queue_msg_t;
 
-int queue_read(char *buffer);
-
+void queue_push(uint8_t *msg, size_t len);
+bool queue_read(queue_msg_t *out);
+void queue_free(queue_msg_t *msg);
 void queue_init(void);
 
 #endif

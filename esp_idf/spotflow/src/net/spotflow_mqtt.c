@@ -128,22 +128,22 @@ void mqtt_publish(void *pvParameters)
         {
             if(esp_mqtt_client_get_outbox_size(client) == 0)    // Check the mqtt buffer is empty if not 
             {
-                char *queue_buffer = malloc(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN);
-                size_t len = 0;
-                while ((len = queue_read(queue_buffer)) != -1 && atomic_load(&mqtt_connected)) //Check if mqtt disconnect event is not generated.
+                queue_msg_t msg;
+                while (queue_read(&msg) && atomic_load(&mqtt_connected)) //Check if mqtt disconnect event is not generated.
                 {
-                   int msg_id = esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , len, 1, 0); // Sending MQTT message the CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN provides the buffer length
+                   int msg_id = esp_mqtt_client_publish(client, "ingest-cbor",(const char*) msg.ptr, msg.len, 1, 0); // Sending MQTT message the CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN provides the buffer length
                    // Error check.
                    if(msg_id < 0)
                    {
                     SPOTFLOW_LOG("Error %d occured while sending mqtt", msg_id);
+                    SPOTFLOW_LOG("Retrying");
                    }
                    else
                    {
-                    SPOTFLOW_LOG("Message sent successfully");
+                    SPOTFLOW_LOG("Message sent successfully. Freeing message in Queue");
+                    queue_free(&msg);
                    }
                 }
-                free(queue_buffer); 
             }
             else
             {

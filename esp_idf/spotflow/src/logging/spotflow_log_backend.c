@@ -68,7 +68,7 @@ int spotflow_log_backend(const char *fmt, va_list args)
                     metadata.uptime_ms = va_arg(args_copy, unsigned long);
                     log_seq_arg++;
                 } else if (log_seq_arg == 1){
-                    unsigned int val = va_arg(args_copy, unsigned int);
+                    va_arg(args_copy, unsigned int);
                     log_seq_arg++;
                 }
                 break;
