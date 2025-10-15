@@ -53,7 +53,7 @@ menu "Spotflow"
 
     config SPOTFLOW_CBOR_LOG_MAX_LEN
         int "Size of Spotflow CBOR log buffer"
-        default 1024
+        default 2048
         help
             Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
             Increase this value if you experience issues with logs being dropped because of buffer overflow.
@@ -65,4 +65,8 @@ menu "Spotflow"
     config SPOTFLOW_MESSAGE_QUEUE_SIZE
         int "Number of messages to retain in case of disconnection"
         default 5
+    
+    config MQTT_BUFFER_SIZE
+        int
+        default SPOTFLOW_CBOR_LOG_MAX_LEN
 endmenu
