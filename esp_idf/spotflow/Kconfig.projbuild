@@ -10,9 +10,7 @@ menu "Spotflow"
         string "Device ID device will use to connect to Spotflow observability platform"
         help
             Device ID is a unique identifier for your device in Spotflow observability
-            platform. If empty, the hexadecimal representation of the result of
-            hwinfo_get_device_id(...) will be used. You can provide the device ID
-            in the code by defining the function char* spotflow_override_device_id(). Keep it less than 32 characters.
+            platform. If empty, the Device MAC Address will be used. Keep it less than 32 characters.
 
     config SPOTFLOW_INGEST_KEY
         string "Password device will use to connect to Spotflow observability platform"
@@ -37,7 +35,7 @@ menu "Spotflow"
 	# Use binary descriptors when possible
 	help
 		Generate build ID and embed it as a binary descriptor.
-		Build ID allows to match core dumps with the original .elf file.
+		Build ID allows to match core dumps with the original .elf file. (Not implemented yet).
 
     config SPOTFLOW_LOG_BACKEND
         bool "Spotflow logging backend"

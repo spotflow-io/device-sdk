@@ -4,6 +4,7 @@
 #include "spotflow.h"
 #include "esp_tls.h"
 #include "logging/spotflow_log_backend.h"
+#include "logging/spotflow_log_queue.h"
 #include "net/spotflow_mqtt.h"
 
 // static const char *TAG = "spotflow_mqtt";
@@ -104,6 +105,46 @@ void mqtt_app_start(void)
     client = esp_mqtt_client_init(&mqtt_cfg);
     esp_mqtt_client_register_event(client, ESP_EVENT_ANY_ID, mqtt_event_handler, NULL);
     esp_mqtt_client_start(client);
-    SPOTFLOW_LOG( "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
+    xTaskCreate(mqtt_publish, "mqtt_publish", CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN*2, NULL, 5, NULL);
+
+}
+
+/**
+ * @brief Seperate Task for publishing the mqtt messages.
+ * 
+ * @param pvParameters 
+ */
+void mqtt_publish(void *pvParameters)
+{
+    while(1)
+    {
+        if(atomic_load(&mqtt_connected))
+        {
+            if(esp_mqtt_client_get_outbox_size(client) == 0)    // Check the mqtt buffer is empty if not 
+            {
+                char *queue_buffer = malloc(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN);
+                size_t len = 0;
+                while ((len = queue_read(queue_buffer)) != -1 && atomic_load(&mqtt_connected)) //Check if mqtt disconnect event is not generated.
+                {
+                   int msg_id = esp_mqtt_client_publish(client, "ingest-cbor", (const char*)queue_buffer , len, 1, 0); // Sending MQTT message the CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN provides the buffer length
+                   // Error check.
+                   if(msg_id < 0)
+                   {
+                    SPOTFLOW_LOG("Error %d occured while sending mqtt", msg_id);
+                   }
+                   else
+                   {
+                    SPOTFLOW_LOG("Message sent successfully");
+                   }
+                }
+                free(queue_buffer); 
+            }
+            else
+            {
+                SPOTFLOW_LOG("MQTT buffer not empty some message is being processed.");
+            } 
+        }
+        vTaskDelay(pdMS_TO_TICKS(50));  // 50ms interval during each recheck we can increase it. 
+    }
 
 }

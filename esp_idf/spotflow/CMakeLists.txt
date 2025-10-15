@@ -1,3 +1,4 @@
+cmake_minimum_required(VERSION 3.16)
 set(SRCS
     "src/net/spotflow_mqtt.c"
     "src/logging/spotflow_log_backend.c"
