@@ -88,10 +88,16 @@ void mqtt_app_start(void)
     static char device_id[32]; // For saving the device ID
     uint8_t mac[6]; //The Mac Address string
     esp_read_mac(mac, ESP_MAC_WIFI_STA); // Read the mac Address
-    snprintf(device_id, sizeof(device_id), "%s",
-            strlen(CONFIG_SPOTFLOW_DEVICE_ID) ? CONFIG_SPOTFLOW_DEVICE_ID :
-            ({ static char tmp[32]; snprintf(tmp, sizeof(tmp), "%02X%02X%02X%02X%02X%02X",
-                                                mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); tmp; }));  // Check if CONFIG_SPOTFLOW_DEVICE_ID is empty if no then copy the device ID, if yes then generate it.
+    
+    // Setting mqtt username
+    if(strlen(CONFIG_SPOTFLOW_DEVICE_ID) != 0)
+    {   
+        snprintf(device_id, sizeof(device_id), "%s",CONFIG_SPOTFLOW_DEVICE_ID); //Adding the device ID here defined in Kconfig
+    }
+    else
+    {
+        snprintf(device_id, sizeof(device_id), "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]); // Reading and adding mac Address.
+    }
 
     const esp_mqtt_client_config_t mqtt_cfg = {
         .broker = {
