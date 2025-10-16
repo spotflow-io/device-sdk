@@ -39,7 +39,8 @@ int main(void)
 	int i = 0;
 	while (true) {
 		LOG_INF("Hello from Zephyr to Spotflow: %d", i++);
-		k_sleep(K_SECONDS(2));
+		k_sleep(K_SECONDS(1));
+
 	}
 }
 
