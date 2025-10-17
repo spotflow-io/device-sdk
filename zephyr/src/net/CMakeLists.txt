@@ -1,10 +1,10 @@
 ﻿zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_LOG_BACKEND
-       spotflow_processor.c
-       spotflow_connection_helper.c
-       spotflow_device_id.c
-       spotflow_mqtt.c
-       spotflow_session_metadata.c
-       spotflow_tls.c
+        spotflow_processor.c
+        spotflow_connection_helper.c
+        spotflow_device_id.c
+        spotflow_mqtt.c
+        spotflow_session_metadata.c
+        spotflow_tls.c
 )
 
 zephyr_library_link_libraries(mbedTLS)
