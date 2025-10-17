@@ -4,10 +4,10 @@
 #include <zephyr/logging/log.h>
 
 #include "logging/spotflow_log_cbor.h"
-#include "net/spotflow_config.h"
-#include "net/spotflow_config_cbor.h"
-#include "net/spotflow_config_options.h"
-#include "net/spotflow_config_persistence.h"
+#include "config/spotflow_config.h"
+#include "config/spotflow_config_cbor.h"
+#include "config/spotflow_config_options.h"
+#include "config/spotflow_config_persistence.h"
 #include "net/spotflow_mqtt.h"
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);

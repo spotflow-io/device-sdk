@@ -3,7 +3,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
 
-#include "net/spotflow_config_persistence.h"
+#include "config/spotflow_config_persistence.h"
 
 #if CONFIG_SPOTFLOW_SETTINGS
 

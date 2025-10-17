@@ -8,8 +8,8 @@
 
 #include "logging/spotflow_log_cbor.h"
 #include "logging/spotflow_cbor_output_context.h"
-#include "net/spotflow_config.h"
-#include "net/spotflow_config_options.h"
+#include "config/spotflow_config.h"
+#include "config/spotflow_config_options.h"
 #include "net/spotflow_processor.h"
 
 LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);

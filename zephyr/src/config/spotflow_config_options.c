@@ -4,7 +4,7 @@
 #include <zephyr/logging/log.h>
 
 #include "logging/spotflow_log_backend.h"
-#include "net/spotflow_config_options.h"
+#include "config/spotflow_config_options.h"
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
