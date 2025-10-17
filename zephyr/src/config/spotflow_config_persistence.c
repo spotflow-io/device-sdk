@@ -44,6 +44,7 @@ void spotflow_config_persistence_try_load(struct spotflow_config_persisted_setti
 void spotflow_config_persistence_try_save(struct spotflow_config_persisted_settings* settings)
 {
 	if (settings->contains_sent_log_level) {
+		/* This function writes the value only if it has changed */
 		int rc =
 		    settings_save_one(SPOTFLOW_SETTINGS_PATH_SENT_LOG_LEVEL,
 				      &settings->sent_log_level, sizeof(settings->sent_log_level));
