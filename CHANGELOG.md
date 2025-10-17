@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+* Added ability to remotely configure the minimal severity of sent log messages
 ### Fixed
 * Fixed coredump example in debug mode on Nordic boards
 

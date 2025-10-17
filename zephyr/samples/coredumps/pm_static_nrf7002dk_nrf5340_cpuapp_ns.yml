@@ -1,13 +1,30 @@
 app:
   address: 0x10000
-  end_address: 0xf0000
+  end_address: 0xec000
   region: flash_primary
-  size: 0xe0000
+  size: 0xdc000
 coredump_partition:
   address: 0xf0000
   end_address: 0x100000
+  inside:
+  - nonsecure_storage
   region: flash_primary
   size: 0x10000
+nonsecure_storage:
+  address: 0xec000
+  end_address: 0x100000
+  span:
+  - settings_storage
+  - coredump_partition
+  region: flash_primary
+  size: 0x14000
+settings_storage:
+  address: 0xec000
+  end_address: 0xf0000
+  inside:
+  - nonsecure_storage
+  region: flash_primary
+  size: 0x4000
 tfm:
   address: 0x0
   end_address: 0x10000
@@ -18,18 +35,15 @@ tfm:
   size: 0x10000
 tfm_nonsecure:
   address: 0x10000
-  end_address: 0x100000
-  orig_span: &id003
+  end_address: 0xec000
+  span:
   - app
-  - coredump_partition
   region: flash_primary
-  size: 0xf0000
-  span: *id003
+  size: 0xdc000
 tfm_secure:
   address: 0x0
   end_address: 0x10000
-  orig_span: &id004
+  span:
   - tfm
   region: flash_primary
   size: 0x10000
-  span: *id004

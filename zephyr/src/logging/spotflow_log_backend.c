@@ -1,13 +1,16 @@
 #include "spotflow_log_backend.h"
 
-#include <zephyr/logging/log_backend.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/logging/log_backend.h>
+#include <zephyr/logging/log_ctrl.h>
 #include <zephyr/net/mqtt.h>
 #include <zephyr/kernel.h>
 
-#include "spotflow_log_cbor.h"
+#include "logging/spotflow_log_cbor.h"
+#include "logging/spotflow_cbor_output_context.h"
+#include "config/spotflow_config.h"
+#include "config/spotflow_config_options.h"
 #include "net/spotflow_processor.h"
-#include "spotflow_cbor_output_context.h"
 
 LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
@@ -55,6 +58,19 @@ static void process_single_message_stats_update(struct spotflow_log_context* con
 static void process_message_stats_update(struct spotflow_log_context* context, uint32_t cnt,
 					 bool dropped);
 
+void spotflow_log_backend_try_set_runtime_filter(uint32_t level)
+{
+#if CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
+
+	for (uint16_t s = 0; s < log_src_cnt_get(0); s++) {
+		log_filter_set(&log_backend_spotflow, 0, s, level);
+	}
+
+	LOG_INF("Runtime filter set to %d for all sources", level);
+
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING */
+}
+
 static void init(const struct log_backend* const backend)
 {
 	LOG_DBG("Initializing spotflow logging backend");
@@ -69,6 +85,8 @@ static void init(const struct log_backend* const backend)
 	ctx->dropped_backend_count = 0;
 	ctx->message_index = 0;
 
+	spotflow_config_init();
+
 	spotflow_start_mqtt();
 
 	LOG_INF("Spotflow logging backend initialized.");
@@ -80,6 +98,10 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 	struct spotflow_log_context* ctx = backend->cb->ctx;
 	if (ctx == NULL) {
 		LOG_DBG("No spotflow log context");
+		return;
+	}
+
+	if (log_msg_get_level(log_msg) > spotflow_config_get_sent_log_level()) {
 		return;
 	}
 

@@ -2,8 +2,8 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/socket.h>
-#include <string.h>
 
+#include "config/spotflow_config.h"
 #include "net/spotflow_processor.h"
 #include "net/spotflow_mqtt.h"
 #include "net/spotflow_connection_helper.h"
@@ -92,9 +92,14 @@ static void process_mqtt()
 	int rc;
 	rc = spotflow_session_metadata_send();
 	if (rc < 0) {
-		LOG_DBG("Failed to send session metadata, aborting MQTT: %d", rc);
+		LOG_WRN("Failed to send session metadata, aborting MQTT: %d", rc);
 		spotflow_mqtt_abort_mqtt();
 		return;
+	}
+
+	rc = spotflow_config_init_session();
+	if (rc < 0) {
+		LOG_WRN("Failed to initialize configuration updating: %d", rc);
 	}
 
 	/*  INNER LOOP: perform normal MQTT I/O until an error occurs. */

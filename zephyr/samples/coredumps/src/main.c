@@ -7,7 +7,7 @@
 #include "zephyr/drivers/gpio.h"
 #include <zephyr/device.h>
 
-LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
+LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_DBG);
 
 #define SW0_NODE DT_ALIAS(sw0)
 #if !DT_NODE_HAS_STATUS_OKAY(SW0_NODE)
@@ -38,8 +38,12 @@ int main(void)
 	connect_to_wifi();
 	int i = 0;
 	while (true) {
-		LOG_INF("Hello from Zephyr to Spotflow: %d", i++);
-		k_sleep(K_SECONDS(2));
+		LOG_ERR("Error from Zephyr to Spotflow: %d", i);
+		LOG_WRN("Warning from Zephyr to Spotflow: %d", i);
+		LOG_INF("Information from Zephyr to Spotflow: %d", i);
+		LOG_DBG("Debug from Zephyr to Spotflow: %d", i);
+		i++;
+		k_sleep(K_SECONDS(5));
 	}
 }
 
