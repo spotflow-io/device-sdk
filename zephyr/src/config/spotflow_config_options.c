@@ -15,15 +15,17 @@ uint8_t spotflow_config_get_sent_log_level()
 	return sent_log_level;
 }
 
-void spotflow_config_init_sent_log_level(bool override_value, uint8_t level)
+void spotflow_config_init_sent_log_level(uint8_t level)
 {
-	if (override_value) {
-		sent_log_level = level;
-	}
-
+	sent_log_level = level;
 	LOG_INF("Initialized sent log level to %d", sent_log_level);
 
 	spotflow_log_backend_try_set_runtime_filter(sent_log_level);
+}
+
+void spotflow_config_init_sent_log_level_default()
+{
+	spotflow_config_init_sent_log_level(CONFIG_SPOTFLOW_DEFAULT_SENT_LOG_LEVEL);
 }
 
 void spotflow_config_set_sent_log_level(uint8_t level)

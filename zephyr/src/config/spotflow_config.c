@@ -22,8 +22,11 @@ void spotflow_config_init()
 	spotflow_config_persistence_try_init();
 	spotflow_config_persistence_try_load(&persisted_settings);
 
-	spotflow_config_init_sent_log_level(persisted_settings.contains_sent_log_level,
-					    persisted_settings.sent_log_level);
+	if (persisted_settings.contains_sent_log_level) {
+		spotflow_config_init_sent_log_level(persisted_settings.sent_log_level);
+	} else {
+		spotflow_config_init_sent_log_level_default();
+	}
 }
 
 int spotflow_config_init_session()
