@@ -4,6 +4,7 @@
 #include <zephyr/net/socket.h>
 
 #include "config/spotflow_config.h"
+#include "config/spotflow_config_net.h"
 #include "net/spotflow_processor.h"
 #include "net/spotflow_mqtt.h"
 #include "net/spotflow_connection_helper.h"
