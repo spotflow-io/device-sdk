@@ -82,7 +82,7 @@ static void handle_desired_msg(uint8_t* payload, size_t len)
 		.acked_desired_config_version = desired_msg.desired_config_version,
 	};
 
-	struct spotflow_config_persisted_settings persisted_settings = { 0 };
+	struct spotflow_config_persisted_settings settings_to_persist = { 0 };
 
 	if (desired_msg.contains_minimal_log_severity) {
 		uint8_t new_sent_log_level =
@@ -92,11 +92,11 @@ static void handle_desired_msg(uint8_t* payload, size_t len)
 
 		add_log_severity_to_reported_msg(&reported_msg);
 
-		persisted_settings.contains_sent_log_level = true;
-		persisted_settings.sent_log_level = new_sent_log_level;
+		settings_to_persist.contains_sent_log_level = true;
+		settings_to_persist.sent_log_level = new_sent_log_level;
 	}
 
-	spotflow_config_persistence_try_save(&persisted_settings);
+	spotflow_config_persistence_try_save(&settings_to_persist);
 
 	uint8_t buffer[SPOTFLOW_CONFIG_RESPONSE_MAX_LENGTH];
 	rc = spotflow_config_cbor_encode_reported(&reported_msg, buffer, sizeof(buffer));
