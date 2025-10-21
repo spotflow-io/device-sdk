@@ -69,7 +69,7 @@ int spotflow_config_cbor_decode_desired(uint8_t* payload, size_t len,
 }
 
 int spotflow_config_cbor_encode_reported(struct spotflow_config_reported_msg* msg, uint8_t* buffer,
-					 size_t len)
+					 size_t len, size_t* encoded_len)
 {
 	if (buffer == NULL || len == 0) {
 		LOG_ERR("Invalid buffer or length");
@@ -106,6 +106,8 @@ int spotflow_config_cbor_encode_reported(struct spotflow_config_reported_msg* ms
 			zcbor_peek_error(state));
 		return -EINVAL;
 	}
+
+	*encoded_len = state->payload - buffer;
 
 	return 0;
 }
