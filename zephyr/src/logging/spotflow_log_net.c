@@ -25,7 +25,7 @@ int poll_and_process_enqueued_logs()
 		 * log message will be lost
 		 */
 		if (k_msgq_get(&g_spotflow_logs_msgq, &msg_ptr, K_NO_WAIT) == 0) {
-			rc = spotflow_mqtt_publish_cbor_msg(msg_ptr->payload, msg_ptr->len);
+			rc = spotflow_mqtt_publish_ingest_cbor_msg(msg_ptr->payload, msg_ptr->len);
 			if (rc < 0) {
 				LOG_DBG("Failed to publish cbor log message rc: %d -> "
 					"aborting mqtt connection",

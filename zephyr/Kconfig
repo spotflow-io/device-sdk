@@ -129,4 +129,13 @@ config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 		Size of the stack used by the Spotflow processing thread.
 		Increase this value if you experience issues with logs/tls handshake.
 
+config SPOTFLOW_SETTINGS
+	bool "Enable persistence of Spotflow configuration using Zephyr settings subsystem"
+	default y
+	depends on SETTINGS
+	help
+		Enable this option to persist Spotflow configuration using Zephyr settings subsystem.
+		If disabled, the configuration set from the cloud will be lost after reboot and loaded
+		only after the connection to the cloud is established.
+
 endif #SPOTFLOW

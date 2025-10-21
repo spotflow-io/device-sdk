@@ -74,6 +74,42 @@ flowchart LR
     processor --> G[Send to MQTT]
 ```
 
+#### Configuration
+
+Most properties of the device SDK are currently configured in build time using Kconfig - see the help text of each option for more information.
+
+The device SDK also provides a way to dynamically configure certain properties from the cloud using the Spotflow portal.
+Currently, there is only one such property:
+
+- **Minimal severity of sent log messages** (the *level* of sent log messages)
+
+The configuration process uses the mechanism of *desired* and *reported* values that are stored for each device in the Spotflow platform and are synchronized using the MQTT protocol.
+If Zephyr Settings subsystem is enabled, the device SDK uses it to persist the last active configuration.
+
+```mermaid
+---
+title: Configuration from the Spotflow Platform
+---
+sequenceDiagram
+participant ZS as Zephyr Settings
+participant SDK as Device SDK
+participant PM as Spotflow Platform
+
+Note left of SDK: On startup
+SDK ->> ZS: Try load initial configuration
+ZS ->> SDK: Configuration loaded / defaults used
+
+Note right of SDK: On MQTT connection activation
+SDK ->> PM: Send reported configuration
+SDK ->> PM: Subscribe to desired configuration
+
+loop When desired configuration changes
+PM ->> SDK: Send desired configuration
+SDK ->> ZS: Persist configuration
+SDK ->> PM: Send reported configuration
+end
+```
+
 ### Build ID
 
 In order to match core dumps with symbol files, our Zephyr module provides a piece of information called build ID.
