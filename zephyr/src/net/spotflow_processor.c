@@ -2,8 +2,9 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/socket.h>
-#include <string.h>
 
+#include "config/spotflow_config.h"
+#include "config/spotflow_config_net.h"
 #include "net/spotflow_processor.h"
 #include "net/spotflow_mqtt.h"
 #include "net/spotflow_connection_helper.h"
@@ -61,9 +62,13 @@ static void mqtt_thread(void)
 	}
 }
 
-static int process_coredumps_or_logs()
+static int process_config_coredumps_or_logs()
 {
-	int rc = 0;
+	int rc = spotflow_config_send_pending_message();
+	if (rc < 0) {
+		LOG_DBG("Failed to send pending configuration message: %d", rc);
+		return rc;
+	}
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 	rc = spotflow_poll_and_process_enqueued_coredump_chunks();
 	if (rc < 0) {
@@ -92,9 +97,14 @@ static void process_mqtt()
 	int rc;
 	rc = spotflow_session_metadata_send();
 	if (rc < 0) {
-		LOG_DBG("Failed to send session metadata, aborting MQTT: %d", rc);
+		LOG_WRN("Failed to send session metadata, aborting MQTT: %d", rc);
 		spotflow_mqtt_abort_mqtt();
 		return;
+	}
+
+	rc = spotflow_config_init_session();
+	if (rc < 0) {
+		LOG_WRN("Failed to initialize configuration updating: %d", rc);
 	}
 
 	/*  INNER LOOP: perform normal MQTT I/O until an error occurs. */
@@ -105,7 +115,7 @@ static void process_mqtt()
 			break; /* break out of the inner loop; outer loop will reconnect */
 		}
 
-		rc = process_coredumps_or_logs();
+		rc = process_config_coredumps_or_logs();
 		if (rc < 0) {
 			/* Problem in sending/mqtt_publish, reestablishing MQTT Connection*/
 			break;
