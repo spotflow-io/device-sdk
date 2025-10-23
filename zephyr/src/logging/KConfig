@@ -54,4 +54,32 @@ config SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL
 		- 3 INFO, write LOG_INF in addition to previous level
 		- 4 DEBUG, write LOG_DBG in addition to previous level
 
+config SPOTFLOW_DEFAULT_SENT_LOG_LEVEL
+	int "Spotflow default sent log level"
+	default LOG_MAX_LEVEL
+	range 0 LOG_MAX_LEVEL
+	help
+		Filters the logs sent to Spotflow cloud according to their severity level.
+		This is the default value that can be dynamically overridden from the cloud.
+		Levels are:
+		- 0 OFF, do not send any logs
+		- 1 ERROR, send LOG_ERR
+		- 2 WARNING, send LOG_WRN in addition to previous level
+		- 3 INFO, send LOG_INF in addition to previous level
+		- 4 DEBUG, send LOG_DBG in addition to previous level
+		The default value is LOG_MAX_LEVEL, i.e. the maximal compiled-in level (the minimal
+		compiled-in severity), so all compiled-in logs are sent by default. LOG_MAX_LEVEL
+		itself defaults to 4 (DEBUG). SPOTFLOW_DEFAULT_SENT_LOG_LEVEL cannot be larger than
+		LOG_MAX_LEVEL.
+
+config SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
+	bool "Set runtime filtering when Spotflow log level is set from the cloud"
+	default y
+	depends on LOG_RUNTIME_FILTERING
+	help
+		If enabled, the Spotflow module will automatically call log_filter_set() to the
+		Spotflow logging backend for all sources when it receives a new log level from the
+		cloud. This optimization might help reduce resource usage, because if no backend
+		consumes log messages of a certain level, their processing is skipped.
+
 endif #SPOTFLOW_LOG_BACKEND

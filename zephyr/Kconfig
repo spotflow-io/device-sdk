@@ -10,6 +10,7 @@ menuconfig SPOTFLOW
 	select MQTT_LIB_TLS
 	select MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED if !NRF_SECURITY
 	select MBEDTLS_ECP_DP_SECP256R1_ENABLED
+	select MBEDTLS_ECP_DP_SECP384R1_ENABLED if NRF_SECURITY
 	select MBEDTLS_ECDH_C
 	select MBEDTLS_ECP_C
 	select MBEDTLS_RSA_C if NRF_SECURITY
@@ -122,9 +123,19 @@ config SPOTFLOW_MQTT_THREAD_PRIORITY
 
 config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 	int "Size of Spotflow processing thread stack"
+	default 3072 if DEBUG_OPTIMIZATIONS
 	default 2560
 	help
 		Size of the stack used by the Spotflow processing thread.
 		Increase this value if you experience issues with logs/tls handshake.
+
+config SPOTFLOW_SETTINGS
+	bool "Enable persistence of Spotflow configuration using Zephyr settings subsystem"
+	default y
+	depends on SETTINGS
+	help
+		Enable this option to persist Spotflow configuration using Zephyr settings subsystem.
+		If disabled, the configuration set from the cloud will be lost after reboot and loaded
+		only after the connection to the cloud is established.
 
 endif #SPOTFLOW

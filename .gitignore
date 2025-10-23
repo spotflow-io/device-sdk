@@ -8,3 +8,9 @@ modules/*west
 **/credentials.conf
 /.vscode/
 **/cmake-build-debug/*
+esp_idf/spotflow/examples/logs/sdkconfig
+esp_idf/spotflow/examples/logs/sdkconfig.old
+esp_idf/spotflow/examples/logs/managed_components/*
+esp_idf/spotflow/examples/logs/.vscode/*
+esp_idf/spotflow/examples/logs/dependencies.lock
+esp_idf/spotflow/.vscode/

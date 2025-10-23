@@ -28,6 +28,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VALIDATE_ALL_CODEBASE: true
           ENABLE_LINTERS: "C_CLANG_FORMAT,EDITORCONFIG_EDITORCONFIG_CHECKER"
+          EXCLUDED_DIRECTORIES: "esp_idf"
 
       # Upload MegaLinter artifacts
       - name: Archive production artifacts
