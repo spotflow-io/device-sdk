@@ -8,9 +8,7 @@ endif()
 
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(coredumps)
-
-add_compile_options(-fno-omit-frame-pointer -g)
+project(metrics)
 
 add_subdirectory(../common ${CMAKE_CURRENT_BINARY_DIR}/common)
 

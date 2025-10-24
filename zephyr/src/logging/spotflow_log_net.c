@@ -42,6 +42,7 @@ int poll_and_process_enqueued_logs()
 			k_free(msg_ptr);
 			if (messages_sent_counter % 100 == 0) {
 				LOG_INF("Sent %" PRIu32 " messages", messages_sent_counter);
+				msg_ptr->len = 10;
 			}
 			if (messages_sent_counter == UINT32_MAX) {
 				LOG_INF("Sent %" PRIu32 " messages. Reset.", messages_sent_counter);
