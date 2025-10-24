@@ -18,14 +18,13 @@ LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_INF);
 #define WIFI_SSID CONFIG_NET_WIFI_SSID
 #define WIFI_PSK CONFIG_NET_WIFI_PASSWORD
 
-/* to provide backward compatibility for zephyr < 4.2.0 */
-
 static struct net_if* sta_iface;
 
 static struct wifi_connect_req_params sta_config;
 
 static struct net_mgmt_event_callback cb;
 
+/* To provide backward compatibility for zephyr < 4.2.0 */
 static void wifi_event_handler(struct net_mgmt_event_callback* cb,
 #if SPOTFLOW_ZEPHYR_VERSION_GE(4, 2)
 			       uint64_t mgmt_event,

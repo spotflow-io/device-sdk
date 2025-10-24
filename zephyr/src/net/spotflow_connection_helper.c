@@ -1,4 +1,6 @@
-﻿#include <zephyr/kernel.h>
+﻿#include <inttypes.h>
+
+#include <zephyr/kernel.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/socket.h>
 #include <version_helper.h>
@@ -8,11 +10,13 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 #define L4_EVENT_MASK \
 	(NET_EVENT_DNS_SERVER_ADD | NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
 
-/*to provide backward compatibility for zephyr <4.2.0 */
+/* To provide backward compatibility for zephyr <4.2.0 */
 #if SPOTFLOW_ZEPHYR_VERSION_GE(4, 2)
 typedef uint64_t mgmt_evt_t;
+#define PRI_MGMT_EVT_T PRIu64
 #else
 typedef uint32_t mgmt_evt_t;
+#define PRI_MGMT_EVT_T PRIu32
 #endif
 
 static struct net_mgmt_event_callback net_mgmt_event_cb;
@@ -69,7 +73,7 @@ void wait_for_network()
 static void l4_event_handler(struct net_mgmt_event_callback* cb, mgmt_evt_t mgmt_event,
 			     struct net_if* iface)
 {
-	LOG_DBG("Network event: %llu", mgmt_event);
+	LOG_DBG("Network event: %" PRI_MGMT_EVT_T, mgmt_event);
 	switch (mgmt_event) {
 	case NET_EVENT_L4_CONNECTED:
 		LOG_DBG("Network connectivity established and IP address assigned");

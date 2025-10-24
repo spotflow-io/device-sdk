@@ -1,5 +1,4 @@
-﻿
-#ifndef VERSION_HELPER_H
+﻿#ifndef VERSION_HELPER_H
 #define VERSION_HELPER_H
 
 #include <version.h>
@@ -15,4 +14,5 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
+
 #endif //VERSION_HELPER_H
