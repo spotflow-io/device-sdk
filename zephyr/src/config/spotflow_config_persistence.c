@@ -22,7 +22,8 @@ void spotflow_config_persistence_try_init()
 	int ret = settings_subsys_init();
 	if (ret != 0) {
 		LOG_ERR("Failed to initialize settings subsystem, persisting configuration will "
-			"not work");
+			"not work: %d",
+			ret);
 		return;
 	}
 }
