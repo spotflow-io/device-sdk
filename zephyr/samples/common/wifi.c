@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/wifi_mgmt.h>
@@ -99,10 +100,20 @@ int connect_to_wifi(void)
 
 	LOG_INF("Connecting to SSID: %s\n", sta_config.ssid);
 
-	int ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, sta_iface, &sta_config,
-			   sizeof(struct wifi_connect_req_params));
+	int ret;
+	do {
+		ret =
+		    net_mgmt(NET_REQUEST_WIFI_CONNECT, sta_iface, &sta_config, sizeof(sta_config));
+		if (ret == -EAGAIN) {
+			LOG_INF("Unable to connect to (%s), retrying...", WIFI_SSID);
+			k_sleep(K_SECONDS(1));
+		} else {
+			break;
+		}
+	} while (true);
+
 	if (ret) {
-		LOG_ERR("Unable to Connect to (%s)", WIFI_SSID);
+		LOG_ERR("Unable to Connect to (%s): %d", WIFI_SSID, ret);
 	}
 
 	return ret;
