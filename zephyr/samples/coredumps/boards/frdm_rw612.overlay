@@ -1,5 +1,6 @@
-/*GPIO not available in 4.1.0, adding based on commit
-https://github.com/zephyrproject-rtos/zephyr/commit/2df6b7fd2dea95105b3598c41fecbd7089fab080*/
+/* GPIO not available in 4.1.0, adding based on commit
+ * https://github.com/zephyrproject-rtos/zephyr/commit/2df6b7fd2dea95105b3598c41fecbd7089fab080
+ */
 #include <zephyr/dt-bindings/input/input-event-codes.h>
 / {
 	aliases {
@@ -18,8 +19,9 @@ https://github.com/zephyrproject-rtos/zephyr/commit/2df6b7fd2dea95105b3598c41fec
 	};
 };
 
-/* external flash chip - winbond - to more information
-	  zephyr\boards\nxp\frdm_rw612\frdm_rw612_common.dtsi*/
+/* External flash chip - winbond - for more information see:
+ * zephyr/boards/nxp/frdm_rw612/frdm_rw612_common.dtsi
+ */
 &w25q512jvfiq {
 	partitions {
 		coredump_partition: partition@3f00000 {

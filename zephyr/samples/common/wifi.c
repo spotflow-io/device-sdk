@@ -1,7 +1,11 @@
+#include <errno.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/dhcpv4_server.h>
+#include "version_helper.h"
+#include <zephyr/kernel_version.h>
+#include <version.h>
 
 LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_INF);
 
@@ -21,7 +25,13 @@ static struct wifi_connect_req_params sta_config;
 
 static struct net_mgmt_event_callback cb;
 
-static void wifi_event_handler(struct net_mgmt_event_callback* cb, uint32_t mgmt_event,
+/* To provide backward compatibility for zephyr < 4.2.0 */
+static void wifi_event_handler(struct net_mgmt_event_callback* cb,
+#if SPOTFLOW_ZEPHYR_VERSION_GE(4, 2)
+			       uint64_t mgmt_event,
+#else
+			       uint32_t mgmt_event,
+#endif
 			       struct net_if* iface)
 {
 	switch (mgmt_event) {
@@ -90,10 +100,20 @@ int connect_to_wifi(void)
 
 	LOG_INF("Connecting to SSID: %s\n", sta_config.ssid);
 
-	int ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, sta_iface, &sta_config,
-			   sizeof(struct wifi_connect_req_params));
+	int ret;
+	do {
+		ret =
+		    net_mgmt(NET_REQUEST_WIFI_CONNECT, sta_iface, &sta_config, sizeof(sta_config));
+		if (ret == -EAGAIN) {
+			LOG_INF("Unable to connect to (%s), retrying...", WIFI_SSID);
+			k_sleep(K_SECONDS(1));
+		} else {
+			break;
+		}
+	} while (true);
+
 	if (ret) {
-		LOG_ERR("Unable to Connect to (%s)", WIFI_SSID);
+		LOG_ERR("Unable to Connect to (%s): %d", WIFI_SSID, ret);
 	}
 
 	return ret;

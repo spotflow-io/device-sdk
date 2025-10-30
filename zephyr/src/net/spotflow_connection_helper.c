@@ -1,16 +1,26 @@
-﻿#include <zephyr/kernel.h>
+﻿#include <inttypes.h>
+
+#include <zephyr/kernel.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/socket.h>
+#include <version_helper.h>
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #define L4_EVENT_MASK \
-	(NET_EVENT_L4_CONNECTED | NET_EVENT_DNS_SERVER_ADD | NET_EVENT_L4_DISCONNECTED)
+	(NET_EVENT_DNS_SERVER_ADD | NET_EVENT_L4_CONNECTED | NET_EVENT_L4_DISCONNECTED)
+
+/* To provide backward compatibility for zephyr <4.2.0 */
+#if SPOTFLOW_ZEPHYR_VERSION_GE(4, 2)
+typedef uint64_t mgmt_evt_t;
+#else
+typedef uint32_t mgmt_evt_t;
+#endif
 
 static struct net_mgmt_event_callback net_mgmt_event_cb;
 static K_SEM_DEFINE(network_connected, 0, 1);
 
-static void l4_event_handler(struct net_mgmt_event_callback* cb, uint32_t event,
+static void l4_event_handler(struct net_mgmt_event_callback* cb, mgmt_evt_t mgmt_event,
 			     struct net_if* iface);
 
 /* Query IP address for the broker URL */
@@ -58,10 +68,10 @@ void wait_for_network()
 	k_sem_take(&network_connected, K_FOREVER);
 }
 
-static void l4_event_handler(struct net_mgmt_event_callback* cb, uint32_t event,
+static void l4_event_handler(struct net_mgmt_event_callback* cb, mgmt_evt_t mgmt_event,
 			     struct net_if* iface)
 {
-	switch (event) {
+	switch (mgmt_event) {
 	case NET_EVENT_L4_CONNECTED:
 		LOG_DBG("Network connectivity established and IP address assigned");
 		k_sem_give(&network_connected);
