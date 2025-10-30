@@ -54,10 +54,12 @@ configdefault MAIN_STACK_SIZE
 configdefault ZVFS_OPEN_MAX
 	default 32 if SPOTFLOW
 
-# generally better to use separate heap for mbedtls so
-# there is a dedicated heap for TLS operations without fragmentation
+# It's generally better to use a separate heap for mbedtls so that
+# there is a dedicated heap for TLS operations without fragmentation.
+# Skipped when nRF Security is used, as the default of MBEDTLS_HEAP_SIZE
+# doesn't propagate correctly, leading to TLS handshake failures.
 configdefault MBEDTLS_ENABLE_HEAP
-	default y if SPOTFLOW
+	default y if SPOTFLOW && !NRF_SECURITY
 
 if MBEDTLS_ENABLE_HEAP
 # recommended size for mbedtls heap is 32kB
