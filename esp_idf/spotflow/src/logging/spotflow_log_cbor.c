@@ -19,10 +19,10 @@
 #define KEY_SEQUENCE_NUMBER 0x0D
 
 typedef enum {
-    LOG_SEVERITY_ERROR = 0x3C,  // Error
-    LOG_SEVERITY_WARN  = 0x32,  // Warn
-    LOG_SEVERITY_INFO  = 0x28,  // Info
-    LOG_SEVERITY_DEBUG = 0x1E,  // Debug
+	LOG_SEVERITY_ERROR = 0x3C, // Error
+	LOG_SEVERITY_WARN = 0x32, // Warn
+	LOG_SEVERITY_INFO = 0x28, // Info
+	LOG_SEVERITY_DEBUG = 0x1E, // Debug
 } LogSeverity;
 
 /**
@@ -31,15 +31,15 @@ typedef enum {
  * @param buf 
  * @param len 
  */
-void print_cbor_hex(const uint8_t *buf, size_t len)
+void print_cbor_hex(const uint8_t* buf, size_t len)
 {
-    SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
-    for (size_t i = 0; i < len; i++) {
-        SPOTFLOW_LOG("%02X ", buf[i]);  // print each byte as 2-digit hex
-        if ((i + 1) % 16 == 0)    // 16 bytes per line
-            SPOTFLOW_LOG("\n");
-    }
-    SPOTFLOW_LOG("\n");
+	SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
+	for (size_t i = 0; i < len; i++) {
+		SPOTFLOW_LOG("%02X ", buf[i]); // print each byte as 2-digit hex
+		if ((i + 1) % 16 == 0) // 16 bytes per line
+			SPOTFLOW_LOG("\n");
+	}
+	SPOTFLOW_LOG("\n");
 }
 
 /**
@@ -50,74 +50,70 @@ void print_cbor_hex(const uint8_t *buf, size_t len)
  * @param out_len 
  * @return uint8_t* 
  */
-uint8_t* log_cbor(const char *log_template, char* body,const uint8_t severity, size_t *out_len, const struct message_metadata *metadata)
+uint8_t* log_cbor(const char* log_template, char* body, const uint8_t severity, size_t* out_len,
+		  const struct message_metadata* metadata)
 {
-    // Buffer to create array to cointain several items
-    CborEncoder array_encoder;
-    CborEncoder map_encoder;
-    CborEncoder labels_encoder;
+	// Buffer to create array to cointain several items
+	CborEncoder array_encoder;
+	CborEncoder map_encoder;
+	CborEncoder labels_encoder;
 
-    uint8_t *buf = malloc(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN);
-    if (!buf) {
-        SPOTFLOW_LOG("Failed to allocate CBOR buffer");
-        return NULL;
-    }
-    
-    int body_len = strlen(body);
+	uint8_t* buf = malloc(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN);
+	if (!buf) {
+		SPOTFLOW_LOG("Failed to allocate CBOR buffer");
+		return NULL;
+	}
 
-    // Check if the last character is a newline and remove it
-    if (body_len > 0 && body[body_len - 1] == '\n') {
-        body[body_len - 1] = '\0';
-    }
+	int body_len = strlen(body);
 
+	// Check if the last character is a newline and remove it
+	if (body_len > 0 && body[body_len - 1] == '\n') {
+		body[body_len - 1] = '\0';
+	}
 
-    cbor_encoder_init(&array_encoder, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 0);
-    cbor_encoder_create_map(&array_encoder, &map_encoder, 7); // {
-    // Get device uptime in milliseconds since boot
-    /* messageType: "LOG" */
-    cbor_encode_uint(&map_encoder, KEY_MESSAGE_TYPE);
-    cbor_encode_uint(&map_encoder, LOGS_MESSAGE_TYPE);
-    
-    cbor_encode_uint(&map_encoder, KEY_BODY);
-    cbor_encode_text_stringz(&map_encoder, body);
+	cbor_encoder_init(&array_encoder, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 0);
+	cbor_encoder_create_map(&array_encoder, &map_encoder, 7); // {
+	// Get device uptime in milliseconds since boot
+	/* messageType: "LOG" */
+	cbor_encode_uint(&map_encoder, KEY_MESSAGE_TYPE);
+	cbor_encode_uint(&map_encoder, LOGS_MESSAGE_TYPE);
 
-    cbor_encode_uint(&map_encoder, KEY_SEVERITY);
-    cbor_encode_uint(&map_encoder, severity);
+	cbor_encode_uint(&map_encoder, KEY_BODY);
+	cbor_encode_text_stringz(&map_encoder, body);
 
-    cbor_encode_uint(&map_encoder, KEY_BODY_TEMPLATE);
-    cbor_encode_text_stringz(&map_encoder, log_template);
-    //------------Metadata
+	cbor_encode_uint(&map_encoder, KEY_SEVERITY);
+	cbor_encode_uint(&map_encoder, severity);
 
-    cbor_encode_uint(&map_encoder, KEY_SEQUENCE_NUMBER);
-    cbor_encode_uint(&map_encoder, metadata->sequence_number);
+	cbor_encode_uint(&map_encoder, KEY_BODY_TEMPLATE);
+	cbor_encode_text_stringz(&map_encoder, log_template);
+	//------------Metadata
 
-    cbor_encode_uint(&map_encoder, KEY_DEVICE_UPTIME_MS);
-    cbor_encode_uint(&map_encoder, metadata->uptime_ms);
+	cbor_encode_uint(&map_encoder, KEY_SEQUENCE_NUMBER);
+	cbor_encode_uint(&map_encoder, metadata->sequence_number);
 
+	cbor_encode_uint(&map_encoder, KEY_DEVICE_UPTIME_MS);
+	cbor_encode_uint(&map_encoder, metadata->uptime_ms);
 
-    // labels → nested map with one element
-    cbor_encode_uint(&map_encoder, KEY_LABELS);
-    cbor_encoder_create_map(&map_encoder, &labels_encoder, 1); // {
-    // // key: source (full string name inside labels map) 
-    cbor_encode_text_stringz(&labels_encoder, "source" );
-    if (metadata->source && metadata->source[0] != '\0') 
-    {
-        cbor_encode_text_stringz(&labels_encoder, metadata->source);
-    } 
-    else 
-    {
-        SPOTFLOW_LOG("Source is missing or empty\n");
-        cbor_encode_text_stringz(&labels_encoder, "");
-    }
-    
-    cbor_encoder_close_container(&map_encoder, &labels_encoder); // }
+	// labels → nested map with one element
+	cbor_encode_uint(&map_encoder, KEY_LABELS);
+	cbor_encoder_create_map(&map_encoder, &labels_encoder, 1); // {
+	// // key: source (full string name inside labels map)
+	cbor_encode_text_stringz(&labels_encoder, "source");
+	if (metadata->source && metadata->source[0] != '\0') {
+		cbor_encode_text_stringz(&labels_encoder, metadata->source);
+	} else {
+		SPOTFLOW_LOG("Source is missing or empty\n");
+		cbor_encode_text_stringz(&labels_encoder, "");
+	}
 
-    cbor_encoder_close_container(&array_encoder, &map_encoder); // }
-    // Allocate buffer for JSON string (adjust size as needed)
-    
-    *out_len = cbor_encoder_get_buffer_size(&array_encoder, buf);
-    // print_cbor_hex(buf, *out_len);
-    return buf;
+	cbor_encoder_close_container(&map_encoder, &labels_encoder); // }
+
+	cbor_encoder_close_container(&array_encoder, &map_encoder); // }
+	// Allocate buffer for JSON string (adjust size as needed)
+
+	*out_len = cbor_encoder_get_buffer_size(&array_encoder, buf);
+	// print_cbor_hex(buf, *out_len);
+	return buf;
 }
 
 /**
@@ -125,24 +121,37 @@ uint8_t* log_cbor(const char *log_template, char* body,const uint8_t severity, s
  * 
  * @param buffer 
  */
-void log_cbor_send(const char *fmt, char* buffer, const char log_severity, const struct message_metadata *metadata)
+void log_cbor_send(const char* fmt, char* buffer, const char log_severity,
+		   const struct message_metadata* metadata)
 {
-    size_t len = strlen(buffer);
-    uint8_t severity = 0;
-    if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
-        switch (log_severity) {
-            case 'E': severity = LOG_SEVERITY_ERROR; break; //Error
-            case 'W': severity = LOG_SEVERITY_WARN; break; //Warning
-            case 'I': severity = LOG_SEVERITY_INFO;  break; //Info
-            case 'D': severity = LOG_SEVERITY_DEBUG; break; //Debug
-            case 'V': severity = LOG_SEVERITY_DEBUG; break; //Verbose right now set to debug
-            default: severity = 0x0; break; //In case no log type set it to 0, unknown level
-        }
+	size_t len = strlen(buffer);
+	uint8_t severity = 0;
+	if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
+		switch (log_severity) {
+		case 'E':
+			severity = LOG_SEVERITY_ERROR;
+			break; //Error
+		case 'W':
+			severity = LOG_SEVERITY_WARN;
+			break; //Warning
+		case 'I':
+			severity = LOG_SEVERITY_INFO;
+			break; //Info
+		case 'D':
+			severity = LOG_SEVERITY_DEBUG;
+			break; //Debug
+		case 'V':
+			severity = LOG_SEVERITY_DEBUG;
+			break; //Verbose right now set to debug
+		default:
+			severity = 0x0;
+			break; //In case no log type set it to 0, unknown level
+		}
 
-        uint8_t *clog_cbor = log_cbor(fmt, buffer, severity, &len, metadata); // It reuses the length
+		uint8_t* clog_cbor =
+		    log_cbor(fmt, buffer, severity, &len, metadata); // It reuses the length
 
-        queue_push(clog_cbor, len);
-        free(clog_cbor);
-        
-    }
+		queue_push(clog_cbor, len);
+		free(clog_cbor);
+	}
 }

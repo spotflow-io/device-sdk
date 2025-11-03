@@ -6,19 +6,43 @@
 #include "esp_event.h"
 #include "esp_netif.h"
 #include "nvs_flash.h"
+#include "driver/gpio.h"
 #include "protocol_examples_common.h"
 
 #include "esp_log.h"
 #include "spotflow.h"
 #include <sys/param.h>
 
-static const char* TAG = "spotflow_testing";
+static const char* TAG = "spotflow_testing_coredump";
+
+#define GPIO_INPUT_IO_0     4
+
+// ISR handler — must be IRAM safe if registered with ISR service
+static void IRAM_ATTR button_isr_handler(void* arg)
+{
+    esp_system_abort("Button pressed -> deliberate crash");
+}
+
 
 void app_main(void)
 {
 	ESP_LOGI(TAG, "[APP] Startup..");
 	ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
 	ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
+
+	 gpio_config_t btn_conf = {
+		.intr_type = GPIO_INTR_NEGEDGE,    // Interrupt on falling edge (button press)
+        .mode = GPIO_MODE_INPUT,
+        .pin_bit_mask = 1ULL << GPIO_INPUT_IO_0,
+        .pull_up_en = GPIO_PULLUP_ENABLE,  // enable pull-up
+        .pull_down_en = GPIO_PULLDOWN_DISABLE
+    };
+    gpio_config(&btn_conf);
+
+	gpio_install_isr_service(0);
+
+    // Attach the ISR handler for the button
+    gpio_isr_handler_add(GPIO_INPUT_IO_0, button_isr_handler, NULL);
 
 	esp_log_level_set("*", ESP_LOG_INFO);
 	esp_log_level_set("spotflow_testing",
@@ -35,31 +59,14 @@ void app_main(void)
 	ESP_ERROR_CHECK(example_connect());
 
 	spotflow_init();
-
-	int test_num = 1;
 	while (1) {
 		// if(atomic_load(&mqtt_connected))
 		{
-			ESP_LOGI(TAG, "Info log message works");
-			ESP_LOGD(TAG, "Debug log message works");
-			ESP_LOGE(TAG, "Debug log message works");
-			ESP_LOGW(TAG, "Warning log message works");
-			ESP_LOGV(TAG, "Verbose log message works");
 
-			//Testing long log messages. With differenet types
-			ESP_LOGI(TAG,
-				 "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abc"
-				 "defghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdef"
-				 "ghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghi"
-				 "jklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijkl"
-				 "mnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmno"
-				 "pqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789abcdefghijklmnopqr"
-				 "stuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789");
-
-			ESP_LOGW(TAG, "Test Number. %d", test_num++);
-			ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes",
-				 esp_get_free_heap_size());
+			// ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
 		}
 		vTaskDelay(pdMS_TO_TICKS(500));
+		// int a = 15 / 0;
+		// ESP_LOGI(TAG, "%d", a);
 	}
 }
