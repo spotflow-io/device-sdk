@@ -1,6 +1,6 @@
 .venv/
 external
-**/build*/
+**/build/
 *.pyc
 **/.vscode/*
 .idea
