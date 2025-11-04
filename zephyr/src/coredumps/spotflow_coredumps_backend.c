@@ -21,8 +21,8 @@ K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_mqtt_coredumps_
 
 static void spotflow_coredumps_thread_entry(void);
 
-K_THREAD_DEFINE(spotflow_coredumps_thread, STACK_SIZE, spotflow_coredumps_thread_entry, NULL, NULL, NULL,
-		THREAD_PRIO, 0, 0);
+K_THREAD_DEFINE(spotflow_coredumps_thread, STACK_SIZE, spotflow_coredumps_thread_entry, NULL, NULL,
+		NULL, THREAD_PRIO, 0, 0);
 
 void spotflow_coredump_sent()
 {

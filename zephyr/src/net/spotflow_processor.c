@@ -28,8 +28,8 @@ LOG_MODULE_REGISTER(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 static void spotflow_mqtt_thread_entry(void);
 static void process_mqtt();
 
-K_THREAD_DEFINE(spotflow_mqtt_thread, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE, spotflow_mqtt_thread_entry, NULL,
-		NULL, NULL, SPOTFLOW_MQTT_THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(spotflow_mqtt_thread, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE,
+		spotflow_mqtt_thread_entry, NULL, NULL, NULL, SPOTFLOW_MQTT_THREAD_PRIORITY, 0, 0);
 
 void spotflow_start_mqtt(void)
 {
