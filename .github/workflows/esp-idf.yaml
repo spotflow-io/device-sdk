@@ -1,0 +1,54 @@
+name: ESP-IDF Build and Test
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'esp_idf/spotflow/examples/logs/**'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'esp_idf/spotflow/examples/logs/**'
+
+jobs:
+  build:
+    name: Build and Test ESP-IDF Project
+    runs-on: ubuntu-latest
+
+    steps:
+      # Step 1: Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up Python (required for ESP-IDF tools)
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      # Step 3: Install ESP-IDF
+      - name: Set up ESP-IDF
+        uses: espressif/setup-esp-idf@v2
+        with:
+          version: 'release/v5.1'  # or whichever ESP-IDF version you need
+
+      - name: Navigate to example directory
+        working-directory: esp_idf/spotflow/examples/logs
+        run: echo "Working directory is now $(pwd)"
+        
+      # Step 4: Install project dependencies
+      - name: Install Python dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Step 5: Build the project
+      - name: Build project
+        working-directory: esp_idf/spotflow/examples/logs
+        run: idf.py build
+
+      # Step 6: Run unit tests (if using Unity/ESP-IDF testing framework)
+      - name: Run tests
+        run: idf.py test
