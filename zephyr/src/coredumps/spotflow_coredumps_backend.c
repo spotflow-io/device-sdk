@@ -19,10 +19,10 @@ K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_mqtt_coredumps_
 /*same priority as mqtt processing thread*/
 #define THREAD_PRIO SPOTFLOW_MQTT_THREAD_PRIORITY
 
-static void spotflow_coredump_thread(void);
+static void spotflow_coredumps_thread_entry(void);
 
-K_THREAD_DEFINE(coredumps_thread_id, STACK_SIZE, spotflow_coredump_thread, NULL, NULL, NULL,
-		THREAD_PRIO, 0, 0);
+K_THREAD_DEFINE(spotflow_coredumps_thread, STACK_SIZE, spotflow_coredumps_thread_entry, NULL, NULL,
+		NULL, THREAD_PRIO, 0, 0);
 
 void spotflow_coredump_sent()
 {
@@ -49,7 +49,7 @@ static int enqueue_log_msg(const struct spotflow_mqtt_coredumps_msg* msg)
 	return rc;
 }
 
-static void spotflow_coredump_thread(void)
+static void spotflow_coredumps_thread_entry(void)
 {
 	/* Check if there is a dump */
 	int rc = coredump_query(COREDUMP_QUERY_HAS_STORED_DUMP, NULL);
@@ -67,7 +67,7 @@ static void spotflow_coredump_thread(void)
 	}
 	LOG_DBG("Coredump found in flash, starting processing thread");
 
-	k_thread_start(coredumps_thread_id);
+	k_thread_start(spotflow_coredumps_thread);
 	/* Get the size of dump */
 	int dump_size = coredump_query(COREDUMP_QUERY_GET_STORED_DUMP_SIZE, NULL);
 	if (dump_size <= 0) {
