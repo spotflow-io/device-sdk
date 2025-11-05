@@ -63,9 +63,9 @@ void app_main(void)
 		// if(atomic_load(&mqtt_connected))
 		{
 
-			// ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
+			ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
 		}
-		vTaskDelay(pdMS_TO_TICKS(500));
+		vTaskDelay(pdMS_TO_TICKS(5000));
 		// int a = 15 / 0;
 		// ESP_LOGI(TAG, "%d", a);
 	}

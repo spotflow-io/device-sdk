@@ -94,5 +94,5 @@ menu "Spotflow"
 
     config SPOTFLOW_COREDUMPS_CHUNK_SIZE
         int 
-        default SPOTFLOW_CBOR_LOG_MAX_LEN
+        default 1024
 endmenu

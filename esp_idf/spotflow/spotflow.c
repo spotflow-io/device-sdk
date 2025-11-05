@@ -31,7 +31,7 @@ void Spotflow_Todo(void)
  */
 void spotflow_init(void)
 {
-	// original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
+	original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
 
 	Spotflow_Todo(); //Checking for unused set Configs.
 	queue_init(); //Initilize the queue

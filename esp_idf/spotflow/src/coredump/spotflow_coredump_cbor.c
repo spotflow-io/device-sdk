@@ -32,7 +32,7 @@ uint8_t buffer[CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE + COREDUMPS_OVERHEAD];
  * @param buf 
  * @param len 
  */
-void print_cbor_hex(const uint8_t* buf, size_t len)
+static void print_cbor_hex(const uint8_t* buf, size_t len)
 {
 	SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
 	for (size_t i = 0; i < len; i++) {
