@@ -13,7 +13,10 @@ Our solution was tested on the following Zephyr boards (more are coming soon):
 * [Nordic NRF7002DK](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK)
 * [ESP32-C3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c3/esp32-c3-devkitc-02/index.html)
 
-We currently support Zephyr v4.1.0 and  nRF Connect SDK v3.0.0, v3.0.1 and v3.0.2.
+We currently support:
+* Zephyr 4.1.0 and 4.2.0
+* nRF Connect SDK 3.0.0, 3.0.1 and 3.0.2
+
 For more information, check [Spotflow](https://app.spotflow.io/) or [Spotflow documentation](https://docs.spotflow.io/).
 
 ## Getting Started
