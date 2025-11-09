@@ -11,6 +11,7 @@
 	#include "coredump/spotflow_coredump_queue.h"
 #endif
 
+
 // static const char *TAG = "spotflow_mqtt";
 
 esp_mqtt_client_handle_t client = NULL;
@@ -88,7 +89,7 @@ static void mqtt_event_handler(void* handler_args, esp_event_base_t base, int32_
 		}
 		break;
 	default:
-		SPOTFLOW_LOG("Other event id:%d\n", event->event_id);
+		SPOTFLOW_LOG("Other event id:%d", event->event_id);
 		break;
 	}
 }
@@ -134,12 +135,10 @@ void mqtt_publish(void* pvParameters)
     while (1) {
         if (atomic_load(&mqtt_connected)) {
 
-            // Only proceed if MQTT outbox is empty
-            if (esp_mqtt_client_get_outbox_size(client) == 0) {
-
+            // Only proceed if the outbox_size i.e. current message is smaller than overall mqtt_buffer.
+            if ((esp_mqtt_client_get_outbox_size(client) < CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN) || (esp_mqtt_client_get_outbox_size(client) < CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE)) {
+#ifdef CONFIG_ESP_COREDUMP_ENABLE
                 // Try to send coredump messages first
-		#ifdef CONFIG_ESP_COREDUMP_ENABLE
-			if(coredump_found) {
                 if (queue_coredump_read(&msg)) {
                     int msg_id = esp_mqtt_client_publish(
                         client,
@@ -151,15 +150,18 @@ void mqtt_publish(void* pvParameters)
                     );
 
                     if (msg_id < 0) {
-                        SPOTFLOW_LOG("Error %d occurred sending MQTT (coredump). Retrying\n", msg_id);
+                        SPOTFLOW_LOG("Error %d occurred sending MQTT (coredump). Retrying", msg_id);
                         vTaskDelay(pdMS_TO_TICKS(10)); // Backoff
                     } else {
-                        SPOTFLOW_LOG("Coredump message sent successfully. Freeing queue entry.\n");
-                        queue_coredump_free(&msg);
+                        SPOTFLOW_LOG("Coredump message sent successfully. Freeing queue entry.");
+                        queue_free(&msg);
+						vTaskDelay(pdMS_TO_TICKS(10)); //Give CPU few ticks
                     }
+
                 }
-			 } // If no coredump pending, send regular log messages
-		#endif 
+                // If no coredump pending, send regular log messages
+                else 
+#endif
 				if (queue_read(&msg)) {
                     int msg_id = esp_mqtt_client_publish(
                         client,
@@ -174,8 +176,9 @@ void mqtt_publish(void* pvParameters)
                         SPOTFLOW_LOG("Error %d occurred sending MQTT (log). Retrying", msg_id);
                         vTaskDelay(pdMS_TO_TICKS(10)); // Backoff
                     } else {
-                        SPOTFLOW_LOG("Log message sent successfully. Freeing queue entry.\n");
+                        SPOTFLOW_LOG("Log message sent successfully. Freeing queue entry. \n");
                         queue_free(&msg);
+						vTaskDelay(pdMS_TO_TICKS(10)); //Give CPU few ticks
                     }
                 }
                 // Nothing to send
@@ -185,6 +188,7 @@ void mqtt_publish(void* pvParameters)
 
             } else {
                 SPOTFLOW_LOG("MQTT outbox not empty; waiting for messages to be sent.\n");
+				SPOTFLOW_LOG("MQTT Size %d \n",esp_mqtt_client_get_outbox_size(client));
                 vTaskDelay(pdMS_TO_TICKS(50));
             }
         } else {

@@ -1,4 +1,0 @@
-intelhex
-pyelftools>=0.29
-
-pytest

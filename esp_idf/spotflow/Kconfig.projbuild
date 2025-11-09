@@ -1,30 +1,4 @@
 menu "Spotflow"
-    menu "Spotflow Build ID"
-
-        config SPOTFLOW_BUILD_ID_TYPE
-            string "Build ID type"
-            default "SHA256_ELF"
-            help
-                Select how the build ID should be generated.
-                Options:
-                    SHA256_ELF  = Hash of ELF file (default)
-                    HARDCODED  = Manually enter value for easier tracking and testing
-
-        config SPOTFLOW_BUILD_ID_SIZE
-            int "Build ID size in bytes"
-            default 20
-            help
-                Number of bytes reserved for the build ID. Typically 20.
-
-        config SPOTFLOW_BUILD_ID_VALUE
-            string "Hardcoded build ID (hex string)"
-            default "0000000000000000000000000000000000000000"
-            depends on SPOTFLOW_BUILD_ID_TYPE = "HARDCODED"
-            help
-                40-character (20-byte) hex string that will be embedded
-                as the build ID when using HARDCODED mode.
-
-    endmenu
 
     config SPOTFLOW_SERVER_HOSTNAME
         string "Hostname of Spotflow observability platform"
@@ -94,5 +68,5 @@ menu "Spotflow"
 
     config SPOTFLOW_COREDUMPS_CHUNK_SIZE
         int 
-        default 1024
+        default SPOTFLOW_CBOR_LOG_MAX_LEN
 endmenu

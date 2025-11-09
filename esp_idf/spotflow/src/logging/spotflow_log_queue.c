@@ -59,6 +59,10 @@ void queue_push(uint8_t* msg, size_t len)
 
 bool queue_read(queue_msg_t* out)
 {
+	if (queue_handle == NULL || out == NULL) {
+       return false;
+    }
+	
 	if (xQueueReceive(queue_handle, out, 0) == pdPASS)
 		return true;
 	return false;

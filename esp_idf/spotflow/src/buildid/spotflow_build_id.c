@@ -4,25 +4,9 @@
 #include <stdio.h>
 #include "logging/spotflow_log_backend.h"
 #include "buildid/spotflow_build_id.h"
+#include "esp_app_desc.h"
 
-#define SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER 0xF0, 0x25, 0x14, 0x00
-#define SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER_SIZE 4
-#define SPOTFLOW_BINDESC_BUILD_ID_VALUE_SIZE 20
-#define SPOTFLOW_BINDESC_BUILD_ID_TOTAL \
-	(SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER_SIZE + SPOTFLOW_BINDESC_BUILD_ID_VALUE_SIZE)
-
-/* Important: name and layout must match what the Python script expects */
-// __attribute__((used, aligned(4)))
-const uint8_t bindesc_entry_spotflow_build_id[SPOTFLOW_BINDESC_BUILD_ID_TOTAL] = {
-	SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER,
-	/* 20 reserved bytes for SHA1 (patched by script) */
-	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
-};
-
-/* pointer to build-id bytes (skip 4-byte header) */
-static const uint8_t* spotflow_build_id_ptr =
-    &bindesc_entry_spotflow_build_id[SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER_SIZE];
-static const uint16_t spotflow_build_id_len = SPOTFLOW_BINDESC_BUILD_ID_VALUE_SIZE;
+#define BUILD_ID_LEN 32  // SHA256 digest length in bytes
 
 /**
  * @brief To get the Build ID values
@@ -33,22 +17,15 @@ static const uint16_t spotflow_build_id_len = SPOTFLOW_BINDESC_BUILD_ID_VALUE_SI
  */
 int spotflow_build_id_get(const uint8_t** build_id, uint16_t* build_id_len)
 {
-	bool is_all_zero = true;
-	for (int i = 0; i < spotflow_build_id_len; i++) {
-		if (spotflow_build_id_ptr[i] != 0) {
-			is_all_zero = false;
-			break;
-		}
-	}
+	 const esp_app_desc_t* app_desc = esp_app_get_description();
+    if (!app_desc) {
+        SPOTFLOW_LOG("Failed to get app description");
+        return -1;
+    }
 
-	if (is_all_zero) {
-		*build_id = NULL;
-		*build_id_len = 0;
-		return -ENOSYS;
-	}
+    *build_id = app_desc->app_elf_sha256;
+    *build_id_len = BUILD_ID_LEN;
 
-	*build_id = spotflow_build_id_ptr;
-	*build_id_len = spotflow_build_id_len;
 	return 0;
 }
 /**
