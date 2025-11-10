@@ -65,8 +65,8 @@ menu "Spotflow"
     config SPOTFLOW_MESSAGE_QUEUE_SIZE
         int "Number of messages to retain in case of disconnection"
         default 5
-    
-    config MQTT_BUFFER_SIZE
-        int
+
+    config SPOTFLOW_COREDUMPS_CHUNK_SIZE
+        int 
         default SPOTFLOW_CBOR_LOG_MAX_LEN
 endmenu
