@@ -1,0 +1,84 @@
+name: Build ESP-IDF Project
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read        # Allows reading repository content (needed for checkout)
+  issues: write         # Allows reporting build results to PR checks
+  pull-requests: write  # Allows commenting/updating PR status
+
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true 
+
+jobs:
+  discover-examples:
+    runs-on: ubuntu-latest
+    outputs:
+      examples: ${{ steps.set-matrix.outputs.examples }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find examples dynamically
+        id: set-matrix
+        run: |
+          echo "🔍 Searching for top-level example folders..."
+
+          examples=$(find esp_idf/spotflow/examples -mindepth 1 -maxdepth 1 -type d \
+            -exec test -f "{}/CMakeLists.txt" \; -print \
+            | jq -R -c . | jq -s -c .)
+          
+          echo "Examples found:"
+          echo "$examples"
+          
+          # Export in GitHub Actions safe format
+          echo "examples=$examples" >> "$GITHUB_OUTPUT"
+
+  build:
+    runs-on: ubuntu-latest
+    needs: discover-examples
+    strategy:
+      matrix:
+        target: [esp32s3, esp32c6]
+        example: ${{ fromJson(needs.discover-examples.outputs.examples) }}
+      fail-fast: false   # continue other builds even if one fails
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Verify example path
+        run: |
+          if [ ! -d "${{ matrix.example }}" ]; then
+            echo "❌ Path does not exist: ${{ matrix.example }}"
+            exit 1
+          fi
+          echo "✅ Found example path: ${{ matrix.example }}"
+
+      - name: Build with ESP-IDF
+        uses: espressif/esp-idf-ci-action@v1
+        continue-on-error: true    # 👈 this build won’t block others if it fails
+        with:
+          esp_idf_version: v5.5.1
+          target: ${{ matrix.target }}
+          path: ${{ matrix.example }}
+
+      - name: Set safe artifact name
+        id: artifact_name
+        run: |
+          EXAMPLE_NAME=$(basename "${{ matrix.example }}")
+          SAFE_NAME="firmware-${{ matrix.target }}-${EXAMPLE_NAME}"
+          echo "name=$SAFE_NAME" >> "$GITHUB_OUTPUT"
+      
+      - name: Upload build artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact_name.outputs.name }}
+          path: ${{ matrix.example }}/build/
