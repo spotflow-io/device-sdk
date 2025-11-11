@@ -15,6 +15,8 @@ struct spotflow_mqtt_logs_msg {
 
 extern struct k_msgq g_spotflow_logs_msgq;
 
+void spotflow_log_backend_try_set_runtime_filter(uint32_t level);
+
 #ifdef __cplusplus
 }
 #endif

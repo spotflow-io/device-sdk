@@ -1,0 +1,6 @@
+name: "spotflow"
+version: "0.1.0"
+dependencies:
+  idf: '>=5.0'
+  espressif/cbor: ^0.6.1~3
+

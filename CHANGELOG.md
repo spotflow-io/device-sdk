@@ -7,14 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 ### Added
+* Added support for Zephyr v4.2.0
+* Added sample for Ethernet on FRDM_RW612
+
+## [0.6.0] - 2025-10-23
+### Added
+* Added ESP-IDF module with support for logging
+* Added ability to remotely configure the minimal severity of sent log messages in Zephyr
+### Fixed
+* Fixed coredump example in debug mode on Nordic boards in Zephyr
+
+## [0.5.1] - 2025-09-25
+### Added
+* Added support for parsing latest Let's Encrypt certificates on Nordic boards
+
+## [0.5.0] - 2025-08-26
+### Added
 * Added coredumps functionality
 * Obtaining device ID from Zephyr if not provided in Kconfig
 * Support for overriding device ID in code
 * Computing build ID and sending it in session metadata and core dumps
-* Added sample for Ethernet on FRDM_RW612
 
 ### Changed
 * Changed KConfig option LOG_BACKEND_SPOTFLOW SPOTFLOW_LOG_BACKEND to match other options
+* Updated default kconfig values to be more stable
 
 ## [0.4.0] - 2025-07-23
 ### Fixed

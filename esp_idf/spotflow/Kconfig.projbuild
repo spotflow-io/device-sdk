@@ -1,0 +1,72 @@
+menu "Spotflow"
+
+    config SPOTFLOW_SERVER_HOSTNAME
+        string "Hostname of Spotflow observability platform"
+        default "mqtts://mqtt.spotflow.io:8883"
+        help
+            URL of an mqtt broker which spotflow connects to.
+    
+    config SPOTFLOW_DEVICE_ID
+        string "Device ID device will use to connect to Spotflow observability platform"
+        help
+            Device ID is a unique identifier for your device in Spotflow observability
+            platform. If empty, the Device MAC Address will be used. Keep it less than 32 characters.
+
+    config SPOTFLOW_INGEST_KEY
+        string "Password device will use to connect to Spotflow observability platform"
+        help
+            Ingest key is a secret key used to authenticate your device
+            It can be found in Spotflow observability platform
+    
+    config BROKER_CERTIFICATE_OVERRIDE
+        string "Broker certificate override"
+        default ""
+        help
+            Please leave empty if broker certificate included from a textfile; otherwise fill in a base64 part of PEM
+            format certificate
+
+    config BROKER_CERTIFICATE_OVERRIDDEN
+        bool
+        default y if BROKER_CERTIFICATE_OVERRIDE != ""
+
+    config SPOTFLOW_GENERATE_BUILD_ID
+	bool "Generate build ID"
+	default n
+	# Use binary descriptors when possible
+	help
+		Generate build ID and embed it as a binary descriptor.
+		Build ID allows to match core dumps with the original .elf file. (Not implemented yet).
+
+    config SPOTFLOW_LOG_BACKEND
+        bool "Spotflow logging backend"
+        default y
+        help
+            Enable sending logs to Spotflow cloud.
+    
+    config SPOTFLOW_LOG_BUFFER_SIZE
+        int "Size of Spotflow log buffer"
+        default 512
+        help
+            Size of the buffer used by Spotflow logging backend to store logs before serialization.
+            Make this at least as big as your longest expected log line.
+            Increase this value if you experience issues with logs being dropped because of buffer overflow.
+
+    config SPOTFLOW_CBOR_LOG_MAX_LEN
+        int "Size of Spotflow CBOR log buffer"
+        default 2048
+        help
+            Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
+            Increase this value if you experience issues with logs being dropped because of buffer overflow.
+
+    config SPOTFLOW_DEBUG_MESSAGE_TERMINAL
+        bool "To view the logs on the spotflow side to view any errors while debugging"
+        default n
+    
+    config SPOTFLOW_MESSAGE_QUEUE_SIZE
+        int "Number of messages to retain in case of disconnection"
+        default 5
+    
+    config MQTT_BUFFER_SIZE
+        int
+        default SPOTFLOW_CBOR_LOG_MAX_LEN
+endmenu
