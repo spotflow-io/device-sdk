@@ -1,25 +1,25 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "../../common/wifi.h"
+// #include "../../common/wifi.h"
 #include "zephyr/debug/coredump.h"
 
 #include "zephyr/drivers/gpio.h"
+#include "zephyr/net/net_if.h"
+
 #include <zephyr/device.h>
 
 LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 
 #define SW0_NODE DT_ALIAS(sw0)
 #if !DT_NODE_HAS_STATUS_OKAY(SW0_NODE)
-#error "Unsupported board: sw0 devicetree alias is not defined"
+#error "Unsupported board: sw2 devicetree alias is not defined"
 #endif
 
 static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, { 0 });
 static struct gpio_callback button_cb_data;
 
 static int prepare_button();
-
-//to use nxp with ethernet, use build with -DOVERLAY_CONFIG="boards/frdm_rw612_eth.conf"y
 
 int main(void)
 {
@@ -33,15 +33,13 @@ int main(void)
 		return ret;
 	}
 
-	// Wait for the initialization of Wi-Fi device
-	k_sleep(K_SECONDS(1));
-#ifdef CONFIG_WIFI
-	init_wifi();
-	connect_to_wifi();
-#elif
-	turn_on_dhcp_when_device_is_up
-#endif
-
+	/*start the dhcp on ethernet interface - not started by default*/
+	struct net_if* iface = net_if_get_default();
+	if (net_if_is_up(iface)) {
+		net_dhcpv4_start(iface);
+	}else {
+		LOG_ERR("Default network interface is not up");
+	}
 	int i = 0;
 	while (true) {
 		LOG_INF("Hello from Zephyr to Spotflow: %d", i++);
@@ -82,19 +80,4 @@ static int prepare_button()
 
 	LOG_DBG("Set up button at %s pin %d", button.port->name, button.pin);
 	return 0;
-}
-
-static void handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
-		    struct net_if *iface) {
-	LOG_INF("Interface event %lld", mgmt_event);
-	if (mgmt_event == NET_EVENT_IF_UP) {
-		LOG_INF("Interface is up -> starting DHCPv4");
-		net_dhcpv4_start(iface);
-	}
-}
-
-static void turn_on_dhcp_when_device_is_up() {
-	static struct net_mgmt_event_callback iface_cb;
-	net_mgmt_init_event_callback(&iface_cb, handler, NET_EVENT_IF_UP);
-	net_mgmt_add_event_callback(&iface_cb);
 }
