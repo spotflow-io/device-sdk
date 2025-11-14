@@ -34,11 +34,11 @@ void spotflow_init(void)
 	original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
 
 	Spotflow_Todo(); //Checking for unused set Configs.
-	queue_init(); //Initilize the queue
-	mqtt_app_start(); // Calling the mqtt_start from the init function.
+	spotflow_queue_init(); //Initilize the queue
+	spotflow_mqtt_app_start(); // Calling the mqtt_start from the init function.
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
-	if (is_coredump_available()) {
-		queue_coredump_init();
+	if (spotflow_is_coredump_available()) {
+		spotflow_queue_coredump_init();
 		spotflow_coredump_backend();
 	}
 #endif

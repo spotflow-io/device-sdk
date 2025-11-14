@@ -31,16 +31,16 @@ typedef enum {
  * @param buf 
  * @param len 
  */
-static void print_cbor_hex(const uint8_t* buf, size_t len)
-{
-	SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
-	for (size_t i = 0; i < len; i++) {
-		SPOTFLOW_LOG("%02X ", buf[i]); // print each byte as 2-digit hex
-		if ((i + 1) % 16 == 0) // 16 bytes per line
-			SPOTFLOW_LOG("\n");
-	}
-	SPOTFLOW_LOG("\n");
-}
+// static void print_cbor_hex(const uint8_t* buf, size_t len)
+// {
+// 	SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
+// 	for (size_t i = 0; i < len; i++) {
+// 		SPOTFLOW_LOG("%02X ", buf[i]); // print each byte as 2-digit hex
+// 		if ((i + 1) % 16 == 0) // 16 bytes per line
+// 			SPOTFLOW_LOG("\n");
+// 	}
+// 	SPOTFLOW_LOG("\n");
+// }
 
 /**
  * @brief To create the message format for logs in CBOR format
@@ -50,7 +50,7 @@ static void print_cbor_hex(const uint8_t* buf, size_t len)
  * @param out_len 
  * @return uint8_t* 
  */
-uint8_t* log_cbor(const char* log_template, char* body, const uint8_t severity, size_t* out_len,
+uint8_t* spotflow_log_cbor(const char* log_template, char* body, const uint8_t severity, size_t* out_len,
 		  const struct message_metadata* metadata)
 {
 	// Buffer to create array to cointain several items
@@ -121,7 +121,7 @@ uint8_t* log_cbor(const char* log_template, char* body, const uint8_t severity, 
  * 
  * @param buffer 
  */
-void log_cbor_send(const char* fmt, char* buffer, const char log_severity,
+void spotflow_log_cbor_send(const char* fmt, char* buffer, const char log_severity,
 		   const struct message_metadata* metadata)
 {
 	size_t len = strlen(buffer);
@@ -149,9 +149,9 @@ void log_cbor_send(const char* fmt, char* buffer, const char log_severity,
 		}
 
 		uint8_t* clog_cbor =
-		    log_cbor(fmt, buffer, severity, &len, metadata); // It reuses the length
+		    spotflow_log_cbor(fmt, buffer, severity, &len, metadata); // It reuses the length
 
-		queue_push(clog_cbor, len);
+		spotflow_queue_push(clog_cbor, len);
 		free(clog_cbor);
 	}
 }

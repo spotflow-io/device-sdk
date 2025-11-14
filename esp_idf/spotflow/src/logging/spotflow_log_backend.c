@@ -114,7 +114,7 @@ int spotflow_log_backend(const char* fmt, va_list args)
 	}
 
 	len = vsnprintf(buffer, len + 1, fmt_copy, args_copy);
-	log_cbor_send(fmt_copy, buffer, log_severity, &metadata);
+	spotflow_log_cbor_send(fmt_copy, buffer, log_severity, &metadata);
 
 	free(buffer);
 	va_end(args_copy);

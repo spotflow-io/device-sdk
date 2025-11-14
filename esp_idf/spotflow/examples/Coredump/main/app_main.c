@@ -48,7 +48,8 @@ void app_main(void)
 	ESP_ERROR_CHECK(esp_netif_init());
     ESP_ERROR_CHECK(esp_event_loop_create_default());
 
-    // Register our custom event handler
+    // Register our custom event handler for button event so the system abort
+    // can be called outside interrupt routine.
     ESP_ERROR_CHECK(esp_event_handler_register(SPOTFLOW_EVENTS, ESP_EVENT_ANY_ID,
                                                &spotflow_event_handler, NULL));
 
