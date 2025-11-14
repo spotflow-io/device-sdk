@@ -27,8 +27,7 @@ enum {
 // ISR handler — must be IRAM safe if registered with ISR service
 static void IRAM_ATTR button_isr_handler(void* arg)
 {
-    // esp_system_abort("Button pressed -> deliberate crash");
-	 esp_event_isr_post(SPOTFLOW_EVENTS, SPOTFLOW_EVENT_TRIGGER_CRASH, NULL, 0, NULL);
+    esp_event_isr_post(SPOTFLOW_EVENTS, SPOTFLOW_EVENT_TRIGGER_CRASH, NULL, 0, NULL);
 }
 
 static void spotflow_event_handler(void *handler_arg, esp_event_base_t base,
@@ -79,13 +78,7 @@ void app_main(void)
 
 	spotflow_init();
 	while (1) {
-		// if(atomic_load(&mqtt_connected))
-		{
-
-			ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
-		}
-		vTaskDelay(pdMS_TO_TICKS(5000));
-		// int a = 15 / 0;
-		// ESP_LOGI(TAG, "%d", a);
+		ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
+		vTaskDelay(5000/portTICK_PERIOD_MS); // Delay for 5s
 	}
 }

@@ -10,10 +10,10 @@ typedef struct {
 	size_t len;
 } queue_msg_t;
 
-void queue_push(uint8_t* msg, size_t len);
-bool queue_read(queue_msg_t* out);
-void queue_free(queue_msg_t* msg);
-void queue_init(void);
+void spotflow_queue_push(uint8_t* msg, size_t len);
+bool spotflow_queue_read(queue_msg_t* out);
+void spotflow_queue_free(queue_msg_t* msg);
+void spotflow_queue_init(void);
 
 #ifdef __cplusplus
 }

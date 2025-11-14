@@ -1,5 +1,11 @@
 name: "spotflow"
 version: "0.1.0"
+description: "This is a component that makes life easy by uploading the logs to cloud."
+url: "https://spotflow.io"
+documentation: "https://docs.spotflow.io"
+repository: "https://github.com/spotflow-io/device-sdk.git"
+repository_info:
+  path: "esp_idf/spotflow"
 dependencies:
   idf: '>=5.0'
   espressif/cbor: ^0.6.1~3
