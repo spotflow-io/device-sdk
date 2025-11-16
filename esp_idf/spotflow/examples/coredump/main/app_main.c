@@ -15,7 +15,19 @@
 
 static const char* TAG = "spotflow_testing_coredump";
 
-#define GPIO_INPUT_IO_0     4
+#if CONFIG_IDF_TARGET_ESP32
+    #define GPIO_INPUT_IO_0 0     // BOOT button on ESP32
+#elif CONFIG_IDF_TARGET_ESP32C3
+    #define GPIO_INPUT_IO_0 9     // BOOT button on many C3 devkits
+#elif CONFIG_IDF_TARGET_ESP32C6
+    #define GPIO_INPUT_IO_0 9     // C6 default BOOT button
+#elif CONFIG_IDF_TARGET_ESP32S3
+    #define GPIO_INPUT_IO_0 0     // S3 devkit button (varies)
+#elif CONFIG_IDF_TARGET_ESP32H2
+    #define GPIO_INPUT_IO_0 9     // Example; depends on board
+#else
+    #error "Unsupported target. Please define GPIO_INPUT_IO_0."
+#endif
 
 ESP_EVENT_DEFINE_BASE(SPOTFLOW_EVENTS);
 
@@ -27,10 +39,18 @@ enum {
 // ISR handler — must be IRAM safe if registered with ISR service
 static void IRAM_ATTR button_isr_handler(void* arg)
 {
-    // esp_system_abort("Button pressed -> deliberate crash");
-	 esp_event_isr_post(SPOTFLOW_EVENTS, SPOTFLOW_EVENT_TRIGGER_CRASH, NULL, 0, NULL);
+    // Post a Crash event
+    esp_event_isr_post(SPOTFLOW_EVENTS, SPOTFLOW_EVENT_TRIGGER_CRASH, NULL, 0, NULL);
 }
 
+/**
+ * @brief Create a event handler to execute when the crash event is called.
+ * 
+ * @param handler_arg 
+ * @param base 
+ * @param id 
+ * @param event_data 
+ */
 static void spotflow_event_handler(void *handler_arg, esp_event_base_t base,
                                    int32_t id, void *event_data)
 {
@@ -39,17 +59,14 @@ static void spotflow_event_handler(void *handler_arg, esp_event_base_t base,
     }
 }
 
-void app_main(void)
+/**
+ * @brief Initilize the button used to cause Coredump
+ * 
+ */
+void button_init(void)
 {
-	ESP_LOGI(TAG, "[APP] Startup..");
-	ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
-	ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
-
-	ESP_ERROR_CHECK(nvs_flash_init());
-	ESP_ERROR_CHECK(esp_netif_init());
-    ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    // Register our custom event handler
+    // Register our custom event handler for button event so the system abort
+    // can be called outside interrupt routine.
     ESP_ERROR_CHECK(esp_event_handler_register(SPOTFLOW_EVENTS, ESP_EVENT_ANY_ID,
                                                &spotflow_event_handler, NULL));
 
@@ -66,11 +83,25 @@ void app_main(void)
 
     // Attach the ISR handler for the button
     gpio_isr_handler_add(GPIO_INPUT_IO_0, button_isr_handler, NULL);
+}
 
+
+void app_main(void)
+{
+	ESP_LOGI(TAG, "[APP] Startup..");
+	ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
+	ESP_LOGI(TAG, "[APP] IDF version: %s", esp_get_idf_version());
+
+	ESP_ERROR_CHECK(nvs_flash_init());
+	ESP_ERROR_CHECK(esp_netif_init());
+    ESP_ERROR_CHECK(esp_event_loop_create_default());
+
+    
 	esp_log_level_set("*", ESP_LOG_INFO);
 	esp_log_level_set("spotflow_testing",
 			  ESP_LOG_VERBOSE); //Setting the current tag to maximum log level
 
+    button_init(); // Initilize the button
 	/* This helper function configures Wi-Fi or Ethernet, as selected in menuconfig.
      * Read "Establishing Wi-Fi or Ethernet Connection" section in
      * examples/protocols/README.md for more information about this function.
@@ -78,14 +109,9 @@ void app_main(void)
 	ESP_ERROR_CHECK(example_connect());
 
 	spotflow_init();
-	while (1) {
-		// if(atomic_load(&mqtt_connected))
-		{
 
-			ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
-		}
-		vTaskDelay(pdMS_TO_TICKS(5000));
-		// int a = 15 / 0;
-		// ESP_LOGI(TAG, "%d", a);
+	while (1) {
+		ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes", esp_get_free_heap_size());
+		vTaskDelay(5000/portTICK_PERIOD_MS); // Delay for 5s
 	}
 }

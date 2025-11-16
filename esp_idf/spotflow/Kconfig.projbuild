@@ -1,5 +1,28 @@
 menu "Spotflow"
 
+    menu "SPOTFLOW Core Dump Settings"
+
+        # Enable ESP-IDF core dump
+        config SPOTFLOW_COREDUMP_BACKEND
+            bool "Enable automatic core dump settings"
+            default n
+            select ESP_COREDUMP_DATA_FORMAT_ELF
+            imply ESP_COREDUMP_CAPTURE_DRAM
+
+        if SPOTFLOW_COREDUMP_BACKEND
+
+            # Default destination = Flash
+            choice ESP_COREDUMP_TO_FLASH_OR_UART
+                default ESP_COREDUMP_ENABLE_TO_FLASH
+            endchoice
+        
+        config SPOTFLOW_COREDUMPS_CHUNK_SIZE
+        int 
+        default SPOTFLOW_CBOR_LOG_MAX_LEN
+
+        endif
+
+    endmenu
     config SPOTFLOW_SERVER_HOSTNAME
         string "Hostname of Spotflow observability platform"
         default "mqtts://mqtt.spotflow.io:8883"
@@ -66,7 +89,4 @@ menu "Spotflow"
         int "Number of messages to retain in case of disconnection"
         default 5
 
-    config SPOTFLOW_COREDUMPS_CHUNK_SIZE
-        int 
-        default SPOTFLOW_CBOR_LOG_MAX_LEN
 endmenu

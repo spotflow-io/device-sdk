@@ -15,11 +15,15 @@ struct message_metadata {
 int spotflow_log_backend(const char* fmt, va_list args);
 
 #if CONFIG_SPOTFLOW_DEBUG_MESSAGE_TERMINAL
+
 #define SPOTFLOW_LOG(fmt, ...) printf("[SPOTFLOW] " fmt, ##__VA_ARGS__)
+
 #else
+
 #define SPOTFLOW_LOG(fmt, ...) \
 	do {                   \
 	} while (0)
+	
 #endif
 
 #ifdef __cplusplus

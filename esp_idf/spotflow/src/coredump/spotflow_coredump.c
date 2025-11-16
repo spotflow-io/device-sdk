@@ -15,7 +15,7 @@
 	#include "buildid/spotflow_build_id.h"
 #endif
 
-static const char* TAG = "SPOTFLOW_COREDUMP";
+// static const char* TAG = "SPOTFLOW_COREDUMP";
 
 #define COREDUMP_PARTITION_NAME "coredump"
 
@@ -34,7 +34,7 @@ static coredump_info_t coredump_info = { 0 };
  * @return true 
  * @return false 
  */
-bool is_coredump_available(void)
+bool spotflow_is_coredump_available(void)
 {
 	const esp_partition_t* part = esp_partition_find_first(
 	    ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
@@ -173,15 +173,8 @@ esp_err_t spotflow_coredump_backend(void)
 
 		// keep retrying to push data until the mqtt function is able to read and clear it
 		do {
-			rc = queue_coredump_push(cbor_data, cbor_data_len);
-			if(rc < 0)
-			{
-				vTaskDelay(pdMS_TO_TICKS(50)); //50ms wait
-			}
-			else
-			{
-				vTaskDelay(pdMS_TO_TICKS(50)); //50ms wait //To avoid watchdog trigger
-			}
+			rc = spotflow_queue_coredump_push(cbor_data, cbor_data_len);
+			vTaskDelay(pdMS_TO_TICKS(50)); //50 ticks wait
 		} while(rc < 0);
 
 		// Free the CBOR data after sending

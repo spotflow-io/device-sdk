@@ -38,7 +38,6 @@ void app_main(void)
 
 	int test_num = 1;
 	while (1) {
-		// if(atomic_load(&mqtt_connected))
 		{
 			ESP_LOGI(TAG, "Info log message works");
 			ESP_LOGD(TAG, "Debug log message works");
@@ -60,6 +59,6 @@ void app_main(void)
 			ESP_LOGI(TAG, "[APP] Free memory: %" PRIu32 " bytes",
 				 esp_get_free_heap_size());
 		}
-		vTaskDelay(pdMS_TO_TICKS(500));
+		vTaskDelay(5000/portTICK_PERIOD_MS); // Delay for 5s
 	}
 }

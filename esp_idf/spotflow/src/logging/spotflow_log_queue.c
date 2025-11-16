@@ -18,7 +18,7 @@ static QueueHandle_t queue_handle = NULL;
  * 
  * @param msg Log Message 
  */
-void queue_push(uint8_t* msg, size_t len)
+void spotflow_queue_push(uint8_t* msg, size_t len)
 {
 	queue_msg_t qmsg;
 	qmsg.ptr = malloc(len);
@@ -57,7 +57,7 @@ void queue_push(uint8_t* msg, size_t len)
  * @return true if a message was read, false if queue empty
  */
 
-bool queue_read(queue_msg_t* out)
+bool spotflow_queue_read(queue_msg_t* out)
 {
 	if (queue_handle == NULL || out == NULL) {
        return false;
@@ -73,7 +73,7 @@ bool queue_read(queue_msg_t* out)
  * 
  * @param msg 
  */
-void queue_free(queue_msg_t* msg)
+void spotflow_queue_free(queue_msg_t* msg)
 {
 	if (msg && msg->ptr) {
 		free(msg->ptr);
@@ -86,7 +86,7 @@ void queue_free(queue_msg_t* msg)
  * @brief Initialize the Queue to save the messgaes
  * 
  */
-void queue_init(void)
+void spotflow_queue_init(void)
 {
 	queue_handle = xQueueCreate(CONFIG_SPOTFLOW_MESSAGE_QUEUE_SIZE, sizeof(queue_msg_t));
 	if (queue_handle == NULL) {

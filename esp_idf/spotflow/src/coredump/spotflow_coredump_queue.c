@@ -22,7 +22,7 @@ bool coredump_found = false;
  * 
  * @param msg Log Message 
  */
-int8_t queue_coredump_push(uint8_t* msg, size_t len)
+int8_t spotflow_queue_coredump_push(uint8_t* msg, size_t len)
 {
 	queue_msg_t qmsg;
 	qmsg.ptr = malloc(len);
@@ -51,7 +51,7 @@ int8_t queue_coredump_push(uint8_t* msg, size_t len)
  * @return true if a message was read, false if queue empty
  */
 
-bool queue_coredump_read(queue_msg_t* out)
+bool spotflow_queue_coredump_read(queue_msg_t* out)
 {
 	if (queue_handle == NULL || out == NULL) {
        return false;
@@ -67,7 +67,7 @@ bool queue_coredump_read(queue_msg_t* out)
  * 
  * @param msg 
  */
-void queue_coredump_free(queue_msg_t* msg)
+void spotflow_queue_coredump_free(queue_msg_t* msg)
 {
 	if (msg && msg->ptr) {
 		free(msg->ptr);
@@ -80,7 +80,7 @@ void queue_coredump_free(queue_msg_t* msg)
  * @brief Initialize the Queue to save the messgaes
  * 
  */
-void queue_coredump_init(void)
+void spotflow_queue_coredump_init(void)
 {
 	coredump_found = true;
 	queue_handle = xQueueCreate(CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE + COREDUMPS_OVERHEAD, sizeof(queue_msg_t));
