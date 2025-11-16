@@ -4,7 +4,7 @@
 #include "logging/spotflow_log_backend.h"
 #include "cbor.h"
 
-static const char* TAG = "SPOTFLOW_COREDUMP";
+// static const char* TAG = "SPOTFLOW_COREDUMP";
 
 #define MAX_KEY_COUNT 8
 

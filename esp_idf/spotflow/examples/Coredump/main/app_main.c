@@ -15,7 +15,19 @@
 
 static const char* TAG = "spotflow_testing_coredump";
 
-#define GPIO_INPUT_IO_0     4
+#if CONFIG_IDF_TARGET_ESP32
+    #define GPIO_INPUT_IO_0 0     // BOOT button on ESP32
+#elif CONFIG_IDF_TARGET_ESP32C3
+    #define GPIO_INPUT_IO_0 9     // BOOT button on many C3 devkits
+#elif CONFIG_IDF_TARGET_ESP32C6
+    #define GPIO_INPUT_IO_0 9     // C6 default BOOT button
+#elif CONFIG_IDF_TARGET_ESP32S3
+    #define GPIO_INPUT_IO_0 0     // S3 devkit button (varies)
+#elif CONFIG_IDF_TARGET_ESP32H2
+    #define GPIO_INPUT_IO_0 9     // Example; depends on board
+#else
+    #error "Unsupported target. Please define GPIO_INPUT_IO_0."
+#endif
 
 ESP_EVENT_DEFINE_BASE(SPOTFLOW_EVENTS);
 
