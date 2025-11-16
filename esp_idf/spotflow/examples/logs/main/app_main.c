@@ -38,7 +38,6 @@ void app_main(void)
 
 	int test_num = 1;
 	while (1) {
-		// if(atomic_load(&mqtt_connected))
 		{
 			ESP_LOGI(TAG, "Info log message works");
 			ESP_LOGD(TAG, "Debug log message works");
