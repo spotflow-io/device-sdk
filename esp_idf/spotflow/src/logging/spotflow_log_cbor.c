@@ -72,7 +72,7 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, const uint8_t s
 	}
 
 	cbor_encoder_init(&array_encoder, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 0);
-	cbor_encoder_create_map(&array_encoder, &map_encoder, 7); // {
+	cbor_encoder_create_map(&array_encoder, &map_encoder, CborIndefiniteLength); // {
 	// Get device uptime in milliseconds since boot
 	/* messageType: "LOG" */
 	cbor_encode_uint(&map_encoder, KEY_MESSAGE_TYPE);
@@ -103,7 +103,6 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, const uint8_t s
 		cbor_encode_text_stringz(&labels_encoder, metadata->source);
 	} else {
 		SPOTFLOW_LOG("Source is missing or empty\n");
-		cbor_encode_text_stringz(&labels_encoder, "");
 	}
 
 	cbor_encoder_close_container(&map_encoder, &labels_encoder); // }

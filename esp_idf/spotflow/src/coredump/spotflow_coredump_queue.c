@@ -36,12 +36,12 @@ int8_t spotflow_queue_coredump_push(uint8_t* msg, size_t len)
 	memcpy(qmsg.ptr, msg, len);
 	// Try to enqueue
 	if (xQueueSend(queue_handle, &qmsg, 0) != pdPASS) {
-        free(qmsg.ptr);
-        return -1; //Could not add wait for it to be freed.
+		free(qmsg.ptr);
+		return -1; //Could not add wait for it to be freed.
 	}
 
 	SPOTFLOW_LOG("Message Added.\n");
-    return 0;
+	return 0;
 }
 
 /**
@@ -54,8 +54,8 @@ int8_t spotflow_queue_coredump_push(uint8_t* msg, size_t len)
 bool spotflow_queue_coredump_read(queue_msg_t* out)
 {
 	if (queue_handle == NULL || out == NULL) {
-       return false;
-    }
+	   return false;
+	}
 
 	if (xQueueReceive(queue_handle, out, 0) == pdPASS)
 		return true;
