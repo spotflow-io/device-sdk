@@ -11,8 +11,9 @@ menu "Spotflow"
         if SPOTFLOW_COREDUMP_BACKEND
 
             # Default destination = Flash
-            config ESP_COREDUMP_ENABLE_TO_FLASH
-                default y
+            choice ESP_COREDUMP_TO_FLASH_OR_UART
+                default ESP_COREDUMP_ENABLE_TO_FLASH
+            endchoice
             
             config ESP_COREDUMP_ENABLE
                 default ESP_COREDUMP_DATA_FORMAT_ELF

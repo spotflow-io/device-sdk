@@ -44,8 +44,8 @@ jobs:
         example: ${{ fromJson(needs.discover-examples.outputs.examples) }}
       fail-fast: false
 
-    container: 
-      image: espressif/idf:release-v5.5 
+    container:
+      image: espressif/idf:release-v5.5
 
     steps:
       - name: Checkout repository
