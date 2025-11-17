@@ -6,19 +6,23 @@ menu "Spotflow"
         config SPOTFLOW_COREDUMP_BACKEND
             bool "Enable automatic core dump settings"
             default n
-            select ESP_COREDUMP_DATA_FORMAT_ELF
-            imply ESP_COREDUMP_CAPTURE_DRAM
+            select ESP_COREDUMP_ENABLE
 
         if SPOTFLOW_COREDUMP_BACKEND
 
             # Default destination = Flash
-            choice ESP_COREDUMP_TO_FLASH_OR_UART
-                default ESP_COREDUMP_ENABLE_TO_FLASH
-            endchoice
+            config ESP_COREDUMP_ENABLE_TO_FLASH
+                default y
+            
+            config ESP_COREDUMP_ENABLE
+                default ESP_COREDUMP_DATA_FORMAT_ELF
+            
+            config ESP_COREDUMP_CAPTURE_DRAM
+                default y
         
-        config SPOTFLOW_COREDUMPS_CHUNK_SIZE
-        int 
-        default SPOTFLOW_CBOR_LOG_MAX_LEN
+            config SPOTFLOW_COREDUMPS_CHUNK_SIZE
+            int 
+            default SPOTFLOW_CBOR_LOG_MAX_LEN
 
         endif
 

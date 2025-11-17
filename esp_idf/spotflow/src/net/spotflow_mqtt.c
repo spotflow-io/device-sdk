@@ -126,10 +126,9 @@ void spotflow_mqtt_publish(void* pvParameters)
         if (atomic_load(&spotflow_mqtt_connected)) {
 
             // Only proceed if the outbox_size i.e. current message is smaller than overall mqtt_buffer.
-            if ((esp_mqtt_client_get_outbox_size(spotflow_client) < CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN) || (esp_mqtt_client_get_outbox_size(spotflow_client) < CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE)) {
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
                 // Try to send coredump messages first
-                if (spotflow_queue_coredump_read(&msg)) {
+                if (spotflow_queue_coredump_read(&msg) && (esp_mqtt_client_get_outbox_size(spotflow_client) < CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE)) {
                     int msg_id = esp_mqtt_client_publish(
                         spotflow_client,
                         "ingest-cbor",
@@ -149,10 +148,8 @@ void spotflow_mqtt_publish(void* pvParameters)
                     }
 
                 }
-                // If no coredump pending, send regular log messages
-                else 
 #endif
-				if (spotflow_queue_read(&msg)) {
+				if (spotflow_queue_read(&msg) && (esp_mqtt_client_get_outbox_size(spotflow_client) < CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)) {
                     int msg_id = esp_mqtt_client_publish(
                         spotflow_client,
                         "ingest-cbor",
@@ -171,16 +168,9 @@ void spotflow_mqtt_publish(void* pvParameters)
 						vTaskDelay(pdMS_TO_TICKS(10)); //Give CPU few ticks
                     }
                 }
-                // Nothing to send
                 else {
                     vTaskDelay(pdMS_TO_TICKS(50)); // Sleep if queues empty
-                }
-
-            } else {
-                SPOTFLOW_LOG("MQTT outbox not empty; waiting for messages to be sent.\n");
-				SPOTFLOW_LOG("MQTT Size %d \n",esp_mqtt_client_get_outbox_size(spotflow_client));
-                vTaskDelay(pdMS_TO_TICKS(50));
-            }
+                } 
         } else {
             // MQTT not connected; wait and retry
             vTaskDelay(pdMS_TO_TICKS(100));

@@ -36,13 +36,16 @@ jobs:
           echo "Examples found: $examples"
           echo "examples=$examples" >> "$GITHUB_OUTPUT"
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest # The host runner must support Docker
     needs: discover-examples
     strategy:
       matrix:
         target: [esp32s3, esp32c6]
         example: ${{ fromJson(needs.discover-examples.outputs.examples) }}
       fail-fast: false
+
+    container: 
+      image: espressif/idf:release-v5.5 
 
     steps:
       - name: Checkout repository
@@ -58,20 +61,12 @@ jobs:
           fi
           echo "✅ Found example path: ${{ matrix.example }}"
 
-
-      - name: Install ESP-IDF v5.5.1
-        run: |
-          sudo apt update
-          sudo apt install -y git wget flex bison gperf python3 python3-pip cmake ninja-build ccache
-          git clone -b v5.5.1 --recursive https://github.com/espressif/esp-idf.git $HOME/esp-idf
-          $HOME/esp-idf/install.sh
-
       - name: Build example with ESP-IDF
         run: |
-          source $HOME/esp-idf/export.sh
+          . /opt/esp/idf/export.sh
           cd "${{ matrix.example }}"
           idf.py set-target ${{ matrix.target }}
-          idf.py build || true  # continue-on-error
+          idf.py build -DCMAKE_C_FLAGS="-Werror" -DCMAKE_CXX_FLAGS="-Werror"
 
       - name: Set safe artifact name
         id: artifact_name
