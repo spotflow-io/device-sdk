@@ -19,6 +19,10 @@ menuconfig SPOTFLOW
 	select NET_SOCKETS
 	select NET_SOCKETS_POLL
 	select NET_TCP
+	select NET_MGMT
+	select NET_MGMT_EVENT
+	select NET_MGMT_EVENT_INFO
+	select NET_CONNECTION_MANAGER
 	select DNS_RESOLVER
 	imply NET_SOCKETS_SOCKOPT_TLS
 	help
