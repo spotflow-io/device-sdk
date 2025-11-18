@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 * Added support for Zephyr v4.2.0
+### Fixed
+* Fixed missing Kconfig dependency on Zephyr connection manager
 
 ## [0.6.0] - 2025-10-23
 ### Added
