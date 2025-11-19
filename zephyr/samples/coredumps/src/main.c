@@ -5,8 +5,10 @@
 
 #include "zephyr/drivers/gpio.h"
 
+#ifdef CONFIG_ETH_DRIVER
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/dhcpv4.h>
+#endif
 
 #include <zephyr/device.h>
 
@@ -25,7 +27,8 @@ static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, {
 static struct gpio_callback button_cb_data;
 
 static int prepare_button();
-#ifndef CONFIG_WIFI
+
+#ifdef CONFIG_ETH_DRIVER
 static void turn_on_dhcp_when_device_is_up();
 #endif
 
@@ -48,7 +51,9 @@ int main(void)
 #ifdef CONFIG_WIFI
 	init_wifi();
 	connect_to_wifi();
-#else
+#endif
+
+#ifdef CONFIG_ETH_DRIVER
 	turn_on_dhcp_when_device_is_up();
 #endif
 
@@ -96,7 +101,7 @@ static int prepare_button()
 
 
 
-#ifndef CONFIG_WIFI
+#ifdef CONFIG_ETH_DRIVER
 static void handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 		    struct net_if *iface) {
 	if (mgmt_event == NET_EVENT_IF_UP) {
