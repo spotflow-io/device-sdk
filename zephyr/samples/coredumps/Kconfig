@@ -8,4 +8,16 @@ config NET_WIFI_PASSWORD
 	help
 		Wifi password for the network that the device should connect to.
 
+# NXP specific configurations
+source KConfig.nxp
+
+config NXP_RW610
+    bool
+    default n
+    help
+      Enable NXP RW610/RW612 support.
+
+
+
+# end of NXP specific configurations
 source "Kconfig.zephyr"

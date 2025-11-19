@@ -1,7 +1,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-// #include "../../common/wifi.h"
 #include "zephyr/debug/coredump.h"
 
 #include "zephyr/drivers/gpio.h"
@@ -20,6 +19,16 @@ static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, {
 static struct gpio_callback button_cb_data;
 
 static int prepare_button();
+
+static void handler(struct net_mgmt_event_callback *cb,
+		    uint32_t mgmt_event, struct net_if *iface)
+{
+	LOG_INF("Network event received: %u", mgmt_event);
+	if (mgmt_event == NET_EVENT_IF_UP) {
+		LOG_INF("Interface is up -> starting DHCPv4");
+		net_dhcpv4_start(iface);
+	}
+}
 
 int main(void)
 {
