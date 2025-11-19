@@ -2,7 +2,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "../../common/wifi.h"
+#include "../../wifi-common/wifi.h"
 
 LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 

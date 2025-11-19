@@ -1,11 +1,18 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "../../common/wifi.h"
 #include "zephyr/debug/coredump.h"
 
 #include "zephyr/drivers/gpio.h"
+
+#include <zephyr/net/net_if.h>
+#include <zephyr/net/dhcpv4.h>
+
 #include <zephyr/device.h>
+
+#ifdef CONFIG_WIFI
+#include "../../wifi-common/wifi.h"
+#endif
 
 LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 
@@ -18,6 +25,9 @@ static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, {
 static struct gpio_callback button_cb_data;
 
 static int prepare_button();
+#ifndef CONFIG_WIFI
+static void turn_on_dhcp_when_device_is_up();
+#endif
 
 //to use nxp with ethernet, use build with -DOVERLAY_CONFIG="boards/frdm_rw612_eth.conf"y
 
@@ -38,8 +48,8 @@ int main(void)
 #ifdef CONFIG_WIFI
 	init_wifi();
 	connect_to_wifi();
-#elif
-	turn_on_dhcp_when_device_is_up
+#else
+	turn_on_dhcp_when_device_is_up();
 #endif
 
 	int i = 0;
@@ -84,17 +94,19 @@ static int prepare_button()
 	return 0;
 }
 
+
+
+#ifndef CONFIG_WIFI
 static void handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
 		    struct net_if *iface) {
-	LOG_INF("Interface event %lld", mgmt_event);
 	if (mgmt_event == NET_EVENT_IF_UP) {
 		LOG_INF("Interface is up -> starting DHCPv4");
 		net_dhcpv4_start(iface);
 	}
 }
-
 static void turn_on_dhcp_when_device_is_up() {
 	static struct net_mgmt_event_callback iface_cb;
 	net_mgmt_init_event_callback(&iface_cb, handler, NET_EVENT_IF_UP);
 	net_mgmt_add_event_callback(&iface_cb);
 }
+#endif
