@@ -99,17 +99,16 @@ static int prepare_button()
 	return 0;
 }
 
-
-
 #ifdef CONFIG_ETH_DRIVER
-static void handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
-		    struct net_if *iface) {
+static void handler(struct net_mgmt_event_callback* cb, uint64_t mgmt_event, struct net_if* iface)
+{
 	if (mgmt_event == NET_EVENT_IF_UP) {
 		LOG_INF("Interface is up -> starting DHCPv4");
 		net_dhcpv4_start(iface);
 	}
 }
-static void turn_on_dhcp_when_device_is_up() {
+static void turn_on_dhcp_when_device_is_up()
+{
 	static struct net_mgmt_event_callback iface_cb;
 	net_mgmt_init_event_callback(&iface_cb, handler, NET_EVENT_IF_UP);
 	net_mgmt_add_event_callback(&iface_cb);
