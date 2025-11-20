@@ -32,8 +32,6 @@ static int prepare_button();
 static void turn_on_dhcp_when_device_is_up();
 #endif
 
-//to use nxp with ethernet, use build with -DOVERLAY_CONFIG="boards/frdm_rw612_eth.conf"y
-
 int main(void)
 {
 	LOG_INF("Starting Spotflow logging example");

@@ -8,33 +8,22 @@ config NET_WIFI_PASSWORD
 	help
 		Wifi password for the network that the device should connect to.
 
-config WIFI
-	bool
+#By default, use WIFI for Spotflow samples (more common among example boards)
+config SPOTFLOW_SAMPLE_WIFI
+	bool "Enable Wifi for Spotflow samples"
 	default y
-	imply WIFI_NM
+	select WIFI
+	select WIFI_NM
 	imply NET_L2_WIFI_MGMT
+	#nxp specific configs
+# 	select WIFI_NXP if NXP_RW610
+	select NXP_WIFI_TX_RX_ZERO_COPY if NXP_RW610
 
-
-config ETH_DRIVER
-	bool
-	default y if !WIFI
-	default n if WIFI
-config NET_L2_ETHERNET_MGMT
-	bool
-	default y if !WIFI
-	default n if WIFI
-
-# NXP specific configurations
-config WIFI_NXP
-	bool
-	default y if WIFI
-	default n if !WIFI
-
-# Enables IP fragmentation, which fixes the TLS handshake issue in Zephyr 4.2
-config NXP_WIFI_TX_RX_ZERO_COPY
-	bool
-	default y if WIFI_NXP
-	default n if !WIFI_NXP
+config SPOTFLOW_SAMPLE_ETH
+	bool "Enable Ethernet for Spotflow samples"
+	default n
+	select ETH_DRIVER
+	select NET_L2_ETHERNET_MGMT
 
 # end of NXP specific configurations
 source "Kconfig.zephyr"
