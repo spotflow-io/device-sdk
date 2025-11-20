@@ -1,0 +1,83 @@
+name: Build ESP-IDF Project
+
+on:
+  push:
+
+permissions:
+  contents: read        # Allows reading repository content (needed for checkout)
+  issues: write         # Allows reporting build results to PR checks
+  pull-requests: write  # Allows commenting/updating PR status
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  discover-examples:
+    runs-on: ubuntu-latest
+    outputs:
+      examples: ${{ steps.set-matrix.outputs.examples }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Find examples dynamically
+        id: set-matrix
+        run: |
+          echo "🔍 Searching for top-level example folders..."
+
+          examples=$(find esp_idf/spotflow/examples -mindepth 1 -maxdepth 1 -type d \
+            -exec test -f "{}/CMakeLists.txt" \; -print \
+            | jq -R -c . | jq -s -c .)
+
+          # Ensure we have a JSON array even if no examples found
+          examples=${examples:-[]}
+
+          echo "Examples found: $examples"
+          echo "examples=$examples" >> "$GITHUB_OUTPUT"
+  build:
+    runs-on: ubuntu-latest # The host runner must support Docker
+    needs: discover-examples
+    strategy:
+      matrix:
+        target: [esp32s3, esp32c6]
+        example: ${{ fromJson(needs.discover-examples.outputs.examples) }}
+      fail-fast: false
+
+    container:
+      image: espressif/idf:release-v5.5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Verify example path
+        run: |
+          if [ ! -d "${{ matrix.example }}" ]; then
+            echo "❌ Path does not exist: ${{ matrix.example }}"
+            exit 1
+          fi
+          echo "✅ Found example path: ${{ matrix.example }}"
+
+      - name: Build example with ESP-IDF
+        run: |
+          . /opt/esp/idf/export.sh
+          cd "${{ matrix.example }}"
+          idf.py set-target ${{ matrix.target }}
+          idf.py build -DCMAKE_C_FLAGS="-Werror" -DCMAKE_CXX_FLAGS="-Werror"
+
+      - name: Set safe artifact name
+        id: artifact_name
+        run: |
+          EXAMPLE_NAME=$(basename "${{ matrix.example }}")
+          SAFE_NAME="firmware-${{ matrix.target }}-${EXAMPLE_NAME}"
+          echo "name=$SAFE_NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Upload build artifacts
+        if: always() && (test -d "${{ matrix.example }}/build/")
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.artifact_name.outputs.name }}
+          path: ${{ matrix.example }}/build/
