@@ -2,12 +2,12 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#ifdef CONFIG_ETH_DRIVER
+#ifdef CONFIG_SPOTFLOW_SAMPLE_ETH
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/dhcpv4.h>
 #endif
 
-#ifdef CONFIG_WIFI
+#ifdef CONFIG_SPOTFLOW_SAMPLE_WIFI
 #include "../../wifi-common/wifi.h"
 #endif
 LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
@@ -18,7 +18,7 @@ LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 	return "my_nrf7002dk_test";
 }*/
 
-#ifdef CONFIG_ETH_DRIVER
+#ifdef CONFIG_SPOTFLOW_SAMPLE_ETH
 static void turn_on_dhcp_when_device_is_up();
 #endif
 
@@ -29,12 +29,12 @@ int main(void)
 	// Wait for the initialization of Wi-Fi device
 	k_sleep(K_SECONDS(1));
 
-#ifdef CONFIG_WIFI
+#ifdef CONFIG_SPOTFLOW_SAMPLE_WIFI
 	init_wifi();
 	connect_to_wifi();
 #endif
 
-#ifdef CONFIG_ETH_DRIVER
+#ifdef CONFIG_SPOTFLOW_SAMPLE_ETH
 	turn_on_dhcp_when_device_is_up();
 #endif
 
@@ -46,7 +46,7 @@ int main(void)
 	return 0;
 }
 
-#ifdef CONFIG_ETH_DRIVER
+#ifdef CONFIG_SPOTFLOW_SAMPLE_ETH
 static void handler(struct net_mgmt_event_callback* cb, uint64_t mgmt_event, struct net_if* iface)
 {
 	if (mgmt_event == NET_EVENT_IF_UP) {
