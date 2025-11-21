@@ -8,4 +8,23 @@ config NET_WIFI_PASSWORD
 	help
 		Wifi password for the network that the device should connect to.
 
+#By default, use WIFI for Spotflow samples (more common among example boards)
+config SPOTFLOW_SAMPLE_WIFI
+	bool "Enable Wifi for Spotflow samples"
+	default y
+	default n if !SPOTFLOW_SAMPLE_ETH
+	select WIFI
+	select WIFI_NM
+	imply NET_L2_WIFI_MGMT
+	#nxp specifi configs
+	select WIFI_NXP if NXP_RW610
+	select NXP_WIFI_TX_RX_ZERO_COPY if NXP_RW610
+
+config SPOTFLOW_SAMPLE_ETH
+	bool "Enable Ethernet for Spotflow samples"
+	default n
+	default y if !SPOTFLOW_SAMPLE_WIFI
+	select ETH_DRIVER
+	select NET_L2_ETHERNET_MGMT
+
 source "Kconfig.zephyr"
