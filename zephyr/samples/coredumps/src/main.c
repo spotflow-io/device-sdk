@@ -5,14 +5,14 @@
 
 #include "zephyr/drivers/gpio.h"
 
-#ifdef CONFIG_SPOTFLOW_SAMPLE_ETH
+#ifdef CONFIG_SPOTFLOW_USE_ETH
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/dhcpv4.h>
 #endif
 
 #include <zephyr/device.h>
 
-#ifdef CONFIG_SPOTFLOW_SAMPLE_WIFI
+#ifdef CONFIG_SPOTFLOW_USE_WIFI
 #include "../../wifi-common/wifi.h"
 #endif
 
@@ -28,7 +28,7 @@ static struct gpio_callback button_cb_data;
 
 static int prepare_button();
 
-#ifdef CONFIG_SPOTFLOW_SAMPLE_ETH
+#ifdef CONFIG_SPOTFLOW_USE_ETH
 static void turn_on_dhcp_when_device_is_up();
 #endif
 
@@ -46,12 +46,12 @@ int main(void)
 
 	// Wait for the initialization of Wi-Fi device
 	k_sleep(K_SECONDS(1));
-#ifdef CONFIG_SPOTFLOW_SAMPLE_WIFI
+#ifdef CONFIG_SPOTFLOW_USE_WIFI
 	init_wifi();
 	connect_to_wifi();
 #endif
 
-#ifdef CONFIG_SPOTFLOW_SAMPLE_ETH
+#ifdef CONFIG_SPOTFLOW_USE_ETH
 	turn_on_dhcp_when_device_is_up();
 #endif
 
@@ -97,7 +97,7 @@ static int prepare_button()
 	return 0;
 }
 
-#ifdef CONFIG_SPOTFLOW_SAMPLE_ETH
+#ifdef CONFIG_SPOTFLOW_USE_ETH
 static void handler(struct net_mgmt_event_callback* cb, uint64_t mgmt_event, struct net_if* iface)
 {
 	if (mgmt_event == NET_EVENT_IF_UP) {
