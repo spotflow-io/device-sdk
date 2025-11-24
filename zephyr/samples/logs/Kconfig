@@ -20,9 +20,8 @@ config SPOTFLOW_USE_WIFI
 	imply NET_L2_WIFI_MGMT
 	#nxp specific configs
 	imply WIFI_NXP if BOARD_FRDM_RW612
+	# Enables IP fragmentation, which fixes the TLS handshake issue in Zephyr 4.2
 	imply NXP_WIFI_TX_RX_ZERO_COPY if NXP_RW610
-	#our handler won't work if ethernet is enabled because it is automatically
-	#default interface -> handler won't receive network change events
 
 
 config SPOTFLOW_USE_ETH
