@@ -9,8 +9,8 @@ config NET_WIFI_PASSWORD
 		Wifi password for the network that the device should connect to.
 
 choice SPOTFLOW_NETWORK_IFACE
-    prompt "Spotflow network interface"
-    default SPOTFLOW_USE_WIFI
+	prompt "Spotflow network interface"
+	default SPOTFLOW_USE_WIFI
 
 #By default, use WIFI for Spotflow samples (more common among example boards)
 config SPOTFLOW_USE_WIFI
@@ -21,7 +21,6 @@ config SPOTFLOW_USE_WIFI
 	#nxp specific configs
 	imply WIFI_NXP if BOARD_FRDM_RW612
 	imply NXP_WIFI_TX_RX_ZERO_COPY if NXP_RW610
-	CONFIG_NET_IF_MAX_IPV4_COUNT=2
 	#our handler won't work if ethernet is enabled because it is automatically
 	#default interface -> handler won't receive network change events
 
@@ -34,10 +33,10 @@ config SPOTFLOW_USE_ETH
 endchoice
 
 config NET_IF_MAX_IPV4_COUNT
-    int
-    #by default eth driver on FRDM_RW612 is enabled;
-    #therefore, we have to allow multiple IPv4 interfaces
-    #so DHCP can work properly
-    default 2 if SPOTFLOW_USE_WIFI && BOARD_FRDM_RW612
+	int
+	#by default eth driver on FRDM_RW612 is enabled;
+	#therefore, we have to allow multiple IPv4 interfaces
+	#so DHCP can work properly
+	default 2 if SPOTFLOW_USE_WIFI && BOARD_FRDM_RW612
 
 source "Kconfig.zephyr"
