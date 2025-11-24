@@ -8,4 +8,34 @@ config NET_WIFI_PASSWORD
 	help
 		Wifi password for the network that the device should connect to.
 
+choice SPOTFLOW_NETWORK_IFACE
+	prompt "Spotflow network interface"
+	default SPOTFLOW_USE_WIFI
+
+#By default, use WIFI for Spotflow samples (more common among example boards)
+config SPOTFLOW_USE_WIFI
+	bool "Enable Wifi for Spotflow samples"
+	imply WIFI
+	imply WIFI_NM
+	imply NET_L2_WIFI_MGMT
+	#nxp specific configs
+	imply WIFI_NXP if BOARD_FRDM_RW612
+	# Enables IP fragmentation, which fixes the TLS handshake issue in Zephyr 4.2
+	imply NXP_WIFI_TX_RX_ZERO_COPY if NXP_RW610
+
+
+config SPOTFLOW_USE_ETH
+	bool "Enable Ethernet for Spotflow samples"
+	imply ETH_DRIVER
+	imply NET_L2_ETHERNET_MGMT
+
+endchoice
+
+config NET_IF_MAX_IPV4_COUNT
+	int
+	#by default eth driver on FRDM_RW612 is enabled;
+	#therefore, we have to allow multiple IPv4 interfaces
+	#so DHCP can work properly
+	default 2 if SPOTFLOW_USE_WIFI && BOARD_FRDM_RW612
+
 source "Kconfig.zephyr"

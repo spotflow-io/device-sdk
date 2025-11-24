@@ -10,7 +10,9 @@ endif()
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(logs)
 
-add_subdirectory(../common ${CMAKE_CURRENT_BINARY_DIR}/common)
+if (CONFIG_SPOTFLOW_USE_WIFI)
+  add_subdirectory(../wifi-common ${CMAKE_CURRENT_BINARY_DIR}/wifi-common)
+endif ()
 
 target_sources(app PRIVATE
         src/main.c
