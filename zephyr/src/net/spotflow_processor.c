@@ -25,20 +25,20 @@
 
 LOG_MODULE_REGISTER(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-static void mqtt_thread(void);
+static void spotflow_mqtt_thread_entry(void);
 static void process_mqtt();
 
-K_THREAD_DEFINE(mqtt_thread_id, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE, mqtt_thread, NULL,
-		NULL, NULL, SPOTFLOW_MQTT_THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(spotflow_mqtt_thread, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE,
+		spotflow_mqtt_thread_entry, NULL, NULL, NULL, SPOTFLOW_MQTT_THREAD_PRIORITY, 0, 0);
 
 void spotflow_start_mqtt(void)
 {
-	k_thread_start(mqtt_thread_id);
+	k_thread_start(spotflow_mqtt_thread);
 	LOG_DBG("Thread started with priority %d and stack size %d", SPOTFLOW_MQTT_THREAD_PRIORITY,
 		CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE);
 }
 
-static void mqtt_thread(void)
+static void spotflow_mqtt_thread_entry(void)
 {
 	LOG_DBG("Starting Spotflow processing thread");
 

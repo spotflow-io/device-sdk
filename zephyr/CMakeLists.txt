@@ -12,6 +12,12 @@ zephyr_include_directories(
         src
 )
 
+if (CONFIG_MBEDTLS_MPI_MAX_SIZE LESS 512)
+    message(WARNING "CONFIG_MBEDTLS_MPI_MAX_SIZE must be at least 512 for Spotflow to "
+                    "connect to the MQTT broker. Add CONFIG_MBEDTLS_MPI_MAX_SIZE=512 to "
+                    "your prj.conf file.")
+endif()
+
 # Prepend patching the .elf, .hex, and .bin files with the build ID to post-build commands
 # so that the build ID is contained in the binary image. It's insufficient to patch just
 # the .elf file, because Zephyr's extra post-build commands are inserted after the generation
