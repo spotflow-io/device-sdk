@@ -18,37 +18,36 @@ static QueueHandle_t queue_handle = NULL;
  * 
  * @param msg Log Message 
  */
-void queue_push(uint8_t *msg, size_t len)
+void spotflow_queue_push(uint8_t* msg, size_t len)
 {
-    queue_msg_t qmsg;
-    qmsg.ptr = malloc(len);
-    qmsg.len = len;
+	queue_msg_t qmsg;
+	qmsg.ptr = malloc(len);
+	qmsg.len = len;
 
-    if (!qmsg.ptr) {
-        SPOTFLOW_LOG("Heap allocation failed");
-        return;
-    }
+	if (!qmsg.ptr) {
+		SPOTFLOW_LOG("Heap allocation failed");
+		return;
+	}
 
-    memcpy(qmsg.ptr, msg, len);
-    // Try to enqueue
-    if (xQueueSend(queue_handle, &qmsg, 0) != pdPASS) {
-        // Queue full → drop oldest
-        queue_msg_t dropped;
-        if (xQueueReceive(queue_handle, &dropped, 0) == pdPASS) {
-            SPOTFLOW_LOG("Queue full — dropped oldest message");
-            free(dropped.ptr);
-        }
+	memcpy(qmsg.ptr, msg, len);
+	// Try to enqueue
+	if (xQueueSend(queue_handle, &qmsg, 0) != pdPASS) {
+		// Queue full → drop oldest
+		queue_msg_t dropped;
+		if (xQueueReceive(queue_handle, &dropped, 0) == pdPASS) {
+			SPOTFLOW_LOG("Queue full — dropped oldest message");
+			free(dropped.ptr);
+		}
 
-        // Retry enqueue
-        if (xQueueSend(queue_handle, &qmsg, 0) != pdPASS) {
-            SPOTFLOW_LOG("Queue send failed even after drop");
-            free(qmsg.ptr);
-            return;
-        }
-    }
+		// Retry enqueue
+		if (xQueueSend(queue_handle, &qmsg, 0) != pdPASS) {
+			SPOTFLOW_LOG("Queue send failed even after drop");
+			free(qmsg.ptr);
+			return;
+		}
+	}
 
-    SPOTFLOW_LOG("Message Added.\n");
-    
+	SPOTFLOW_LOG("Message Added.\n");
 }
 
 /**
@@ -58,11 +57,15 @@ void queue_push(uint8_t *msg, size_t len)
  * @return true if a message was read, false if queue empty
  */
 
-bool queue_read(queue_msg_t *out)
+bool spotflow_queue_read(queue_msg_t* out)
 {
-   if (xQueueReceive(queue_handle, out, 0) == pdPASS)
-        return true;
-    return false;
+	if (queue_handle == NULL || out == NULL) {
+       return false;
+    }
+	
+	if (xQueueReceive(queue_handle, out, 0) == pdPASS)
+		return true;
+	return false;
 }
 
 /**
@@ -70,24 +73,23 @@ bool queue_read(queue_msg_t *out)
  * 
  * @param msg 
  */
-void queue_free(queue_msg_t *msg)
+void spotflow_queue_free(queue_msg_t* msg)
 {
-    if (msg && msg->ptr) {
-        free(msg->ptr);
-        msg->ptr = NULL;
-        msg->len = 0;
-    }
+	if (msg && msg->ptr) {
+		free(msg->ptr);
+		msg->ptr = NULL;
+		msg->len = 0;
+	}
 }
 
 /**
  * @brief Initialize the Queue to save the messgaes
  * 
  */
-void queue_init(void)
+void spotflow_queue_init(void)
 {
-    queue_handle = xQueueCreate(CONFIG_SPOTFLOW_MESSAGE_QUEUE_SIZE,  sizeof(queue_msg_t));
-    if (queue_handle == NULL) {
-        SPOTFLOW_LOG("Failed to create queue");
-    }
+	queue_handle = xQueueCreate(CONFIG_SPOTFLOW_MESSAGE_QUEUE_SIZE, sizeof(queue_msg_t));
+	if (queue_handle == NULL) {
+		SPOTFLOW_LOG("Failed to create queue");
+	}
 }
-
