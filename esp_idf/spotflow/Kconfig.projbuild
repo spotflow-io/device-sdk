@@ -6,7 +6,8 @@ menu "Spotflow"
         config SPOTFLOW_COREDUMP_BACKEND
             bool "Enable automatic core dump settings"
             default n
-            select ESP_COREDUMP_ENABLE
+            select ESP_COREDUMP_DATA_FORMAT_ELF
+            imply ESP_COREDUMP_CAPTURE_DRAM
 
         if SPOTFLOW_COREDUMP_BACKEND
 
@@ -14,17 +15,10 @@ menu "Spotflow"
             choice ESP_COREDUMP_TO_FLASH_OR_UART
                 default ESP_COREDUMP_ENABLE_TO_FLASH
             endchoice
-
-            config ESP_COREDUMP_ENABLE
-                default y
-                select ESP_COREDUMP_DATA_FORMAT_ELF
-
-            config ESP_COREDUMP_CAPTURE_DRAM
-                default y
-
-            config SPOTFLOW_COREDUMPS_CHUNK_SIZE
-            int
-            default SPOTFLOW_CBOR_LOG_MAX_LEN
+        
+        config SPOTFLOW_COREDUMPS_CHUNK_SIZE
+        int 
+        default SPOTFLOW_CBOR_LOG_MAX_LEN
 
         endif
 
@@ -34,7 +28,7 @@ menu "Spotflow"
         default "mqtts://mqtt.spotflow.io:8883"
         help
             URL of an mqtt broker which spotflow connects to.
-
+    
     config SPOTFLOW_DEVICE_ID
         string "Device ID device will use to connect to Spotflow observability platform"
         help
@@ -46,7 +40,7 @@ menu "Spotflow"
         help
             Ingest key is a secret key used to authenticate your device
             It can be found in Spotflow observability platform
-
+    
     config BROKER_CERTIFICATE_OVERRIDE
         string "Broker certificate override"
         default ""
@@ -69,7 +63,7 @@ menu "Spotflow"
         default y
         help
             Enable sending logs to Spotflow cloud.
-
+    
     config SPOTFLOW_LOG_BUFFER_SIZE
         int "Size of Spotflow log buffer"
         default 512
@@ -88,9 +82,27 @@ menu "Spotflow"
     config SPOTFLOW_DEBUG_MESSAGE_TERMINAL
         bool "To view the logs on the spotflow side to view any errors while debugging"
         default n
-
+    
     config SPOTFLOW_MESSAGE_QUEUE_SIZE
         int "Number of messages to retain in case of disconnection"
         default 5
 
+    
+    config SPOTFLOW_DEFAULT_SENT_LOG_LEVEL
+        int "Spotflow default sent log level"
+        default 4
+        range 0 6   
+        help
+            Filters the logs sent to Spotflow cloud according to their severity level.
+            This is the default value that can be dynamically overridden from the cloud.
+            Levels are:
+            - 0 OFF, do not send any logs
+            - 1 ERROR, send LOG_ERR
+            - 2 WARNING, send LOG_WRN in addition to previous level
+            - 3 INFO, send LOG_INF in addition to previous level
+            - 4 DEBUG, send LOG_DBG in addition to previous level
+    
+    config SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
+        bool "To enable the logs set"
+        default y
 endmenu

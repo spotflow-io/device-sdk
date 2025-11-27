@@ -11,9 +11,11 @@
 #include "spotflow.h"
 
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
-	#include "coredump/spotflow_coredump.h"
-	#include "coredump/spotflow_coredump_queue.h"
+#include "coredump/spotflow_coredump.h"
+#include "coredump/spotflow_coredump_queue.h"
 #endif
+
+#include "configs/spotflow_config.h"
 
 vprintf_like_t original_vprintf = NULL;
 
@@ -33,4 +35,5 @@ void spotflow_init(void)
 		spotflow_coredump_backend();
 	}
 #endif
+	spotflow_config_init();
 }

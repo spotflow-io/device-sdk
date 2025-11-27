@@ -10,9 +10,10 @@
 #include "coredump/spotflow_coredump.h"
 #include "coredump/spotflow_coredump_cbor.h"
 #include "coredump/spotflow_coredump_queue.h"
+#include "net/spotflow_mqtt.h"
 
 #ifdef CONFIG_SPOTFLOW_USE_BUILD_ID
-	#include "buildid/spotflow_build_id.h"
+#include "buildid/spotflow_build_id.h"
 #endif
 
 // static const char* TAG = "SPOTFLOW_COREDUMP";
@@ -30,9 +31,9 @@ static coredump_info_t coredump_info = { 0 };
 
 /**
  * @brief If coredump Partion is available return true otherwise false
- * 
- * @return true 
- * @return false 
+ *
+ * @return true
+ * @return false
  */
 bool spotflow_is_coredump_available(void)
 {
@@ -40,30 +41,30 @@ bool spotflow_is_coredump_available(void)
 	    ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
 
 	if (part == NULL) {
-		SPOTFLOW_LOG( "No coredump partition found.");
+		SPOTFLOW_LOG("No coredump partition found.");
 		return false;
 	}
 
 	// Get the actual size of the coredump partition
 	size_t partition_size = part->size;
 	if (partition_size == 0) {
-		SPOTFLOW_LOG( "Coredump partition size is zero.");
+		SPOTFLOW_LOG("Coredump partition size is zero.");
 		return false;
 	}
 	size_t coredump_addr = 0;
 	esp_err_t err = esp_core_dump_image_get(&coredump_addr, &partition_size);
-	
+
 	if (err != ESP_OK) {
-		SPOTFLOW_LOG( "No Coredump found.");
+		SPOTFLOW_LOG("No Coredump found.");
 		return false;
 	}
 	return true;
 }
 
 /**
- * @brief 
- * 
- * @return esp_err_t 
+ * @brief
+ *
+ * @return esp_err_t
  */
 esp_err_t spotflow_coredump_backend(void)
 {
@@ -73,32 +74,32 @@ esp_err_t spotflow_coredump_backend(void)
 	// Retrieve the coredump image address and size
 	esp_err_t err = esp_core_dump_image_get(&coredump_addr, &coredump_size);
 	if (err != ESP_OK) {
-		SPOTFLOW_LOG( "No Coredump found.");
+		SPOTFLOW_LOG("No Coredump found.");
 		return err;
 	}
 
 	// If the coredump size is 0, Coredump is empty
 	if (coredump_size == 0) {
-		SPOTFLOW_LOG( "Coredump is empty.");
+		SPOTFLOW_LOG("Coredump is empty.");
 		return ESP_ERR_INVALID_STATE;
 	}
 
 	// Log the coredump information
-	SPOTFLOW_LOG( "Coredump address: 0x%08X, size: 0x%08X bytes", (unsigned int)coredump_addr,
-		 (int)coredump_size);
+	SPOTFLOW_LOG("Coredump address: 0x%08X, size: 0x%08X bytes", (unsigned int)coredump_addr,
+		     (int)coredump_size);
 
 	// Find the coredump partition
 	const esp_partition_t* part = esp_partition_find_first(
 	    ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_DATA_COREDUMP, NULL);
 	if (!part) {
-		SPOTFLOW_LOG( "Coredump partition not found.");
+		SPOTFLOW_LOG("Coredump partition not found.");
 		return ESP_ERR_NOT_FOUND;
 	}
 
 	// Adjust address to partition offset
 	coredump_addr = coredump_addr - part->address;
-	SPOTFLOW_LOG( "Adjusted coredump address: 0x%08X, partition address: 0x%08X",
-		 (unsigned int)coredump_addr, (unsigned int)part->address);
+	SPOTFLOW_LOG("Adjusted coredump address: 0x%08X, partition address: 0x%08X",
+		     (unsigned int)coredump_addr, (unsigned int)part->address);
 
 	// Initialize coredump info
 	coredump_info.size = coredump_size;
@@ -106,15 +107,15 @@ esp_err_t spotflow_coredump_backend(void)
 	coredump_info.chunk_ordinal = 0;
 	coredump_info.coredump_id = esp_random(); // Generate random coredump ID
 
-	SPOTFLOW_LOG( "Starting coredump processing with ID: 0x%08X, size: %zu",
-		 (unsigned int)coredump_info.coredump_id, coredump_info.size);
+	SPOTFLOW_LOG("Starting coredump processing with ID: 0x%08X, size: %zu",
+		     (unsigned int)coredump_info.coredump_id, coredump_info.size);
 
 	// Allocate buffer for one chunk only
 	size_t chunk_size = CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE;
 	uint8_t* chunk_buffer = malloc(chunk_size);
 
 	if (!chunk_buffer) {
-		SPOTFLOW_LOG( "Failed to allocate memory for chunk buffer.");
+		SPOTFLOW_LOG("Failed to allocate memory for chunk buffer.");
 		return ESP_ERR_NO_MEM;
 	}
 
@@ -130,8 +131,8 @@ esp_err_t spotflow_coredump_backend(void)
 					 current_chunk_size);
 		if (err != ESP_OK) {
 			free(chunk_buffer);
-			SPOTFLOW_LOG( "Failed to read coredump chunk at offset %zu.",
-				 coredump_info.offset);
+			SPOTFLOW_LOG("Failed to read coredump chunk at offset %zu.",
+				     coredump_info.offset);
 			return err;
 		}
 
@@ -139,7 +140,7 @@ esp_err_t spotflow_coredump_backend(void)
 		bool is_last_chunk =
 		    (coredump_info.offset + current_chunk_size) >= coredump_info.size;
 		if (is_last_chunk) {
-			SPOTFLOW_LOG( "Processing last chunk of coredump\n");
+			SPOTFLOW_LOG("Processing last chunk of coredump\n");
 		}
 
 		// Get build ID (only for first chunk)
@@ -150,9 +151,9 @@ esp_err_t spotflow_coredump_backend(void)
 		if (coredump_info.chunk_ordinal == 0) {
 			int rc = spotflow_build_id_get(&build_id, &build_id_len);
 			if (rc != 0) {
-				SPOTFLOW_LOG( "Failed to get build ID for coredump: %d", rc);
+				SPOTFLOW_LOG("Failed to get build ID for coredump: %d", rc);
 			} else {
-				SPOTFLOW_LOG( "Build ID retrieved, length: %zu", build_id_len);
+				SPOTFLOW_LOG("Build ID retrieved, length: %zu", build_id_len);
 			}
 		}
 #endif
@@ -167,16 +168,20 @@ esp_err_t spotflow_coredump_backend(void)
 
 		if (rc < 0) {
 			free(chunk_buffer);
-			SPOTFLOW_LOG( "Failed to encode coredump chunk: %d", rc);
+			SPOTFLOW_LOG("Failed to encode coredump chunk: %d", rc);
 			return ESP_FAIL;
 		}
 
 		// keep retrying to push data until the mqtt function is able to read and clear it
 		do {
 			rc = spotflow_queue_coredump_push(cbor_data, cbor_data_len);
-			vTaskDelay(pdMS_TO_TICKS(50)); //50 ticks wait
-		} while(rc < 0);
+			if (rc < 0) {
+				// vTaskDelay(pdMS_TO_TICKS(500));
+				// Add a small delay here so CPU doesn't hog the other tasks
+			}
+		} while (rc < 0);
 
+		spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_COURDUMP);
 		// Free the CBOR data after sending
 		free(cbor_data);
 
@@ -184,22 +189,24 @@ esp_err_t spotflow_coredump_backend(void)
 		coredump_info.chunk_ordinal++;
 		coredump_info.offset += current_chunk_size;
 
-		SPOTFLOW_LOG( "Sent chunk %d: %zu/%zu bytes (%.1f%%)\n",
-			 coredump_info.chunk_ordinal - 1, coredump_info.offset, coredump_info.size,
-			 (float)coredump_info.offset * 100.0f / coredump_info.size);
+		SPOTFLOW_LOG("Sent chunk %d: %zu/%zu bytes (%.1f%%)\n",
+			     coredump_info.chunk_ordinal - 1, coredump_info.offset,
+			     coredump_info.size,
+			     (float)coredump_info.offset * 100.0f / coredump_info.size);
 	}
 
 	free(chunk_buffer);
-	SPOTFLOW_LOG( "Successfully processed and sent all %zu bytes of coredump data in %d chunks\n",
-		 coredump_info.size, coredump_info.chunk_ordinal);
-	
-	spotflow_coredump_cleanup(); // call the cleanup as the data is in the mqtt court. 
+	SPOTFLOW_LOG(
+	    "Successfully processed and sent all %zu bytes of coredump data in %d chunks\n",
+	    coredump_info.size, coredump_info.chunk_ordinal);
+
+	spotflow_coredump_cleanup(); // call the cleanup as the data is in the mqtt court.
 	return ESP_OK;
 }
 
 /**
  * @brief Erase the coredump image.
- * 
+ *
  */
 void spotflow_coredump_cleanup()
 {
