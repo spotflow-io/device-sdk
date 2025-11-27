@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 * Added sample for Ethernet on FRDM_RW612
+* Added Coredump for ESP IDF.
+* Added example for ESP IDF(tested on esp32s3, esp32c3, esp32c6).
+* Added CI/CD Pipeline for ESP IDF.
+  
 ### Fixed
 * Added check of `CONFIG_MBEDTLS_MPI_MAX_SIZE` in CMake and explicitly set it for Nordic boards in samples
 
