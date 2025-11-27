@@ -14,15 +14,16 @@ menu "Spotflow"
             choice ESP_COREDUMP_TO_FLASH_OR_UART
                 default ESP_COREDUMP_ENABLE_TO_FLASH
             endchoice
-            
+
             config ESP_COREDUMP_ENABLE
-                default ESP_COREDUMP_DATA_FORMAT_ELF
-            
+                default y
+                select ESP_COREDUMP_DATA_FORMAT_ELF
+
             config ESP_COREDUMP_CAPTURE_DRAM
                 default y
-        
+
             config SPOTFLOW_COREDUMPS_CHUNK_SIZE
-            int 
+            int
             default SPOTFLOW_CBOR_LOG_MAX_LEN
 
         endif
@@ -33,7 +34,7 @@ menu "Spotflow"
         default "mqtts://mqtt.spotflow.io:8883"
         help
             URL of an mqtt broker which spotflow connects to.
-    
+
     config SPOTFLOW_DEVICE_ID
         string "Device ID device will use to connect to Spotflow observability platform"
         help
@@ -45,7 +46,7 @@ menu "Spotflow"
         help
             Ingest key is a secret key used to authenticate your device
             It can be found in Spotflow observability platform
-    
+
     config BROKER_CERTIFICATE_OVERRIDE
         string "Broker certificate override"
         default ""
@@ -68,7 +69,7 @@ menu "Spotflow"
         default y
         help
             Enable sending logs to Spotflow cloud.
-    
+
     config SPOTFLOW_LOG_BUFFER_SIZE
         int "Size of Spotflow log buffer"
         default 512
@@ -87,7 +88,7 @@ menu "Spotflow"
     config SPOTFLOW_DEBUG_MESSAGE_TERMINAL
         bool "To view the logs on the spotflow side to view any errors while debugging"
         default n
-    
+
     config SPOTFLOW_MESSAGE_QUEUE_SIZE
         int "Number of messages to retain in case of disconnection"
         default 5
