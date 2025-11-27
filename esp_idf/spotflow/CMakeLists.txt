@@ -19,7 +19,7 @@ set(PRIV_REQUIRES
 )
 
 # ---- Optional build ID source ----
-if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID)
+if(CONFIG_SPOTFLOW_USE_BUILD_ID)
     list(APPEND SRCS "src/buildid/spotflow_build_id.c")
     list(APPEND PRIV_REQUIRES esp_app_format)
 endif()

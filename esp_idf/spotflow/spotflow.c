@@ -5,7 +5,7 @@
 #include "net/spotflow_mqtt.h"
 #include "logging/spotflow_log_backend.h"
 #include "logging/spotflow_log_queue.h"
-#ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
+#ifdef CONFIG_SPOTFLOW_USE_BUILD_ID
 #include "buildid/spotflow_build_id.h"
 #endif
 #include "spotflow.h"

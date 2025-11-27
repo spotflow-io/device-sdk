@@ -11,7 +11,7 @@
 #include "coredump/spotflow_coredump_cbor.h"
 #include "coredump/spotflow_coredump_queue.h"
 
-#ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
+#ifdef CONFIG_SPOTFLOW_USE_BUILD_ID
 	#include "buildid/spotflow_build_id.h"
 #endif
 
@@ -146,7 +146,7 @@ esp_err_t spotflow_coredump_backend(void)
 		const uint8_t* build_id = NULL;
 		uint16_t build_id_len = 0;
 
-#ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
+#ifdef CONFIG_SPOTFLOW_USE_BUILD_ID
 		if (coredump_info.chunk_ordinal == 0) {
 			int rc = spotflow_build_id_get(&build_id, &build_id_len);
 			if (rc != 0) {

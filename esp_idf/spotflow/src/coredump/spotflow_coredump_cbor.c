@@ -174,7 +174,7 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 		goto fail;
 	}
 
-#ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
+#ifdef CONFIG_SPOTFLOW_USE_BUILD_ID
 	if (build_id_data && build_id_data_len > 0) {
 		err = cbor_encode_uint(&map_encoder, KEY_BUILD_ID);
 		if (err != CborNoError) {

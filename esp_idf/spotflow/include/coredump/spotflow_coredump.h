@@ -11,6 +11,7 @@ extern "C" {
 bool spotflow_is_coredump_available(void);
 esp_err_t spotflow_coredump_backend(void);
 void spotflow_coredump_cleanup(void);
+
 #ifdef __cplusplus
 }
 #endif

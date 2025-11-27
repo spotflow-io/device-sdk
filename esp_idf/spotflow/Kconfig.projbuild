@@ -57,13 +57,11 @@ menu "Spotflow"
         bool
         default y if BROKER_CERTIFICATE_OVERRIDE != ""
 
-    config SPOTFLOW_GENERATE_BUILD_ID
-	bool "Generate build ID"
-	default n
-	# Use binary descriptors when possible
+    config SPOTFLOW_USE_BUILD_ID
+	bool "Use build ID"
+	default y
 	help
-		Generate build ID and embed it as a binary descriptor.
-		Build ID allows to match core dumps with the original .elf file. (Not implemented yet).
+		Build ID allows to match core dumps with the original .elf file.
 
     config SPOTFLOW_LOG_BACKEND
         bool "Spotflow logging backend"
