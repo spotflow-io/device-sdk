@@ -41,7 +41,7 @@ jobs:
         run: west packages pip --install --ignore-venv-check
 
       - name: Download blobs
-        run: west blobs fetch ${{ matrix.blob }}
+        run: west blobs fetch ${{ matrix.blob }} --auto-accept
 
       - name: Install SDK
         run: west sdk install ${{ matrix.sdk_version }} --toolchains ${{ matrix.sdk_toolchain }}
