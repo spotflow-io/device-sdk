@@ -33,11 +33,11 @@ jobs:
       - name: Install West
         run: pip install west
 
-      # TODO: Use URL of the repository (to account for forks)
       - name: Create workspace
         run: |
           west init . \
-            --manifest-url https://github.com/spotflow-io/device-sdk \
+            --manifest-url ${{ github.server_url }}/${{ github.repository }} \
+            --manifest-rev ${{ github.sha }} \
             --manifest-file zephyr/${{ matrix.manifest }}
           west update --fetch-opt=--depth=1 --narrow
 
