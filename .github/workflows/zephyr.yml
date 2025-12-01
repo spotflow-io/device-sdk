@@ -37,7 +37,7 @@ jobs:
         run: |
           west init . \
             --manifest-url ${{ github.server_url }}/${{ github.repository }} \
-            --manifest-rev ${{ github.sha }} \
+            --manifest-rev ${{ github.ref_name }} \
             --manifest-file zephyr/${{ matrix.manifest }}
           west update --fetch-opt=--depth=1 --narrow
 
