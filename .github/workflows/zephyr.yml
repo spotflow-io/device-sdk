@@ -38,7 +38,7 @@ jobs:
           west update --fetch-opt=--depth=1 --narrow
 
       - name: Install Python packages
-        run: west packages pip --install
+        run: west packages pip --install --ignore-venv-check
 
       - name: Download blobs
         run: west blobs fetch ${{ matrix.blob }}
