@@ -44,7 +44,10 @@ jobs:
         run: west blobs fetch ${{ matrix.blob }} --auto-accept
 
       - name: Install SDK
-        run: west sdk install ${{ matrix.sdk_version }} --toolchains ${{ matrix.sdk_toolchain }}
+        run: |
+          west sdk install \
+            --version ${{ matrix.sdk_version }} \
+            --toolchains ${{ matrix.sdk_toolchain }}
 
       - name: Build application
         working-directory: modules/lib/spotflow/zephyr/samples/logs
