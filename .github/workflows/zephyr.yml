@@ -49,11 +49,17 @@ jobs:
             --version ${{ matrix.sdk_version }} \
             --toolchains ${{ matrix.sdk_toolchain }}
 
+      - name: Configure application
+        working-directory: modules/lib/spotflow/zephyr/samples/logs
+        run: |
+          cat <<EOF > credentials.conf
+          CONFIG_NET_WIFI_SSID="TODOTODO"
+          CONFIG_NET_WIFI_PASSWORD="TODOTODO"
+          CONFIG_SPOTFLOW_DEVICE_ID="${{ matrix.board }}_${{ github.run_id }}"
+          CONFIG_SPOTFLOW_INGEST_KEY="TODO"
+          EOF
+
       - name: Build application
         working-directory: modules/lib/spotflow/zephyr/samples/logs
         run: |
-          west build -b ${{ matrix.board }} \
-            -DCONFIG_NET_WIFI_SSID="TODOTODO" \
-            -DCONFIG_NET_WIFI_PASSWORD="TODOTODO" \
-            -DCONFIG_SPOTFLOW_DEVICE_ID="${{ matrix.board }}_${{ github.run_id }}" \
-            -DCONFIG_SPOTFLOW_INGEST_KEY="TODO"
+          west build --board ${{ matrix.board }}
