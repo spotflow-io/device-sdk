@@ -25,11 +25,6 @@ jobs:
             blob: hal_nxp
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          submodules: 'recursive'
-
       - name: Install West
         run: pip install west
 
@@ -37,7 +32,7 @@ jobs:
         run: |
           west init \
             --manifest-url ${{ github.server_url }}/${{ github.repository }} \
-            --manifest-rev ${{ github.ref_name }} \
+            --clone-opt=--revision=${{ github.sha }} \
             --manifest-file zephyr/${{ matrix.manifest }} \
             .
           west update --fetch-opt=--depth=1 --narrow
