@@ -35,10 +35,11 @@ jobs:
 
       - name: Create workspace
         run: |
-          west init . \
+          west init \
             --manifest-url ${{ github.server_url }}/${{ github.repository }} \
             --manifest-rev ${{ github.ref_name }} \
-            --manifest-file zephyr/${{ matrix.manifest }}
+            --manifest-file zephyr/${{ matrix.manifest }} \
+            .
           west update --fetch-opt=--depth=1 --narrow
 
       - name: Install Python packages
