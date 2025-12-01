@@ -1,0 +1,60 @@
+name: Build Zephyr Project
+
+on:
+  push:
+
+permissions:
+  contents: read        # Allows reading repository content (needed for checkout)
+  issues: write         # Allows reporting build results to PR checks
+  pull-requests: write  # Allows commenting/updating PR status
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - board: frdm_rw612
+            manifest: west-zephyr-nxp.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: arm-zephyr-eabi
+            blob: hal_nxp
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      
+      - name: Install West
+        run: pip install west
+      
+      - name: Install SDK
+        run: west sdk install ${{ matrix.sdk_version }} --toolchains ${{ matrix.sdk_toolchain }}
+      
+      # TODO: Use URL of the repository (to account for forks)
+      - name: Create workspace
+        run: |
+          west init . \
+            --manifest-url https://github.com/spotflow-io/device-sdk \
+            --manifest-file zephyr/${{ matrix.manifest }}
+          west update --fetch-opt=--depth=1 --narrow
+      
+      - name: Install Python packages
+        run: west packages pip --install
+      
+      - name: Download blobs
+        run: west blobs fetch ${{ matrix.blob }}
+
+      - name: Build application
+        working-directory: modules/lib/spotflow/zephyr/samples/logs
+        run: |
+          west build -b ${{ matrix.board }} \
+            -DCONFIG_NET_WIFI_SSID="TODOTODO" \
+            -DCONFIG_NET_WIFI_PASSWORD="TODOTODO" \
+            -DCONFIG_SPOTFLOW_DEVICE_ID="${{ matrix.board }}_${{ github.run_id }}" \
+            -DCONFIG_SPOTFLOW_INGEST_KEY="TODO"
