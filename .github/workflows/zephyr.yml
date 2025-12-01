@@ -29,13 +29,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           submodules: 'recursive'
-      
+
       - name: Install West
         run: pip install west
-      
-      - name: Install SDK
-        run: west sdk install ${{ matrix.sdk_version }} --toolchains ${{ matrix.sdk_toolchain }}
-      
+
       # TODO: Use URL of the repository (to account for forks)
       - name: Create workspace
         run: |
@@ -43,12 +40,15 @@ jobs:
             --manifest-url https://github.com/spotflow-io/device-sdk \
             --manifest-file zephyr/${{ matrix.manifest }}
           west update --fetch-opt=--depth=1 --narrow
-      
+
       - name: Install Python packages
         run: west packages pip --install
-      
+
       - name: Download blobs
         run: west blobs fetch ${{ matrix.blob }}
+
+      - name: Install SDK
+        run: west sdk install ${{ matrix.sdk_version }} --toolchains ${{ matrix.sdk_toolchain }}
 
       - name: Build application
         working-directory: modules/lib/spotflow/zephyr/samples/logs
