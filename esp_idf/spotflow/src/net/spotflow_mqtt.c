@@ -14,8 +14,6 @@
 #include "coredump/spotflow_coredump_net.h"
 #endif
 
-// static const char *TAG = "spotflow_mqtt";
-
 esp_mqtt_client_handle_t spotflow_client = NULL;
 static TaskHandle_t mqtt_publish_task_handle = NULL;
 EventGroupHandle_t spotflow_mqtt_event_group;
@@ -72,9 +70,6 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 		break;
 	case MQTT_EVENT_DATA:
 		spotflow_mqtt_handle_data(event);
-#if CONFIG_MQTT_PROTOCOL_5
-
-#endif
 		break;
 	case MQTT_EVENT_ERROR:
 		SPOTFLOW_LOG("MQTT_EVENT_ERROR");
