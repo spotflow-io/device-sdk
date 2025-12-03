@@ -1,0 +1,57 @@
+config SPOTFLOW_METRICS_PIPELINE
+	bool "Spotflow metrics pipeline"
+	default y
+	help
+		Enable sending metrics to Spotflow cloud using the MQTT processing thread.
+
+config SPOTFLOW_METRICS_QUEUE_SIZE
+	int "Size of Spotflow metrics queue"
+	default 16
+	help
+		Size of the queue used to buffer metrics before sending them to the server.
+		Increase this value if you experience metrics drops due to a slow network.
+
+config SPOTFLOW_METRICS_MAX_REGISTERED
+	int "Maximum registered metrics"
+	default 8
+	help
+		Upper bound on concurrently registered metrics (system + user-defined).
+
+config SPOTFLOW_METRICS_MAX_TIMESERIES_PER_METRIC
+	int "Maximum time series per metric"
+	default 4
+	help
+		Maximum dimension combinations kept per metric handle.
+
+config SPOTFLOW_METRICS_MAX_DIMENSIONS
+	int "Maximum dimensions per metric"
+	default 4
+	help
+		Maximum number of dimensions allowed for a single metric time series.
+
+config SPOTFLOW_METRICS_MAX_SAMPLES_PER_SERIES
+	int "Maximum stored raw samples per aggregation window"
+	default 8
+	help
+		When collectSamples is true, raw sample values are stored up to this count per window.
+
+config SPOTFLOW_METRICS_NAME_MAX_LEN
+	int "Maximum metric name length"
+	default 32
+
+config SPOTFLOW_METRICS_LABEL_MAX_LEN
+	int "Maximum label key/value length"
+	default 32
+
+config SPOTFLOW_METRICS_AGGREGATION_INTERVAL_SECONDS
+	int "Aggregation interval in seconds"
+	default 60
+	help
+		Window over which samples are aggregated before sending.
+		Set to 0 to disable aggregation (send on every flush tick).
+
+config SPOTFLOW_CBOR_METRIC_MAX_LEN
+	int "Maximum encoded CBOR metric length"
+	default 256
+	help
+		Size of the buffer used to encode a single metric message.

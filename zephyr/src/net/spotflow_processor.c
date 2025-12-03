@@ -10,6 +10,9 @@
 #include "net/spotflow_connection_helper.h"
 #include "net/spotflow_session_metadata.h"
 #include "net/spotflow_tls.h"
+#ifdef CONFIG_SPOTFLOW_METRICS_PIPELINE
+#include "metrics/spotflow_metrics_net.h"
+#endif
 
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 #include "coredumps/spotflow_coredumps_net.h"
@@ -50,6 +53,9 @@ static void spotflow_mqtt_thread_entry(void)
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 	spotflow_init_core_dumps_polling();
 #endif
+#ifdef CONFIG_SPOTFLOW_METRICS_PIPELINE
+	spotflow_init_metrics_polling();
+#endif
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	init_logs_polling();
 #endif
@@ -61,8 +67,8 @@ static void spotflow_mqtt_thread_entry(void)
 		process_mqtt();
 	}
 }
-
-static int process_config_coredumps_or_logs()
+//todo rename
+static int process_config_coredumps_or_metrics_or_logs()
 {
 	int rc = spotflow_config_send_pending_message();
 	if (rc < 0) {
@@ -74,6 +80,15 @@ static int process_config_coredumps_or_logs()
 	if (rc < 0) {
 		LOG_DBG("Failed to process coredumps: %d", rc);
 		return rc;
+	}
+#endif
+#ifdef CONFIG_SPOTFLOW_METRICS_PIPELINE
+	if (rc == 0) {
+		rc = spotflow_poll_and_process_enqueued_metrics();
+		if (rc < 0) {
+			LOG_DBG("Failed to process metrics: %d", rc);
+			return rc;
+		}
 	}
 #endif
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
@@ -115,7 +130,7 @@ static void process_mqtt()
 			break; /* break out of the inner loop; outer loop will reconnect */
 		}
 
-		rc = process_config_coredumps_or_logs();
+		rc = process_config_coredumps_or_metrics_or_logs();
 		if (rc < 0) {
 			/* Problem in sending/mqtt_publish, reestablishing MQTT Connection*/
 			break;
