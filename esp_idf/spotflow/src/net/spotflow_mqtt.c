@@ -70,6 +70,8 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 		break;
 	case MQTT_EVENT_DATA:
 		spotflow_mqtt_handle_data(event);
+		// Future expansion.
+		// For any other data event for MQTT 5.
 		break;
 	case MQTT_EVENT_ERROR:
 		SPOTFLOW_LOG("MQTT_EVENT_ERROR");
