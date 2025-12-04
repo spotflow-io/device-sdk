@@ -20,7 +20,7 @@ void spotflow_mqtt_publish(void* pvParameters);
 int spotflow_mqtt_subscribe(esp_mqtt_client_handle_t client, const char* topic, int qos);
 void spotflow_mqtt_handle_data(esp_mqtt_event_handle_t event);
 void spotflow_mqtt_on_message(const char* topic, int topic_len, const uint8_t* data, int data_len);
-int spotflow_mqtt_publish_messgae(const char* topic, const uint8_t* data, int len, int qos);
+int spotflow_mqtt_publish_message(const char* topic, const uint8_t* data, int len, int qos);
 void spotflow_mqtt_notify_action(uint32_t action_type);
 
 #ifdef __cplusplus

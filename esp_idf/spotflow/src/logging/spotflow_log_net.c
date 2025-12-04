@@ -9,7 +9,7 @@ int spotflow_logging_send_message(void)
 {
 	if (spotflow_queue_read(&msg)) {
 		int msg_id =
-		    spotflow_mqtt_publish_messgae(SPOTFLOW_MQTT_LOG_TOPIC, msg.ptr, msg.len,
+		    spotflow_mqtt_publish_message(SPOTFLOW_MQTT_LOG_TOPIC, msg.ptr, msg.len,
 						  SPOTFLOW_MQTT_LOG_QOS // QoS
 		    );
 

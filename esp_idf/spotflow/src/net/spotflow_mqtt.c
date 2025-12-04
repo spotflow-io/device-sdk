@@ -298,7 +298,7 @@ void spotflow_mqtt_on_message(const char* topic, int topic_len, const uint8_t* d
  * @param qos
  * @return int
  */
-int spotflow_mqtt_publish_messgae(const char* topic, const uint8_t* data, int len, int qos)
+int spotflow_mqtt_publish_message(const char* topic, const uint8_t* data, int len, int qos)
 {
 	int msg_id =
 		esp_mqtt_client_publish(spotflow_client, topic, (const char*)data, len, qos, 0);

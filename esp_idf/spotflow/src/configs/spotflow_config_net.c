@@ -18,7 +18,7 @@ int spotflow_config_prepare_pending_message(struct spotflow_config_reported_msg*
 
 int spotflow_config_send_pending_message(void)
 {
-	int rc = spotflow_mqtt_publish_messgae(SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC,
+	int rc = spotflow_mqtt_publish_message(SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC,
 					       pending_message_buffer, pending_message_length,
 					       SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC_QOS);
 
