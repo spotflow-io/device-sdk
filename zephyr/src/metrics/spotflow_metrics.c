@@ -6,6 +6,9 @@
 
 #include "metrics/spotflow_metrics_backend.h"
 #include "metrics/spotflow_metrics_cbor.h"
+#if IS_ENABLED(CONFIG_SPOTFLOW_SYSTEM_METRICS)
+#include "metrics/spotflow_system_metrics.h"
+#endif
 
 LOG_MODULE_REGISTER(spotflow_metrics_core, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -289,6 +292,9 @@ int spotflow_metrics_pipeline_init(void)
 	}
 	k_work_schedule(&metrics_flush_work, K_SECONDS(period));
 	pipeline_started = true;
+#if IS_ENABLED(CONFIG_SPOTFLOW_SYSTEM_METRICS)
+	spotflow_system_metrics_start();
+#endif
 	return 0;
 }
 

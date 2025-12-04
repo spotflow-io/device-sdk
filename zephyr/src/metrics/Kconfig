@@ -11,6 +11,26 @@ config SPOTFLOW_METRICS_QUEUE_SIZE
 		Size of the queue used to buffer metrics before sending them to the server.
 		Increase this value if you experience metrics drops due to a slow network.
 
+config SPOTFLOW_SYSTEM_METRICS
+	bool "Enable Spotflow system metrics (heap, CPU load)"
+	default y
+	depends on SPOTFLOW_METRICS_PIPELINE
+	select SYS_HEAP_RUNTIME_STATS
+	select THREAD_RUNTIME_STATS
+	select THREAD_RUNTIME_STATS_USE_TIMING_FUNCTIONS
+	select CPU_LOAD_METRIC
+	help
+		Collect basic system metrics (heap usage, CPU utilization) and send them via the
+		metrics pipeline. Starts automatically with the pipeline.
+
+config SPOTFLOW_SYSTEM_METRICS_INTERVAL_SEC
+	int "System metrics sampling interval (seconds)"
+	default 5
+	depends on SPOTFLOW_SYSTEM_METRICS
+	range 1 3600
+	help
+		How often system metrics are sampled and aggregated.
+
 config SPOTFLOW_METRICS_MAX_REGISTERED
 	int "Maximum registered metrics"
 	default 8
