@@ -15,9 +15,9 @@ menu "Spotflow"
             choice ESP_COREDUMP_TO_FLASH_OR_UART
                 default ESP_COREDUMP_ENABLE_TO_FLASH
             endchoice
-        
+
         config SPOTFLOW_COREDUMPS_CHUNK_SIZE
-        int 
+        int
         default SPOTFLOW_CBOR_LOG_MAX_LEN
 
         endif
@@ -28,7 +28,7 @@ menu "Spotflow"
         default "mqtts://mqtt.spotflow.io:8883"
         help
             URL of an mqtt broker which spotflow connects to.
-    
+
     config SPOTFLOW_DEVICE_ID
         string "Device ID device will use to connect to Spotflow observability platform"
         help
@@ -40,7 +40,7 @@ menu "Spotflow"
         help
             Ingest key is a secret key used to authenticate your device
             It can be found in Spotflow observability platform
-    
+
     config BROKER_CERTIFICATE_OVERRIDE
         string "Broker certificate override"
         default ""
@@ -63,7 +63,7 @@ menu "Spotflow"
         default y
         help
             Enable sending logs to Spotflow cloud.
-    
+
     config SPOTFLOW_LOG_BUFFER_SIZE
         int "Size of Spotflow log buffer"
         default 512
@@ -80,18 +80,22 @@ menu "Spotflow"
             Increase this value if you experience issues with logs being dropped because of buffer overflow.
 
     config SPOTFLOW_DEBUG_MESSAGE_TERMINAL
-        bool "To view the logs on the spotflow side to view any errors while debugging"
+        bool "To view the debug logs on the spotflow side."
         default n
-    
+
+    config SPOTFLOW_MESSAGE_TERMINAL
+        bool "To view the logs on the spotflow side to view any errors."
+        default n
+
     config SPOTFLOW_MESSAGE_QUEUE_SIZE
         int "Number of messages to retain in case of disconnection"
         default 5
 
-    
+
     config SPOTFLOW_DEFAULT_SENT_LOG_LEVEL
         int "Spotflow default sent log level"
         default 4
-        range 0 6   
+        range 0 6
         help
             Filters the logs sent to Spotflow cloud according to their severity level.
             This is the default value that can be dynamically overridden from the cloud.
@@ -101,7 +105,7 @@ menu "Spotflow"
             - 2 WARNING, send LOG_WRN in addition to previous level
             - 3 INFO, send LOG_INF in addition to previous level
             - 4 DEBUG, send LOG_DBG in addition to previous level
-    
+
     config SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
         bool "To enable the logs set"
         default y
