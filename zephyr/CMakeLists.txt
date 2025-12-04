@@ -7,6 +7,7 @@ add_subdirectory(src/logging)
 add_subdirectory(src/net)
 add_subdirectory(src/config)
 add_subdirectory(src/coredumps)
+add_subdirectory(src/metrics)
 
 zephyr_include_directories(
         src
