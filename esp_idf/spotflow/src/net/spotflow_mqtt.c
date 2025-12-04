@@ -165,7 +165,7 @@ void spotflow_mqtt_publish(void* pvParameters)
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 			// Try to send coredump messages first
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_COREDUMP) {
-				if(spotflow_coredump_send_message() == 5) {
+				if(spotflow_coredump_send_message() == SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
 					clear_mask |= SPOTFLOW_MQTT_NOTIFY_COREDUMP;
 				}
 			}
@@ -176,7 +176,7 @@ void spotflow_mqtt_publish(void* pvParameters)
 				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
 			}
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_LOGS) {
-				if (spotflow_logging_send_message() == 5) {
+				if (spotflow_logging_send_message() == SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
 				clear_mask |= SPOTFLOW_MQTT_NOTIFY_LOGS;
 				}
 			}

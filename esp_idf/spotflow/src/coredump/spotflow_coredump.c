@@ -175,10 +175,6 @@ esp_err_t spotflow_coredump_backend(void)
 		// keep retrying to push data until the mqtt function is able to read and clear it
 		do {
 			rc = spotflow_queue_coredump_push(cbor_data, cbor_data_len);
-			if (rc < 0) {
-				// vTaskDelay(pdMS_TO_TICKS(500));
-				// Add a small delay here so CPU doesn't hog the other tasks
-			}
 		} while (rc < 0);
 
 		spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_COREDUMP);

@@ -21,7 +21,7 @@ int spotflow_logging_send_message(void)
 		}
 	}
 	else {
-		return 5; // Queue empty
+		return SPOTFLOW_MESSAGE_QUEUE_EMPTY; // Queue empty
 	}
 	return 0;
 }

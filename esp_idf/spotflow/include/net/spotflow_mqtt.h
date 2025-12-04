@@ -7,6 +7,7 @@
 #define SPOTFLOW_MQTT_NOTIFY_COREDUMP (1 << 0) // Flag to trigger sending coredump
 #define SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG (1 << 1) // Flag to trigger sending pending config message
 #define SPOTFLOW_MQTT_NOTIFY_LOGS (1 << 2) // Flag to trigger sending heartbeat
+#define SPOTFLOW_MESSAGE_QUEUE_EMPTY 5     // Just a value set to know the message queue is empty
 
 #ifdef __cplusplus
 extern "C" {
