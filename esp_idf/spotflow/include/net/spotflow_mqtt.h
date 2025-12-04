@@ -4,7 +4,7 @@
 #include "stdatomic.h"
 #include "mqtt_client.h"
 
-#define SPOTFLOW_MQTT_NOTIFY_COURDUMP (1 << 0) // Flag to trigger sending coredump
+#define SPOTFLOW_MQTT_NOTIFY_COREDUMP (1 << 0) // Flag to trigger sending coredump
 #define SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG (1 << 1) // Flag to trigger sending pending config message
 #define SPOTFLOW_MQTT_NOTIFY_LOGS (1 << 2) // Flag to trigger sending heartbeat
 

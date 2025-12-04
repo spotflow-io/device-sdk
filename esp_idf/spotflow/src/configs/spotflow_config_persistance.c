@@ -7,7 +7,7 @@
 #include "logging/spotflow_log_backend.h"
 
 #define SPOTFLOW_STORAGE "Spotflow_S_L"
-#define STORAGE_NAMESPACE "spotflow"
+#define STORAGE_NAMESPACE "Spotflow"
 /**
  * @brief
  *

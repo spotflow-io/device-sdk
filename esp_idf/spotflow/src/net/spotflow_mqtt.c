@@ -137,7 +137,7 @@ void spotflow_mqtt_app_start(void)
  */
 void spotflow_mqtt_publish(void* pvParameters)
 {
-	const EventBits_t ALL_BITS = SPOTFLOW_MQTT_NOTIFY_COURDUMP |
+	const EventBits_t ALL_BITS = SPOTFLOW_MQTT_NOTIFY_COREDUMP |
 		SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG |
 		SPOTFLOW_MQTT_NOTIFY_LOGS;
 
@@ -153,7 +153,7 @@ void spotflow_mqtt_publish(void* pvParameters)
 		SPOTFLOW_LOG("Received notification value: %lu\n", notify_value);
 		// Only proceed if the outbox_size i.e. current message is smaller than overall mqtt_buffer.
 		// 2️⃣ Wait until MQTT outbox has space (zero polling)
-		
+
 		while (esp_mqtt_client_get_outbox_size(spotflow_client) >=
 				CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)
 			{
@@ -164,9 +164,9 @@ void spotflow_mqtt_publish(void* pvParameters)
 			 CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)) {
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 			// Try to send coredump messages first
-			if (notify_value & SPOTFLOW_MQTT_NOTIFY_COURDUMP) {
+			if (notify_value & SPOTFLOW_MQTT_NOTIFY_COREDUMP) {
 				if(spotflow_coredump_send_message() == 5) {
-					clear_mask |= SPOTFLOW_MQTT_NOTIFY_COURDUMP;
+					clear_mask |= SPOTFLOW_MQTT_NOTIFY_COREDUMP;
 				}
 			}
 			// If no coredump pending, send regular log messages

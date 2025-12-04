@@ -31,7 +31,7 @@ void spotflow_config_init()
 }
 
 /**
- * @brief Initialize the sesson and send a intiail message with current configurations.
+ * @brief Initialize the session and send a intiail message with current configurations.
  *
  * @return int
  */

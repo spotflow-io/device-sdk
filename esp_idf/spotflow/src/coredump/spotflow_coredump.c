@@ -181,7 +181,7 @@ esp_err_t spotflow_coredump_backend(void)
 			}
 		} while (rc < 0);
 
-		spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_COURDUMP);
+		spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_COREDUMP);
 		// Free the CBOR data after sending
 		free(cbor_data);
 
