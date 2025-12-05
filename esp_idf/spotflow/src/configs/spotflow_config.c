@@ -61,7 +61,7 @@ int spotflow_config_init_session()
 void spotflow_config_desired_message(const uint8_t* payload, int len)
 {
 	struct spotflow_config_desired_msg desired_msg;
-	SPOTFLOW_LOG("Deconding Payload\n");
+	SPOTFLOW_LOG("Decoding Payload\n");
 	int rc = spotflow_config_cbor_decode_desired(payload, len, &desired_msg);
 	if (rc < 0) {
 		SPOTFLOW_LOG("Failed to decode received desired configuration message: %d\n", rc);

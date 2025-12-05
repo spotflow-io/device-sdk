@@ -278,8 +278,8 @@ void spotflow_mqtt_on_message(const char* topic, int topic_len, const uint8_t* d
 {
 	SPOTFLOW_LOG("MQTT Message Received on topic: %.*s", topic_len, topic);
 
-	// Compare topic exactly
-	if (strstr(topic, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC) != NULL) {
+	// Check if the incoming topic prefix matches the config topic.
+	if (strncmp(topic, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC, strlen(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC)) == 0) {
 		// Your config handling
 		SPOTFLOW_LOG("Dispatching to config handler...\n");
 		spotflow_config_desired_message(data, data_len);

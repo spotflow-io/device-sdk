@@ -27,7 +27,7 @@ menu "Spotflow"
         string "Hostname of Spotflow observability platform"
         default "mqtts://mqtt.spotflow.io:8883"
         help
-            URL of an mqtt broker which spotflow connects to.
+            URL of an mqtt broker which Spotflow connects to.
 
     config SPOTFLOW_DEVICE_ID
         string "Device ID device will use to connect to Spotflow observability platform"
@@ -80,11 +80,11 @@ menu "Spotflow"
             Increase this value if you experience issues with logs being dropped because of buffer overflow.
 
     config SPOTFLOW_DEBUG_MESSAGE_TERMINAL
-        bool "To view the debug logs on the spotflow side."
+        bool "To view the debug logs on the Spotflow side."
         default n
 
     config SPOTFLOW_MESSAGE_TERMINAL
-        bool "To view the logs on the spotflow side to view any errors."
+        bool "To view the logs on the Spotflow side to view any errors."
         default n
 
     config SPOTFLOW_MESSAGE_QUEUE_SIZE
@@ -108,5 +108,5 @@ menu "Spotflow"
 
     config SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
         bool "To enable the logs set"
-        default y
+        default n
 endmenu
