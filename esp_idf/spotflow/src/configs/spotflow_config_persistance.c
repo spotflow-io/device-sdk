@@ -5,6 +5,7 @@
 #include "esp_err.h"
 #include "configs/spotflow_config_persistance.h"
 #include "logging/spotflow_log_backend.h"
+#include "configs/spotflow_config_cbor.h"
 
 #define SPOTFLOW_STORAGE "Spotflow_S_L"
 #define STORAGE_NAMESPACE "Spotflow"
@@ -43,7 +44,7 @@ void spotflow_config_persistence_try_load(struct spotflow_config_persisted_setti
 	if (err != ESP_OK) {
 		SPOTFLOW_LOG("Failed to read log_level! Error : (%s)\n", esp_err_to_name(err));
 	} else {
-		settings->flags |= SPOTFLOW_REPORTED_FLAG_MINIMAL_LOG_SEVERITY;
+		settings->flags |= SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL;
 	}
 
 	nvs_close(spotflow_handle);

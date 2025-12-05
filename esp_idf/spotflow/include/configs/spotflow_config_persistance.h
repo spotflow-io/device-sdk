@@ -8,7 +8,6 @@
 extern "C" {
 #endif
 
-#define SPOTFLOW_REPORTED_FLAG_MINIMAL_LOG_SEVERITY (1 << 0)
 
 struct spotflow_config_persisted_settings {
 	uint8_t flags;

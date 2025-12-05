@@ -22,7 +22,7 @@ void spotflow_config_init()
 	spotflow_config_persistence_try_init();
 	spotflow_config_persistence_try_load(&persisted_settings);
 
-	if ((persisted_settings.flags & SPOTFLOW_REPORTED_FLAG_MINIMAL_LOG_SEVERITY) != 0) {
+	if ((persisted_settings.flags & SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL) != 0) {
 		spotflow_config_init_sent_log_level(persisted_settings.sent_log_level);
 	} else {
 		spotflow_config_init_sent_log_level_default();
@@ -77,7 +77,7 @@ void spotflow_config_desired_message(const uint8_t* payload, int len)
 
 	struct spotflow_config_persisted_settings settings_to_persist = { 0 };
 
-	if (desired_msg.flags & SPOTFLOW_REPORTED_FLAG_MINIMAL_LOG_SEVERITY) {
+	if (desired_msg.flags & SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL) {
 		uint8_t new_sent_log_level =
 		    spotflow_cbor_convert_severity_to_log_level(desired_msg.minimal_log_severity);
 
@@ -85,7 +85,7 @@ void spotflow_config_desired_message(const uint8_t* payload, int len)
 
 		add_log_severity_to_reported_msg(&reported_msg);
 
-		settings_to_persist.flags |= SPOTFLOW_REPORTED_FLAG_MINIMAL_LOG_SEVERITY;
+		settings_to_persist.flags |= SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL;
 		settings_to_persist.sent_log_level = new_sent_log_level;
 	}
 
@@ -109,7 +109,7 @@ static void add_log_severity_to_reported_msg(struct spotflow_config_reported_msg
 {
 	uint8_t sent_log_level = spotflow_config_get_sent_log_level();
 
-	reported_msg->flags |= SPOTFLOW_REPORTED_FLAG_MINIMAL_LOG_SEVERITY;
+	reported_msg->flags |= SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL;
 	reported_msg->minimal_log_severity =
 	    spotflow_cbor_convert_log_level_to_severity(sent_log_level);
 

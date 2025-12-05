@@ -164,7 +164,7 @@ int spotflow_config_cbor_encode_reported(struct spotflow_config_reported_msg* ms
 	}
 
 	// Minimal log severity
-	if (msg->flags & SPOTFLOW_REPORTED_FLAG_MINIMAL_LOG_SEVERITY) {
+	if (msg->flags & SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL) {
 		err = cbor_encode_uint(&map, KEY_MINIMAL_SEVERITY);
 		if (err != CborNoError) {
 			SPOTFLOW_DEBUG("[CONFIG_CBOR] Error Code %d ", err);
