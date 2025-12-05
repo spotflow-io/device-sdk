@@ -45,7 +45,7 @@ int spotflow_config_init_session()
 	int rc = spotflow_config_prepare_pending_message(&reported_msg);
 	if (rc < 0) {
 		SPOTFLOW_LOG(
-		    "Failed to prepare initial reported configuration response message: %d", rc);
+		    "Failed to prepare initial reported configuration message: %d", rc);
 		return rc;
 	}
 
