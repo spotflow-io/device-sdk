@@ -17,7 +17,7 @@ static QueueHandle_t queue_handle = NULL;
 static SemaphoreHandle_t buffer_slot_semaphore = NULL; // New semaphore handle
 
 // Set the max number of concurrent buffers we allow in memory
-#define MAX_BUFFER_SLOTS 10
+#define MAX_BUFFER_SLOTS 5
 #define COREDUMPS_OVERHEAD 64
 
 bool coredump_found = false;
@@ -28,7 +28,7 @@ bool coredump_found = false;
  */
 int8_t spotflow_queue_coredump_push(uint8_t* msg, size_t len)
 {
-	if (xSemaphoreTake(buffer_slot_semaphore, 0) != pdPASS) {
+	if (xSemaphoreTake(buffer_slot_semaphore, portMAX_DELAY) != pdPASS) {
         return -1;
     }
 
@@ -50,10 +50,7 @@ int8_t spotflow_queue_coredump_push(uint8_t* msg, size_t len)
 
 	memcpy(qmsg.ptr, msg, len);
 	// Try to enqueue
-	if (xQueueSend(queue_handle, &qmsg, 0) != pdPASS) {
-		heap_caps_free(qmsg.ptr);
-		xSemaphoreGive(buffer_slot_semaphore); // Return the token
-        SPOTFLOW_LOG("Queue full unexpectedly. Dropping.");
+	if (xQueueSend(queue_handle, &qmsg, portMAX_DELAY) != pdPASS) {
 		return -1; //Could not add wait for it to be freed.
 	}
 
