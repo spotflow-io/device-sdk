@@ -17,7 +17,7 @@ static QueueHandle_t queue_handle = NULL;
 static SemaphoreHandle_t buffer_slot_semaphore = NULL; // New semaphore handle
 
 // Set the max number of concurrent buffers we allow in memory
-#define MAX_BUFFER_SLOTS 5
+#define SPOTFLOW_MAX_BUFFER_SLOTS CONFIG_SPOTFLOW_MAX_QUEUE_SIZE
 #define COREDUMPS_OVERHEAD 64
 
 bool coredump_found = false;
@@ -98,8 +98,8 @@ void spotflow_queue_coredump_free(queue_msg_t* msg)
 void spotflow_queue_coredump_init(void)
 {
 	coredump_found = true;
-	queue_handle = xQueueCreate(MAX_BUFFER_SLOTS, sizeof(queue_msg_t));
-	buffer_slot_semaphore = xSemaphoreCreateCounting(MAX_BUFFER_SLOTS, MAX_BUFFER_SLOTS);
+	queue_handle = xQueueCreate(SPOTFLOW_MAX_BUFFER_SLOTS, sizeof(queue_msg_t));
+	buffer_slot_semaphore = xSemaphoreCreateCounting(SPOTFLOW_MAX_BUFFER_SLOTS, SPOTFLOW_MAX_BUFFER_SLOTS);
 	if (queue_handle == NULL || buffer_slot_semaphore == NULL) {
 		SPOTFLOW_LOG("Failed to create queue or semaphore\n");
 	}

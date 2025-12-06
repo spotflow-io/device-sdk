@@ -1,0 +1,24 @@
+menu "Spotflow Cloud log level Configs"
+    config SPOTFLOW_DEFAULT_SENT_LOG_LEVEL
+        int "Spotflow default sent log level"
+        default 3
+        range 0 4
+        help
+            Filters the logs sent to Spotflow cloud according to their severity level.
+            This is the default value that can be dynamically overridden from the cloud.
+            Levels are:
+            - 0 OFF, do not send any logs
+            - 1 ERROR, send ESP_LOGE
+            - 2 WARNING, send ESP_LOGW in addition to previous level
+            - 3 INFO, send ESP_LOGI in addition to previous level
+            - 4 DEBUG, send ESP_LOGD in addition to previous level
+
+    config SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
+        bool "To set the cloud received logs to esp_set_log_level()"
+        default n
+
+    config SPOTFLOW_ERASE_NVS_FLASH
+        bool "To try to erase and initialize the nvs again if the log savings fails."
+        default n
+
+endmenu

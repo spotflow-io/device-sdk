@@ -1,0 +1,5 @@
+config SPOTFLOW_USE_BUILD_ID
+	bool "Use build ID"
+	default y
+	help
+		Build ID allows to match core dumps with the original .elf file.
