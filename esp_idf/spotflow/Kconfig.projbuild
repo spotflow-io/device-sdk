@@ -20,6 +20,7 @@ menu "Spotflow"
         int
         default SPOTFLOW_CBOR_LOG_MAX_LEN
 
+
         endif
 
     endmenu
@@ -109,4 +110,7 @@ menu "Spotflow"
     config SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
         bool "To enable the logs set"
         default n
+
+     config SPOTFLOW_ERASE_NVS_FLASH
+        default y
 endmenu

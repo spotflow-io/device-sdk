@@ -17,8 +17,17 @@ void spotflow_config_persistence_try_init(void)
 {
 	esp_err_t err = nvs_flash_init();
 	if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+#if CONFIG_SPOTFLOW_ERASE_NVS_FLASH
+		SPOTFLOW_LOG("[CONFIG_PERSISTANCE] Initialize failed due to %s erasing nvs flash "
+			     "and retrying \n",
+			     esp_err_to_name(err));
 		ESP_ERROR_CHECK(nvs_flash_erase());
 		err = nvs_flash_init();
+#else
+		SPOTFLOW_LOG("[CONFIG_PERSISTANCE] Initialize failed due to (%s). Please erase the "
+			     "nvs flash and try again\n",
+			     esp_err_to_name(err));
+#endif
 	}
 	ESP_ERROR_CHECK(err);
 }
