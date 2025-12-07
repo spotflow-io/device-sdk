@@ -44,8 +44,7 @@ int spotflow_config_init_session()
 
 	int rc = spotflow_config_prepare_pending_message(&reported_msg);
 	if (rc < 0) {
-		SPOTFLOW_LOG(
-		    "Failed to prepare initial reported configuration message: %d", rc);
+		SPOTFLOW_LOG("Failed to prepare initial reported configuration message: %d", rc);
 		return rc;
 	}
 
@@ -80,16 +79,22 @@ void spotflow_config_desired_message(const uint8_t* payload, int len)
 	if (desired_msg.flags & SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL) {
 		uint8_t new_sent_log_level =
 		    spotflow_cbor_convert_severity_to_log_level(desired_msg.minimal_log_severity);
-
-		spotflow_config_set_sent_log_level(new_sent_log_level);
-
+		bool log_level_updated = false;
+		if (spotflow_config_get_sent_log_level() != new_sent_log_level) {
+			spotflow_config_set_sent_log_level(new_sent_log_level);
+			log_level_updated = true;
+		}
 		add_log_severity_to_reported_msg(&reported_msg);
 
 		settings_to_persist.flags |= SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL;
 		settings_to_persist.sent_log_level = new_sent_log_level;
+		if (log_level_updated) {
+			spotflow_config_persistence_try_save(&settings_to_persist);
+			SPOTFLOW_DEBUG("[CONFIG] Log level saved in NVS.");
+		} else {
+			SPOTFLOW_DEBUG("[CONFIG] Log level same so skipped saving in NVS");
+		}
 	}
-
-	spotflow_config_persistence_try_save(&settings_to_persist);
 
 	SPOTFLOW_LOG("Reported log severity %lu, desired config version %lu \n\n",
 		     reported_msg.minimal_log_severity, desired_msg.minimal_log_severity);
