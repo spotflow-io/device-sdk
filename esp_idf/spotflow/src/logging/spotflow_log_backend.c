@@ -129,24 +129,12 @@ int spotflow_log_backend(const char* fmt, va_list args)
 /**
  * @brief Set the value at low level such that device doesn't generate the logs
  * 
- * @param level 
- * @param ... 
+ * @param level
  */
-void spotflow_log_backend_try_set_runtime_filter(uint8_t level, ...) {
+void spotflow_log_backend_try_set_runtime_filter(uint8_t level) {
 #if CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
-	va_list args;
-    va_start(args, level);  // Start processing variadic arguments
-    const char *tag = va_arg(args, const char*);
-    
-    // If tag is NULL (or not provided), apply the level to all log sources
-    if (tag == NULL) {
-		esp_log_level_set("*", level);  // Set log level for all
-    } else {
-        // Otherwise, set the log level for the specified tag
-        esp_log_level_set("*", level);  // Set log level for the provided tag
-    }
 
-    va_end(args);  // End variadic argument processing
+	esp_log_level_set("*", level);  // Set log level for the provided tag
 
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING */
 }
