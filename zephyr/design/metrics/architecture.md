@@ -926,7 +926,10 @@ Time T0+120s (next window):
   - Good hash distribution with low collision probability
   - Low computational cost (critical for embedded systems)
   - Simple implementation (no external dependencies)
-- **Alternatives Considered**: MurmurHash3 (more complex), CRC32 (lower quality distribution)
+  - **Production-ready** for typical use cases (max_timeseries ≤ 256)
+  - 32-bit hash space (4 billion values) sufficient for expected cardinalities
+- **Collision Handling**: Full dimension comparison performed on hash match
+- **Alternatives Considered**: MurmurHash3 (more complex, marginal improvement), CRC32 (lower quality distribution)
 
 **AD-6: Aggregation Window Alignment**
 - **Decision**: Use **sliding window** aggregation (from first report)
@@ -936,6 +939,57 @@ Time T0+120s (next window):
   - Predictable behavior regardless of wall clock time
 - **Alternatives Considered**: Wall clock alignment (rejected - requires NTP/time sync, more complex)
 - **Impact**: Aggregation windows start at first metric report, not aligned to wall clock
+
+**Concrete Timing Example**:
+```
+Metric with PT1M (1-minute) aggregation interval:
+
+T=0:        Metric registered via spotflow_register_metric_float()
+            (Timer NOT started yet)
+
+T=0.5s:     First spotflow_report_metric_float() call
+            → Aggregation window STARTS at T=0.5s
+            → Timer scheduled for T=60.5s
+
+T=1s-60s:   Additional reports accumulate in aggregation state
+            (sum, count, min, max updated)
+
+T=60.5s:    Timer expires
+            → Aggregation window CLOSES
+            → CBOR message generated with aggregated data
+            → Message enqueued to MQTT queue
+            → NEW window begins immediately at T=60.5s
+            → Timer rescheduled for T=120.5s
+
+T=120.5s:   Next window expiration
+            → Process repeats
+
+Key: Window duration is always exactly PT1M (60 seconds), but window
+boundaries are determined by first report time, not wall clock.
+```
+
+**Boot-Time and MQTT Connection Timing**:
+
+The metrics subsystem can initialize and start aggregation timers **BEFORE** the MQTT connection is established. This is safe because of the message queue buffering design:
+
+1. **Aggregated metrics** are encoded to CBOR and enqueued to message queue
+2. **Queue provides buffering** (default 16 messages via `CONFIG_SPOTFLOW_METRICS_QUEUE_SIZE`)
+3. **Processor thread** dequeues and publishes when MQTT connection becomes ready
+4. **If queue fills** before connection ready, oldest messages are dropped (logged as warnings)
+
+**Architecture Flow**:
+```
+Aggregator → CBOR Encoder → Message Queue (16 msg buffer) → Processor → MQTT
+                                    ↓
+                          Decouples metrics collection from
+                          network availability
+```
+
+This design ensures that:
+- Metrics collection can begin immediately after SDK initialization
+- Aggregation timers can fire even if MQTT not connected yet
+- Network unavailability doesn't block the application
+- Messages are delivered when connection becomes available
 
 **AD-7: Time Series Cardinality Limit Handling**
 - **Decision**: **Reject** new dimension combinations when pool is full
@@ -1196,7 +1250,7 @@ CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE=512
 CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED=32
 CONFIG_SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL=1  # PT1M (see below)
 CONFIG_SPOTFLOW_METRICS_MAX_DIMENSIONS_PER_METRIC=8
-CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS=8192
+CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS=16384
 CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL=2  # WARNING
 ```
 
@@ -1242,5 +1296,33 @@ CONFIG_SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL=2  # PT10M
 # High-frequency monitoring (development, debugging)
 CONFIG_SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL=0  # PT0S (not recommended for production)
 ```
+
+**Heap Pool Sizing Calculator:**
+
+The `CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS` value depends on the number and configuration of registered metrics. Use this formula to calculate the required heap size:
+
+**Base overhead**: 2KB (CBOR buffers, queue structures)
+
+**Per registered metric**:
+- Aggregator context: 128 bytes
+- Per time series: 96 bytes × max_timeseries
+- Formula: `128 + (96 × max_timeseries)`
+
+**Total formula**:
+```
+HEAP_SIZE = 2048 + SUM(128 + 96 × max_timeseries[i]) for all i metrics
+```
+
+**Example configurations**:
+- 10 dimensionless metrics: `2048 + 10×128 = 3.3KB`
+- 10 dimensional metrics (max_timeseries=16): `2048 + 10×(128+96×16) = 17.4KB`
+- 32 metrics (max_timeseries=16 each): `2048 + 32×(128+96×16) = 53KB`
+
+**Recommendation**: Add 25% safety margin to calculated value.
+
+**Default value rationale** (16384 bytes / 16KB):
+- Supports system metrics auto-collection (7 metrics, up to 4 time series each)
+- Provides headroom for application metrics (additional 8KB available)
+- If system metrics disabled or fewer application metrics used, this value can be reduced
 
 **Note**: The default aggregation interval applies only to metrics that don't specify an explicit interval when reporting. Application code can override this on a per-report basis by passing a specific ISO 8601 duration string to the reporting functions (see API specification for details).

@@ -711,6 +711,25 @@ config SPOTFLOW_METRICS_SYSTEM_INTERVAL
       Default is 60 seconds (1 minute).
       Lower values increase network/CPU overhead.
 
+config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
+    int "Additional heap memory pool size for system metrics (bytes)"
+    default 16384
+    range 4096 65536
+    help
+      System metrics auto-collection requires heap memory for:
+      - Metric registration (7 metrics × 128 bytes context)
+      - Time series storage (network metrics have 4 time series)
+      - CBOR encoding buffers
+
+      Default 16KB is sufficient for all system metrics enabled.
+      Reduce if only subset of metrics enabled:
+      - Memory + Connection only: 4KB
+      - Memory + Network: 8KB
+      - All metrics: 16KB (default)
+
+      This is added to CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
+      which is for application metrics.
+
 endif # SPOTFLOW_METRICS_SYSTEM
 ```
 
@@ -726,6 +745,7 @@ CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK=y
 CONFIG_SPOTFLOW_METRICS_SYSTEM_CPU=n
 CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION=y
 CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL=60
+CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM=8192  # 8KB for minimal config
 ```
 
 **Full Configuration (all metrics enabled):**
@@ -738,6 +758,7 @@ CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK=y
 CONFIG_SPOTFLOW_METRICS_SYSTEM_CPU=y
 CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION=y
 CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL=30
+CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM=16384  # 16KB (default)
 ```
 
 ---

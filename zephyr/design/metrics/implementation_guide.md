@@ -315,9 +315,10 @@ spotflow_metric_t* spotflow_register_metric_float_with_dimensions(
     int rc = aggregator_register_metric(metric);
     if (rc < 0) {
         LOG_ERR("Failed to initialize aggregator for metric '%s': %d", normalized_name, rc);
+        // Rollback: mark registry slot as available if aggregator registration fails
         g_metric_registry[i].in_use = false;
         k_mutex_unlock(&g_registry_lock);
-        return NULL;
+        return NULL;  // Metric NOT registered, error code propagated
     }
 
     k_mutex_unlock(&g_registry_lock);
@@ -532,6 +533,9 @@ struct metric_aggregator_context {
     uint16_t timeseries_count;      // Current number of active time series
     uint16_t timeseries_capacity;   // Max (from metric->max_timeseries)
 
+    // Timer scope: ONE timer per metric (not per time series)
+    // All time series of this metric share the same aggregation window
+    // When timer expires, all active time series generate messages with their counts
     struct k_work_delayable aggregation_work;  // Timer for window expiration
 };
 ```
@@ -540,6 +544,9 @@ struct metric_aggregator_context {
 
 1. **Aggregator Registration**:
 ```c
+// Contract: This function MUST be atomic - either full success (returns 0)
+// or full failure (returns -ENOMEM with no side effects). Caller relies on
+// this to safely rollback metric registration on failure.
 int aggregator_register_metric(struct spotflow_metric* metric) {
     // Allocate aggregator context
     struct metric_aggregator_context* ctx =
@@ -552,7 +559,7 @@ int aggregator_register_metric(struct spotflow_metric* metric) {
     ctx->timeseries = k_calloc(metric->max_timeseries,
                                sizeof(struct metric_timeseries_state));
     if (!ctx->timeseries) {
-        k_free(ctx);
+        k_free(ctx);  // Clean up - maintain atomic semantics
         return -ENOMEM;
     }
 
@@ -623,6 +630,10 @@ static struct metric_timeseries_state* find_or_create_timeseries(
     const spotflow_dimension_t* dimensions,
     uint8_t dimension_count)
 {
+    // Performance Note: O(n) linear search is acceptable for typical use cases
+    // where max_timeseries ≤ 256. For larger cardinalities, consider hash table
+    // optimization in future version.
+
     // First, try to find existing time series with matching hash
     for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
         if (ctx->timeseries[i].active &&
@@ -904,6 +915,13 @@ int spotflow_metrics_cbor_encode_simple(
         return -EINVAL;
     }
 
+    // Memory Ownership Contract:
+    // 1. Encoder allocates and returns pointer to caller
+    // 2. Caller enqueues pointer to message queue
+    // 3. If enqueue fails: caller MUST free immediately
+    // 4. If enqueue succeeds: ownership transfers to processor thread
+    // 5. Processor thread ALWAYS frees (success or failure)
+
     // Allocate and copy
     size_t encoded_len = state->payload - buffer;
     uint8_t* data = k_malloc(encoded_len);
@@ -965,15 +983,26 @@ int spotflow_poll_and_process_enqueued_metrics(void) {
         return 0;  // No message available
     }
 
-    // Publish via MQTT
-    rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
+    // Memory Ownership: Processor thread ALWAYS frees message memory
+    // (success or failure) after dequeue completes
 
-    // Free message memory
+    // Infinite retry loop for transient errors (preserves message ordering)
+    do {
+        rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
+        if (rc == -EAGAIN) {
+            LOG_DBG("MQTT busy, retrying...");
+            k_sleep(K_MSEC(10));  // Small delay before retry
+            // Continue loop - do NOT requeue (would break ordering)
+        }
+    } while (rc == -EAGAIN);
+
+    // ALWAYS free message memory (success or permanent failure)
     k_free(msg->payload);
     k_free(msg);
 
     if (rc < 0) {
         LOG_WRN("Failed to publish metric message: %d", rc);
+        // Permanent error - message lost
         return rc;
     }
 
