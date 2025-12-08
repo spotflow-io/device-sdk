@@ -19,6 +19,11 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - board: esp32c3_devkitc
+            manifest: west-zephyr-espressif.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: riscv64-zephyr-elf
+            blob: hal_espressif
           - board: cy8cproto_062_4343w
             manifest: west-zephyr-infineon.yml
             sdk_version: 0.17.4
