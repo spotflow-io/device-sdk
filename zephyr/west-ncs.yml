@@ -1,10 +1,11 @@
 manifest:
   projects:
-    - name: ncs
+    - name: nrf
       url: https://github.com/nrfconnect/sdk-nrf
       revision: v3.1.1
       clone-depth: 1
       import: true
 
   self:
-    path: modules/lib/spotflow
+    # Short path to work on Windows
+    path: spotflow

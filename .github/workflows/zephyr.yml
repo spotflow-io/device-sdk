@@ -44,6 +44,10 @@ jobs:
             sdk_version: 0.17.4
             sdk_toolchain: arm-zephyr-eabi
             blob: hal_nxp
+          - board: nrf7002dk/nrf5340/cpuapp/ns
+            manifest: west-ncs.yml
+            sdk_version: 0.17.0
+            sdk_toolchain: arm-zephyr-eabi
           - board: rpi_pico/rp2040/w
             manifest: west-zephyr-raspberrypi.yml
             sdk_version: 0.17.4
@@ -67,6 +71,7 @@ jobs:
         run: west packages pip --install --ignore-venv-check
 
       - name: Download blobs
+        if: ${{ matrix.blob != '' }}
         run: west blobs fetch ${{ matrix.blob }} --auto-accept
 
       - name: Install SDK
