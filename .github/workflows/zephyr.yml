@@ -24,6 +24,11 @@ jobs:
             sdk_version: 0.17.4
             sdk_toolchain: riscv64-zephyr-elf
             blob: hal_espressif
+          - board: esp32c3_devkitm
+            manifest: west-zephyr-espressif.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: riscv64-zephyr-elf
+            blob: hal_espressif
           - board: esp32c6_devkitc/esp32c6/hpcore
             manifest: west-zephyr-espressif.yml
             sdk_version: 0.17.4
