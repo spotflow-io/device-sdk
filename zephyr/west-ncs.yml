@@ -7,5 +7,4 @@ manifest:
       import: true
 
   self:
-    # Short path to work on Windows
-    path: spotflow
+    path: modules/lib/spotflow
