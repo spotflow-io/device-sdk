@@ -16,6 +16,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
         include:
           - board: cy8cproto_062_4343w
@@ -29,7 +30,7 @@ jobs:
             sdk_toolchain: arm-zephyr-eabi
             blob: hal_nxp
           - board: rpi_pico/rp2040/w
-            manifest: west-zephyr-infineon.yml
+            manifest: west-zephyr-raspberrypi.yml
             sdk_version: 0.17.4
             sdk_toolchain: arm-zephyr-eabi
             blob: hal_infineon
