@@ -80,7 +80,7 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ steps.pip-cache-dir.outputs.dir }}
-          key: ${{ runner.name }}-pip-cache-${{ matrix.manifest }}
+          key: pip-cache-${{ matrix.manifest }}
 
       - name: Install Python packages
         run: west packages pip --install --ignore-venv-check
@@ -89,7 +89,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: ${{ steps.pip-cache-dir.outputs.dir }}
-          key: ${{ runner.name }}-pip-cache-${{ matrix.manifest }}
+          key: pip-cache-${{ matrix.manifest }}
 
       - name: Download blobs
         if: ${{ matrix.blob != '' }}
