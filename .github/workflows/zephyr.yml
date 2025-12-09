@@ -72,8 +72,27 @@ jobs:
             .
           west update --fetch-opt=--depth=1 --narrow
 
+      - name: Dry run Python package installation
+        run: west packages pip --install --ignore-venv-check -- --dry-run > pip-dry-run.txt
+
+      - name: Get pip cache directory
+        id: pip-cache-dir
+        run: echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
+
+      - name: Restore Python package cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ steps.pip-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-pip-cache-${{ hashFiles('pip-dry-run.txt') }}
+
       - name: Install Python packages
         run: west packages pip --install --ignore-venv-check
+
+      - name: Save Python package cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ steps.pip-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-pip-cache-${{ hashFiles('pip-dry-run.txt') }}
 
       - name: Download blobs
         if: ${{ matrix.blob != '' }}
