@@ -68,7 +68,7 @@ jobs:
           west init \
             --manifest-url ${{ github.server_url }}/${{ github.repository }} \
             --clone-opt=--revision=${{ github.sha }} \
-            --manifest-file zephyr/${{ matrix.manifest }} \
+            --manifest-file zephyr/manifests/${{ matrix.manifest }} \
             .
           west update --fetch-opt=--depth=1 --narrow
 
