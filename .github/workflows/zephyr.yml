@@ -95,7 +95,6 @@ jobs:
         uses: actions/checkout@v6
         with:
           path: modules/lib/spotflow
-          repository: https://github.com/spotflow-io/device-sdk
 
       - name: Install Python packages
         if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
