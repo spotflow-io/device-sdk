@@ -111,7 +111,15 @@ jobs:
           path: .
           key: workspace-${{ matrix.manifest }}-${{ matrix.blob }}
 
+      - name: Cache Zephyr SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/.local/opt/zephyr-sdk-${{ matrix.sdk_version }}
+          key: zephyr-sdk-${{ matrix.sdk_version }}-${{ matrix.sdk_toolchain }}-${{ runner.os }}
+
       - name: Install SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
         run: |
           west sdk install \
             --version ${{ matrix.sdk_version }} \
