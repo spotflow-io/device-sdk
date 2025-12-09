@@ -125,14 +125,6 @@ jobs:
             --version ${{ matrix.sdk_version }} \
             --toolchains ${{ matrix.sdk_toolchain }}
 
-      - name: Debug SDK installation path
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
-        run: |
-          echo "Checking for SDK installation in common locations:"
-          ls -la ~/.local/opt/ || echo "~/.local/opt/ does not exist"
-          ls -la ~/ | grep zephyr || echo "No zephyr directories in home"
-          find ~ -maxdepth 3 -name "zephyr-sdk-*" -type d 2>/dev/null || echo "SDK not found"
-
       - name: Configure application
         working-directory: modules/lib/spotflow/zephyr/samples/logs
         run: |
