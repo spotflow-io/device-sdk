@@ -60,7 +60,22 @@ jobs:
             blob: hal_infineon
 
     steps:
+      - name: Restore Python virtual environment
+        id: cache-restore-venv
+        uses: actions/cache/restore@v4
+        with:
+          path: .venv
+          key: venv-${{ matrix.manifest }}
+
+      - name: Create Python virtual environment
+        if: steps.cache-restore-venv.outputs.cache-hit != 'true'
+        run: python -m venv .venv
+
+      - name: Activate Python virtual environment
+        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
       - name: Install West
+        if: steps.cache-restore-venv.outputs.cache-hit != 'true'
         run: pip install west
 
       - name: Create workspace
@@ -72,24 +87,16 @@ jobs:
             .
           west update --fetch-opt=--depth=1 --narrow
 
-      - name: Get pip cache directory
-        id: pip-cache-dir
-        run: echo "dir=$(pip cache dir)" >> $GITHUB_OUTPUT
-
-      - name: Restore Python package cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ steps.pip-cache-dir.outputs.dir }}
-          key: pip-cache-${{ matrix.manifest }}
-
       - name: Install Python packages
+        if: steps.cache-restore-venv.outputs.cache-hit != 'true'
         run: west packages pip --install --ignore-venv-check
 
-      - name: Save Python package cache
+      - name: Cache Python virtual environment
+        if: steps.cache-restore-venv.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: ${{ steps.pip-cache-dir.outputs.dir }}
-          key: pip-cache-${{ matrix.manifest }}
+          path: .venv
+          key: venv-${{ matrix.manifest }}
 
       - name: Download blobs
         if: ${{ matrix.blob != '' }}
