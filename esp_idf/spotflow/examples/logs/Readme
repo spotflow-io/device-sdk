@@ -1,0 +1,20 @@
+# Logs example
+
+In this example we are sending the Logs of the ESP32 to cloud.
+
+## Configurations
+
+## Instructions for running the example.
+- In your terminal run
+```bash
+idf.py create-project-from-example "spotflow/device_sdk:logs"
+```
+- It will create a new project. Open the project folder and run
+
+```bash
+idf.py menuconfig
+```
+- In this fo into **Example Configuration** and add your wifi ssid and password.
+- Then Go back into Main Menu and go into **Spotflow**, and add your device ID and Ingest ID from Spotflow Cloud.
+
+Now Flash the code to your controller and you can start seeing the logs appear on the spotflow.io.
