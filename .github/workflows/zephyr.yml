@@ -60,12 +60,20 @@ jobs:
             blob: hal_infineon
 
     steps:
+      # Needed to use the hash of the manifest as a part of the cache key
+      - name: Checkout manifest
+        uses: actions/checkout@v6
+        with:
+          path: temp-manifest
+          sparse-checkout: zephyr/manifests/${{ matrix.manifest }}
+          sparse-checkout-cone-mode: false
+
       - name: Restore workspace dependencies
         id: cache-restore-workspace
         uses: actions/cache/restore@v4
         with:
           path: .
-          key: workspace-${{ matrix.manifest }}-${{ matrix.blob }}
+          key: zephyr-workspace-${{ matrix.manifest }}-${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-${{ matrix.blob }}-${{ runner.os }}
 
       - name: Create Python virtual environment
         if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
@@ -109,7 +117,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .
-          key: workspace-${{ matrix.manifest }}-${{ matrix.blob }}
+          key: zephyr-workspace-${{ matrix.manifest }}-${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-${{ matrix.blob }}-${{ runner.os }}
 
       - name: Cache Zephyr SDK
         id: cache-sdk
