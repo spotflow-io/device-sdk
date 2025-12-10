@@ -135,40 +135,6 @@ jobs:
           CONFIG_SPOTFLOW_INGEST_KEY="TODO"
           EOF
 
-      - name: Get timestamp
-        id: timestamp
-        run: echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
-
-      - name: Cache ccache data
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ccache
-          key: zephyr-ccache-${{ matrix.board }}-${{ steps.timestamp.outputs.timestamp }}
-          restore-keys: zephyr-ccache-${{ matrix.board }}-
-
-      - name: Cache ccache installation
-        id: zephyr-ccache-installation
-        uses: actions/cache@v4
-        with:
-          path: |
-            /usr/bin/ccache
-            /usr/lib/ccache
-            /usr/lib/x86_64-linux-gnu/libhiredis*
-          key: ccache-installation-${{ runner.os }}
-
-      - name: Install ccache
-        if: steps.zephyr-ccache-installation.outputs.cache-hit != 'true'
-        run: sudo apt-get install -y ccache
-
-      - name: Configure ccache
-        run: |
-          # Update shared library cache if ccache was restored from cache
-          if [ "${{ steps.zephyr-ccache-installation.outputs.cache-hit }}" == "true" ]; then
-            sudo ldconfig
-          fi
-          echo "CCACHE_IGNOREOPTIONS=-specs=* --specs=*" >> $GITHUB_ENV
-          ccache -z
-
       - name: Build application
         working-directory: modules/lib/spotflow/zephyr/samples/logs
         run: |
