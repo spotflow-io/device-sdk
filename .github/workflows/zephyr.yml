@@ -135,11 +135,16 @@ jobs:
           CONFIG_SPOTFLOW_INGEST_KEY="TODO"
           EOF
 
-      - name: Restore ccache data
-        uses: actions/cache/restore@v4
+      - name: Get timestamp
+        id: timestamp
+        run: echo "timestamp=$(date +%s)" >> $GITHUB_OUTPUT
+
+      - name: Cache ccache data
+        uses: actions/cache@v4
         with:
           path: ~/.cache/ccache
-          key: zephyr-ccache-${{ matrix.board }}
+          key: zephyr-ccache-${{ matrix.board }}-${{ steps.timestamp.outputs.timestamp }}
+          restore-keys: zephyr-ccache-${{ matrix.board }}-
 
       - name: Install and configure ccache
         run: |
@@ -151,10 +156,3 @@ jobs:
         working-directory: modules/lib/spotflow/zephyr/samples/logs
         run: |
           west build --board ${{ matrix.board }}
-
-      # Forces updating the cache even after a cache hit
-      - name: Cache ccache data
-        uses: actions/cache/save@v4
-        with:
-          path: ~/.cache/ccache
-          key: zephyr-ccache-${{ matrix.board }}
