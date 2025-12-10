@@ -135,7 +135,27 @@ jobs:
           CONFIG_SPOTFLOW_INGEST_KEY="TODO"
           EOF
 
+      - name: Restore ccache data
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.cache/ccache
+          key: zephyr-ccache-${{ matrix.manifest }}
+
+      - name: Install and configure ccache
+        run: |
+          sudo apt-get install -y ccache
+          echo "CCACHE_IGNOREOPTIONS=-specs=* --specs=*" >> $GITHUB_ENV
+          ccache -p
+          ccache -z -s -vv
+
       - name: Build application
         working-directory: modules/lib/spotflow/zephyr/samples/logs
         run: |
           west build --board ${{ matrix.board }}
+
+      # Forces updating the cache even after a cache hit
+      - name: Cache ccache data
+        uses: actions/cache/save@v4
+        with:
+          path: ~/.cache/ccache
+          key: zephyr-ccache-${{ matrix.manifest }}
