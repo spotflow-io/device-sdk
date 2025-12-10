@@ -145,8 +145,6 @@ jobs:
         run: |
           sudo apt-get install -y ccache
           echo "CCACHE_IGNOREOPTIONS=-specs=* --specs=*" >> $GITHUB_ENV
-          ccache -p
-          ccache -z -s -vv
 
       - name: Build application
         working-directory: modules/lib/spotflow/zephyr/samples/logs
