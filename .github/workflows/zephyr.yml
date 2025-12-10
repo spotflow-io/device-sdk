@@ -73,7 +73,10 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: .
-          key: zephyr-workspace-${{ matrix.manifest }}-${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-${{ matrix.blob }}-${{ runner.os }}
+          key: >-
+            zephyr-workspace-${{ matrix.manifest }}-
+            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-
+            ${{ matrix.blob }}-${{ runner.os }}
 
       - name: Create Python virtual environment
         if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
@@ -117,7 +120,10 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .
-          key: zephyr-workspace-${{ matrix.manifest }}-${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-${{ matrix.blob }}-${{ runner.os }}
+          key: >-
+            zephyr-workspace-${{ matrix.manifest }}-
+            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-
+            ${{ matrix.blob }}-${{ runner.os }}
 
       - name: Cache Zephyr SDK
         id: cache-sdk
