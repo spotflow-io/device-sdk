@@ -2,6 +2,9 @@ name: Build Zephyr Project
 
 on:
   push:
+    paths:
+      - 'zephyr/**'
+      - '.github/workflows/zephyr.yml'
 
 permissions:
   contents: read        # Allows reading repository content (needed for checkout)
