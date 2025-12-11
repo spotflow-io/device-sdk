@@ -30,6 +30,16 @@ config SPOTFLOW_USE_ETH
 
 endchoice
 
+# If selected, fulfills SPOTFLOW_SETTINGS dependencies by storing Zephyr settings on flash
+config SPOTFLOW_SAMPLE_CONFIG_PERSISTENCE_FLASH
+	bool "Enable configuration persistence on flash"
+	default y
+	select CONFIG_FLASH
+	select CONFIG_FLASH_MAP
+	select CONFIG_NVS
+	select CONFIG_SETTINGS
+	select CONFIG_SETTINGS_NVS
+
 config NET_IF_MAX_IPV4_COUNT
 	int
 	# By default eth driver on FRDM_RW612 is enabled;
