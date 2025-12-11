@@ -49,17 +49,8 @@ spotflow_init();
 
 #### Logging
 
-```mermaid
----
-title: Main log flow
----
-flowchart LR
-    A[User Code] --> B[ESP IDF logging backend]
-    B --> C[Spotflow Logging Backend]
-    C -- QoS [Set in kconfig] --> D[Spotflow Mqtt Broker]
-    D --> E[Spotflow Observability Platform]
-```
-Currently, the Spotflow backend uses MQTT QoS 0 only.
+### Spotflow Main Log Flow
+![Spotflow Main Log Flow](docs/Spotflow_main_log_flow.svg)
 
 ### Spotflow Data Flow
 ![Spotflow Data Flow](docs/spotflow_data_flow.svg)
@@ -74,12 +65,14 @@ Currently, there is only one such property:
 - **Minimal severity of sent log messages** (the *level* of sent log messages)
 
 The configuration process uses the mechanism of *desired* and *reported* values that are stored for each device in the Spotflow platform and are synchronized using the MQTT protocol.
-If ESp IDF NVS storage is enabled, the Component uses it to persist the last active configuration.
+If ESP IDF NVS storage is enabled, the Component uses it to persist the last active configuration.
+
 ### Spotflow Backend Flow
 ![Spotflow Backend Flow](docs/Spotflow_backend.svg)
 
-### Build ID
-
+### Coredump
+It uses the default coredump component from esp idf. [espcoredump](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/core_dump.html). If you get any not enought memory errors to save coreudmp increase the coredump parttion size in the partition.csv file.
+If **Flash Encryption** is enabled add the encrypted flag to the coredump partition in partitions.csv. Nothing else is required.
 
 ## Feedback
 Any comments, suggestions, or issues are welcome.
