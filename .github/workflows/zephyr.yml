@@ -2,6 +2,12 @@ name: Build Zephyr Project
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - 'zephyr/**'
+      - '.github/workflows/zephyr.yml'
+  pull_request:
     paths:
       - 'zephyr/**'
       - '.github/workflows/zephyr.yml'
