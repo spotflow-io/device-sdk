@@ -43,11 +43,28 @@ spotflow_init();
 ```
 
 
-## Documentation
+## Component Size Default
+### Without Coredump
 
-### Architecture
+| Archive File  | Total Size | DRAM | .bss | .data | IRAM | .text | .vectors | Flash Code | .text | Flash Data | .rodata |
+|---------------|------------|------|------|-------|------|-------|----------|------------|-------|------------|---------|
+| libspotflow.a | 7009       | 373  | 372  | 1     | 0    | 0     | 0        | 4633       | 4633  | 2003       | 2003    |
 
-#### Logging
+### With Coredump
+
+| Archive File  | Total Size | DRAM | .bss | .data | IRAM | .text | .vectors | Flash Code | .text | Flash Data | .rodata |
+|---------------|------------|------|------|-------|------|-------|----------|------------|-------|------------|---------|
+| libspotflow.a | 8562       | 406  | 405  | 1     | 0    | 0     | 0        | 6153       | 6153  | 2003       | 2003    |
+
+
+### Configurations
+Details on the configuration to add in the sdkconfig if required.
+
+- SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING : If disabled, cloud based config only controls the logs going to the spotflow cloud. rest of the logs are printed on the terminal or other logging backends.
+- SPOTFLOW_ERASE_NVS_FLASH: If disabled it doesn't erase the flash in case of persistence save fails.
+- SPOTFLOW_COREDUMP_BACKEND: Enable or disable whether the coredump is created and sent to cloud backend.
+- SPOTFLOW_COREDUMPS_CHUNK_SIZE: Coredump is divided into multiple chunks so reading and sending them to cloud can be made easier. Default is 2048 bytes can be reduced to like 256 but it will take a long while to upload. Keep it less than MQTT buffer.
+- SPOTFLOW_MAX_QUEUE_SIZE: It takes a little while for coredump to read from flash and prepare it for transit. keep it small so when network connection is formed it sends all the queued buffers first before reading any more.
 
 ### Spotflow Main Log Flow
 ![Spotflow Main Log Flow](docs/Spotflow_main_log_flow.svg)

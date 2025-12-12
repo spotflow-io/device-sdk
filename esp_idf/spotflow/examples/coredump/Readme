@@ -25,4 +25,7 @@ idf.py menuconfig
 - In this fo into **Example Configuration** and add your wifi ssid and password.
 - Then Go back into Main Menu and go into **Spotflow**, and add your device ID and Ingest ID from Spotflow Cloud.
 
+### Running with qemu config
+```idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.qemu"```
+
 Now Flash the code to your controller and after a few seconds push the boot button on the dev kit for it to crash.
