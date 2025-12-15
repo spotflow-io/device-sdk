@@ -76,7 +76,7 @@ void spotflow_config_handle_desired_message(const uint8_t* payload, int len)
 
 	struct spotflow_config_persisted_settings settings_to_persist = { 0 };
 
-	if (desired_msg.flags & SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL) {
+	if (desired_msg.flags & SPOTFLOW_DESIRED_FLAG_MINIMAL_LOG_SEVERITY) {
 		uint8_t new_sent_log_level =
 		    spotflow_cbor_convert_severity_to_log_level(desired_msg.minimal_log_severity);
 		bool log_level_updated = false;

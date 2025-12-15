@@ -8,9 +8,12 @@
 extern "C" {
 #endif
 
+typedef enum {
+SPOTFLOW_PERSISTED_SETTINGS_FLAG_SENT_LOG_LEVEL = (1 << 0)
+} spotflow_config_persisted_flags_t;
 
 struct spotflow_config_persisted_settings {
-	uint8_t flags;
+	spotflow_config_persisted_flags_t flags;
 	uint8_t sent_log_level;
 };
 
