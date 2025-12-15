@@ -3,7 +3,7 @@
 #include "esp_err.h"
 #include "cbor.h"
 #include "configs/spotflow_config_cbor.h"
-#include "configs/spotflow_config_persistance.h"
+#include "configs/spotflow_config_persistence.h"
 #include "logging/spotflow_log_backend.h"
 
 #define MAX_KEY_COUNT 4

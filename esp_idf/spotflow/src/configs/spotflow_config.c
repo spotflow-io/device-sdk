@@ -5,7 +5,7 @@
 #include "logging/spotflow_log_cbor.h"
 #include "configs/spotflow_config.h"
 #include "configs/spotflow_config_cbor.h"
-#include "configs/spotflow_config_persistance.h"
+#include "configs/spotflow_config_persistence.h"
 #include "configs/spotflow_config_net.h"
 #include "configs/spotflow_config_options.h"
 

@@ -3,7 +3,7 @@
 #include "nvs_flash.h"
 #include "nvs.h"
 #include "esp_err.h"
-#include "configs/spotflow_config_persistance.h"
+#include "configs/spotflow_config_persistence.h"
 #include "logging/spotflow_log_backend.h"
 #include "configs/spotflow_config_cbor.h"
 
