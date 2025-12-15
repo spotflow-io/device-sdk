@@ -57,7 +57,7 @@ int spotflow_config_init_session()
  * @param payload
  * @param len
  */
-void spotflow_config_desired_message(const uint8_t* payload, int len)
+void spotflow_config_handle_desired_message(const uint8_t* payload, int len)
 {
 	struct spotflow_config_desired_msg desired_msg;
 	SPOTFLOW_LOG("Decoding Payload\n");

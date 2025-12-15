@@ -282,7 +282,7 @@ void spotflow_mqtt_on_message(const char* topic, int topic_len, const uint8_t* d
 	if (strncmp(topic, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC, strlen(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC)) == 0) {
 		// Your config handling
 		SPOTFLOW_LOG("Dispatching to config handler...\n");
-		spotflow_config_desired_message(data, data_len);
+		spotflow_config_handle_desired_message(data, data_len);
 		return;
 	}
 
