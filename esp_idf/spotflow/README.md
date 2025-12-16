@@ -8,9 +8,9 @@ send your logs to the Spotflow observability platform.
 It is integrated with ESP IDF as a component which utilizes the ESP IDF logging component to seamlessly integrate with current firmwares.
 
 Our solution was tested on the following Espressif boards (more are coming soon):
-* [ESP32-S3]()
-* [ESP32-C3]()
-* [ESP32-C6]()
+* [ESP32-S3](https://docs.espressif.com/projects/esp-idf/en/stable/esp32s3/get-started/index.html)
+* [ESP32-C3](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c3/get-started/index.html)
+* [ESP32-C6](https://docs.espressif.com/projects/esp-idf/en/stable/esp32c6/get-started/index.html)
 
 We currently support:
 * ESP IDF v5.x.x
@@ -60,17 +60,20 @@ spotflow_init();
 |---------------|------------|------|------|-------|------|-------|----------|------------|-------|------------|---------|
 | libspotflow.a | 8562       | 406  | 405  | 1     | 0    | 0     | 0        | 6153       | 6153  | 2003       | 2003    |
 
-
-### Configurations
-Details on the configuration to add in the sdkconfig if required.
-
-- SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING : If disabled, cloud based config only controls the logs going to the spotflow cloud. rest of the logs are printed on the terminal or other logging backends.
-- SPOTFLOW_ERASE_NVS_FLASH: If disabled it doesn't erase the flash in case of persistence save fails.
-- SPOTFLOW_COREDUMP_BACKEND: Enable or disable whether the coredump is created and sent to cloud backend.
-- SPOTFLOW_COREDUMPS_CHUNK_SIZE: Coredump is divided into multiple chunks so reading and sending them to cloud can be made easier. Default is 2048 bytes can be reduced to like 256 but it will take a long while to upload. Keep it less than MQTT buffer.
-- SPOTFLOW_MAX_QUEUE_SIZE: It takes a little while for coredump to read from flash and prepare it for transit. keep it small so when network connection is formed it sends all the queued buffers first before reading any more.
-
 ### Spotflow Main Log Flow
+
+<!--
+```mermaid
+---
+title: Main log flow
+---
+flowchart LR
+    A[User Code] --> B[ESP IDF logging backend]
+    B --> C[Spotflow Logging Backend]
+    C -- QoS [Set in kconfig] --> D[Spotflow Mqtt Broker]
+    D --> E[Spotflow Observability Platform]
+```
+-->
 ![Spotflow Main Log Flow](docs/Spotflow_main_log_flow.svg)
 
 ### Spotflow Data Flow
