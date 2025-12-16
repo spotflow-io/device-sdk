@@ -1,4 +1,4 @@
-# Spotflow Observability IOT Devices
+# Spotflow Observability for IoT Devices
 
 Device Component for Spotflow embedded observability platform.
 
@@ -28,16 +28,20 @@ Follow the Quickstart guide that is available in our portal after registration.
 Alternatively, you can check example applications in the [examples]().
 The Component is meant to be used as
 a [ESP IDF component](https://docs.espressif.com/projects/idf-component-manager/en/latest/).
-You can add it to your ESP IDF project by running the following command.
+You can add it to your ESP IDF project by running the following command:
 
 ```code
 idf.py add-dependency "spotflow/device_sdk"
 ```
-and adding the following header file in your main file
+
+Include the following header file from your main file:
+
 ```C
 #include "spotflow.h"
 ```
-in your starting or intial main task.
+
+Call the following function during startup:
+
 ```C
 spotflow_init();
 ```
@@ -88,8 +92,8 @@ If ESP IDF NVS storage is enabled, the Component uses it to persist the last act
 ![Spotflow Backend Flow](docs/Spotflow_backend.svg)
 
 ### Coredump
-It uses the default coredump component from esp idf. [espcoredump](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/core_dump.html). If you get any not enought memory errors to save coreudmp increase the coredump parttion size in the partition.csv file.
-If **Flash Encryption** is enabled add the encrypted flag to the coredump partition in partitions.csv. Nothing else is required.
+It uses the default coredump component from ESP-IDF, [espcoredump](https://docs.espressif.com/projects/esp-idf/en/stable/esp32/api-guides/core_dump.html). If you get any not enough memory errors when saving coredumps, increase the coredump partition size in the `partition.csv` file.
+If **Flash Encryption** is enabled, add the encrypted flag to the coredump partition in partitions.csv. Nothing else is required.
 
 ## Feedback
 Any comments, suggestions, or issues are welcome.

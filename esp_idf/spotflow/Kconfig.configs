@@ -1,4 +1,4 @@
-menu "Spotflow Cloud log level Configs"
+menu "Spotflow cloud log level configuration"
     config SPOTFLOW_DEFAULT_SENT_LOG_LEVEL
         int "Spotflow default sent log level"
         default 3

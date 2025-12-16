@@ -19,12 +19,14 @@ menu "Spotflow Core Dump Settings"
                 help
                     Coredump chunk size while uploading to cloud. 
                     Bigger size means less chunks and quick uploads. 
-                    But with bigger chunks more mmeory buffer is used for mqtt connection and to save it.
+                    But with bigger chunks more memory buffer is used for preparing and sending
+                    each one via MQTT.
+
             config SPOTFLOW_MAX_QUEUE_SIZE
                 int "Coredump Max Queue size"
                 default 2
                 help
-                    Coredump chunk saved in queue to make the mqtt send streamlined.
+                    Maximum number of coredump chunks saved in the queue before sending.
                     Memory usage is SPOTFLOW_MAX_QUEUE_SIZE*SPOTFLOW_COREDUMP_CHUNK_SIZE.
 
         endif
