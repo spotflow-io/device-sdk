@@ -61,19 +61,6 @@ spotflow_init();
 | libspotflow.a | 8562       | 406  | 405  | 1     | 0    | 0     | 0        | 6153       | 6153  | 2003       | 2003    |
 
 ### Spotflow Main Log Flow
-
-<!--
-```mermaid
----
-title: Main log flow
----
-flowchart LR
-    A[User Code] --> B[ESP IDF logging backend]
-    B --> C[Spotflow Logging Backend]
-    C -- QoS [Set in kconfig] --> D[Spotflow Mqtt Broker]
-    D --> E[Spotflow Observability Platform]
-```
--->
 ![Spotflow Main Log Flow](docs/Spotflow_main_log_flow.svg)
 
 ### Spotflow Data Flow
