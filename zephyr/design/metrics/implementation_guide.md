@@ -13,17 +13,17 @@ This document provides practical guidance for implementing the Spotflow Metrics 
 
 This document uses the following terminology consistently:
 
-- **Time series**: A unique sequence of metric values identified by a metric name and dimension combination
-- **Time series pool**: Pre-allocated storage for tracking multiple time series within a dimensional metric
-- **Time series slot**: Individual entry in the time series pool (one slot per unique dimension combination)
-- **Dimensionless metric**: Metric without dimensions (single time series)
-- **Dimensional metric**: Metric with dimensions (multiple time series, one per unique dimension combination)
+- **Time series**: A unique sequence of metric values identified by a metric name and label combination
+- **Time series pool**: Pre-allocated storage for tracking multiple time series within a labeled metric
+- **Time series slot**: Individual entry in the time series pool (one slot per unique label combination)
+- **Simple metric**: Metric without labels (single time series)
+- **Labeled metric**: Metric with labels (multiple time series, one per unique label combination)
 
 ## Implementation Roadmap
 
 ### Phase 1: Core Infrastructure (Week 1-2)
 
-**Goal**: Implement basic metric registration and simple (dimensionless) metrics with aggregation.
+**Goal**: Implement basic metric registration and simple (non-labeled) metrics with aggregation.
 
 **Tasks**:
 1. Create module directory structure
@@ -40,21 +40,21 @@ This document uses the following terminology consistently:
 - `spotflow_metrics_cbor.c/h` (simple messages only)
 - Unit test suite for core components
 
-### Phase 2: Dimensional Metrics (Week 3-4)
+### Phase 2: Labeled Metrics (Week 3-4)
 
-**Goal**: Add support for metrics with dimensions and multiple time series.
+**Goal**: Add support for metrics with labels and multiple time series.
 
 **Tasks**:
-1. Implement dimension handling and hashing
+1. Implement label handling and hashing
 2. Extend aggregator for multi-timeseries tracking
 3. Implement pool full error handling (reject with -ENOSPC)
-4. Add dimensional metric registration APIs
-5. Write unit tests for dimensional features
+4. Add labeled metric registration APIs
+5. Write unit tests for labeled features
 
 **Deliverables**:
 - Extended `spotflow_metrics_aggregator.c` with time series management
-- Dimensional metric APIs in `spotflow_metrics_backend.c`
-- Unit tests for dimensional metrics and cardinality limits
+- Labeled metric APIs in `spotflow_metrics_backend.c`
+- Unit tests for labeled metrics and cardinality limits
 
 ### Phase 3: Network Integration (Week 5)
 
@@ -145,17 +145,17 @@ modules/lib/spotflow/zephyr/src/metrics/
 
 /* Configuration limits */
 #define SPOTFLOW_MAX_METRIC_NAME_LEN 64
-#define SPOTFLOW_MAX_DIMENSION_KEY_LEN 32
-#define SPOTFLOW_MAX_DIMENSION_STRING_VAL_LEN 128
-#define SPOTFLOW_MAX_DIMENSIONS_PER_METRIC 16
+#define SPOTFLOW_MAX_LABEL_KEY_LEN 16
+#define SPOTFLOW_MAX_LABEL_VALUE_LEN 32
+#define SPOTFLOW_MAX_LABELS_PER_METRIC 8
 
 /* Metric type enum */
 typedef enum {
-    SPOTFLOW_METRIC_TYPE_INT,    // Integer metric (dimensionless or dimensional)
-    SPOTFLOW_METRIC_TYPE_FLOAT,  // Float metric (dimensionless or dimensional)
+    SPOTFLOW_METRIC_TYPE_INT,    // Integer metric (simple or labeled)
+    SPOTFLOW_METRIC_TYPE_FLOAT,  // Float metric (simple or labeled)
 } spotflow_metric_type_t;
 
-// Note: Dimensionless vs dimensional is determined by max_dimensions == 0
+// Note: Simple vs labeled is determined by max_labels == 0
 
 /* Aggregation interval enum */
 typedef enum {
@@ -165,18 +165,18 @@ typedef enum {
     SPOTFLOW_AGG_INTERVAL_1HOUR = 3,  // PT1H
 } spotflow_aggregation_interval_t;
 
-/* Dimension key-value pair (from public API) */
+/* Label key-value pair (from public API) */
 typedef struct {
-    const char* key;     // Dimension key (e.g., "core", "interface")
-    const char* value;   // Dimension value (string only)
-} spotflow_dimension_t;
+    const char* key;     // Label key (e.g., "core", "interface"). Max 16 chars.
+    const char* value;   // Label value (string only). Max 32 chars.
+} spotflow_label_t;
 
 /* Internal metric structure */
 struct spotflow_metric {
     char name[SPOTFLOW_MAX_METRIC_NAME_LEN];
     spotflow_metric_type_t type;
     uint16_t max_timeseries;
-    uint8_t max_dimensions;
+    uint8_t max_labels;
     uint64_t sequence_number;
     spotflow_aggregation_interval_t agg_interval;
     bool collect_samples;  // Reserved for future
@@ -242,11 +242,11 @@ spotflow_metric_t* spotflow_register_metric_float(const char* name)
         return NULL;
     }
 
-// Dimensional float metric
-spotflow_metric_t* spotflow_register_metric_float_with_dimensions(
+// Labeled float metric
+spotflow_metric_t* spotflow_register_metric_float_with_labels(
     const char* name,
     uint16_t max_timeseries,
-    uint8_t max_dimensions)
+    uint8_t max_labels)
 {
     // Validate parameters
     if (!name || strlen(name) == 0 || strlen(name) >= SPOTFLOW_MAX_METRIC_NAME_LEN) {
@@ -259,8 +259,8 @@ spotflow_metric_t* spotflow_register_metric_float_with_dimensions(
         return NULL;
     }
 
-    if (max_dimensions == 0 || max_dimensions > SPOTFLOW_MAX_DIMENSIONS_PER_METRIC) {
-        LOG_ERR("Invalid max_dimensions: %u", max_dimensions);
+    if (max_labels == 0 || max_labels > SPOTFLOW_MAX_LABELS_PER_METRIC) {
+        LOG_ERR("Invalid max_labels: %u", max_labels);
         return NULL;
     }
 
@@ -301,7 +301,7 @@ spotflow_metric_t* spotflow_register_metric_float_with_dimensions(
     strncpy(metric->name, normalized_name, sizeof(metric->name));
     metric->type = SPOTFLOW_METRIC_TYPE_FLOAT;
     metric->max_timeseries = max_timeseries;
-    metric->max_dimensions = max_dimensions;
+    metric->max_labels = max_labels;
     metric->sequence_number = 0;
     metric->agg_interval = CONFIG_SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL;
     // collect_samples reserved for future (not in v1)
@@ -324,7 +324,7 @@ spotflow_metric_t* spotflow_register_metric_float_with_dimensions(
     k_mutex_unlock(&g_registry_lock);
 
     LOG_INF("Registered metric '%s' (type=float, max_ts=%u, max_dims=%u)",
-            normalized_name, max_timeseries, max_dimensions);
+            normalized_name, max_timeseries, max_labels);
 
     return metric;
 }
@@ -342,8 +342,8 @@ int spotflow_report_metric_int(
         return -EINVAL;
     }
 
-    if (metric->max_dimensions > 0) {
-        LOG_ERR("Use spotflow_report_metric_int_with_dimensions for dimensional metrics");
+    if (metric->max_labels > 0) {
+        LOG_ERR("Use spotflow_report_metric_int_with_labels for labeled metrics");
         return -EINVAL;
     }
 
@@ -357,8 +357,8 @@ int spotflow_report_metric_float(
         return -EINVAL;
     }
 
-    if (metric->max_dimensions > 0) {
-        LOG_ERR("Use spotflow_report_metric_float_with_dimensions for dimensional metrics");
+    if (metric->max_labels > 0) {
+        LOG_ERR("Use spotflow_report_metric_float_with_labels for labeled metrics");
         return -EINVAL;
     }
 
@@ -368,47 +368,47 @@ int spotflow_report_metric_float(
         return -EINVAL;
     }
 
-// Dimensional integer metric reporting
-int spotflow_report_metric_int_with_dimensions(
+// Labeled integer metric reporting
+int spotflow_report_metric_int_with_labels(
     spotflow_metric_t* metric,
     int64_t value,
-    const spotflow_dimension_t* dimensions,
-    uint8_t dimension_count)
+    const spotflow_label_t* labels,
+    uint8_t label_count)
 {
     // Validate parameters
-    if (!metric || !dimensions) {
+    if (!metric || !labels) {
         return -EINVAL;
     }
 
-    if (metric->max_dimensions == 0) {
-        LOG_ERR("Use spotflow_report_metric_int for dimensionless metrics");
+    if (metric->max_labels == 0) {
+        LOG_ERR("Use spotflow_report_metric_int for simple metrics");
         return -EINVAL;
     }
 
-    if (dimension_count == 0 || dimension_count > metric->max_dimensions) {
-        LOG_ERR("Invalid dimension_count: %d (max: %d)", dimension_count, metric->max_dimensions);
+    if (label_count == 0 || label_count > metric->max_labels) {
+        LOG_ERR("Invalid label_count: %d (max: %d)", label_count, metric->max_labels);
         return -EINVAL;
     }
 
-// Dimensional float metric reporting
-int spotflow_report_metric_float_with_dimensions(
+// Labeled float metric reporting
+int spotflow_report_metric_float_with_labels(
     spotflow_metric_t* metric,
     double value,
-    const spotflow_dimension_t* dimensions,
-    uint8_t dimension_count)
+    const spotflow_label_t* labels,
+    uint8_t label_count)
 {
     // Validate parameters
-    if (!metric || !dimensions) {
+    if (!metric || !labels) {
         return -EINVAL;
     }
 
-    if (metric->max_dimensions == 0) {
-        LOG_ERR("Use spotflow_report_metric_float for dimensionless metrics");
+    if (metric->max_labels == 0) {
+        LOG_ERR("Use spotflow_report_metric_float for simple metrics");
         return -EINVAL;
     }
 
-    if (dimension_count == 0 || dimension_count > metric->max_dimensions) {
-        LOG_ERR("Invalid dimension_count: %d (max: %d)", dimension_count, metric->max_dimensions);
+    if (label_count == 0 || label_count > metric->max_labels) {
+        LOG_ERR("Invalid label_count: %d (max: %d)", label_count, metric->max_labels);
         return -EINVAL;
     }
 
@@ -419,7 +419,7 @@ int spotflow_report_metric_float_with_dimensions(
     }
 
     // Dispatch to aggregator
-    int rc = aggregator_report_value(metric, dimensions, value);
+    int rc = aggregator_report_value(metric, labels, value);
 
     // Update statistics
     metric->total_reports++;
@@ -438,8 +438,8 @@ int spotflow_report_event(spotflow_metric_t* metric)
         return -EINVAL;
     }
 
-    if (metric->max_dimensions > 0) {
-        LOG_ERR("Use spotflow_report_event_with_dimensions for dimensional metrics");
+    if (metric->max_labels > 0) {
+        LOG_ERR("Use spotflow_report_event_with_labels for labeled metrics");
         return -EINVAL;
     }
 
@@ -447,28 +447,28 @@ int spotflow_report_event(spotflow_metric_t* metric)
     return spotflow_report_metric_int(metric, 1);
 }
 
-int spotflow_report_event_with_dimensions(
+int spotflow_report_event_with_labels(
     spotflow_metric_t* metric,
-    const spotflow_dimension_t* dimensions,
-    uint8_t dimension_count)
+    const spotflow_label_t* labels,
+    uint8_t label_count)
 {
     // Validate parameters
-    if (!metric || !dimensions) {
+    if (!metric || !labels) {
         return -EINVAL;
     }
 
-    if (metric->max_dimensions == 0) {
-        LOG_ERR("Use spotflow_report_event for dimensionless metrics");
+    if (metric->max_labels == 0) {
+        LOG_ERR("Use spotflow_report_event for simple metrics");
         return -EINVAL;
     }
 
-    if (dimension_count == 0 || dimension_count > metric->max_dimensions) {
-        LOG_ERR("Invalid dimension_count: %d (max: %d)", dimension_count, metric->max_dimensions);
+    if (label_count == 0 || label_count > metric->max_labels) {
+        LOG_ERR("Invalid label_count: %d (max: %d)", label_count, metric->max_labels);
         return -EINVAL;
     }
 
     // Report value of 1 (event occurred)
-    return spotflow_report_metric_int_with_dimensions(metric, 1, dimensions, dimension_count);
+    return spotflow_report_metric_int_with_labels(metric, 1, labels, label_count);
 }
 ```
 
@@ -492,9 +492,9 @@ static void normalize_metric_name(const char* input, char* output, size_t output
 **Key Data Structures**:
 
 ```c
-/* Time series state for one dimension combination */
+/* Time series state for one label combination */
 struct metric_timeseries_state {
-    uint32_t dimension_hash;  // Hash of dimension key-value pairs
+    uint32_t label_hash;  // Hash of label key-value pairs
 
     // Aggregated values
     union {
@@ -514,14 +514,14 @@ struct metric_timeseries_state {
 
     uint64_t window_start_ms;  // Start of current aggregation window
 
-    // Stored dimensions (keys and values)
-    spotflow_dimension_t dimensions[SPOTFLOW_MAX_DIMENSIONS_PER_METRIC];
-    uint8_t dimension_count;
+    // Stored labels (keys and values)
+    spotflow_label_t labels[SPOTFLOW_MAX_LABELS_PER_METRIC];
+    uint8_t label_count;
 
-    // Dimension string storage (inline to avoid dynamic allocation)
-    // Each dimension gets fixed-size buffers for key and value strings
-    char dimension_key_storage[SPOTFLOW_MAX_DIMENSIONS_PER_METRIC][32];
-    char dimension_value_storage[SPOTFLOW_MAX_DIMENSIONS_PER_METRIC][128];
+    // Label string storage (inline to avoid dynamic allocation)
+    // Each label gets fixed-size buffers for key and value strings
+    char label_key_storage[SPOTFLOW_MAX_LABELS_PER_METRIC][16];
+    char label_value_storage[SPOTFLOW_MAX_LABELS_PER_METRIC][32];
 
     bool active;     // Slot in use
 };
@@ -582,7 +582,7 @@ int aggregator_register_metric(struct spotflow_metric* metric) {
 ```c
 int aggregator_report_value(
     struct spotflow_metric* metric,
-    const spotflow_dimension_t* dimensions,
+    const spotflow_label_t* labels,
     double value)
 {
     struct metric_aggregator_context* ctx = metric->aggregator_context;
@@ -592,13 +592,13 @@ int aggregator_report_value(
 
     k_mutex_lock(&metric->lock, K_FOREVER);
 
-    // Find or create time series for this dimension combination
-    uint32_t dim_hash = hash_dimensions(dimensions, metric->max_dimensions);
-    struct metric_timeseries_state* ts = find_or_create_timeseries(ctx, dim_hash, dimensions, metric->max_dimensions);
+    // Find or create time series for this label combination
+    uint32_t dim_hash = hash_labels(labels, metric->max_labels);
+    struct metric_timeseries_state* ts = find_or_create_timeseries(ctx, dim_hash, labels, metric->max_labels);
 
     if (!ts) {
         // Time series pool full, reject this report
-        LOG_ERR("Metric '%s': time series pool full, dropping dimension combination",
+        LOG_ERR("Metric '%s': time series pool full, dropping label combination",
                 metric->name);
         k_mutex_unlock(&metric->lock);
         return -ENOSPC;
@@ -627,8 +627,8 @@ int aggregator_report_value(
 static struct metric_timeseries_state* find_or_create_timeseries(
     struct metric_aggregator_context* ctx,
     uint32_t dim_hash,
-    const spotflow_dimension_t* dimensions,
-    uint8_t dimension_count)
+    const spotflow_label_t* labels,
+    uint8_t label_count)
 {
     // Performance Note: O(n) linear search is acceptable for typical use cases
     // where max_timeseries ≤ 256. For larger cardinalities, consider hash table
@@ -637,9 +637,9 @@ static struct metric_timeseries_state* find_or_create_timeseries(
     // First, try to find existing time series with matching hash
     for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
         if (ctx->timeseries[i].active &&
-            ctx->timeseries[i].dimension_hash == dim_hash) {
-            // Hash match - verify full dimension comparison to handle collisions
-            if (dimensions_equal(&ctx->timeseries[i], dimensions, dimension_count)) {
+            ctx->timeseries[i].label_hash == dim_hash) {
+            // Hash match - verify full label comparison to handle collisions
+            if (labels_equal(&ctx->timeseries[i], labels, label_count)) {
                 return &ctx->timeseries[i];
             }
         }
@@ -658,20 +658,20 @@ static struct metric_timeseries_state* find_or_create_timeseries(
             // Initialize new time series
             memset(ts, 0, sizeof(*ts));
             ts->active = true;
-            ts->dimension_hash = dim_hash;
-            ts->dimension_count = dimension_count;
+            ts->label_hash = dim_hash;
+            ts->label_count = label_count;
 
-            // Copy dimension strings into inline storage
-            for (uint8_t d = 0; d < dimension_count; d++) {
-                strncpy(ts->dimension_key_storage[d], dimensions[d].key, 31);
-                ts->dimension_key_storage[d][31] = '\0';
+            // Copy label strings into inline storage
+            for (uint8_t d = 0; d < label_count; d++) {
+                strncpy(ts->label_key_storage[d], labels[d].key, 15);
+                ts->label_key_storage[d][15] = '\0';
 
-                strncpy(ts->dimension_value_storage[d], dimensions[d].value, 127);
-                ts->dimension_value_storage[d][127] = '\0';
+                strncpy(ts->label_value_storage[d], labels[d].value, 31);
+                ts->label_value_storage[d][31] = '\0';
 
-                // Point dimension struct to inline storage
-                ts->dimensions[d].key = ts->dimension_key_storage[d];
-                ts->dimensions[d].value = ts->dimension_value_storage[d];
+                // Point label struct to inline storage
+                ts->labels[d].key = ts->label_key_storage[d];
+                ts->labels[d].value = ts->label_value_storage[d];
             }
 
             ctx->timeseries_count++;
@@ -682,19 +682,19 @@ static struct metric_timeseries_state* find_or_create_timeseries(
     return NULL;  // Should never reach here
 }
 
-// Helper to compare dimensions for collision detection
-static bool dimensions_equal(
+// Helper to compare labels for collision detection
+static bool labels_equal(
     const struct metric_timeseries_state* ts,
-    const spotflow_dimension_t* dimensions,
-    uint8_t dimension_count)
+    const spotflow_label_t* labels,
+    uint8_t label_count)
 {
-    if (ts->dimension_count != dimension_count) {
+    if (ts->label_count != label_count) {
         return false;
     }
 
-    for (uint8_t i = 0; i < dimension_count; i++) {
-        if (strcmp(ts->dimensions[i].key, dimensions[i].key) != 0 ||
-            strcmp(ts->dimensions[i].value, dimensions[i].value) != 0) {
+    for (uint8_t i = 0; i < label_count; i++) {
+        if (strcmp(ts->labels[i].key, labels[i].key) != 0 ||
+            strcmp(ts->labels[i].value, labels[i].value) != 0) {
             return false;
         }
     }
@@ -798,11 +798,11 @@ static void schedule_aggregation_timer(struct metric_aggregator_context* ctx) {
 }
 ```
 
-5. **Dimension Hashing**:
+5. **Label Hashing**:
 ```c
-static uint32_t hash_dimensions(const spotflow_dimension_t* dimensions, uint8_t count) {
-    if (!dimensions || count == 0) {
-        return 0;  // Dimensionless metric
+static uint32_t hash_labels(const spotflow_label_t* labels, uint8_t count) {
+    if (!labels || count == 0) {
+        return 0;  // Simple metric (no labels)
     }
 
     // FNV-1a hash
@@ -810,14 +810,14 @@ static uint32_t hash_dimensions(const spotflow_dimension_t* dimensions, uint8_t 
 
     for (uint8_t i = 0; i < count; i++) {
         // Hash key
-        const char* key = dimensions[i].key;
+        const char* key = labels[i].key;
         while (*key) {
             hash ^= (uint32_t)*key++;
             hash *= 16777619u;
         }
 
         // Hash value (string only)
-        const char* val = dimensions[i].value;
+        const char* val = labels[i].value;
         while (*val) {
             hash ^= (uint32_t)*val++;
             hash *= 16777619u;
@@ -867,7 +867,7 @@ int spotflow_metrics_cbor_encode_simple(
     succ = succ && zcbor_uint64_put(state, k_uptime_get());
 
     // sequenceNumber (per-metric, incremented for EACH message)
-    // NOTE: For dimensional metrics with N active time series, sequence number
+    // NOTE: For labeled metrics with N active time series, sequence number
     // advances by N per aggregation interval (one increment per message)
     succ = succ && zcbor_uint32_put(state, KEY_SEQUENCE_NUMBER);
     succ = succ && zcbor_uint64_put(state, metric->sequence_number++);
@@ -937,9 +937,9 @@ int spotflow_metrics_cbor_encode_simple(
 }
 ```
 
-2. **Encode Dimensional Metric (with labels)**:
+2. **Encode Labeled Metric (with labels)**:
 ```c
-static int encode_labels(zcbor_state_t* state, const spotflow_dimension_t* dims, uint8_t count) {
+static int encode_labels(zcbor_state_t* state, const spotflow_label_t* dims, uint8_t count) {
     bool succ = zcbor_uint32_put(state, KEY_LABELS);
     succ = succ && zcbor_map_start_encode(state, count);
 
@@ -1056,7 +1056,7 @@ config SPOTFLOW_METRICS_CBOR_BUFFER_SIZE
     range 128 2048
     help
         Size of the buffer used for CBOR encoding of metric messages.
-        Increase if you have metrics with many dimensions or long names.
+        Increase if you have metrics with many labels or long names.
 
 config SPOTFLOW_METRICS_MAX_REGISTERED
     int "Maximum number of registered metrics"
@@ -1143,13 +1143,13 @@ rsource "src/metrics/KConfig"
    - Test single value aggregation
    - Test multi-value aggregation (sum, count, min, max)
    - Test sum overflow detection (sumTruncated flag)
-   - Test dimension hashing
+   - Test label hashing
    - Test cardinality limit enforcement (pool full returns -ENOSPC)
    - Test error logging when pool full
 
 3. **CBOR Encoding Tests**:
    - Test simple metric encoding
-   - Test dimensional metric encoding
+   - Test labeled metric encoding
    - Test PT0S (event) encoding (no min/max)
    - Test decode and verify roundtrip
 
@@ -1228,7 +1228,7 @@ ZTEST(metrics_tests, test_duplicate_registration)
 
 ### 4. Hash Collisions
 
-**Problem**: Different dimension combinations produce same hash.
+**Problem**: Different label combinations produce same hash.
 
 **Solution**:
 - Use full comparison in addition to hash for matching

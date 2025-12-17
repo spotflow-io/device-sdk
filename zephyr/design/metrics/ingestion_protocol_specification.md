@@ -95,7 +95,7 @@ All metric messages are encoded as CBOR maps with integer keys for efficiency.
 
 ### Single Metric Message (No Dimensions)
 
-Used for simple metrics without dimensions, or events.
+Used for simple metrics without labels, or events.
 
 **CBOR Schema**:
 ```
@@ -154,14 +154,14 @@ A8                      # map(8)
 
 ### Dimensional Metric Message
 
-Used for metrics with dimensions. Each time series (unique dimension combination) sends a separate message.
+Used for metrics with labels. Each time series (unique label combination) sends a separate message.
 
 **CBOR Schema**:
 ```
 {
     0x00: uint,           // messageType = 0x05
     0x10: tstr,           // metricName
-    0x05: {               // labels (dimensions)
+    0x05: {               // labels
         tstr: tstr|int|float|bool,  // key-value pairs
         ...
     },
@@ -255,8 +255,8 @@ Events are metrics with `aggregationInterval = PT0S`. They typically represent p
 - `min` (0x16): Minimum value in window
 - `max` (0x17): Maximum value in window
 
-#### Conditionally Required (for Dimensional Metrics):
-- `labels` (0x05): Map of dimension key-value pairs (omitted for dimensionless metrics)
+#### Conditionally Required (for Labeled Metrics):
+- `labels` (0x05): Map of label key-value pairs (omitted for simple (non-labeled) metrics)
 
 #### Optional (MAY be omitted from CBOR):
 - `sumTruncated` (0x14): Only included if sum overflow detected (defaults to false)
@@ -321,7 +321,7 @@ Events are metrics with `aggregationInterval = PT0S`. They typically represent p
 - **Semantics**:
   - Starts at 0 or arbitrary value on device boot
   - Increments by 1 for each message sent for this metric
-  - All time series of a dimensional metric share the sequence
+  - All time series of a labeled metric share the sequence
   - Used to detect message loss
 - **Wrapping**: If sequence reaches 2^64, wraps to 0
 
@@ -400,9 +400,9 @@ Events are metrics with `aggregationInterval = PT0S`. They typically represent p
 
 **Recommended Values**:
 - **Minimal** (simple metrics only): 256 bytes
-- **Default** (typical dimensional metrics): 512 bytes
-- **Extended** (complex dimensional metrics): 1024 bytes
-- **Maximum**: 2048 bytes (rare, high dimension count)
+- **Default** (typical labeled metrics): 512 bytes
+- **Extended** (complex labeled metrics): 1024 bytes
+- **Maximum**: 2048 bytes (rare, high label count)
 
 **Calculation** (v1, single time series per message):
 ```
@@ -481,8 +481,8 @@ Buffer_Size ≈ 80 + (Metric_Name_Length) +
 
 ### Data Privacy
 - TLS encryption in transit
-- No PII should be included in metric names or dimension values
-- Dimension values logged/stored by backend
+- No PII should be included in metric names or label values
+- Label values logged/stored by backend
 
 ### Denial of Service
 - Device-side rate limiting via queue size
@@ -515,11 +515,11 @@ Buffer_Size ≈ 80 + (Metric_Name_Length) +
 ```
 **Expected**: Accept, parse as aggregated counter
 
-#### Test Case 2: Dimensional Metric
+#### Test Case 2: Labeled Metric
 ```cbor-diag
 {0: 5, 16: "test_temp", 5: {"sensor": "1"}, 17: 1, 6: 2000, 13: 1, 19: 25.5, 21: 5, 22: 24.0, 23: 27.0}
 ```
-**Expected**: Accept, extract dimension
+**Expected**: Accept, extract label
 
 #### Test Case 3: Event (No Aggregation)
 ```cbor-diag

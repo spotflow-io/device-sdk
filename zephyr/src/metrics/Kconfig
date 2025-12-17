@@ -1,0 +1,89 @@
+menuconfig SPOTFLOW_METRICS
+	bool "Enable Spotflow metrics collection and reporting"
+	depends on SPOTFLOW
+	default n
+	help
+	  Enable metrics collection and reporting feature for the Spotflow SDK.
+	  Allows devices to collect, aggregate, and transmit metrics to the cloud.
+
+if SPOTFLOW_METRICS
+
+config SPOTFLOW_METRICS_QUEUE_SIZE
+	int "Metrics message queue size"
+	range 4 64
+	default 16
+	help
+	  Maximum number of encoded metric messages buffered before transmission.
+	  Messages are dropped if queue is full. Default 16 messages.
+
+config SPOTFLOW_METRICS_CBOR_BUFFER_SIZE
+	int "CBOR encoding buffer size (bytes)"
+	range 256 2048
+	default 512
+	help
+	  Size of stack-allocated buffer for CBOR encoding.
+	  Must be large enough for the largest metric message.
+	  Default 512 bytes is sufficient for most use cases.
+
+config SPOTFLOW_METRICS_MAX_REGISTERED
+	int "Maximum number of registered metrics"
+	range 1 128
+	default 32
+	help
+	  Maximum number of metrics that can be registered simultaneously.
+	  Each metric consumes heap memory for aggregation context and time series storage.
+
+config SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL
+	int "Default aggregation interval (enum)"
+	range 0 3
+	default 1
+	help
+	  Default aggregation period for metrics registered without explicit interval.
+	  0 = PT0S (no aggregation, immediate)
+	  1 = PT1M (1 minute, recommended default)
+	  2 = PT10M (10 minutes)
+	  3 = PT1H (1 hour)
+
+config SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC
+	int "Maximum labels per metric"
+	range 1 8
+	default 8
+	help
+	  Maximum number of label key-value pairs per metric report.
+	  Affects memory consumption per time series.
+
+config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
+	int "Additional heap memory pool size for metrics (bytes)"
+	default 16384
+	range 4096 65536
+	help
+	  Heap memory required for metrics subsystem:
+	  - Metric registration (per-metric context: 128 bytes)
+	  - Time series storage (per time series: 96 bytes × max_timeseries)
+	  - CBOR encoding buffers
+
+	  Sizing formula:
+	  HEAP_SIZE = 2048 + SUM(128 + 96 × max_timeseries[i]) for all i metrics
+
+	  Examples:
+	  - 10 dimensionless metrics: 2048 + 10×128 = 3.3KB
+	  - 10 dimensional (max_ts=16): 2048 + 10×(128+96×16) = 17.4KB
+	  - 32 metrics (max_ts=16 each): 2048 + 32×(128+96×16) = 53KB
+
+	  Default 16KB supports typical mixed workload. Adjust based on your needs.
+
+config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
+	int "Metrics subsystem log level"
+	default 2
+	range 0 4
+	help
+	  Log level for metrics subsystem:
+	  0 = OFF
+	  1 = ERROR
+	  2 = WARNING (default)
+	  3 = INFO
+	  4 = DEBUG
+
+rsource "Kconfig.system"
+
+endif # SPOTFLOW_METRICS

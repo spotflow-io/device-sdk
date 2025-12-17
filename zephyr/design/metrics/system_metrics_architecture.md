@@ -232,8 +232,8 @@ This architecture covers:
    │       └─> spotflow_report_metric_int(memory_free_metric, free_bytes)
    │       └─> spotflow_report_metric_int(memory_total_metric, total_bytes)
    │   └─> Collect Network Stats (if CONFIG_...NETWORK=y)
-   │       └─> net_if_foreach() with dimensions
-   │       └─> spotflow_report_metric_int_with_dimensions(network_sent_metric, bytes, dims, 1)
+   │       └─> net_if_foreach() with labels
+   │       └─> spotflow_report_metric_int_with_labels(network_sent_metric, bytes, dims, 1)
    │   └─> Collect CPU Stats (if CONFIG_...CPU=y)
    │       └─> k_thread_runtime_stats_all_get()
    │       └─> spotflow_report_metric_float(cpu_utilization_metric, percent)
@@ -398,11 +398,11 @@ struct net_if *iface = net_if_get_default();
 if (iface && CONFIG_NET_STATISTICS) {
     char iface_name[16];
     net_if_get_name(iface, iface_name, sizeof(iface_name));
-    spotflow_dimension_t dims[] = {{ .key = "interface", .value = iface_name }};
+    spotflow_label_t dims[] = {{ .key = "interface", .value = iface_name }};
 
-    spotflow_report_metric_int_with_dimensions(system_network_sent_metric,
+    spotflow_report_metric_int_with_labels(system_network_sent_metric,
                                           iface->stats.bytes.sent, dims, 1);
-    spotflow_report_metric_int_with_dimensions(system_network_received_metric,
+    spotflow_report_metric_int_with_labels(system_network_received_metric,
                                           iface->stats.bytes.received, dims, 1);
 }
 ```
@@ -413,7 +413,7 @@ if (iface && CONFIG_NET_STATISTICS) {
 static void collect_network_stats_per_interface(void) {
     struct net_if *iface;
     char iface_name[16];
-    spotflow_dimension_t dims[1];
+    spotflow_label_t dims[1];
 
     // Iterate all network interfaces
     STRUCT_SECTION_FOREACH(net_if, iface) {
@@ -426,13 +426,13 @@ static void collect_network_stats_per_interface(void) {
         dims[0].value = iface_name;
 
         // Report TX bytes
-        spotflow_report_metric_int_with_dimensions(
+        spotflow_report_metric_int_with_labels(
             g_system_metrics_ctx.network_sent_metric,
             iface->stats.bytes.sent,
             dims, 1);
 
         // Report RX bytes
-        spotflow_report_metric_int_with_dimensions(
+        spotflow_report_metric_int_with_labels(
             g_system_metrics_ctx.network_received_metric,
             iface->stats.bytes.received,
             dims, 1);
@@ -605,7 +605,7 @@ All system metrics follow the naming convention: `system_<category>_<metric>_<un
 - Reset cause is reported once on boot (not periodic)
 - All byte counters are cumulative (monotonically increasing)
 - CPU utilization is an instantaneous sample (0.0 - 100.0)
-- Network metrics are dimensional (include "interface" dimension)
+- Network metrics are labeled (include "interface" label)
 
 ### 6.2 Internal Data Structures
 
@@ -820,7 +820,7 @@ int spotflow_system_metrics_init(void) {
 
 ```c
 static int register_system_metrics(void) {
-    // Register dimensionless metrics
+    // Register simple metrics
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_MEMORY
     g_system_metrics_ctx.memory_free_metric =
         spotflow_register_metric_int("system_memory_free_bytes");
@@ -838,12 +838,12 @@ static int register_system_metrics(void) {
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK
-    // Network metrics are dimensional (interface dimension)
+    // Network metrics are labeled (interface dimension)
     g_system_metrics_ctx.network_sent_metric =
-        spotflow_register_metric_int_with_dimensions(
+        spotflow_register_metric_int_with_labels(
             "system_network_sent_bytes",
             4,  // Max 4 network interfaces
-            1   // One dimension: interface
+            1   // One label: interface
         );
     if (!g_system_metrics_ctx.network_sent_metric) {
         LOG_ERR("Failed to register network_sent metric");
@@ -851,10 +851,10 @@ static int register_system_metrics(void) {
     }
 
     g_system_metrics_ctx.network_received_metric =
-        spotflow_register_metric_int_with_dimensions(
+        spotflow_register_metric_int_with_labels(
             "system_network_received_bytes",
             4,  // Max 4 network interfaces
-            1   // One dimension: interface
+            1   // One label: interface
         );
     if (!g_system_metrics_ctx.network_received_metric) {
         LOG_ERR("Failed to register network_received metric");

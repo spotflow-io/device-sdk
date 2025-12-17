@@ -41,14 +41,14 @@ This document defines the public API for the Spotflow SDK metrics collection fea
 typedef struct spotflow_metric* spotflow_metric_t;
 ```
 
-### Dimension Key-Value Pair
+### Label Key-Value Pair
 
 ```c
 /**
- * @brief Represents a single dimension (label) key-value pair.
+ * @brief Represents a single label key-value pair.
  *
- * Dimensions identify specific time series within a metric. For example,
- * a "cpu_temperature" metric might have a "core" dimension to distinguish
+ * Labels identify specific time series within a metric. For example,
+ * a "cpu_temperature" metric might have a "core" label to distinguish
  * between different CPU cores.
  *
  * @note Keys must be null-terminated strings and remain valid for the
@@ -57,11 +57,11 @@ typedef struct spotflow_metric* spotflow_metric_t;
  *       duration of the spotflow_report_metric_*() call.
  */
 typedef struct {
-    /** Dimension key (e.g., "core", "interface", "zone") */
+    /** Label key (e.g., "core", "interface", "zone"). Max length: 16 characters. */
     const char* key;
-    /** Dimension value (null-terminated string) */
+    /** Label value (null-terminated string). Max length: 32 characters. */
     const char* value;
-} spotflow_dimension_t;
+} spotflow_label_t;
 ```
 
 ### Aggregation Intervals
@@ -87,15 +87,15 @@ typedef enum {
 
 ## Registration Functions
 
-### Register Float Metric (Dimensionless)
+### Register Float Metric (Simple)
 
 ```c
 /**
- * @brief Register a floating-point metric without dimensions.
+ * @brief Register a floating-point metric without labels.
  *
  * Registers a simple metric that reports floating-point values without
- * any dimensional labels. Use this for straightforward counters, gauges,
- * or measurements that don't vary by any dimension.
+ * any labels. Use this for straightforward counters, gauges,
+ * or measurements that don't vary by any label.
  *
  * @param name Metric name (null-terminated string). Must be unique across
  *             all registered metrics. Metric names are case-insensitive and
@@ -128,14 +128,14 @@ typedef enum {
 spotflow_metric_t* spotflow_register_metric_float(const char* name);
 ```
 
-### Register Integer Metric (Dimensionless)
+### Register Integer Metric (Simple)
 
 ```c
 /**
- * @brief Register an integer metric without dimensions.
+ * @brief Register an integer metric without labels.
  *
  * Registers a simple metric that reports integer values without
- * any dimensional labels. Integer metrics are more efficient than
+ * any labels. Integer metrics are more efficient than
  * float metrics and should be preferred when fractional values are
  * not needed (e.g., counters, byte counts, event counts).
  *
@@ -162,30 +162,29 @@ spotflow_metric_t* spotflow_register_metric_float(const char* name);
 spotflow_metric_t* spotflow_register_metric_int(const char* name);
 ```
 
-### Register Float Metric with Dimensions
+### Register Float Metric with Labels
 
 ```c
 /**
- * @brief Register a floating-point metric with support for dimensions.
+ * @brief Register a floating-point metric with support for labels.
  *
- * Registers a dimensional metric that reports floating-point values labeled
- * with dimensions (also called labels or tags). Each unique combination of
- * dimension values creates a separate time series.
+ * Registers a labeled metric that reports floating-point values identified
+ * by labels. Each unique combination of label values creates a separate time series.
  *
- * Function naming: "_with_dimensions" indicates this metric SUPPORTS dimensions
- * (vs dimensionless metrics). When reporting values, dimensions are REQUIRED.
+ * Function naming: "_with_labels" indicates this metric SUPPORTS labels
+ * (vs simple metrics). When reporting values, labels are REQUIRED.
  *
  * @param name Metric name (null-terminated string). Must be unique across
  *             all registered metrics. Metric names are case-insensitive and
  *             normalized to lowercase. Maximum length: 64 characters.
  * @param max_timeseries Maximum number of concurrent time series (unique
- *                       dimension combinations) to track. System allocates
+ *                       label combinations) to track. System allocates
  *                       exactly max_timeseries slots.
  *                       When exceeded, additional combinations are rejected
  *                       with error log and -ENOSPC return code.
  *                       Valid range: 1-256. Typical: 4-20.
- * @param max_dimensions Maximum number of dimensions per metric report.
- *                       Valid range: 1-16. Typical: 1-4.
+ * @param max_labels Maximum number of labels per metric report.
+ *                   Valid range: 1-8. Typical: 1-4.
  *
  * @return Pointer to metric handle on success, NULL on failure.
  *
@@ -204,90 +203,93 @@ spotflow_metric_t* spotflow_register_metric_int(const char* name);
  *
  * Example:
  * @code
- * spotflow_metric_t* temp_metric = spotflow_register_metric_float_with_dimensions(
+ * spotflow_metric_t* temp_metric = spotflow_register_metric_float_with_labels(
  *     "cpu_temperature_celsius",
  *     4,      // Track up to 4 CPU cores
- *     1       // One dimension: "core"
+ *     1       // One label: "core"
  * );
  * if (temp_metric == NULL) {
  *     LOG_ERR("Failed to register temperature metric");
  * }
  * @endcode
  */
-spotflow_metric_t* spotflow_register_metric_float_with_dimensions(
+spotflow_metric_t* spotflow_register_metric_float_with_labels(
     const char* name,
     uint16_t max_timeseries,
-    uint8_t max_dimensions
+    uint8_t max_labels
 );
 ```
 
-### Register Integer Metric with Dimensions
+### Register Integer Metric with Labels
 
 ```c
 /**
- * @brief Register an integer metric with support for dimensions.
+ * @brief Register an integer metric with support for labels.
  *
- * Similar to spotflow_register_metric_float_with_dimensions() but for integer values.
+ * Similar to spotflow_register_metric_float_with_labels() but for integer values.
  *
- * Function naming: "_with_dimensions" indicates this metric SUPPORTS dimensions
- * (vs dimensionless metrics). When reporting values, dimensions are REQUIRED.
+ * Function naming: "_with_labels" indicates this metric SUPPORTS labels
+ * (vs simple metrics). When reporting values, labels are REQUIRED.
  *
  * Integer metrics are more efficient and should be preferred when
  * fractional values are not needed (e.g., counters, byte counts).
  *
  * @param name Metric name (null-terminated string). See
- *             spotflow_register_metric_float_with_dimensions() for details.
+ *             spotflow_register_metric_float_with_labels() for details.
  * @param max_timeseries Maximum concurrent time series. See
- *                       spotflow_register_metric_float_with_dimensions() for details.
- * @param max_dimensions Maximum dimensions per report. See
- *                       spotflow_register_metric_float_with_dimensions() for details.
+ *                       spotflow_register_metric_float_with_labels() for details.
+ * @param max_labels Maximum labels per report. See
+ *                   spotflow_register_metric_float_with_labels() for details.
+ *                   Valid range: 1-8. Typical: 1-4.
  *
  * @return Pointer to metric handle on success, NULL on failure.
  *
- * @note All other semantics identical to spotflow_register_metric_float_with_dimensions().
+ * @note All other semantics identical to spotflow_register_metric_float_with_labels().
  *
  * Example:
  * @code
- * spotflow_metric_t* bytes_metric = spotflow_register_metric_int_with_dimensions(
+ * spotflow_metric_t* bytes_metric = spotflow_register_metric_int_with_labels(
  *     "network_bytes_total",
  *     8,      // 2 interfaces × 2 directions × 2 protocols
- *     3       // Dimensions: interface, direction, protocol
+ *     3       // Labels: interface, direction, protocol
  * );
  * @endcode
  */
-spotflow_metric_t* spotflow_register_metric_int_with_dimensions(
+spotflow_metric_t* spotflow_register_metric_int_with_labels(
     const char* name,
     uint16_t max_timeseries,
-    uint8_t max_dimensions
+    uint8_t max_labels
 );
 ```
 
 ## Reporting Functions
 
-### Report Integer Metric Value (Dimensionless)
+### Report Integer Metric Value (Simple)
 
 ```c
 /**
- * @brief Report an integer value for a dimensionless metric.
+ * @brief Report an integer value for a simple (non-labeled) integer metric.
  *
- * Records an integer metric measurement for metrics registered without dimensions.
+ * Records an integer metric measurement for metrics registered without labels.
  * The value is aggregated according to the metric's configuration.
  *
- * @param metric Metric handle returned by a registration function.
- *               Must not be NULL. Must be a dimensionless metric.
- * @param value Integer value to report. If the metric was registered as float,
- *              the value is converted to double. If registered as int, stored as-is.
+ * @param metric Metric handle returned by spotflow_register_metric_int().
+ *               Must not be NULL. Must be a simple (non-labeled) integer metric.
+ * @param value Integer value to report.
  *
  * @return 0 on success, negative error code on failure.
  *
  * @retval 0 Value successfully recorded for aggregation/transmission.
  * @retval -EINVAL Invalid parameters:
  *                 - metric is NULL
- *                 - metric is dimensional (use spotflow_report_metric_int_with_dimensions)
+ *                 - metric is labeled (use spotflow_report_metric_int_with_labels)
+ *                 - metric was registered as float (use spotflow_report_metric_float)
  * @retval -ENOMEM Metric queue is full. The metric value is dropped.
  *
  * @note This function is thread-safe and may be called from any context.
  * @note Performance: Typical execution time < 50 microseconds.
+ * @note Type enforcement: This function only works with integer metrics.
+ *       Float metrics must use spotflow_report_metric_float().
  *
  * Example:
  * @code
@@ -304,20 +306,18 @@ int spotflow_report_metric_int(
 );
 ```
 
-### Report Float Metric Value (Dimensionless)
+### Report Float Metric Value (Simple)
 
 ```c
 /**
- * @brief Report a floating-point value for a dimensionless metric.
+ * @brief Report a floating-point value for a simple (non-labeled) float metric.
  *
- * Records a float metric measurement for metrics registered without dimensions.
+ * Records a float metric measurement for metrics registered without labels.
  * The value is aggregated according to the metric's configuration.
  *
- * @param metric Metric handle returned by a registration function.
- *               Must not be NULL. Must be a dimensionless metric.
- * @param value Float value to report. Type conversion rules:
- *              - If metric registered as INT: value truncated to int64_t (e.g., 42.7 → 42)
- *              - If metric registered as FLOAT: value stored as-is (double precision)
+ * @param metric Metric handle returned by spotflow_register_metric_float().
+ *               Must not be NULL. Must be a simple (non-labeled) float metric.
+ * @param value Float value to report.
  *              - Special values (NaN, Inf) are rejected with -EINVAL
  *              - Overflow during aggregation is detected and flagged (sumTruncated=true)
  *
@@ -326,12 +326,15 @@ int spotflow_report_metric_int(
  * @retval 0 Value successfully recorded for aggregation/transmission.
  * @retval -EINVAL Invalid parameters:
  *                 - metric is NULL
- *                 - metric is dimensional (use spotflow_report_metric_float_with_dimensions)
+ *                 - metric is labeled (use spotflow_report_metric_float_with_labels)
+ *                 - metric was registered as int (use spotflow_report_metric_int)
  *                 - value is NaN or Inf
  * @retval -ENOMEM Metric queue is full. The metric value is dropped.
  *
  * @note This function is thread-safe and may be called from any context.
  * @note Performance: Typical execution time < 50 microseconds.
+ * @note Type enforcement: This function only works with float metrics.
+ *       Integer metrics must use spotflow_report_metric_int().
  *
  * Example:
  * @code
@@ -348,94 +351,98 @@ int spotflow_report_metric_float(
 );
 ```
 
-### Report Integer Metric Value with Dimensions
+### Report Integer Metric Value with Labels
 
 ```c
 /**
- * @brief Report an integer value with dimensions for a dimensional metric.
+ * @brief Report an integer value with labels for a labeled integer metric.
  *
- * Records an integer metric measurement with dimensional labels.
+ * Records an integer metric measurement with labels.
  *
- * @param metric Metric handle returned by a registration function.
- *               Must not be NULL. Must be a dimensional metric.
- * @param value Integer value to report. If the metric was registered as float,
- *              the value is converted to double. If registered as int, stored as-is.
- * @param dimensions Array of dimension key-value pairs. Must not be NULL.
- * @param dimension_count Number of dimensions in the array. Must be > 0
- *                        and <= max_dimensions specified at registration.
+ * @param metric Metric handle returned by spotflow_register_metric_int_with_labels().
+ *               Must not be NULL. Must be a labeled integer metric.
+ * @param value Integer value to report.
+ * @param labels Array of label key-value pairs. Must not be NULL.
+ * @param label_count Number of labels in the array. Must be > 0
+ *                    and <= max_labels specified at registration.
  *
  * @return 0 on success, negative error code on failure.
  *
  * @retval 0 Value successfully recorded for aggregation/transmission.
- * @retval -EINVAL Invalid parameters
+ * @retval -EINVAL Invalid parameters:
+ *                 - metric is NULL or labels is NULL
+ *                 - metric was registered as float (use spotflow_report_metric_float_with_labels)
  * @retval -ENOMEM Metric queue is full.
  * @retval -ENOSPC Time series pool is full.
  *
- * @note Dimension strings are hashed/copied internally.
+ * @note Label strings are hashed/copied internally.
+ * @note Type enforcement: This function only works with integer metrics.
  *
  * Example:
  * @code
- * spotflow_dimension_t dims[] = {{ .key = "core", .value = "0" }};
+ * spotflow_label_t labels[] = {{ .key = "core", .value = "0" }};
  * int64_t cycles = 1234567;
- * int rc = spotflow_report_metric_int_with_dimensions(cycles_metric, cycles, dims, 1);
+ * int rc = spotflow_report_metric_int_with_labels(cycles_metric, cycles, labels, 1);
  * @endcode
  */
-int spotflow_report_metric_int_with_dimensions(
+int spotflow_report_metric_int_with_labels(
     spotflow_metric_t* metric,
     int64_t value,
-    const spotflow_dimension_t* dimensions,
-    uint8_t dimension_count
+    const spotflow_label_t* labels,
+    uint8_t label_count
 );
 ```
 
-### Report Float Metric Value with Dimensions
+### Report Float Metric Value with Labels
 
 ```c
 /**
- * @brief Report a floating-point value with dimensions for a dimensional metric.
+ * @brief Report a floating-point value with labels for a labeled float metric.
  *
- * Records a float metric measurement with dimensional labels.
+ * Records a float metric measurement with labels.
  *
- * @param metric Metric handle returned by a registration function.
- *               Must not be NULL. Must be a dimensional metric.
- * @param value Float value to report. Type conversion rules:
- *              - If metric registered as INT: value truncated to int64_t (e.g., 42.7 → 42)
- *              - If metric registered as FLOAT: value stored as-is (double precision)
+ * @param metric Metric handle returned by spotflow_register_metric_float_with_labels().
+ *               Must not be NULL. Must be a labeled float metric.
+ * @param value Float value to report.
  *              - Special values (NaN, Inf) are rejected with -EINVAL
  *              - Overflow during aggregation is detected and flagged (sumTruncated=true)
- * @param dimensions Array of dimension key-value pairs. Must not be NULL.
- * @param dimension_count Number of dimensions in the array. Must be > 0
- *                        and <= max_dimensions specified at registration.
+ * @param labels Array of label key-value pairs. Must not be NULL.
+ * @param label_count Number of labels in the array. Must be > 0
+ *                    and <= max_labels specified at registration.
  *
  * @return 0 on success, negative error code on failure.
  *
  * @retval 0 Value successfully recorded for aggregation/transmission.
- * @retval -EINVAL Invalid parameters (including NaN/Inf)
+ * @retval -EINVAL Invalid parameters:
+ *                 - metric is NULL or labels is NULL
+ *                 - metric was registered as int (use spotflow_report_metric_int_with_labels)
+ *                 - value is NaN or Inf
  * @retval -ENOMEM Metric queue is full.
  * @retval -ENOSPC Time series pool is full.
  *
- * @note Dimension strings are hashed/copied internally.
+ * @note Label strings are hashed/copied internally.
+ * @note Type enforcement: This function only works with float metrics.
  *
  * Example:
  * @code
- * spotflow_dimension_t dims[] = {{ .key = "core", .value = "0" }};
+ * spotflow_label_t labels[] = {{ .key = "core", .value = "0" }};
  * double temp = read_cpu_temp(0);
- * int rc = spotflow_report_metric_float_with_dimensions(temp_metric, temp, dims, 1);
+ * int rc = spotflow_report_metric_float_with_labels(temp_metric, temp, labels, 1);
  * @endcode
  */
-int spotflow_report_metric_float_with_dimensions(
+int spotflow_report_metric_float_with_labels(
     spotflow_metric_t* metric,
     double value,
-    const spotflow_dimension_t* dimensions,
-    uint8_t dimension_count
+    const spotflow_label_t* labels,
+    uint8_t label_count
 );
 ```
 
-### Report Event (Dimensionless)
+### Report Event (Simple)
 
 ```c
 /**
- * @brief Report an event for a dimensionless metric.
+ * @brief Report an event for a simple (non-labeled) metric.
  *
  * Events are point-in-time occurrences that are not aggregated over time.
  * This function is equivalent to calling spotflow_report_metric_int(metric, 1)
@@ -445,14 +452,14 @@ int spotflow_report_metric_float_with_dimensions(
  * transitions that should be transmitted individually.
  *
  * @param metric Metric handle returned by a registration function.
- *               Must not be NULL. Must be a dimensionless metric.
+ *               Must not be NULL. Must be a simple (non-labeled) metric.
  *
  * @return 0 on success, negative error code on failure.
  *
  * @retval 0 Event successfully enqueued for transmission.
  * @retval -EINVAL Invalid parameters:
  *                 - metric is NULL
- *                 - metric is dimensional (use spotflow_report_event_with_dimensions)
+ *                 - metric is labeled (use spotflow_report_event_with_labels)
  * @retval -ENOMEM Metric queue is full. The event is dropped.
  *
  * @note Events bypass aggregation and are enqueued immediately (non-blocking).
@@ -472,65 +479,65 @@ int spotflow_report_metric_float_with_dimensions(
 int spotflow_report_event(spotflow_metric_t* metric);
 ```
 
-### Report Event with Dimensions
+### Report Event with Labels
 
 ```c
 /**
- * @brief Report an event with dimensions for a dimensional metric.
+ * @brief Report an event with labels for a labeled metric.
  *
  * Events are point-in-time occurrences that are not aggregated over time.
- * This function is equivalent to calling spotflow_report_metric_int_with_dimensions(metric, 1, ...)
+ * This function is equivalent to calling spotflow_report_metric_int_with_labels(metric, 1, ...)
  * with PT0S aggregation interval. The value is always 1 (event occurred).
  *
  * Use events for occurrences like boot events, errors, alerts, or state
- * transitions that need contextual information via dimensions.
+ * transitions that need contextual information via labels.
  *
  * @param metric Metric handle returned by a registration function.
- *               Must not be NULL. Must be a dimensional metric.
- * @param dimensions Array of dimension key-value pairs. Must not be NULL.
- *                   Provides context about the event occurrence.
- * @param dimension_count Number of dimensions in the array. Must be > 0
- *                        and <= max_dimensions specified at registration.
+ *               Must not be NULL. Must be a labeled metric.
+ * @param labels Array of label key-value pairs. Must not be NULL.
+ *               Provides context about the event occurrence.
+ * @param label_count Number of labels in the array. Must be > 0
+ *                    and <= max_labels specified at registration.
  *
  * @return 0 on success, negative error code on failure.
  *
  * @retval 0 Event successfully enqueued for transmission.
  * @retval -EINVAL Invalid parameters:
  *                 - metric is NULL
- *                 - metric is dimensionless (use spotflow_report_event)
- *                 - dimensions is NULL
- *                 - dimension_count is 0 or exceeds max_dimensions
- *                 - invalid dimension key or value (NULL, empty string)
+ *                 - metric is simple (use spotflow_report_event)
+ *                 - labels is NULL
+ *                 - label_count is 0 or exceeds max_labels
+ *                 - invalid label key or value (NULL, empty string)
  * @retval -ENOMEM Metric queue is full. The event is dropped.
- * @retval -ENOSPC Time series pool is full. Cannot track this dimension
+ * @retval -ENOSPC Time series pool is full. Cannot track this label
  *                 combination. The event is dropped.
  *
  * @note Events bypass aggregation and are enqueued immediately (non-blocking).
  * @note Events are transmitted with aggregationInterval = PT0S.
- * @note Dimension strings are hashed/copied internally.
+ * @note Label strings are hashed/copied internally.
  * @note Do not use events for high-frequency occurrences (> 1 Hz sustained).
  *
  * Example:
  * @code
- * spotflow_dimension_t dims[] = {
+ * spotflow_label_t labels[] = {
  *     { .key = "reason", .value = "power_on" },
- *     { .key = "firmware_version", .value = "1.2.3" }
+ *     { .key = "fw_ver", .value = "1.2.3" }
  * };
  *
- * int rc = spotflow_report_event_with_dimensions(
+ * int rc = spotflow_report_event_with_labels(
  *     boot_event_metric,
- *     dims,
- *     2  // dimension_count
+ *     labels,
+ *     2  // label_count
  * );
  * if (rc < 0) {
  *     LOG_WRN("Failed to report boot event: %d", rc);
  * }
  * @endcode
  */
-int spotflow_report_event_with_dimensions(
+int spotflow_report_event_with_labels(
     spotflow_metric_t* metric,
-    const spotflow_dimension_t* dimensions,
-    uint8_t dimension_count
+    const spotflow_label_t* labels,
+    uint8_t label_count
 );
 ```
 
@@ -587,33 +594,30 @@ int spotflow_set_metric_aggregation_interval(
 - Reporting functions use per-metric locking to minimize contention.
 - Multiple threads may report to the same metric concurrently without data corruption.
 
-### Type Compatibility
+### Type Enforcement
 
-**Type conversion is based on the metric's registration type, not the reporting function used:**
+**Strict type matching is enforced between registration and reporting:**
 
-- **Integer metrics** (`spotflow_register_metric_int()`):
-  - `spotflow_report_metric_int(metric, int64_t)` - stores value as-is
-  - `spotflow_report_metric_float(metric, double)` - truncates to int64_t (e.g., `42.7` → `42`)
+- **Integer metrics** (`spotflow_register_metric_int()` / `spotflow_register_metric_int_with_labels()`):
+  - MUST use `spotflow_report_metric_int()` or `spotflow_report_metric_int_with_labels()`
+  - Using `spotflow_report_metric_float*()` returns `-EINVAL`
 
-- **Float metrics** (`spotflow_register_metric_float()`):
-  - `spotflow_report_metric_float(metric, double)` - stores value as-is
-  - `spotflow_report_metric_int(metric, int64_t)` - converts to double (e.g., `42` → `42.0`)
-
-- **No runtime error**: Calling `_int` or `_float` reporting function on either metric type works - conversion happens based on registration type
-- **Best practice**: Match the reporting function to the metric type for clarity and type safety
+- **Float metrics** (`spotflow_register_metric_float()` / `spotflow_register_metric_float_with_labels()`):
+  - MUST use `spotflow_report_metric_float()` or `spotflow_report_metric_float_with_labels()`
+  - Using `spotflow_report_metric_int*()` returns `-EINVAL`
 
 **Example:**
 ```c
 spotflow_metric_t* int_metric = spotflow_register_metric_int("counter");
 spotflow_metric_t* float_metric = spotflow_register_metric_float("temperature");
 
-// Best practice - match function to type:
-spotflow_report_metric_int(int_metric, 100);         // Stored as 100
-spotflow_report_metric_float(float_metric, 98.6);    // Stored as 98.6
+// Correct - match function to type:
+spotflow_report_metric_int(int_metric, 100);         // OK - stores 100
+spotflow_report_metric_float(float_metric, 98.6);    // OK - stores 98.6
 
-// Also valid - type conversion happens automatically:
-spotflow_report_metric_float(int_metric, 42.7);      // Stored as 42 (truncated)
-spotflow_report_metric_int(float_metric, 42);        // Stored as 42.0 (converted)
+// Error - type mismatch:
+spotflow_report_metric_float(int_metric, 42.7);      // Returns -EINVAL
+spotflow_report_metric_int(float_metric, 42);        // Returns -EINVAL
 ```
 
 ### Performance Considerations
@@ -631,7 +635,7 @@ spotflow_report_metric_int(float_metric, 42);        // Stored as 42.0 (converte
 
 3. **Memory Usage**:
    - Per-metric overhead: ~128 bytes (configurable)
-   - Per-timeseries overhead: ~96 bytes (depends on dimension count)
+   - Per-timeseries overhead: ~96 bytes (depends on label count)
    - Total per-metric: ~128 + max_timeseries * 96 bytes
    - Example: max_timeseries=16 → ~128 + 16*96 = ~1664 bytes per metric
    - Queue overhead: `CONFIG_SPOTFLOW_METRICS_QUEUE_SIZE * sizeof(void*)`
@@ -648,33 +652,35 @@ spotflow_report_metric_int(float_metric, 42);        // Stored as 42.0 (converte
      - No suffix for gauges: `cpu_temperature_celsius`
    - Maximum length: 64 characters
 
-2. **Dimension Keys**:
+2. **Label Keys**:
    - Use lowercase with underscores: `interface`, `error_code`
    - Keep keys short (1-2 words)
    - Use consistent keys across related metrics
+   - Maximum length: 16 characters
 
-3. **Dimension Values**:
-   - All dimension values are strings - use descriptive values: `eth0`, `power_on`, `critical`
+3. **Label Values**:
+   - All label values are strings - use descriptive values: `eth0`, `power_on`, `critical`
    - For booleans, use string values: `"true"`, `"false"`, or `"1"`, `"0"`
    - For enums/numbers, convert to strings: `snprintf(buf, sizeof(buf), "%d", value)`
+   - Maximum length: 32 characters
 
 ### Cardinality Management
 
-**Critical**: Dimension cardinality (number of unique combinations) directly impacts memory and performance.
+**Critical**: Label cardinality (number of unique combinations) directly impacts memory and performance.
 
 **Pool Full Behavior**:
 - Each metric allocates exactly `max_timeseries` slots (e.g., max_timeseries=16 allocates 16 slots)
 - First `max_timeseries` unique combinations get dedicated slots
 - When pool is full, additional combinations are **rejected with -ENOSPC error**
-- Error log generated: "Metric '%s': time series pool full, dropping dimension combination"
-- Rejected dimensions are not aggregated or transmitted (data loss)
+- Error log generated: "Metric '%s': time series pool full, dropping label combination"
+- Rejected labels are not aggregated or transmitted (data loss)
 
 **Guidelines**:
-- Set `max_timeseries` to expected cardinality (number of unique dimension combinations)
+- Set `max_timeseries` to expected cardinality (number of unique label combinations)
 - Add margin for safety (e.g., if expecting 10 combinations, use max_timeseries=15)
 - Keep cardinality bounded (< 100 time series per metric)
-- Avoid unbounded dimensions (user IDs, timestamps, session IDs)
-- Prefer bounded dimensions (core number [0-7], interface name [eth0, wlan0], error code [1-100])
+- Avoid unbounded labels (user IDs, timestamps, session IDs)
+- Prefer bounded labels (core number [0-7], interface name [eth0, wlan0], error code [1-100])
 - Monitor application logs for "pool full" errors to detect cardinality issues
 
 **Example of BAD cardinality**:
@@ -682,10 +688,10 @@ spotflow_report_metric_int(float_metric, 42);        // Stored as 42.0 (converte
 // BAD: User ID creates unbounded time series
 char user_id_str[32];
 snprintf(user_id_str, sizeof(user_id_str), "%d", user_id);
-spotflow_dimension_t dims[] = {
+spotflow_label_t labels[] = {
     { .key = "user_id", .value = user_id_str }  // Could be millions of users!
 };
-spotflow_report_metric_with_dimensions(requests_metric, 1.0, dims, 1);
+spotflow_report_metric_int_with_labels(requests_metric, 1, labels, 1);
 ```
 
 **Example of GOOD cardinality**:
@@ -693,10 +699,10 @@ spotflow_report_metric_with_dimensions(requests_metric, 1.0, dims, 1);
 // GOOD: HTTP status code creates bounded time series (5-10 common codes)
 char status_str[8];
 snprintf(status_str, sizeof(status_str), "%d", status_code);
-spotflow_dimension_t dims[] = {
-    { .key = "status_code", .value = status_str }  // Only ~10 common status codes
+spotflow_label_t labels[] = {
+    { .key = "status", .value = status_str }  // Only ~10 common status codes
 };
-spotflow_report_metric_with_dimensions(requests_metric, 1.0, dims, 1);
+spotflow_report_metric_int_with_labels(requests_metric, 1, labels, 1);
 ```
 
 ### Error Handling Patterns
@@ -711,7 +717,7 @@ if (metric == NULL) {
 }
 ```
 
-2. **Reporting Errors (Dimensionless)**:
+2. **Reporting Errors (Simple)**:
 ```c
 int rc = spotflow_report_metric_int(metric, value);
 if (rc == -ENOMEM) {
@@ -727,9 +733,9 @@ if (rc == -ENOMEM) {
 // Continue application execution regardless
 ```
 
-3. **Reporting Errors (With Dimensions)**:
+3. **Reporting Errors (With Labels)**:
 ```c
-int rc = spotflow_report_metric_with_dimensions(metric, value, dims, dimension_count);
+int rc = spotflow_report_metric_int_with_labels(metric, value, labels, label_count);
 if (rc == -ENOSPC) {
     // Time series pool full - consider increasing max_timeseries
     LOG_ERR("Time series pool full - increase max_timeseries at registration");
@@ -737,7 +743,7 @@ if (rc == -ENOSPC) {
     // Queue full - transient error
     LOG_DBG("Metric queue full - sample dropped");
 } else if (rc == -EINVAL) {
-    // Programming error - check dimension_count and values
+    // Programming error - check label_count, values, and type match
     LOG_ERR("Invalid metric parameters: %d", rc);
 } else if (rc < 0) {
     LOG_WRN("Metric report failed: %d", rc);
@@ -839,11 +845,11 @@ LOG_MODULE_REGISTER(temp_monitor, LOG_LEVEL_INF);
 static spotflow_metric_t* temp_metric;
 
 void temp_monitor_init(void) {
-    // Register temperature metric with dimension for core number
-    temp_metric = spotflow_register_metric_float_with_dimensions(
+    // Register temperature metric with label for core number
+    temp_metric = spotflow_register_metric_float_with_labels(
         "cpu_temperature_celsius",
         NUM_CORES,  // Track all 4 cores
-        1           // One dimension: core
+        1           // One label: core
     );
 
     if (temp_metric == NULL) {
@@ -856,19 +862,19 @@ void temp_monitor_thread(void) {
 
     while (1) {
         for (int core = 0; core < NUM_CORES; core++) {
-            float temp = cpu_temp_read(core);
+            double temp = cpu_temp_read(core);
 
-            // Create dimension for core number
+            // Create label for core number
             snprintf(core_str, sizeof(core_str), "%d", core);
-            spotflow_dimension_t dims[] = {
+            spotflow_label_t labels[] = {
                 { .key = "core", .value = core_str }
             };
 
-            int rc = spotflow_report_metric_with_dimensions(
+            int rc = spotflow_report_metric_float_with_labels(
                 temp_metric,
                 temp,
-                dims,
-                1  // dimension_count
+                labels,
+                1  // label_count
             );
             if (rc == -ENOMEM) {
                 LOG_DBG("Metric queue full for core %d", core);
@@ -894,11 +900,11 @@ LOG_MODULE_REGISTER(net_stats, LOG_LEVEL_INF);
 static spotflow_metric_t* bytes_metric;
 
 void network_stats_init(void) {
-    // Register network bytes metric with multiple dimensions
-    bytes_metric = spotflow_register_metric_int_with_dimensions(
+    // Register network bytes metric with multiple labels
+    bytes_metric = spotflow_register_metric_int_with_labels(
         "network_bytes_total",
         8,   // Max time series: 2 interfaces × 2 directions × 2 protocols
-        3    // Dimensions: interface, direction, protocol
+        3    // Labels: interface, direction, protocol
     );
 
     if (bytes_metric == NULL) {
@@ -910,29 +916,29 @@ void report_interface_stats(const char* iface_name, struct net_stats* stats) {
     if (bytes_metric == NULL) return;
 
     // Report RX bytes for TCP
-    spotflow_dimension_t rx_tcp_dims[] = {
+    spotflow_label_t rx_tcp_labels[] = {
         { .key = "interface", .value = iface_name },
         { .key = "direction", .value = "rx" },
         { .key = "protocol", .value = "tcp" }
     };
-    spotflow_report_metric_with_dimensions(
+    spotflow_report_metric_int_with_labels(
         bytes_metric,
-        (double)stats->tcp_rx_bytes,
-        rx_tcp_dims,
-        3  // dimension_count
+        stats->tcp_rx_bytes,
+        rx_tcp_labels,
+        3  // label_count
     );
 
     // Report TX bytes for TCP
-    spotflow_dimension_t tx_tcp_dims[] = {
+    spotflow_label_t tx_tcp_labels[] = {
         { .key = "interface", .value = iface_name },
         { .key = "direction", .value = "tx" },
         { .key = "protocol", .value = "tcp" }
     };
-    spotflow_report_metric_with_dimensions(
+    spotflow_report_metric_int_with_labels(
         bytes_metric,
-        (double)stats->tcp_tx_bytes,
-        tx_tcp_dims,
-        3  // dimension_count
+        stats->tcp_tx_bytes,
+        tx_tcp_labels,
+        3  // label_count
     );
 
     // ... Similar for UDP and other protocols
@@ -952,10 +958,10 @@ static spotflow_metric_t* boot_event_metric;
 
 void report_boot_event(const char* reason, const char* fw_version) {
     if (boot_event_metric == NULL) {
-        boot_event_metric = spotflow_register_metric_int_with_dimensions(
+        boot_event_metric = spotflow_register_metric_int_with_labels(
             "device_boot_event",
             10,  // Track up to 10 different boot reason combinations
-            2    // Dimensions: reason, firmware_version
+            2    // Labels: reason, fw_ver
         );
         if (boot_event_metric == NULL) {
             LOG_WRN("Cannot register boot event metric");
@@ -964,15 +970,15 @@ void report_boot_event(const char* reason, const char* fw_version) {
     }
 
     // Report boot event with context
-    spotflow_dimension_t dims[] = {
+    spotflow_label_t labels[] = {
         { .key = "reason", .value = reason },
-        { .key = "firmware_version", .value = fw_version }
+        { .key = "fw_ver", .value = fw_version }
     };
 
-    int rc = spotflow_report_event_with_dimensions(
+    int rc = spotflow_report_event_with_labels(
         boot_event_metric,
-        dims,
-        2  // dimension_count
+        labels,
+        2  // label_count
     );
     if (rc < 0) {
         LOG_WRN("Failed to report boot event: %d", rc);

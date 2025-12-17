@@ -100,7 +100,7 @@ This directory contains the complete architectural and design specifications for
 
 **Focus areas**:
 - How to register and report metrics
-- Dimension design and cardinality limits
+- Label design and cardinality limits
 - Error handling patterns
 - Integration with existing SDK features
 
@@ -187,12 +187,17 @@ A **metric** is a named measurement that tracks a numeric value over time. Examp
 - `http_requests_total` - Count of HTTP requests
 - `memory_usage_bytes` - Current memory consumption
 
-### Dimensions (Labels)
-**Dimensions** are key-value pairs that identify specific time series within a metric. Examples:
+### Labels
+**Labels** are key-value pairs that identify specific time series within a metric. Examples:
 - `cpu_temperature_celsius{core="0"}` vs `cpu_temperature_celsius{core="1"}`
 - `network_bytes_total{interface="eth0", direction="rx"}`
 
-Each unique combination of dimension values creates a separate **time series**.
+Each unique combination of label values creates a separate **time series**.
+
+**Limits**:
+- Maximum 8 labels per metric
+- Label key max length: 16 characters
+- Label value max length: 32 characters
 
 ### Aggregation
 Metrics are **aggregated** over time windows (1 minute, 10 minutes, 1 hour) before transmission to reduce network bandwidth. Aggregation computes:
@@ -252,7 +257,7 @@ Example traffic (1-minute aggregation):
 | Phase | Duration | Deliverables |
 |-------|----------|--------------|
 | Phase 1: Core Infrastructure | 2 weeks | Registry, aggregation, simple metrics |
-| Phase 2: Dimensional Metrics | 2 weeks | Multi-timeseries, batching |
+| Phase 2: Labeled Metrics | 2 weeks | Multi-timeseries, labels |
 | Phase 3: Network Integration | 1 week | MQTT integration, polling |
 | Phase 4: Configuration & Docs | 1 week | Kconfig, samples, docs |
 | Phase 5: Testing & Validation | 2 weeks | Tests, benchmarks, cloud validation |
@@ -303,10 +308,10 @@ Example traffic (1-minute aggregation):
 ## Common Questions
 
 **Q: Can I use metrics in interrupt context?**
-A: Yes, but only for simple metrics. Dimensional metrics may block briefly.
+A: Yes, but only for simple metrics. Labeled metrics may block briefly.
 
 **Q: What happens if I exceed the time series limit?**
-A: Least Recently Used (LRU) time series is evicted to make room.
+A: New label combinations are rejected with `-ENOSPC` error. Configure `max_timeseries` appropriately at registration.
 
 **Q: How do I know if metrics are being dropped?**
 A: Check `dropped_reports` in `spotflow_get_metric_stats()` and SDK logs.

@@ -19,6 +19,13 @@
 #include "logging/spotflow_log_net.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 
+#ifdef CONFIG_SPOTFLOW_METRICS
+#include "metrics/spotflow_metrics_net.h"
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
+#include "metrics/spotflow_metrics_system.h"
+#endif
+#endif /* CONFIG_SPOTFLOW_METRICS */
+
 #define APP_CONNECT_TIMEOUT_MS 10000
 
 #define LOG_DBG_PRINT_RESULT(func, rc) LOG_DBG("%s: %d <%s>", (func), rc, RC_STR(rc))
@@ -42,6 +49,17 @@ static void spotflow_mqtt_thread_entry(void)
 {
 	LOG_DBG("Starting Spotflow processing thread");
 
+#ifdef CONFIG_SPOTFLOW_METRICS
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
+	/* Initialize system metrics early so they start collecting at boot,
+	 * before network connection is established */
+	int rc_sys_metrics = spotflow_metrics_system_init();
+	if (rc_sys_metrics < 0) {
+		LOG_ERR("Failed to initialize system metrics: %d", rc_sys_metrics);
+	}
+#endif
+#endif
+
 	wait_for_network();
 
 	spotflow_tls_init();
@@ -52,6 +70,9 @@ static void spotflow_mqtt_thread_entry(void)
 #endif
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	init_logs_polling();
+#endif
+#ifdef CONFIG_SPOTFLOW_METRICS
+	spotflow_metrics_net_init();
 #endif
 
 	/* 1) OUTER LOOP: keep trying until mqtt_connected == true, reconnect if connection failed */
@@ -76,12 +97,22 @@ static int process_config_coredumps_or_logs()
 		return rc;
 	}
 #endif
+#ifdef CONFIG_SPOTFLOW_METRICS
+	/* Process metrics after coredumps, before logs */
+	if (rc == 0) {
+		rc = spotflow_poll_and_process_enqueued_metrics();
+		if (rc < 0) {
+			LOG_DBG("Failed to process metrics: %d", rc);
+			return rc;
+		}
+	}
+#endif
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
-	/* rc > 0 means core dumps were sent
-	 *	-> doing mqtt routine and continue with core dumps chunks sending
+	/* rc > 0 means core dumps or metrics were sent
+	 *	-> doing mqtt routine and continue with core dumps/metrics sending
 	 */
 	if (rc == 0) {
-		/*No coredumps to send -> sending logs*/
+		/*No coredumps or metrics to send -> sending logs*/
 		rc = poll_and_process_enqueued_logs();
 		if (rc < 0) {
 			LOG_DBG("Failed to process logs: %d", rc);

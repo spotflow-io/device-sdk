@@ -5,22 +5,24 @@
 ### 1.1 Functional Requirements
 
 #### FR-1: Metric Registration (MUST - Source: PO API Spec)
-- FR-1.1: System shall support registration of float-type metrics with dimensions
-- FR-1.2: System shall support registration of integer-type metrics with dimensions
-- FR-1.3: System shall support registration of dimensionless metrics
+- FR-1.1: System shall support registration of float-type metrics with labels
+- FR-1.2: System shall support registration of integer-type metrics with labels
+- FR-1.3: System shall support registration of simple (non-labeled) metrics
 - FR-1.4: Each metric registration shall specify a unique metric name
-- FR-1.5: Dimensional metrics shall support configurable maximum concurrent time series count
-- FR-1.6: Dimensional metrics shall support configurable maximum dimensions count
+- FR-1.5: Labeled metrics shall support configurable maximum concurrent time series count
+- FR-1.6: Labeled metrics shall support configurable maximum labels count (1-8)
 - FR-1.7: System shall optionally support sample collection (future enhancement)
+- FR-1.8: System shall enforce strict type matching between registration and reporting
 
-**Verification**: Unit tests for registration API, validation of metric name uniqueness, dimension limits enforcement
+**Verification**: Unit tests for registration API, validation of metric name uniqueness, label limits enforcement
 
 #### FR-2: Metric Reporting (MUST - Source: PO API Spec)
-- FR-2.1: System shall support reporting metric values with optional dimension key-value pairs
-- FR-2.2: Dimension keys shall be string type
-- FR-2.3: Dimension values shall be string type
+- FR-2.1: System shall support reporting metric values with optional label key-value pairs
+- FR-2.2: Label keys shall be string type (max 16 characters)
+- FR-2.3: Label values shall be string type (max 32 characters)
 - FR-2.4: System shall return error codes indicating success or failure of metric reporting
 - FR-2.5: System shall support reporting events (special case of metrics)
+- FR-2.6: System shall enforce type-specific reporting (int metrics use int functions, float metrics use float functions)
 
 **Verification**: Integration tests validating metric data flow to cloud platform
 
@@ -35,9 +37,9 @@
 
 #### FR-3A: Time Series Cardinality Control (MUST)
 - FR-3A.1: System shall preallocate storage for exactly max_timeseries slots
-- FR-3A.2: When time series pool is full, new dimension combinations shall be rejected with `-ENOSPC` error code
-- FR-3A.3: System shall log error when rejecting dimensions due to full pool
-- FR-3A.4: Rejected dimension combinations shall not be aggregated or transmitted
+- FR-3A.2: When time series pool is full, new label combinations shall be rejected with `-ENOSPC` error code
+- FR-3A.3: System shall log error when rejecting labels due to full pool
+- FR-3A.4: Rejected label combinations shall not be aggregated or transmitted
 
 **Verification**: Unit tests for cardinality limit enforcement, error logging verification
 
@@ -90,8 +92,8 @@
 #### NFR-4: Scalability (SHOULD)
 - NFR-4.1: System shall support 10-50 registered metrics (typical use case)
 - NFR-4.2: System shall support 100-1000 metric reports per minute (typical load)
-- NFR-4.3: Dimensional metrics shall support 1-10 dimensions per metric
-- NFR-4.4: System shall support 10-100 concurrent time series per dimensional metric
+- NFR-4.3: Labeled metrics shall support 1-8 labels per metric
+- NFR-4.4: System shall support 10-100 concurrent time series per labeled metric
 
 **Verification**: Load testing, scalability benchmarks
 
@@ -161,7 +163,7 @@ The following items are explicitly OUT OF SCOPE for this design:
 │                    Spotflow Metrics Backend                                  │
 │  ┌────────────────────────────────────────────────────────────────┐         │
 │  │  Metric Registry                                                │         │
-│  │  - Stores metric metadata (name, type, dimensions config)      │         │
+│  │  - Stores metric metadata (name, type, labels config)          │         │
 │  │  - Manages metric handles                                       │         │
 │  │  - Validates registration parameters                            │         │
 │  └────────────────────────────────────────────────────────────────┘         │
@@ -171,7 +173,7 @@ The following items are explicitly OUT OF SCOPE for this design:
 │  │  - Maintains per-timeseries aggregation state                   │         │
 │  │  - Computes sum, count, min, max                                │         │
 │  │  - Manages aggregation windows (1m, 10m, 1h)                    │         │
-│  │  - Handles dimension-based time series tracking                 │         │
+│  │  - Handles label-based time series tracking                     │         │
 │  └────────────────────────────────────────────────────────────────┘         │
 │                               │                                               │
 │                               ▼                                               │
@@ -265,14 +267,14 @@ Backend:                                              Aggregator:
 // Public API (see API specification for full signatures)
 spotflow_metric_t* spotflow_register_metric_float(const char* name);
 spotflow_metric_t* spotflow_register_metric_int(const char* name);
-spotflow_metric_t* spotflow_register_metric_float_with_dimensions(const char* name, uint16_t max_timeseries, uint8_t max_dimensions);
-spotflow_metric_t* spotflow_register_metric_int_with_dimensions(const char* name, uint16_t max_timeseries, uint8_t max_dimensions);
+spotflow_metric_t* spotflow_register_metric_float_with_labels(const char* name, uint16_t max_timeseries, uint8_t max_labels);
+spotflow_metric_t* spotflow_register_metric_int_with_labels(const char* name, uint16_t max_timeseries, uint8_t max_labels);
 int spotflow_report_metric_int(spotflow_metric_t* metric, int64_t value);
 int spotflow_report_metric_float(spotflow_metric_t* metric, double value);
-int spotflow_report_metric_int_with_dimensions(spotflow_metric_t* metric, int64_t value, const spotflow_dimension_t* dimensions, uint8_t dimension_count);
-int spotflow_report_metric_float_with_dimensions(spotflow_metric_t* metric, double value, const spotflow_dimension_t* dimensions, uint8_t dimension_count);
+int spotflow_report_metric_int_with_labels(spotflow_metric_t* metric, int64_t value, const spotflow_label_t* labels, uint8_t label_count);
+int spotflow_report_metric_float_with_labels(spotflow_metric_t* metric, double value, const spotflow_label_t* labels, uint8_t label_count);
 int spotflow_report_event(spotflow_metric_t* metric);
-int spotflow_report_event_with_dimensions(spotflow_metric_t* metric, const spotflow_dimension_t* dimensions, uint8_t dimension_count);
+int spotflow_report_event_with_labels(spotflow_metric_t* metric, const spotflow_label_t* labels, uint8_t label_count);
 ```
 
 **Threading Model**:
@@ -291,10 +293,10 @@ int spotflow_report_event_with_dimensions(spotflow_metric_t* metric, const spotf
 
 **Key Responsibilities**:
 - Maintain per-timeseries aggregation state (sum, count, min, max)
-- Track dimension combinations (time series) within configured limits
+- Track label combinations (time series) within configured limits
 - Implement aggregation window management (1min, 10min, 1hour timers)
 - Trigger metric message generation on window expiration
-- Reject new dimension combinations with error log when pool is full
+- Reject new label combinations with error log when pool is full
 - Manage sequence numbers per metric
 - Support PT0S (immediate reporting) by bypassing aggregation and enqueuing directly
 
@@ -309,7 +311,7 @@ int spotflow_report_event_with_dimensions(spotflow_metric_t* metric, const spotf
 int aggregator_init(void);
 int aggregator_register_metric(struct spotflow_metric* metric);
 int aggregator_report_value(struct spotflow_metric* metric,
-                            const spotflow_dimension_t* dimensions,
+                            const spotflow_label_t* labels,
                             double value);
 int aggregator_flush(struct spotflow_metric* metric); // Force aggregation window close
 ```
@@ -318,7 +320,7 @@ int aggregator_flush(struct spotflow_metric* metric); // Force aggregation windo
 - `aggregator_report_value()` accepts `double value` for both int and float metrics
   - For int metrics: value is cast to `int64_t` inside the function
   - For float metrics: value is used as-is
-- `dimensions` parameter may be `NULL` for dimensionless metrics
+- `labels` parameter may be `NULL` for simple (non-labeled) metrics
 - Return value: `0` on success, `-ENOSPC` if time series pool is full, `-EINVAL` for invalid parameters
 
 **Threading Model**:
@@ -328,7 +330,7 @@ int aggregator_flush(struct spotflow_metric* metric); // Force aggregation windo
 
 **Error Handling**:
 - Overflow detection for sum (set truncation flag)
-- Dimension limit enforcement (drop or replace oldest time series)
+- Label limit enforcement (reject new combinations when pool is full)
 - Timer failures logged but not fatal
 
 ### 3.3 CBOR Encoder (spotflow_metrics_cbor.c/h)
@@ -427,12 +429,12 @@ struct spotflow_mqtt_metrics_msg {
 
 ```c
 typedef enum {
-    SPOTFLOW_METRIC_TYPE_FLOAT,  // Float metric (dimensionless or dimensional)
-    SPOTFLOW_METRIC_TYPE_INT,    // Integer metric (dimensionless or dimensional)
+    SPOTFLOW_METRIC_TYPE_FLOAT,  // Float metric (simple or labeled)
+    SPOTFLOW_METRIC_TYPE_INT,    // Integer metric (simple or labeled)
 } spotflow_metric_type_t;
 ```
 
-**Design Note**: Dimensionless vs dimensional metrics are distinguished by `max_dimensions == 0` (dimensionless) vs `max_dimensions > 0` (dimensional), not by separate type enum values. This simplifies the type system.
+**Design Note**: Simple vs labeled metrics are distinguished by `max_labels == 0` (simple) vs `max_labels > 0` (labeled), not by separate type enum values. This simplifies the type system.
 
 ### 4.2 Metric Handle (Opaque)
 
@@ -445,8 +447,8 @@ typedef struct spotflow_metric* spotflow_metric_t;
 struct spotflow_metric {
     char name[SPOTFLOW_MAX_METRIC_NAME_LEN];
     spotflow_metric_type_t type;     // FLOAT or INT
-    uint16_t max_timeseries;         // 0 for dimensionless, >0 for dimensional
-    uint8_t max_dimensions;          // 0 for dimensionless, >0 for dimensional
+    uint16_t max_timeseries;         // 0 for simple, >0 for labeled
+    uint8_t max_labels;              // 0 for simple, >0 for labeled
     uint32_t sequence_number;        // Per-metric sequence
     struct k_mutex lock;             // Protects aggregation state
     void* aggregator_state;          // Pointer to aggregation context
@@ -457,37 +459,37 @@ struct spotflow_metric {
 **Field Semantics**:
 - `type`: Value type (FLOAT or INT) - determines how values are stored/transmitted
 - `max_timeseries`:
-  - `0` = dimensionless metric (single time series)
-  - `>0` = dimensional metric (up to max_timeseries concurrent time series)
-- `max_dimensions`:
-  - `0` = dimensionless metric (no dimensions allowed)
-  - `>0` = dimensional metric (up to max_dimensions per report)
-- Dimensionless metrics have `max_timeseries == 0` AND `max_dimensions == 0`
+  - `0` = simple metric (single time series)
+  - `>0` = labeled metric (up to max_timeseries concurrent time series)
+- `max_labels`:
+  - `0` = simple metric (no labels allowed)
+  - `>0` = labeled metric (up to max_labels per report, max 8)
+- Simple metrics have `max_timeseries == 0` AND `max_labels == 0`
 
-### 4.3 Dimension Model
+### 4.3 Label Model
 
 ```c
-// Dimension key-value pair (string-only values)
+// Label key-value pair (string-only values)
 typedef struct {
-    const char* key;      // Dimension key (e.g., "core", "interface")
-    const char* value;    // Dimension value (string only)
-} spotflow_dimension_t;
+    const char* key;      // Label key (e.g., "core", "interface")
+    const char* value;    // Label value (string only)
+} spotflow_label_t;
 ```
 
 **Design Notes**:
-- Dimension values are **string-only** for simplicity
+- Label values are **string-only** for simplicity
 - Numeric values should be converted to strings before reporting (e.g., `snprintf()`)
-- Dimension keys are **case-sensitive** (not normalized)
+- Label keys are **case-sensitive** (not normalized)
 - Both key and value must be non-NULL, non-empty strings
 - Strings must remain valid for duration of `spotflow_report_metric_*()` call
 - Internally hashed/copied, so caller can free/reuse after call returns
 
 **String Length Limits**:
 ```c
-#define SPOTFLOW_MAX_METRIC_NAME_LEN        64  // Maximum metric name length
-#define SPOTFLOW_MAX_DIMENSION_KEY_LEN      32  // Maximum dimension key length
-#define SPOTFLOW_MAX_DIMENSION_VALUE_LEN    64  // Maximum dimension value length
-#define SPOTFLOW_MAX_DIMENSIONS_PER_METRIC  16  // Maximum dimensions per metric
+#define SPOTFLOW_MAX_METRIC_NAME_LEN     64  // Maximum metric name length
+#define SPOTFLOW_MAX_LABEL_KEY_LEN       16  // Maximum label key length
+#define SPOTFLOW_MAX_LABEL_VALUE_LEN     32  // Maximum label value length
+#define SPOTFLOW_MAX_LABELS_PER_METRIC    8  // Maximum labels per metric
 ```
 
 ### 4.4 Aggregation State (Per Time Series)
@@ -495,8 +497,8 @@ typedef struct {
 ```c
 // Internal structure for aggregation tracking
 struct metric_timeseries_state {
-    // Dimension hash or key for this time series
-    uint32_t dimension_hash;
+    // Label hash for this time series
+    uint32_t label_hash;
 
     // Aggregated values
     union {
@@ -517,10 +519,10 @@ struct metric_timeseries_state {
     // Timestamp tracking
     uint64_t window_start_ms;
 
-    // Dimension storage (strings are copied/stored for this time series)
-    char dimension_keys[SPOTFLOW_MAX_DIMENSIONS_PER_METRIC][SPOTFLOW_MAX_DIMENSION_KEY_LEN];
-    char dimension_values[SPOTFLOW_MAX_DIMENSIONS_PER_METRIC][SPOTFLOW_MAX_DIMENSION_VALUE_LEN];
-    uint8_t dimension_count;
+    // Label storage (strings are copied/stored for this time series)
+    char label_keys[SPOTFLOW_MAX_LABELS_PER_METRIC][SPOTFLOW_MAX_LABEL_KEY_LEN];
+    char label_values[SPOTFLOW_MAX_LABELS_PER_METRIC][SPOTFLOW_MAX_LABEL_VALUE_LEN];
+    uint8_t label_count;
 
     // Active flag
     bool is_active;
@@ -567,7 +569,7 @@ struct metric_aggregator_context {
 {
     0x00: 0x05,                      // messageType = METRIC
     0x10: "cpu_temperature",         // metricName
-    0x05: {                          // labels (dimensions)
+    0x05: {                          // labels
         "core": "0",
         "zone": "thermal1"
     },
@@ -587,9 +589,9 @@ struct metric_aggregator_context {
 {
     0x00: 0x05,                      // messageType = METRIC
     0x10: "device_restart",          // metricName
-    0x05: {                          // labels (dimensions)
+    0x05: {                          // labels
         "reason": "watchdog",
-        "firmware": "1.2.3"
+        "fw_ver": "1.2.3"
     },
     0x11: 0,                         // aggregationInterval = PT0S (immediate)
     0x06: 123456789,                 // deviceUptimeMs
