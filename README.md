@@ -9,12 +9,16 @@ Device SDK is integrated with Zephyr as a module that contains the Spotflow logg
 that seamlessly integrates with the Zephyr logging subsystem.
 
 Our solution was tested on the following Zephyr boards (more are coming soon):
-* [NXP FRDM-RW612](https://www.nxp.com/design/microcontrollers/arm-cortex-m/rw6xx-rtos-ready-wireless-mcus:FRDM-RW612)
-* [Nordic NRF7002DK](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK)
 * [ESP32-C3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c3/esp32-c3-devkitc-02/index.html)
+* [ESP32-C6-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32c6/esp32-c6-devkitc-1/index.html)
+* [ESP32-S3-DevKitC](https://docs.espressif.com/projects/esp-dev-kits/en/latest/esp32s3/esp32-s3-devkitc-1/index.html)
+* [Infineon CY8CProto-062-4343W](https://www.infineon.com/evaluation-board/CY8CPROTO-062-4343W)
+* [Nordic nRF7002DK](https://www.nordicsemi.com/Products/Development-hardware/nRF7002-DK)
+* [NXP FRDM-RW612](https://www.nxp.com/design/microcontrollers/arm-cortex-m/rw6xx-rtos-ready-wireless-mcus:FRDM-RW612)
+* [Raspberry Pi Pico 2 W](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#pico2w-technical-specification)
 
 We currently support:
-* Zephyr 4.1.x, 4.2.x, and 4.3.x
+* Zephyr 3.7.x, 4.1.x, 4.2.x, and 4.3.x
 * nRF Connect SDK 3.0.x and 3.1.x
 
 For more information, check [Spotflow](https://app.spotflow.io/) or [Spotflow documentation](https://docs.spotflow.io/).
