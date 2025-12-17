@@ -1,0 +1,164 @@
+name: Build Zephyr Project
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'zephyr/**'
+      - '.github/workflows/zephyr.yml'
+  pull_request:
+    paths:
+      - 'zephyr/**'
+      - '.github/workflows/zephyr.yml'
+
+permissions:
+  contents: read        # Allows reading repository content (needed for checkout)
+  issues: write         # Allows reporting build results to PR checks
+  pull-requests: write  # Allows commenting/updating PR status
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - board: esp32c3_devkitc
+            manifest: west-zephyr-espressif.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: riscv64-zephyr-elf
+            blob: hal_espressif
+          - board: esp32c3_devkitm
+            manifest: west-zephyr-espressif.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: riscv64-zephyr-elf
+            blob: hal_espressif
+          - board: esp32c6_devkitc/esp32c6/hpcore
+            manifest: west-zephyr-espressif.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: riscv64-zephyr-elf
+            blob: hal_espressif
+          - board: esp32s3_devkitc/esp32s3/procpu
+            manifest: west-zephyr-espressif.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
+            blob: hal_espressif
+          - board: cy8cproto_062_4343w
+            manifest: west-zephyr-infineon.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: arm-zephyr-eabi
+            blob: hal_infineon
+          - board: frdm_rw612
+            manifest: west-zephyr-nxp.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: arm-zephyr-eabi
+            blob: hal_nxp
+          - board: nrf7002dk/nrf5340/cpuapp/ns
+            manifest: west-ncs.yml
+            sdk_version: 0.17.0
+            sdk_toolchain: arm-zephyr-eabi
+          - board: rpi_pico/rp2040/w
+            manifest: west-zephyr-raspberrypi.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: arm-zephyr-eabi
+            blob: hal_infineon
+
+    steps:
+      # Needed to use the hash of the manifest as a part of the cache key
+      - name: Checkout manifest
+        uses: actions/checkout@v6
+        with:
+          path: temp-manifest
+          sparse-checkout: zephyr/manifests/${{ matrix.manifest }}
+          sparse-checkout-cone-mode: false
+
+      - name: Restore workspace dependencies
+        id: cache-restore-workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: .
+          key: >-
+            zephyr-workspace-${{ matrix.manifest }}-
+            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-
+            ${{ matrix.blob }}-${{ runner.os }}
+
+      - name: Create Python virtual environment
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        run: python -m venv .venv
+
+      - name: Activate Python virtual environment
+        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
+      - name: Install West
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        run: pip install west
+
+      - name: Create workspace
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        run: |
+          west init \
+            --manifest-url ${{ github.server_url }}/${{ github.repository }} \
+            --clone-opt=--revision=${{ github.sha }} \
+            --manifest-file zephyr/manifests/${{ matrix.manifest }} \
+            .
+          west update --fetch-opt=--depth=1 --narrow
+
+      # If west init is skipped thanks to a cache hit, we need to overwrite the outdated version of
+      # the Spotflow module restored from the cache by the current commit
+      - name: Checkout Spotflow module
+        if: steps.cache-restore-workspace.outputs.cache-hit == 'true'
+        uses: actions/checkout@v6
+        with:
+          path: modules/lib/spotflow
+
+      - name: Install Python packages
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        run: west packages pip --install --ignore-venv-check
+
+      - name: Download blobs
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true' && ${{ matrix.blob != '' }}
+        run: west blobs fetch ${{ matrix.blob }} --auto-accept
+
+      - name: Cache workspace dependencies
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .
+          key: >-
+            zephyr-workspace-${{ matrix.manifest }}-
+            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-
+            ${{ matrix.blob }}-${{ runner.os }}
+
+      - name: Cache Zephyr SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/zephyr-sdk-${{ matrix.sdk_version }}
+          key: zephyr-sdk-${{ matrix.sdk_version }}-${{ matrix.sdk_toolchain }}-${{ runner.os }}
+
+      - name: Install SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          west sdk install \
+            --version ${{ matrix.sdk_version }} \
+            --toolchains ${{ matrix.sdk_toolchain }}
+
+      - name: Configure application
+        working-directory: modules/lib/spotflow/zephyr/samples/logs
+        run: |
+          cat <<EOF > credentials.conf
+          CONFIG_NET_WIFI_SSID="TODOTODO"
+          CONFIG_NET_WIFI_PASSWORD="TODOTODO"
+          CONFIG_SPOTFLOW_DEVICE_ID="${{ matrix.board }}_${{ github.run_id }}"
+          CONFIG_SPOTFLOW_INGEST_KEY="TODO"
+          EOF
+
+      - name: Build application
+        working-directory: modules/lib/spotflow/zephyr/samples/logs
+        run: |
+          west build --board ${{ matrix.board }}
