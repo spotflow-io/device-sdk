@@ -5,11 +5,11 @@ on:
       - 'v*'            # Trigger on tags starting with v (e.g., v1.0.0)
     paths:
       - 'esp_idf/**'    # Trigger on changes within the esp_idf directory
-  workflow_dispatch:    # Keep manual trigger for flexibility
-    inputs:
-      version:
-        description: 'Manual version override'
-        required: false
+  # workflow_dispatch:    # Keep manual trigger for flexibility
+  #   inputs:
+  #     version:
+  #       description: 'Manual version override'
+  #       required: false
 
 jobs:
   upload_components:
