@@ -28,7 +28,7 @@ jobs:
         uses: espressif/upload-components-ci-action@v2
         with:
           version: ${{ github.event.inputs.version }}
-          components: "device_sdk: esp_idf/spotflow"
+          components: "device_sdk: esp_idf/spotflow/device_sdk"
           namespace: "spotflow"
           dry_run: ${{ github.event.inputs.dry_run }}
           skip_pre_release: ${{ github.event.inputs.skip_pre_release }}
