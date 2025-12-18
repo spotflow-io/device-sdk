@@ -1,0 +1,38 @@
+name: Push component to component registry
+
+on:
+  workflow_dispatch:  # This allows you to manually trigger the workflow from GitHub UI
+    inputs:
+      version:
+        description: 'Version of the component to upload'
+        required: true
+        default: '0.8.0-alpha'
+      dry_run:
+        description: 'Run a dry run (true/false)?'
+        required: false
+        default: 'false'
+      skip_pre_release:
+        description: 'Skip pre-release (true/false)?'
+        required: false
+        default: 'false'
+jobs:
+  upload_components:
+    permissions:
+      id-token: write # IMPORTANT: Required to generate an OIDC Token
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+      - name: Upload components to component staging service
+        uses: espressif/upload-components-ci-action@v2
+        with:
+          version: ${{ github.event.inputs.version }}
+          components: "device_sdk: esp_idf/spotflow"
+          namespace: "spotflow"
+          dry_run: ${{ github.event.inputs.dry_run }}
+          skip_pre_release: ${{ github.event.inputs.skip_pre_release }}
+          # registry_url: https://components-staging.espressif.com/
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
+          # API token will only be available in the master branch in the main repository.
+          # However, dry-run doesn't require a valid token.
