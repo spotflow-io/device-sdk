@@ -1,5 +1,4 @@
 name: Push ESP IDF component to component registry
-
 on:
   push:
     tags:
@@ -49,5 +48,5 @@ jobs:
           namespace: "spotflow"
           dry_run: ${{ github.event.inputs.dry_run || 'false' }}
           skip_pre_release: ${{ steps.prep.outputs.skip_pre_release }}
-          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN_STAGING }}
-          registry_url: "https://components-staging.espressif.com/"
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
+          # registry_url: "https://components-staging.espressif.com/"
