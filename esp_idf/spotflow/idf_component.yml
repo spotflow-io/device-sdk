@@ -13,6 +13,7 @@ dependencies:
   espressif/cbor: ^0.6.1~3
   espressif/mqtt:
     version: "^1.0.0"
+    service_url: "https://components.espressif.com/"
     rules:
       # Only add MQTT when using ESP-IDF 6.0 or later
       - if: idf_version >= "6.0"
