@@ -12,3 +12,4 @@ modules/*west
 **/managed_components/*
 **/dependencies.lock
 **/.clangd
+esp_idf/spotflow/dist/*

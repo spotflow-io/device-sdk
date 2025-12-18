@@ -1,0 +1,28 @@
+menu "Spotflow log menu"
+        config SPOTFLOW_LOG_BACKEND
+        bool "Spotflow logging backend"
+        default y
+        help
+            Enable sending logs to Spotflow cloud.
+
+    config SPOTFLOW_LOG_BUFFER_SIZE
+        int "Size of Spotflow log buffer"
+        default 512
+        help
+            Size of the buffer used by Spotflow logging backend to store logs before serialization.
+            Make this at least as big as your longest expected log line.
+            Increase this value if you experience issues with logs being dropped because of buffer overflow.
+
+    config SPOTFLOW_CBOR_LOG_MAX_LEN
+        int "Size of Spotflow CBOR log buffer"
+        default 1024
+        help
+            Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
+            Increase this value if you experience issues with logs being dropped because of buffer overflow.
+
+    config SPOTFLOW_MESSAGE_QUEUE_SIZE
+        int "Number of messages to retain in case of disconnection"
+        default 5
+
+    
+endmenu

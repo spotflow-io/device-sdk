@@ -1,0 +1,31 @@
+# Coredump example
+
+In this example we are sending the coredump of the ESP32 to cloud.
+
+## Configurations
+
+In this you can set using
+```bash
+idf.py menuconfig
+```
+- Set Spotflow -> Coredump -> Enabled
+- Set the Coredump Chunk size in menuconfig or by modifying the following Kconfig **CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE**. By default it is 2048 but you can increase or decrease it depending on your available memory.
+- Similarly for queue reading and sending the value can be increased.
+
+## Instructions for running the example.
+- In your terminal run
+```bash
+idf.py create-project-from-example "spotflow/device_sdk:coredump"
+```
+- It will create a new project. Open the project folder and run
+
+```bash
+idf.py menuconfig
+```
+- In this fo into **Example Configuration** and add your wifi ssid and password.
+- Then Go back into Main Menu and go into **Spotflow**, and add your device ID and Ingest ID from Spotflow Cloud.
+
+### Running with qemu config
+```idf.py -D SDKCONFIG_DEFAULTS="sdkconfig.qemu"```
+
+Now Flash the code to your controller and after a few seconds push the boot button on the dev kit for it to crash.

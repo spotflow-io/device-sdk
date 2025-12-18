@@ -1,0 +1,34 @@
+menu "Spotflow Core Dump Settings"
+
+        # Enable ESP-IDF core dump
+        config SPOTFLOW_COREDUMP_BACKEND
+            bool "Enable core dump"
+            default n
+            select ESP_COREDUMP_DATA_FORMAT_ELF
+            imply ESP_COREDUMP_CAPTURE_DRAM
+
+        if SPOTFLOW_COREDUMP_BACKEND
+
+            choice ESP_COREDUMP_TO_FLASH_OR_UART
+                default ESP_COREDUMP_ENABLE_TO_FLASH
+            endchoice
+
+            config SPOTFLOW_COREDUMPS_CHUNK_SIZE
+                int "Coredump Chunk Size"
+                default 2048
+                help
+                    Coredump chunk size while uploading to cloud. 
+                    Bigger size means less chunks and quick uploads. 
+                    But with bigger chunks more memory buffer is used for preparing and sending
+                    each one via MQTT.
+
+            config SPOTFLOW_MAX_QUEUE_SIZE
+                int "Coredump Max Queue size"
+                default 2
+                help
+                    Maximum number of coredump chunks saved in the queue before sending.
+                    Memory usage is SPOTFLOW_MAX_QUEUE_SIZE*SPOTFLOW_COREDUMP_CHUNK_SIZE.
+
+        endif
+
+endmenu
