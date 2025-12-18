@@ -35,7 +35,7 @@ jobs:
             VERSION="${BASE_VERSION}-dev-${GITHUB_SHA::7}"
             echo "skip_pre_release=true" >> $GITHUB_OUTPUT
           fi
-          
+
           # Use manual input if provided, otherwise use calculated version
           FINAL_VERSION=${{ github.event.inputs.version }}
           echo "version=${FINAL_VERSION:-$VERSION}" >> $GITHUB_OUTPUT
