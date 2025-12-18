@@ -1,0 +1,89 @@
+menuconfig SPOTFLOW_METRICS_SYSTEM
+	bool "Enable Spotflow system metrics auto-collection"
+	depends on SPOTFLOW_METRICS
+	default n
+	help
+	  Enable automatic collection of system-level metrics (memory, network, CPU, etc.).
+	  These metrics are collected periodically and reported to the cloud without
+	  requiring any application code.
+
+if SPOTFLOW_METRICS_SYSTEM
+
+config SPOTFLOW_METRICS_SYSTEM_MEMORY
+	bool "Enable memory metrics"
+	default y
+	help
+	  Collect system memory statistics (free/total bytes).
+	  Uses Zephyr sys_mem_stats_get() API.
+
+config SPOTFLOW_METRICS_SYSTEM_HEAP
+	bool "Enable heap metrics"
+	depends on HEAP_MEM_POOL_SIZE > 0
+	default y
+	help
+	  Collect heap memory statistics (free/allocated bytes).
+	  Requires heap memory pool to be configured.
+
+config SPOTFLOW_METRICS_SYSTEM_NETWORK
+	bool "Enable network metrics"
+	depends on NETWORKING && NET_STATISTICS
+	default y
+	help
+	  Collect network traffic statistics (TX/RX bytes).
+	  Requires networking and network statistics to be enabled.
+
+config SPOTFLOW_METRICS_SYSTEM_CPU
+	bool "Enable CPU utilization metrics"
+	select THREAD_RUNTIME_STATS
+	select THREAD_RUNTIME_STATS_USE_TIMING_FUNCTIONS
+	default n
+	help
+	  Collect CPU utilization percentage.
+	  WARNING: Enabling this adds overhead to thread scheduling.
+	  Only enable if CPU utilization monitoring is required.
+
+config SPOTFLOW_METRICS_SYSTEM_CONNECTION
+	bool "Enable connection state metrics"
+	default y
+	help
+	  Report MQTT connection state changes (connected=1, disconnected=0).
+	  Event-driven metric (not periodic).
+
+config SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
+	bool "Enable reset cause metric"
+	depends on HWINFO
+	default y
+	help
+	  Report device reset cause on boot (power-on, watchdog, etc.).
+	  Event-driven metric (reported once on boot, not periodic).
+	  Requires HWINFO support in the platform.
+
+config SPOTFLOW_METRICS_SYSTEM_INTERVAL
+	int "System metrics collection interval (seconds)"
+	range 10 3600
+	default 60
+	help
+	  How often to collect and report system metrics (10-3600 seconds).
+	  Default is 60 seconds (1 minute).
+	  Lower values increase network/CPU overhead.
+
+config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
+	int "Additional heap memory pool size for system metrics (bytes)"
+	default 16384
+	range 4096 65536
+	help
+	  System metrics auto-collection requires heap memory for:
+	  - Metric registration (7 metrics × 128 bytes context)
+	  - Time series storage (network metrics have 4 time series)
+	  - CBOR encoding buffers
+
+	  Default 16KB is sufficient for all system metrics enabled.
+	  Reduce if only subset of metrics enabled:
+	  - Memory + Connection only: 4KB
+	  - Memory + Network: 8KB
+	  - All metrics: 16KB (default)
+
+	  This is added to CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
+	  which is for application metrics.
+
+endif # SPOTFLOW_METRICS_SYSTEM
