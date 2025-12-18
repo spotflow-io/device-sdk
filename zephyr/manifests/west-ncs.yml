@@ -1,0 +1,23 @@
+manifest:
+  projects:
+    - name: nrf
+      url: https://github.com/nrfconnect/sdk-nrf
+      revision: v3.1.1
+      clone-depth: 1
+      import:
+        name-allowlist:
+          - cmsis_6
+          - hal_nordic
+          - hostap
+          - mbedtls
+          - mcuboot
+          - net-tools
+          - nrf_wifi
+          - nrfxlib
+          - oberon-psa-crypto
+          - trusted-firmware-m
+          - zcbor
+          - zephyr
+
+  self:
+    path: modules/lib/spotflow

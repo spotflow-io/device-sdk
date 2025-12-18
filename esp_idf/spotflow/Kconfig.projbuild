@@ -1,39 +1,10 @@
 menu "Spotflow"
 
-    menu "SPOTFLOW Core Dump Settings"
-
-        # Enable ESP-IDF core dump
-        config SPOTFLOW_COREDUMP_BACKEND
-            bool "Enable automatic core dump settings"
-            default n
-            select ESP_COREDUMP_ENABLE
-
-        if SPOTFLOW_COREDUMP_BACKEND
-
-            # Default destination = Flash
-            choice ESP_COREDUMP_TO_FLASH_OR_UART
-                default ESP_COREDUMP_ENABLE_TO_FLASH
-            endchoice
-
-            config ESP_COREDUMP_ENABLE
-                default y
-                select ESP_COREDUMP_DATA_FORMAT_ELF
-
-            config ESP_COREDUMP_CAPTURE_DRAM
-                default y
-
-            config SPOTFLOW_COREDUMPS_CHUNK_SIZE
-            int
-            default SPOTFLOW_CBOR_LOG_MAX_LEN
-
-        endif
-
-    endmenu
     config SPOTFLOW_SERVER_HOSTNAME
         string "Hostname of Spotflow observability platform"
         default "mqtts://mqtt.spotflow.io:8883"
         help
-            URL of an mqtt broker which spotflow connects to.
+            URL of an mqtt broker which Spotflow connects to.
 
     config SPOTFLOW_DEVICE_ID
         string "Device ID device will use to connect to Spotflow observability platform"
@@ -58,39 +29,28 @@ menu "Spotflow"
         bool
         default y if BROKER_CERTIFICATE_OVERRIDE != ""
 
-    config SPOTFLOW_USE_BUILD_ID
-	bool "Use build ID"
-	default y
-	help
-		Build ID allows to match core dumps with the original .elf file.
-
-    config SPOTFLOW_LOG_BACKEND
-        bool "Spotflow logging backend"
-        default y
+    choice SPOTFLOW_INTERNAL_LOGS
+        prompt "Set log level of spotflow internal logs"
+        default SPOTFLOW_INTERNAL_LOGS_DISABLED
         help
-            Enable sending logs to Spotflow cloud.
+            Select the log level for spotflow to display.
+            - "Debug" : Display all logs debug and others.
+            - "logs"  : Only display info logs
+            - "Disabled" : Disable the spotflow component logs.
+        config SPOTFLOW_DEBUG_MESSAGE_TERMINAL
+            bool "Debug"
 
-    config SPOTFLOW_LOG_BUFFER_SIZE
-        int "Size of Spotflow log buffer"
-        default 512
-        help
-            Size of the buffer used by Spotflow logging backend to store logs before serialization.
-            Make this at least as big as your longest expected log line.
-            Increase this value if you experience issues with logs being dropped because of buffer overflow.
+        config SPOTFLOW_MESSAGE_TERMINAL
+            bool "logs"
+        
+        config SPOTFLOW_INTERNAL_LOGS_DISABLED
+            bool "Disabled"
 
-    config SPOTFLOW_CBOR_LOG_MAX_LEN
-        int "Size of Spotflow CBOR log buffer"
-        default 2048
-        help
-            Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
-            Increase this value if you experience issues with logs being dropped because of buffer overflow.
+    endchoice
 
-    config SPOTFLOW_DEBUG_MESSAGE_TERMINAL
-        bool "To view the logs on the spotflow side to view any errors while debugging"
-        default n
-
-    config SPOTFLOW_MESSAGE_QUEUE_SIZE
-        int "Number of messages to retain in case of disconnection"
-        default 5
+    rsource "./Kconfig.buildid"
+    rsource "./Kconfig.logging"
+    rsource "./Kconfig.configs"
+    rsource "./Kconfig.coredump"
 
 endmenu
