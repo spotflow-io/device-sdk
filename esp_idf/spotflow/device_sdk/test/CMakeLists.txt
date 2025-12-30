@@ -1,0 +1,9 @@
+idf_component_register(
+    SRC_DIRS
+        "queue"
+    INCLUDE_DIRS
+        "queue"
+    REQUIRES
+        unity
+        spotflow/device_sdk
+)
