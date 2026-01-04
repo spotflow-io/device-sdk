@@ -3,7 +3,8 @@ idf_component_register(
         "queue"
     INCLUDE_DIRS
         "queue"
+        "../include"
     REQUIRES
         unity
-        spotflow/device_sdk
+        cmock
 )
