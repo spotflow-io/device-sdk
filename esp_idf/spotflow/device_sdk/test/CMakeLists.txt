@@ -3,6 +3,7 @@ idf_component_register(
         "queue"
     INCLUDE_DIRS
         "queue"
+        "port"
         "../include"
     REQUIRES
         unity

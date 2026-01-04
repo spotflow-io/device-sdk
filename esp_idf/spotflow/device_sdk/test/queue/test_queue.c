@@ -1,5 +1,5 @@
 #include "test_common.h"
-#include "unity.h"
+#include "test_wrapper.h"
 
 static void queue_setup(void)
 {
@@ -15,9 +15,9 @@ static void test_queue_single_push_pop_impl(void)
 
     spotflow_queue_push((uint8_t *)data, sizeof(data));
 
-    TEST_ASSERT_TRUE(spotflow_queue_read(&msg));
-    TEST_ASSERT_EQUAL(sizeof(data), msg.len);
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(data, msg.ptr, msg.len);
+    TEST_SPOTFLOW_ASSERT_TRUE(spotflow_queue_read(&msg));
+    TEST_SPOTFLOW_ASSERT_EQUAL(sizeof(data), msg.len);
+    TEST_SPOTFLOW_ASSERT_EQUAL_UINT8_ARRAY(data, msg.ptr, msg.len);
 
     spotflow_queue_free(&msg);
 }
@@ -35,15 +35,15 @@ static void test_queue_fifo_impl(void)
     spotflow_queue_push((uint8_t *)c, sizeof(c));
 
     spotflow_queue_read(&msg);
-    TEST_ASSERT_EQUAL(1, msg.ptr[0]);
+    TEST_SPOTFLOW_ASSERT_EQUAL(1, msg.ptr[0]);
     spotflow_queue_free(&msg);
 
     spotflow_queue_read(&msg);
-    TEST_ASSERT_EQUAL(2, msg.ptr[0]);
+    TEST_SPOTFLOW_ASSERT_EQUAL(2, msg.ptr[0]);
     spotflow_queue_free(&msg);
 
     spotflow_queue_read(&msg);
-    TEST_ASSERT_EQUAL(3, msg.ptr[0]);
+    TEST_SPOTFLOW_ASSERT_EQUAL(3, msg.ptr[0]);
     spotflow_queue_free(&msg);
 }
 
@@ -51,7 +51,7 @@ static void test_queue_empty_read_impl(void)
 {
     queue_msg_t msg;
     bool ret = spotflow_queue_read(&msg);
-    TEST_ASSERT_FALSE(ret);
+    TEST_SPOTFLOW_ASSERT_FALSE(ret);
 }
 
 static void test_queue_overflow_impl(void)
@@ -74,7 +74,7 @@ static void test_queue_overflow_impl(void)
         spotflow_queue_free(&msg);
     }
 
-    TEST_ASSERT_LESS_OR_EQUAL(CONFIG_SPOTFLOW_MESSAGE_QUEUE_SIZE, count);
+    TEST_SPOTFLOW_ASSERT_LESS_OR_EQUAL(CONFIG_SPOTFLOW_MESSAGE_QUEUE_SIZE, count);
 }
 
 /* ---------------- TEST CASES ---------------- */
