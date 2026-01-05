@@ -1,8 +1,10 @@
 idf_component_register(
     SRC_DIRS
         "queue"
+        "cbor"
     INCLUDE_DIRS
         "queue"
+        "cbor"
         "port"
         "../include"
     REQUIRES

@@ -1,5 +1,4 @@
 #include "test_common.h"
-#include "test_wrapper.h"
 
 static void queue_setup(void)
 {

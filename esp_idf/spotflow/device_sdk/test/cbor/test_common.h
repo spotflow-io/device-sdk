@@ -5,4 +5,5 @@
 #include <string.h>
 #include "test_wrapper.h"
 
-#include "logging/spotflow_log_queue.h"
+#include "logging/spotflow_log_backend.h"
+#include "logging/spotflow_log_cbor.h"
