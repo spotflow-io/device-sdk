@@ -58,6 +58,11 @@ jobs:
             sdk_version: 0.17.4
             sdk_toolchain: arm-zephyr-eabi
             blob: hal_nxp
+          - board: frdm_k64f
+            manifest: west-zephyr-nxp.yml
+            sdk_version: 0.17.4
+            sdk_toolchain: arm-zephyr-eabi
+            blob: hal_nxp
           - board: nrf7002dk/nrf5340/cpuapp/ns
             manifest: west-ncs.yml
             sdk_version: 0.17.0
