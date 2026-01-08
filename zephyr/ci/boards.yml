@@ -1,0 +1,68 @@
+vendors:
+
+  - name: Espressif
+    manifest: west-zephyr-espressif.yml
+    sdk_version: 0.17.4
+    sdk_toolchain: riscv64-zephyr-elf
+    blob: hal_espressif
+    connection: ["wifi"]
+    boards:
+      - id: esp32c3_devkitc
+        name: ESP32-C3-DevKitC
+      - id: esp32c3_devkitm
+        name: ESP32-C3-DevKitM
+      - id: esp32c6_devkitc
+        name: ESP32-C6-DevKitC
+        board: esp32c6_devkitc/esp32c6/hpcore
+      - id: esp32s3_devkitc
+        name: ESP32-S3-DevKitC
+        board: esp32s3_devkitc/esp32s3/procpu
+        sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
+
+  - name: Infineon
+    manifest: west-zephyr-infineon.yml
+    sdk_version: 0.17.4
+    sdk_toolchain: arm-zephyr-eabi
+    blob: hal_infineon
+    connection: ["wifi"]
+    boards:
+      - id: cy8cproto_062_4343w
+        name: CY8CProto-062-4343W
+
+  - name: Nordic Semiconductor
+    manifest: west-ncs.yml
+    sdk_version: 0.17.0
+    sdk_toolchain: arm-zephyr-eabi
+    connection: ["wifi"]
+    boards:
+      - id: nrf7002dk
+        name: nRF7002 DK
+        board: nrf7002dk/nrf5340/cpuapp/ns
+      - id: thingy53_nrf7002eb
+        name: Thingy:53 with nRF7002 EB shield
+        board: thingy53/nrf5340/cpuapp/ns
+        build_extra_args: -- -Dlogs_SHIELD=nrf7002eb
+
+  - name: NXP
+    manifest: west-zephyr-nxp.yml
+    sdk_version: 0.17.4
+    sdk_toolchain: arm-zephyr-eabi
+    blob: hal_nxp
+    connection: ["ethernet"]
+    boards:
+      - id: frdm_rw612
+        name: FRDM-RW612
+        connection: ["wifi", "ethernet"]
+      - id: frdm_k64f
+        name: FRDM-K64F
+
+  - name: Raspberry Pi
+    manifest: west-zephyr-raspberrypi.yml
+    sdk_version: 0.17.4
+    sdk_toolchain: arm-zephyr-eabi
+    blob: hal_infineon
+    connection: ["wifi"]
+    boards:
+      - id: rpi_pico
+        name: Raspberry Pi Pico
+        board: rpi_pico/rp2040/w

@@ -22,61 +22,59 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: zephyr/ci/boards.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Generate matrix
+        id: generate
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import json
+          import os
+
+          with open('zephyr/ci/boards.yml') as f:
+              config = yaml.safe_load(f)
+
+          matrix_entries = []
+          for vendor in config['vendors']:
+              vendor_props = {
+                  'manifest': vendor.get('manifest'),
+                  'sdk_version': vendor.get('sdk_version'),
+                  'sdk_toolchain': vendor.get('sdk_toolchain'),
+                  'blob': vendor.get('blob', ''),
+                  'build_extra_args': vendor.get('build_extra_args', '')
+              }
+              
+              for board in vendor['boards']:
+                  entry = vendor_props.copy()
+                  # Override with board-specific properties
+                  for key in entry:
+                      if key in board:
+                          entry[key] = board[key]
+                  # Use id as board if not specified
+                  entry['board'] = board.get('board', board['id'])
+                  matrix_entries.append(entry)
+
+          matrix_json = json.dumps({'include': matrix_entries})
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'matrix={matrix_json}\n')
+          EOF
+
   build:
+    needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - board: esp32c3_devkitc
-            manifest: west-zephyr-espressif.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: riscv64-zephyr-elf
-            blob: hal_espressif
-          - board: esp32c3_devkitm
-            manifest: west-zephyr-espressif.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: riscv64-zephyr-elf
-            blob: hal_espressif
-          - board: esp32c6_devkitc/esp32c6/hpcore
-            manifest: west-zephyr-espressif.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: riscv64-zephyr-elf
-            blob: hal_espressif
-          - board: esp32s3_devkitc/esp32s3/procpu
-            manifest: west-zephyr-espressif.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
-            blob: hal_espressif
-          - board: cy8cproto_062_4343w
-            manifest: west-zephyr-infineon.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: arm-zephyr-eabi
-            blob: hal_infineon
-          - board: frdm_rw612
-            manifest: west-zephyr-nxp.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: arm-zephyr-eabi
-            blob: hal_nxp
-          - board: frdm_k64f
-            manifest: west-zephyr-nxp.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: arm-zephyr-eabi
-            blob: hal_nxp
-          - board: nrf7002dk/nrf5340/cpuapp/ns
-            manifest: west-ncs.yml
-            sdk_version: 0.17.0
-            sdk_toolchain: arm-zephyr-eabi
-          - board: thingy53/nrf5340/cpuapp/ns
-            manifest: west-ncs.yml
-            sdk_version: 0.17.0
-            sdk_toolchain: arm-zephyr-eabi
-            build_extra_args: -- -Dlogs_SHIELD=nrf7002eb
-          - board: rpi_pico/rp2040/w
-            manifest: west-zephyr-raspberrypi.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: arm-zephyr-eabi
-            blob: hal_infineon
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
 
     steps:
       # Needed to use the hash of the manifest as a part of the cache key
