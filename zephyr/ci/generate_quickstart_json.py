@@ -43,9 +43,9 @@ def compute_sample_device_id(board_value: str) -> str:
     return f"{prefix}-001"
 
 
-def compute_zephyr_docs_url(vendor_key: str, board_value: str) -> str:
+def compute_zephyr_docs_url(vendor: str, board_value: str) -> str:
     board_prefix = compute_board_prefix(board_value)
-    return f"https://docs.zephyrproject.org/latest/boards/{vendor_key}/{board_prefix}/doc/index.html"
+    return f"https://docs.zephyrproject.org/latest/boards/{vendor}/{board_prefix}/doc/index.html"
 
 
 def transform_board(

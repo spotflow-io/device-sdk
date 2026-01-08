@@ -22,18 +22,17 @@ permissions:
 jobs:
   generate-quickstart:
     runs-on: ubuntu-latest
-    
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
-      
-      
+
       - name: Install dependencies
         run: pip install pyyaml
-      
+
       - name: Generate quickstart.json
         run: python zephyr/ci/generate_quickstart_json.py
-      
+
       - name: Upload quickstart.json artifact
         uses: actions/upload-artifact@v4
         with:
