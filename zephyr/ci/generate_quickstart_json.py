@@ -10,46 +10,39 @@ and tooling purposes.
 import json
 import yaml
 from pathlib import Path
-from typing import Dict, List, Any, Optional
+from typing import Dict, Any
 
 
 def load_yaml(filepath: Path) -> Dict[str, Any]:
-    """Load and parse a YAML file."""
     with open(filepath, 'r') as f:
         return yaml.safe_load(f)
 
 
 def extract_spotflow_path(manifest_filepath: Path) -> str:
-    """Extract the spotflow_path from a manifest file."""
     manifest_data = load_yaml(manifest_filepath)
     return manifest_data.get('manifest', {}).get('self', {}).get('path', '')
 
 
 def get_board_property(board: Dict[str, Any], vendor: Dict[str, Any], 
                        key: str, default: Any = None) -> Any:
-    """Get a property from board, falling back to vendor if not present."""
     return board.get(key, vendor.get(key, default))
 
 
 def compute_board_prefix(board_value: str) -> str:
-    """Extract board prefix (everything before first '/')."""
     return board_value.split('/')[0]
 
 
 def compute_sample_device_id(board_value: str) -> str:
     """
-    Compute sample_device_id from board value.
     Example: 'thingy53/nrf5340/cpuapp/ns' -> 'thingy53-001'
     Example: 'frdm_k64f' -> 'frdm-k64f-001'
     """
     prefix = compute_board_prefix(board_value)
-    # Replace underscores with hyphens
     prefix = prefix.replace('_', '-')
     return f"{prefix}-001"
 
 
 def compute_zephyr_docs_url(vendor_key: str, board_value: str) -> str:
-    """Construct Zephyr documentation URL."""
     board_prefix = compute_board_prefix(board_value)
     return f"https://docs.zephyrproject.org/latest/boards/{vendor_key}/{board_prefix}/doc/index.html"
 
@@ -60,14 +53,11 @@ def transform_board(board: Dict[str, Any], vendor: Dict[str, Any],
     Transform a board entry by applying property inheritance and computing
     derived properties.
     """
-    # Get the board identifier (with fallback to id)
     board_value = board.get('board', board['id'])
     
-    # Get manifest name and look up spotflow_path
     manifest = get_board_property(board, vendor, 'manifest')
     spotflow_path = spotflow_paths.get(manifest, '')
     
-    # Build the transformed board entry
     result = {
         'id': board['id'],
         'name': board['name'],
@@ -81,12 +71,10 @@ def transform_board(board: Dict[str, Any], vendor: Dict[str, Any],
         'sample_device_id': compute_sample_device_id(board_value),
     }
     
-    # Add optional blob property if present
     blob = get_board_property(board, vendor, 'blob', '')
     if blob:
         result['blob'] = blob
     
-    # Add optional build_extra_args if present
     build_extra_args = get_board_property(board, vendor, 'build_extra_args', '')
     if build_extra_args:
         result['build_extra_args'] = build_extra_args
@@ -141,7 +129,6 @@ def generate_quickstart(boards_config: Dict[str, Any],
         "vendors": zephyr_vendors
     }
     
-    # Combine all sections
     return {
         "esp_idf": esp_idf,
         "ncs": ncs,
@@ -150,21 +137,15 @@ def generate_quickstart(boards_config: Dict[str, Any],
 
 
 def main():
-    """Main entry point for the script."""
-    # Determine script location and repository root
     script_dir = Path(__file__).parent
-    repo_root = script_dir.parent.parent
     
-    # Define paths
     boards_yml_path = script_dir / 'boards.yml'
     manifests_dir = script_dir.parent / 'manifests'
     output_path = script_dir / 'quickstart.json'
     
-    # Load boards configuration
     print(f"Loading boards configuration from {boards_yml_path}")
     boards_config = load_yaml(boards_yml_path)
     
-    # Extract spotflow_path from all manifest files
     print(f"Loading manifest files from {manifests_dir}")
     spotflow_paths = {}
     for manifest_file in manifests_dir.glob('*.yml'):
@@ -173,11 +154,9 @@ def main():
         spotflow_paths[manifest_name] = spotflow_path
         print(f"  {manifest_name}: spotflow_path = {spotflow_path}")
     
-    # Generate quickstart data
     print("Generating quickstart.json...")
     quickstart_data = generate_quickstart(boards_config, spotflow_paths)
     
-    # Write output file
     print(f"Writing output to {output_path}")
     with open(output_path, 'w') as f:
         json.dump(quickstart_data, f, indent=4)
