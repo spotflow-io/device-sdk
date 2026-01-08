@@ -131,7 +131,7 @@ jobs:
         run: west packages pip --install --ignore-venv-check
 
       - name: Download blobs
-        if: steps.cache-restore-workspace.outputs.cache-hit != 'true' && ${{ matrix.blob != '' }}
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true' && matrix.blob != ''
         run: west blobs fetch ${{ matrix.blob }} --auto-accept
 
       - name: Cache workspace dependencies
