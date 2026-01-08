@@ -67,6 +67,11 @@ jobs:
             manifest: west-ncs.yml
             sdk_version: 0.17.0
             sdk_toolchain: arm-zephyr-eabi
+          - board: thingy53/nrf5340/cpuapp/ns
+            manifest: west-ncs.yml
+            sdk_version: 0.17.0
+            sdk_toolchain: arm-zephyr-eabi
+            build_extra_args: -- -Dlogs_SHIELD=nrf7002eb
           - board: rpi_pico/rp2040/w
             manifest: west-zephyr-raspberrypi.yml
             sdk_version: 0.17.4
@@ -166,4 +171,4 @@ jobs:
       - name: Build application
         working-directory: modules/lib/spotflow/zephyr/samples/logs
         run: |
-          west build --board ${{ matrix.board }}
+          west build --board ${{ matrix.board }} ${{ matrix.build_extra_args }}
