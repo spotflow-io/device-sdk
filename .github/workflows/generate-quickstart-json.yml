@@ -1,0 +1,41 @@
+name: Generate Quickstart JSON
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'zephyr/ci/boards.yml'
+      - 'zephyr/ci/generate_quickstart.py'
+      - 'zephyr/manifests/**'
+      - '.github/workflows/generate-quickstart.yml'
+  pull_request:
+    paths:
+      - 'zephyr/ci/boards.yml'
+      - 'zephyr/ci/generate_quickstart.py'
+      - 'zephyr/manifests/**'
+      - '.github/workflows/generate-quickstart.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  generate-quickstart:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+      
+      
+      - name: Install dependencies
+        run: pip install pyyaml
+      
+      - name: Generate quickstart.json
+        run: python zephyr/ci/generate_quickstart_json.py
+      
+      - name: Upload quickstart.json artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quickstart-json
+          path: zephyr/ci/quickstart.json

@@ -1,6 +1,7 @@
 vendors:
 
   - name: Espressif
+    vendor: espressif
     manifest: west-zephyr-espressif.yml
     sdk_version: 0.17.4
     sdk_toolchain: riscv64-zephyr-elf
@@ -20,6 +21,7 @@ vendors:
         sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
 
   - name: Infineon
+    vendor: infineon
     manifest: west-zephyr-infineon.yml
     sdk_version: 0.17.4
     sdk_toolchain: arm-zephyr-eabi
@@ -30,6 +32,7 @@ vendors:
         name: CY8CProto-062-4343W
 
   - name: Nordic Semiconductor
+    vendor: nordic
     manifest: west-ncs.yml
     sdk_version: 0.17.0
     sdk_toolchain: arm-zephyr-eabi
@@ -44,6 +47,7 @@ vendors:
         build_extra_args: -- -Dlogs_SHIELD=nrf7002eb
 
   - name: NXP
+    vendor: nxp
     manifest: west-zephyr-nxp.yml
     sdk_version: 0.17.4
     sdk_toolchain: arm-zephyr-eabi
@@ -57,6 +61,7 @@ vendors:
         name: FRDM-K64F
 
   - name: Raspberry Pi
+    vendor: raspberrypi
     manifest: west-zephyr-raspberrypi.yml
     sdk_version: 0.17.4
     sdk_toolchain: arm-zephyr-eabi
