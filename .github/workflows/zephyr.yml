@@ -53,15 +53,12 @@ jobs:
                   'blob': vendor.get('blob', ''),
                   'build_extra_args': vendor.get('build_extra_args', '')
               }
-              
+
               for board in vendor['boards']:
-                  entry = vendor_props.copy()
-                  # Override with board-specific properties
-                  for key in entry:
-                      if key in board:
-                          entry[key] = board[key]
-                  # Use id as board if not specified
-                  entry['board'] = board.get('board', board['id'])
+                  entry = {'board': board.get('board', board['id'])}
+                  for key, value in vendor_props.items():
+                      entry[key] = board.get(key, value)
+
                   matrix_entries.append(entry)
 
           matrix_json = json.dumps({'include': matrix_entries})
