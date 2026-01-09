@@ -177,7 +177,7 @@ static void aggregation_timer_handler(struct k_work *work)
 
 	/* Capture timestamp when aggregation window closes */
 	int64_t timestamp_ms = k_uptime_get();
-	LOG_INF("Aggregation window closed for metric '%s' at %lld ms",
+	LOG_DBG("Aggregation window closed for metric '%s' at %lld ms",
 		metric->name, timestamp_ms);
 
 	k_mutex_lock(&metric->lock, K_FOREVER);

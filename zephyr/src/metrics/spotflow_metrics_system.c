@@ -9,10 +9,11 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/sys/printk.h>
 #include <zephyr/sys/atomic.h>
 
-/* Memory and heap metrics use k_mem_free_get() from kernel.h */
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP
+#include <zephyr/sys/heap_listener.h>
+#endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK
 #include <zephyr/net/net_if.h>
@@ -22,35 +23,30 @@
 /* CPU metrics use k_thread_runtime_stats_all_get() from kernel.h */
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
-#include <zephyr/drivers/hwinfo.h>
+#include "spotflow_reset_helper.h"
 #endif
 
 LOG_MODULE_REGISTER(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-/* Metric handles - using type-specific handles */
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_MEMORY
-static spotflow_metric_int_t *g_memory_free_metric;
-static spotflow_metric_int_t *g_memory_total_metric;
-#endif
-
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP
-static spotflow_metric_int_t *g_heap_free_metric;
-static spotflow_metric_int_t *g_heap_allocated_metric;
+static spotflow_metric_int_t* g_heap_free_metric;
+static spotflow_metric_int_t* g_heap_allocated_metric;
+extern struct sys_heap _system_heap;
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK
-static spotflow_metric_int_t *g_network_tx_metric;
-static spotflow_metric_int_t *g_network_rx_metric;
+static spotflow_metric_int_t* g_network_tx_metric;
+static spotflow_metric_int_t* g_network_rx_metric;
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CPU
-static spotflow_metric_float_t *g_cpu_utilization_metric;
+static spotflow_metric_float_t* g_cpu_utilization_metric;
 static uint64_t g_last_idle_cycles = 0;
 static uint64_t g_last_total_cycles = 0;
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-static spotflow_metric_int_t *g_connection_state_metric;
+static spotflow_metric_int_t* g_connection_state_metric;
 #endif
 
 /* Collection timer */
@@ -63,40 +59,133 @@ static struct k_work_delayable g_collection_work;
  */
 static atomic_t g_system_metrics_init_state = ATOMIC_INIT(0);
 
-/**
- * @brief Collect and report memory metrics
- */
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_MEMORY
-static void collect_memory_metrics(void)
+static void collection_timer_handler(struct k_work* work);
+
+int spotflow_metrics_system_init(void)
 {
-	/* Safety check: metrics must be registered */
-	if (!g_memory_free_metric || !g_memory_total_metric) {
-		LOG_ERR("Memory metrics not registered");
-		return;
+	/* Fast path: already fully initialized */
+	if (atomic_get(&g_system_metrics_init_state) == 2) {
+		return 0;
+	}
+
+	/* Try to claim initialization (0 -> 1) */
+	if (!atomic_cas(&g_system_metrics_init_state, 0, 1)) {
+		/* Another thread is initializing - wait for completion */
+		while (atomic_get(&g_system_metrics_init_state) != 2) {
+			k_yield();
+		}
+		return 0;
 	}
 
 	/*
-	 * Note: Zephyr doesn't provide a portable runtime API to query heap statistics.
-	 * We report the configured heap size. Applications can track their own allocations
-	 * if detailed runtime stats are needed.
+	 * Note: No need to explicitly call spotflow_metrics_init() - the backend
+	 * auto-initializes on first metric registration (lazy initialization).
 	 */
-	size_t total_bytes = K_HEAP_MEM_POOL_SIZE;
 
-	/* Report placeholder for free memory (0 = unknown) */
-	int rc = spotflow_report_metric_int(g_memory_free_metric, 0);
-	if (rc < 0) {
-		LOG_ERR("Failed to report memory free: %d", rc);
+	LOG_DBG("Initializing system metrics auto-collection");
+
+	int registered_count = 0;
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP
+	/* Register heap metrics (aggregated over 1 minute) */
+	g_heap_free_metric = spotflow_register_metric_int("heap_free_bytes", "PT1M");
+	if (!g_heap_free_metric) {
+		LOG_ERR("Failed to register heap free metric");
+		return -ENOMEM;
 	}
+	registered_count++;
 
-	/* Report total memory pool size */
-	rc = spotflow_report_metric_int(g_memory_total_metric, (int64_t)total_bytes);
-	if (rc < 0) {
-		LOG_ERR("Failed to report memory total: %d", rc);
+	g_heap_allocated_metric = spotflow_register_metric_int("heap_allocated_bytes", "PT1M");
+	if (!g_heap_allocated_metric) {
+		LOG_ERR("Failed to register heap allocated metric");
+		return -ENOMEM;
 	}
-
-	LOG_DBG("Memory: total=%zu bytes (free=unknown)", total_bytes);
-}
+	registered_count++;
+	LOG_INF("Registered heap metrics");
 #endif
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK
+	/* Register network metrics (labeled, aggregated over 1 minute) */
+	/* Max 4 time series to support typical multi-interface devices */
+	g_network_tx_metric =
+	    spotflow_register_metric_int_with_labels("network_tx_bytes", "PT1M", 4, 1);
+	if (!g_network_tx_metric) {
+		LOG_ERR("Failed to register network TX metric");
+		return -ENOMEM;
+	}
+	registered_count++;
+
+	g_network_rx_metric =
+	    spotflow_register_metric_int_with_labels("network_rx_bytes", "PT1M", 4, 1);
+	if (!g_network_rx_metric) {
+		LOG_ERR("Failed to register network RX metric");
+		return -ENOMEM;
+	}
+	registered_count++;
+	LOG_INF("Registered network metrics");
+#endif
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CPU
+	/* Register CPU utilization metric (aggregated over 1 minute) */
+	g_cpu_utilization_metric =
+	    spotflow_register_metric_float("cpu_utilization_percent", "PT1M");
+	if (!g_cpu_utilization_metric) {
+		LOG_ERR("Failed to register CPU utilization metric");
+		return -ENOMEM;
+	}
+	registered_count++;
+	LOG_INF("Registered CPU utilization metric");
+#endif
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+	/* Register connection state metric (immediate/event-driven) */
+	g_connection_state_metric =
+	    spotflow_register_metric_int("connection_mqtt_connected", "PT0S");
+	if (!g_connection_state_metric) {
+		LOG_ERR("Failed to register connection state metric");
+		return -ENOMEM;
+	}
+	registered_count++;
+	LOG_INF("Registered connection state metric");
+#endif
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
+	/* Report reset cause once on boot */
+	report_reboot_reason();
+#endif
+
+	/* Initialize collection timer */
+	k_work_init_delayable(&g_collection_work, collection_timer_handler);
+
+	/* Start periodic collection */
+	k_work_schedule(&g_collection_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL));
+
+	/* Mark as fully initialized */
+	atomic_set(&g_system_metrics_init_state, 2);
+
+	LOG_INF("System metrics initialized: %d metrics registered, collection interval=%d "
+		"seconds",
+		registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL);
+
+	return 0;
+}
+
+void spotflow_metrics_system_report_connection_state(bool connected)
+{
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+	if (atomic_get(&g_system_metrics_init_state) != 2 || !g_connection_state_metric) {
+		return;
+	}
+
+	int rc = spotflow_report_metric_int(g_connection_state_metric, connected ? 1 : 0);
+	if (rc < 0) {
+		LOG_ERR("Failed to report connection state: %d", rc);
+		return;
+	}
+
+	LOG_INF("MQTT connection state: %s", connected ? "connected" : "disconnected");
+#endif
+}
 
 /**
  * @brief Collect and report heap metrics
@@ -110,25 +199,23 @@ static void collect_heap_metrics(void)
 		return;
 	}
 
-	/*
-	 * Note: Zephyr doesn't provide a portable runtime API to query heap statistics.
-	 * We report placeholders. Applications can track their own allocations
-	 * if detailed runtime stats are needed.
-	 */
-
-	/* Report placeholder for free heap (0 = unknown) */
-	int rc = spotflow_report_metric_int(g_heap_free_metric, 0);
+	struct sys_memory_stats heap_stats;
+	int ret = sys_heap_runtime_stats_get(&_system_heap, &heap_stats);
+	if (ret < 0) {
+		LOG_ERR("Failed to get heap stats: %d", ret);
+		return;
+	}
+	int rc = spotflow_report_metric_int(g_heap_free_metric, heap_stats.free_bytes);
 	if (rc < 0) {
 		LOG_ERR("Failed to report heap free: %d", rc);
 	}
-
-	/* Report placeholder for allocated heap (0 = unknown) */
-	rc = spotflow_report_metric_int(g_heap_allocated_metric, 0);
+	rc = spotflow_report_metric_int(g_heap_allocated_metric, heap_stats.allocated_bytes);
 	if (rc < 0) {
 		LOG_ERR("Failed to report heap allocated: %d", rc);
 	}
+	LOG_DBG("Heap: free=%zu bytes, allocated=%zu bytes", heap_stats.free_bytes,
+		heap_stats.allocated_bytes);
 
-	LOG_DBG("Heap: statistics not available in runtime");
 }
 #endif
 
@@ -136,9 +223,9 @@ static void collect_heap_metrics(void)
  * @brief Callback for reporting network metrics for each interface
  */
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK
-static void report_network_interface_metrics(struct net_if *iface, void *user_data)
+static void report_network_interface_metrics(struct net_if* iface, void* user_data)
 {
-	int *if_count = (int *)user_data;
+	int* if_count = (int*)user_data;
 
 	/* Skip interfaces that are not up */
 	if (!net_if_is_up(iface)) {
@@ -146,54 +233,41 @@ static void report_network_interface_metrics(struct net_if *iface, void *user_da
 	}
 
 	/* Get device and validate */
-	const struct device *dev = net_if_get_device(iface);
+	const struct device* dev = net_if_get_device(iface);
 	if (!dev || !dev->name) {
 		LOG_WRN("Interface has no valid device/name");
 		return;
 	}
 
-	const char *if_name = dev->name;
+	const char* if_name = dev->name;
 
 	/* Get network statistics */
 	uint64_t tx_bytes = 0;
 	uint64_t rx_bytes = 0;
 
-#if defined(CONFIG_NET_STATISTICS)
 	/* Access statistics if enabled - use structure field directly */
-	struct net_stats *stats = &iface->stats;
+	struct net_stats* stats = &iface->stats;
 	tx_bytes = stats->bytes.sent;
 	rx_bytes = stats->bytes.received;
-#endif
 
 	/* Create labels for interface name */
-	spotflow_label_t labels[] = {
-		{.key = "interface", .value = if_name}
-	};
+	spotflow_label_t labels[] = { { .key = "interface", .value = if_name } };
 
 	/* Report TX bytes */
-	int rc = spotflow_report_metric_int_with_labels(
-		g_network_tx_metric,
-		(int64_t)tx_bytes,
-		labels,
-		1
-	);
+	int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, (int64_t)tx_bytes,
+							labels, 1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report network TX for %s: %d", if_name, rc);
 	}
 
 	/* Report RX bytes */
-	rc = spotflow_report_metric_int_with_labels(
-		g_network_rx_metric,
-		(int64_t)rx_bytes,
-		labels,
-		1
-	);
+	rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, (int64_t)rx_bytes, labels,
+						    1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report network RX for %s: %d", if_name, rc);
 	}
 
-	LOG_DBG("Network %s: TX=%llu bytes, RX=%llu bytes",
-		if_name, (unsigned long long)tx_bytes,
+	LOG_DBG("Network %s: TX=%llu bytes, RX=%llu bytes", if_name, (unsigned long long)tx_bytes,
 		(unsigned long long)rx_bytes);
 
 	(*if_count)++;
@@ -274,57 +348,18 @@ static void collect_cpu_metrics(void)
 	}
 
 	/* Save current values for next iteration */
-	g_last_idle_cycles = stats.execution_cycles;  /* Store active cycles */
+	g_last_idle_cycles = stats.execution_cycles; /* Store active cycles */
 	g_last_total_cycles = total_cycles;
 }
 #endif
 
-/**
- * @brief Report reset cause (called once on boot)
- */
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
-static void report_reset_cause(void)
-{
-	uint32_t cause;
-	int rc = hwinfo_get_reset_cause(&cause);
-
-	if (rc < 0) {
-		LOG_WRN("Failed to get reset cause: %d", rc);
-		return;
-	}
-
-	/* Report as immediate event metric */
-	static spotflow_metric_int_t *reset_cause_metric;
-	reset_cause_metric = spotflow_register_metric_int("boot_reset_cause", "PT0S");
-	if (!reset_cause_metric) {
-		LOG_ERR("Failed to register reset cause metric");
-		return;
-	}
-
-	rc = spotflow_report_metric_int(reset_cause_metric, (int64_t)cause);
-	if (rc < 0) {
-		LOG_ERR("Failed to report reset cause: %d", rc);
-		return;
-	}
-
-	LOG_INF("Reset cause reported: 0x%08x", cause);
-
-	/* Clear reset cause after reporting */
-	hwinfo_clear_reset_cause();
-}
-#endif
 
 /**
  * @brief Periodic collection timer handler
  */
-static void collection_timer_handler(struct k_work *work)
+static void collection_timer_handler(struct k_work* work)
 {
 	LOG_DBG("Collecting system metrics...");
-
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_MEMORY
-	collect_memory_metrics();
-#endif
-
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP
 	collect_heap_metrics();
 #endif
@@ -338,156 +373,9 @@ static void collection_timer_handler(struct k_work *work)
 #endif
 
 	/* Reschedule for next collection */
-	k_work_schedule(&g_collection_work,
-			K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL));
+	k_work_schedule(&g_collection_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL));
 }
 
-/* Public API */
 
-int spotflow_metrics_system_init(void)
-{
-	/* Fast path: already fully initialized */
-	if (atomic_get(&g_system_metrics_init_state) == 2) {
-		return 0;
-	}
 
-	/* Try to claim initialization (0 -> 1) */
-	if (!atomic_cas(&g_system_metrics_init_state, 0, 1)) {
-		/* Another thread is initializing - wait for completion */
-		while (atomic_get(&g_system_metrics_init_state) != 2) {
-			k_yield();
-		}
-		return 0;
-	}
 
-	/*
-	 * Note: No need to explicitly call spotflow_metrics_init() - the backend
-	 * auto-initializes on first metric registration (lazy initialization).
-	 */
-
-	LOG_INF("Initializing system metrics auto-collection");
-
-	int registered_count = 0;
-
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_MEMORY
-	/* Register memory metrics (aggregated over 1 minute) */
-	g_memory_free_metric = spotflow_register_metric_int(
-		"memory_free_bytes", "PT1M");
-	if (!g_memory_free_metric) {
-		LOG_ERR("Failed to register memory free metric");
-		return -ENOMEM;
-	}
-	registered_count++;
-
-	g_memory_total_metric = spotflow_register_metric_int(
-		"memory_total_bytes", "PT1M");
-	if (!g_memory_total_metric) {
-		LOG_ERR("Failed to register memory total metric");
-		return -ENOMEM;
-	}
-	registered_count++;
-	LOG_INF("Registered memory metrics");
-#endif
-
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP
-	/* Register heap metrics (aggregated over 1 minute) */
-	g_heap_free_metric = spotflow_register_metric_int(
-		"heap_free_bytes", "PT1M");
-	if (!g_heap_free_metric) {
-		LOG_ERR("Failed to register heap free metric");
-		return -ENOMEM;
-	}
-	registered_count++;
-
-	g_heap_allocated_metric = spotflow_register_metric_int(
-		"heap_allocated_bytes", "PT1M");
-	if (!g_heap_allocated_metric) {
-		LOG_ERR("Failed to register heap allocated metric");
-		return -ENOMEM;
-	}
-	registered_count++;
-	LOG_INF("Registered heap metrics");
-#endif
-
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK
-	/* Register network metrics (labeled, aggregated over 1 minute) */
-	/* Max 4 time series to support typical multi-interface devices */
-	g_network_tx_metric = spotflow_register_metric_int_with_labels(
-		"network_tx_bytes", "PT1M", 4, 1);
-	if (!g_network_tx_metric) {
-		LOG_ERR("Failed to register network TX metric");
-		return -ENOMEM;
-	}
-	registered_count++;
-
-	g_network_rx_metric = spotflow_register_metric_int_with_labels(
-		"network_rx_bytes", "PT1M", 4, 1);
-	if (!g_network_rx_metric) {
-		LOG_ERR("Failed to register network RX metric");
-		return -ENOMEM;
-	}
-	registered_count++;
-	LOG_INF("Registered network metrics");
-#endif
-
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CPU
-	/* Register CPU utilization metric (aggregated over 1 minute) */
-	g_cpu_utilization_metric = spotflow_register_metric_float(
-		"cpu_utilization_percent", "PT1M");
-	if (!g_cpu_utilization_metric) {
-		LOG_ERR("Failed to register CPU utilization metric");
-		return -ENOMEM;
-	}
-	registered_count++;
-	LOG_INF("Registered CPU utilization metric");
-#endif
-
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-	/* Register connection state metric (immediate/event-driven) */
-	g_connection_state_metric = spotflow_register_metric_int(
-		"connection_mqtt_connected", "PT0S");
-	if (!g_connection_state_metric) {
-		LOG_ERR("Failed to register connection state metric");
-		return -ENOMEM;
-	}
-	registered_count++;
-	LOG_INF("Registered connection state metric");
-#endif
-
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
-	/* Report reset cause once on boot */
-	report_reset_cause();
-#endif
-
-	/* Initialize collection timer */
-	k_work_init_delayable(&g_collection_work, collection_timer_handler);
-
-	/* Start periodic collection */
-	k_work_schedule(&g_collection_work,
-			K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL));
-
-	/* Mark as fully initialized */
-	atomic_set(&g_system_metrics_init_state, 2);
-
-	LOG_INF("System metrics initialized: %d metrics registered, collection interval=%d seconds",
-		registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL);
-
-	return 0;
-}
-
-void spotflow_metrics_system_report_connection_state(bool connected)
-{
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-	if (atomic_get(&g_system_metrics_init_state) != 2 || !g_connection_state_metric) {
-		return;
-	}
-
-	int rc = spotflow_report_metric_int(g_connection_state_metric, connected ? 1 : 0);
-	if (rc < 0) {
-		LOG_ERR("Failed to report connection state: %d", rc);
-		return;
-	}
-
-	LOG_INF("MQTT connection state: %s", connected ? "connected" : "disconnected");
-#endif
-}

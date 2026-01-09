@@ -19,6 +19,7 @@ config SPOTFLOW_METRICS_SYSTEM_MEMORY
 config SPOTFLOW_METRICS_SYSTEM_HEAP
 	bool "Enable heap metrics"
 	depends on HEAP_MEM_POOL_SIZE > 0
+	imply SYS_HEAP_RUNTIME_STATS
 	default y
 	help
 	  Collect heap memory statistics (free/allocated bytes).
@@ -61,7 +62,7 @@ config SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
 config SPOTFLOW_METRICS_SYSTEM_INTERVAL
 	int "System metrics collection interval (seconds)"
 	range 10 3600
-	default 60
+	default 10
 	help
 	  How often to collect and report system metrics (10-3600 seconds).
 	  Default is 60 seconds (1 minute).
