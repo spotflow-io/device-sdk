@@ -41,24 +41,28 @@ jobs:
           import json
           import os
 
+          def get_property(key, board, vendor, defaults, default=None):
+              """Get property with priority: board > vendor > defaults > default."""
+              return board.get(key, vendor.get(key, defaults.get(key, default)))
+
           with open('zephyr/ci/boards.yml') as f:
               config = yaml.safe_load(f)
 
+          defaults = config.get('defaults', {})
           matrix_entries = []
+
           for vendor in config['vendors']:
-              vendor_props = {
-                  'manifest': vendor.get('manifest'),
-                  'sdk_version': vendor.get('sdk_version'),
-                  'sdk_toolchain': vendor.get('sdk_toolchain'),
-                  'blob': vendor.get('blob', ''),
-                  'build_extra_args': vendor.get('build_extra_args', '')
-              }
-
               for board in vendor['boards']:
-                  entry = {'board': board.get('board', board['id'])}
-                  for key, value in vendor_props.items():
-                      entry[key] = board.get(key, value)
-
+                  entry = {
+                      'board': board.get('board', board['id']),
+                      'manifest': get_property('manifest', board, vendor, defaults),
+                      'sdk_version': get_property('sdk_version', board, vendor, defaults),
+                      'sdk_toolchain': get_property('sdk_toolchain', board, vendor, defaults),
+                      'blob': get_property('blob', board, vendor, defaults, ''),
+                      'build_extra_args': get_property(
+                        'build_extra_args', board, vendor, defaults, ''
+                      )
+                  }
                   matrix_entries.append(entry)
 
           matrix_json = json.dumps({'include': matrix_entries})

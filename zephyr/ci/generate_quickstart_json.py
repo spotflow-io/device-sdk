@@ -24,9 +24,18 @@ def extract_spotflow_path(manifest_filepath: Path) -> str:
 
 
 def get_board_property(
-    board: Dict[str, Any], vendor: Dict[str, Any], key: str, default: Any = None
+    key: str,
+    board: Dict[str, Any],
+    vendor: Dict[str, Any],
+    defaults: Dict[str, Any] = None,
+    default: Any = None,
 ) -> Any:
-    return board.get(key, vendor.get(key, default))
+    """
+    Get a property value with priority: board > vendor > global defaults > default.
+    """
+    if defaults is None:
+        defaults = {}
+    return board.get(key, vendor.get(key, defaults.get(key, default)))
 
 
 def compute_board_prefix(board_value: str) -> str:
@@ -49,15 +58,21 @@ def compute_zephyr_docs_url(vendor: str, board_value: str) -> str:
 
 
 def transform_board(
-    board: Dict[str, Any], vendor: Dict[str, Any], spotflow_paths: Dict[str, str]
+    board: Dict[str, Any],
+    vendor: Dict[str, Any],
+    spotflow_paths: Dict[str, str],
+    defaults: Dict[str, Any] = None,
 ) -> Dict[str, Any]:
     """
     Transform a board entry by applying property inheritance and computing
     derived properties.
     """
+    if defaults is None:
+        defaults = {}
+
     board_value = board.get("board", board["id"])
 
-    manifest = get_board_property(board, vendor, "manifest")
+    manifest = get_board_property("manifest", board, vendor, defaults)
     spotflow_path = spotflow_paths.get(manifest, "")
 
     result = {
@@ -66,22 +81,24 @@ def transform_board(
         "board": board_value,
         "manifest": manifest,
         "spotflow_path": spotflow_path,
-        "sdk_version": get_board_property(board, vendor, "sdk_version"),
-        "sdk_toolchain": get_board_property(board, vendor, "sdk_toolchain"),
-        "connection": get_board_property(board, vendor, "connection", []),
+        "sdk_version": get_board_property("sdk_version", board, vendor, defaults),
+        "sdk_toolchain": get_board_property("sdk_toolchain", board, vendor, defaults),
+        "connection": get_board_property("connection", board, vendor, defaults, []),
         "zephyr_docs": compute_zephyr_docs_url(vendor["vendor"], board_value),
         "sample_device_id": compute_sample_device_id(board_value),
     }
 
-    callout = get_board_property(board, vendor, "callout", "")
+    callout = get_board_property("callout", board, vendor, defaults, "")
     if callout:
         result["callout"] = callout
 
-    blob = get_board_property(board, vendor, "blob", "")
+    blob = get_board_property("blob", board, vendor, defaults, "")
     if blob:
         result["blob"] = blob
 
-    build_extra_args = get_board_property(board, vendor, "build_extra_args", "")
+    build_extra_args = get_board_property(
+        "build_extra_args", board, vendor, defaults, ""
+    )
     if build_extra_args:
         result["build_extra_args"] = build_extra_args
 
@@ -92,6 +109,9 @@ def generate_quickstart(
     boards_config: Dict[str, Any], spotflow_paths: Dict[str, str]
 ) -> Dict[str, Any]:
     """Generate the complete quickstart.json structure."""
+
+    # Extract global defaults
+    defaults = boards_config.get("defaults", {})
 
     # Hard-coded esp_idf section
     esp_idf = {
@@ -106,7 +126,7 @@ def generate_quickstart(
     for vendor in boards_config["vendors"]:
         if vendor.get("vendor") == "nordic":
             for board in vendor["boards"]:
-                transformed = transform_board(board, vendor, spotflow_paths)
+                transformed = transform_board(board, vendor, spotflow_paths, defaults)
                 ncs_boards.append(transformed)
 
     ncs = {"boards": ncs_boards}
@@ -116,7 +136,7 @@ def generate_quickstart(
     for vendor in boards_config["vendors"]:
         vendor_boards = []
         for board in vendor["boards"]:
-            transformed = transform_board(board, vendor, spotflow_paths)
+            transformed = transform_board(board, vendor, spotflow_paths, defaults)
             vendor_boards.append(transformed)
 
         zephyr_vendors.append({"name": vendor["name"], "boards": vendor_boards})

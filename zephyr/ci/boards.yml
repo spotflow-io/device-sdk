@@ -1,9 +1,12 @@
+defaults:
+  manifest: west-zephyr.yml
+  sdk_version: 0.17.4
+
 vendors:
 
   - name: Espressif
     vendor: espressif
     manifest: west-zephyr-espressif.yml
-    sdk_version: 0.17.4
     sdk_toolchain: riscv64-zephyr-elf
     blob: hal_espressif
     connection: ["wifi"]
@@ -23,7 +26,6 @@ vendors:
   - name: Infineon
     vendor: infineon
     manifest: west-zephyr-infineon.yml
-    sdk_version: 0.17.4
     sdk_toolchain: arm-zephyr-eabi
     blob: hal_infineon
     connection: ["wifi"]
@@ -49,7 +51,6 @@ vendors:
   - name: NXP
     vendor: nxp
     manifest: west-zephyr-nxp.yml
-    sdk_version: 0.17.4
     sdk_toolchain: arm-zephyr-eabi
     blob: hal_nxp
     connection: ["ethernet"]
@@ -63,7 +64,6 @@ vendors:
   - name: Raspberry Pi
     vendor: raspberrypi
     manifest: west-zephyr-raspberrypi.yml
-    sdk_version: 0.17.4
     sdk_toolchain: arm-zephyr-eabi
     blob: hal_infineon
     connection: ["wifi"]
