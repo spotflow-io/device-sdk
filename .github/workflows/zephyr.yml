@@ -82,6 +82,21 @@ jobs:
           sparse-checkout: zephyr/manifests/${{ matrix.manifest }}
           sparse-checkout-cone-mode: false
 
+      - name: Extract module path from manifest
+        id: module-path
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import os
+
+          with open('temp-manifest/zephyr/manifests/${{ matrix.manifest }}') as f:
+              manifest = yaml.safe_load(f)
+
+          module_path = manifest['manifest']['self']['path']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'path={module_path}\n')
+          EOF
+
       - name: Restore workspace dependencies
         id: cache-restore-workspace
         uses: actions/cache/restore@v4
@@ -119,7 +134,7 @@ jobs:
         if: steps.cache-restore-workspace.outputs.cache-hit == 'true'
         uses: actions/checkout@v6
         with:
-          path: modules/lib/spotflow
+          path: ${{ steps.module-path.outputs.path }}
 
       - name: Install Python packages
         if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
@@ -154,7 +169,7 @@ jobs:
             --toolchains ${{ matrix.sdk_toolchain }}
 
       - name: Configure application
-        working-directory: modules/lib/spotflow/zephyr/samples/logs
+        working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/logs
         run: |
           cat <<EOF > credentials.conf
           CONFIG_NET_WIFI_SSID="TODOTODO"
@@ -164,6 +179,6 @@ jobs:
           EOF
 
       - name: Build application
-        working-directory: modules/lib/spotflow/zephyr/samples/logs
+        working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/logs
         run: |
           west build --board ${{ matrix.board }} ${{ matrix.build_extra_args }}
