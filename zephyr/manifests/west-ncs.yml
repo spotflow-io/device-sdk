@@ -20,4 +20,4 @@ manifest:
           - zephyr
 
   self:
-    path: modules/lib/spotflow
+    path: spotflow
