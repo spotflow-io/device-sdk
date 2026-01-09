@@ -73,6 +73,10 @@ def transform_board(
         "sample_device_id": compute_sample_device_id(board_value),
     }
 
+    callout = get_board_property(board, vendor, "callout", "")
+    if callout:
+        result["callout"] = callout
+
     blob = get_board_property(board, vendor, "blob", "")
     if blob:
         result["blob"] = blob
