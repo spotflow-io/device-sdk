@@ -88,8 +88,8 @@ jobs:
         with:
           path: .
           key: >-
-            zephyr-workspace-${{ matrix.manifest }}-
-            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-
+            zephyr-workspace-${{ matrix.manifest }}
+            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}
             ${{ matrix.blob }}-${{ runner.os }}
 
       - name: Create Python virtual environment
@@ -135,8 +135,8 @@ jobs:
         with:
           path: .
           key: >-
-            zephyr-workspace-${{ matrix.manifest }}-
-            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-
+            zephyr-workspace-${{ matrix.manifest }}
+            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}
             ${{ matrix.blob }}-${{ runner.os }}
 
       - name: Cache Zephyr SDK
