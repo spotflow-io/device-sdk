@@ -18,16 +18,146 @@ LOG_MODULE_REGISTER(spotflow_metrics_agg, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG
 /* External message queue (defined in spotflow_metrics_net.c) */
 extern struct k_msgq g_spotflow_metrics_msgq;
 
+static bool labels_equal(const struct metric_timeseries_state* ts, const spotflow_label_t* labels,
+			 uint8_t label_count);
+static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value);
+static void update_aggregation_float(struct metric_timeseries_state* ts, double value);
+static int64_t get_interval_ms(spotflow_agg_interval_t interval);
+static int enqueue_metric_message(uint8_t* payload, size_t len);
+static struct metric_timeseries_state*
+find_or_create_timeseries(struct metric_aggregator_context* ctx, const spotflow_label_t* labels,
+			  uint8_t label_count);
+static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_timeseries_state* ts,
+			    int64_t timestamp_ms);
+static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
+				       const spotflow_label_t* labels, uint8_t label_count,
+				       int64_t value_int, double value_float);
+static void aggregation_timer_handler(struct k_work* work);
+
+/* Public API Implementation */
+
+int aggregator_register_metric(struct spotflow_metric_base* metric)
+{
+	/* Contract: This function MUST be atomic - either full success (returns 0) */
+	/* or full failure (returns -ENOMEM with no side effects). Caller relies on */
+	/* this to safely rollback metric registration on failure. */
+
+	/* Allocate aggregator context */
+	struct metric_aggregator_context* ctx = k_malloc(sizeof(*ctx));
+	if (!ctx) {
+		return -ENOMEM;
+	}
+
+	/* Allocate time series array */
+	ctx->timeseries = k_calloc(metric->max_timeseries, sizeof(struct metric_timeseries_state));
+	if (!ctx->timeseries) {
+		k_free(ctx); /* Clean up - maintain atomic semantics */
+		return -ENOMEM;
+	}
+
+	ctx->metric = metric;
+	ctx->timeseries_count = 0;
+	ctx->timeseries_capacity = metric->max_timeseries;
+	ctx->timer_started = false;
+
+	/* Always initialize aggregation timer work structure (even for PT0S) */
+	/* to prevent NULL pointer dereference if work is accidentally accessed */
+	k_work_init_delayable(&ctx->aggregation_work, aggregation_timer_handler);
+
+	metric->aggregator_context = ctx;
+
+	LOG_DBG("Registered aggregator for metric '%s' (max_ts=%u)", metric->name,
+		metric->max_timeseries);
+
+	return 0;
+}
+
+int aggregator_report_value(struct spotflow_metric_base* metric, const spotflow_label_t* labels,
+			    uint8_t label_count, int64_t value_int, double value_float)
+{
+	if (metric == NULL || metric->aggregator_context == NULL) {
+		return -EINVAL;
+	}
+
+	if (metric->agg_interval == SPOTFLOW_AGG_INTERVAL_NONE) {
+		int rc = flush_no_aggregation_metric(metric, labels, label_count, value_int, value_float);
+		k_mutex_unlock(&metric->lock);
+		return rc;
+	}
+
+	struct metric_aggregator_context* ctx = metric->aggregator_context;
+
+	k_mutex_lock(&metric->lock, K_FOREVER);
+
+	/* Find or create time series */
+	struct metric_timeseries_state* ts = find_or_create_timeseries(ctx, labels, label_count);
+
+	if (ts == NULL) {
+		k_mutex_unlock(&metric->lock);
+		LOG_WRN("Time series pool full for metric '%s' (%u/%u)", metric->name,
+			ctx->timeseries_count, ctx->timeseries_capacity);
+		return -ENOSPC;
+	}
+
+	/* Start aggregation timer on first report (sliding window) */
+	/* Use per-metric flag to prevent race condition with labeled metrics */
+	if (!ctx->timer_started) {
+		int64_t interval_ms = get_interval_ms(metric->agg_interval);
+		if (interval_ms > 0) {
+			k_work_schedule(&ctx->aggregation_work, K_MSEC(interval_ms));
+			ctx->timer_started = true;
+			LOG_DBG("Started aggregation timer for metric '%s' (interval=%lld ms)",
+				metric->name, interval_ms);
+		}
+	}
+
+	/* Update aggregation state */
+	if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
+		update_aggregation_int(ts, value_int);
+	} else {
+		update_aggregation_float(ts, value_float);
+	}
+
+	k_mutex_unlock(&metric->lock);
+	return 0;
+}
+
+void aggregator_unregister_metric(struct spotflow_metric_base* metric)
+{
+	if (metric == NULL || metric->aggregator_context == NULL) {
+		return;
+	}
+
+	struct metric_aggregator_context* ctx = metric->aggregator_context;
+
+	k_mutex_lock(&metric->lock, K_FOREVER);
+
+	/* Cancel pending timer */
+	if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE) {
+		k_work_cancel_delayable(&ctx->aggregation_work);
+	}
+
+	/* Free time series array */
+	k_free(ctx->timeseries);
+
+	/* Free context */
+	k_free(ctx);
+
+	metric->aggregator_context = NULL;
+
+	k_mutex_unlock(&metric->lock);
+
+	LOG_DBG("Unregistered aggregator for metric '%s'", metric->name);
+}
+
 /**
  * @brief Compare label arrays for equality
  *
  * Direct string comparison is used instead of hashing since labels are
  * sufficiently small (max 8 labels, key max 16 chars, value max 32 chars).
  */
-static bool labels_equal(
-	const struct metric_timeseries_state *ts,
-	const spotflow_label_t *labels,
-	uint8_t label_count)
+static bool labels_equal(const struct metric_timeseries_state* ts, const spotflow_label_t* labels,
+			 uint8_t label_count)
 {
 	if (ts->label_count != label_count) {
 		return false;
@@ -43,66 +173,42 @@ static bool labels_equal(
 	return true;
 }
 
-/**
- * @brief Get aggregation interval in milliseconds
- */
-static int64_t get_interval_ms(spotflow_agg_interval_t interval)
+static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
+				       const spotflow_label_t* labels, uint8_t label_count,
+				       int64_t value_int, double value_float)
 {
-	switch (interval) {
-	case SPOTFLOW_AGG_INTERVAL_NONE:
-		return 0;
-	case SPOTFLOW_AGG_INTERVAL_1MIN:
-		return 60 * 1000;
-	case SPOTFLOW_AGG_INTERVAL_10MIN:
-		return 10 * 60 * 1000;
-	case SPOTFLOW_AGG_INTERVAL_1HOUR:
-		return 60 * 60 * 1000;
-	default:
-		return 60 * 1000;  /* Default to 1 minute */
-	}
-}
+	uint8_t* cbor_data = NULL;
+	size_t cbor_len = 0;
 
-/**
- * @brief Enqueue message to transmission queue
- *
- * Called by flush_timeseries() to enqueue encoded messages.
- *
- * Memory ownership:
- * - On success: ownership of payload transfers to queue (processor will free)
- * - On failure: caller retains ownership and must free payload
- */
-static int enqueue_metric_message(uint8_t *payload, size_t len)
-{
-	if (payload == NULL || len == 0) {
-		return -EINVAL;
+	/* Get and increment sequence number while holding mutex */
+	uint64_t seq_num = metric->sequence_number++;
+
+	/* Encode to CBOR */
+	int rc = /* Get and increment sequence number while holding mutex */
+	    spotflow_metrics_cbor_encode_no_aggregation(metric, labels, label_count, value_int,
+							value_float, k_uptime_get(), seq_num,
+							&cbor_data, &cbor_len);
+	if (rc < 0) {
+		LOG_ERR("Failed to encode metric '%s': %d", metric->name, rc);
+		return rc;
 	}
 
-	/* Allocate message structure */
-	struct spotflow_mqtt_metrics_msg *msg = k_malloc(sizeof(*msg));
-	if (!msg) {
-		return -ENOMEM;
+	/* Enqueue message */
+	rc = enqueue_metric_message(cbor_data, cbor_len);
+	if (rc < 0) {
+		/* enqueue_metric_message does NOT free payload on failure */
+		/* We must free it here */
+		k_free(cbor_data);
+		LOG_WRN("Failed to enqueue metric '%s': %d", metric->name, rc);
+		return rc;
 	}
 
-	msg->payload = payload;
-	msg->len = len;
+	/* Ownership transferred to queue - processor will free */
 
-	/* Enqueue message (non-blocking) */
-	int rc = k_msgq_put(&g_spotflow_metrics_msgq, &msg, K_NO_WAIT);
-	if (rc != 0) {
-		/* Queue full - free message structure only, caller frees payload */
-		k_free(msg);
-		LOG_WRN("Metrics queue full, dropping message (%zu bytes)", len);
-		return -ENOMEM;
-	}
-
-	LOG_DBG("Enqueued metric message (%zu bytes)", len);
+	/* Increment message counter */
+	metric->transmitted_messages++;
 	return 0;
 }
-
-/**
- * @brief Forward declaration of aggregation timer handler
- */
-static void aggregation_timer_handler(struct k_work *work);
 
 /**
  * @brief Flush time series (encode and enqueue message)
@@ -113,18 +219,18 @@ static void aggregation_timer_handler(struct k_work *work);
  * @param ts Time series state to flush
  * @param timestamp_ms Device uptime when aggregation window closed
  */
-static int flush_timeseries(struct spotflow_metric_base *metric, struct metric_timeseries_state *ts,
+static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_timeseries_state* ts,
 			    int64_t timestamp_ms)
 {
-	uint8_t *cbor_data = NULL;
+	uint8_t* cbor_data = NULL;
 	size_t cbor_len = 0;
 
 	/* Get and increment sequence number while holding mutex */
 	uint64_t seq_num = metric->sequence_number++;
 
 	/* Encode to CBOR */
-	int rc = spotflow_metrics_cbor_encode(metric, ts, timestamp_ms, seq_num,
-					      &cbor_data, &cbor_len);
+	int rc =
+	    spotflow_metrics_cbor_encode(metric, ts, timestamp_ms, seq_num, &cbor_data, &cbor_len);
 	if (rc < 0) {
 		LOG_ERR("Failed to encode metric '%s': %d", metric->name, rc);
 		return rc;
@@ -167,27 +273,26 @@ static int flush_timeseries(struct spotflow_metric_base *metric, struct metric_t
  *
  * Called when aggregation window closes. Flushes all active time series.
  */
-static void aggregation_timer_handler(struct k_work *work)
+static void aggregation_timer_handler(struct k_work* work)
 {
-	struct k_work_delayable *dwork = k_work_delayable_from_work(work);
-	struct metric_aggregator_context *ctx =
-		CONTAINER_OF(dwork, struct metric_aggregator_context, aggregation_work);
+	struct k_work_delayable* dwork = k_work_delayable_from_work(work);
+	struct metric_aggregator_context* ctx =
+	    CONTAINER_OF(dwork, struct metric_aggregator_context, aggregation_work);
 
-	struct spotflow_metric_base *metric = ctx->metric;
+	struct spotflow_metric_base* metric = ctx->metric;
 
 	/* Capture timestamp when aggregation window closes */
 	int64_t timestamp_ms = k_uptime_get();
-	LOG_DBG("Aggregation window closed for metric '%s' at %lld ms",
-		metric->name, timestamp_ms);
+	LOG_DBG("Aggregation window closed for metric '%s' at %lld ms", metric->name, timestamp_ms);
 
 	k_mutex_lock(&metric->lock, K_FOREVER);
 
-	LOG_DBG("Aggregation timer expired for metric '%s' (%u active time series)",
-		metric->name, ctx->timeseries_count);
+	LOG_DBG("Aggregation timer expired for metric '%s' (%u active time series)", metric->name,
+		ctx->timeseries_count);
 
 	/* Flush all active time series with the same timestamp */
 	for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
-		struct metric_timeseries_state *ts = &ctx->timeseries[i];
+		struct metric_timeseries_state* ts = &ctx->timeseries[i];
 
 		if (ts->active && ts->count > 0) {
 			int rc = flush_timeseries(metric, ts, timestamp_ms);
@@ -213,10 +318,9 @@ static void aggregation_timer_handler(struct k_work *work)
  * Uses direct string comparison for label matching. O(n) linear search
  * is acceptable since max_timeseries ≤ 256 and labels are small.
  */
-static struct metric_timeseries_state *find_or_create_timeseries(
-	struct metric_aggregator_context *ctx,
-	const spotflow_label_t *labels,
-	uint8_t label_count)
+static struct metric_timeseries_state*
+find_or_create_timeseries(struct metric_aggregator_context* ctx, const spotflow_label_t* labels,
+			  uint8_t label_count)
 {
 	/* First, try to find existing time series with matching labels */
 	for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
@@ -228,13 +332,13 @@ static struct metric_timeseries_state *find_or_create_timeseries(
 
 	/* Not found - create new time series if space available */
 	if (ctx->timeseries_count >= ctx->timeseries_capacity) {
-		return NULL;  /* Pool full */
+		return NULL; /* Pool full */
 	}
 
 	/* Find first inactive slot */
 	for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
 		if (!ctx->timeseries[i].active) {
-			struct metric_timeseries_state *ts = &ctx->timeseries[i];
+			struct metric_timeseries_state* ts = &ctx->timeseries[i];
 
 			/* Initialize new time series */
 			memset(ts, 0, sizeof(*ts));
@@ -251,8 +355,8 @@ static struct metric_timeseries_state *find_or_create_timeseries(
 				}
 				size_t key_len = strlen(labels[j].key);
 				if (key_len >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
-					LOG_ERR("Label key too long: %zu chars (max %d)",
-						key_len, SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
+					LOG_ERR("Label key too long: %zu chars (max %d)", key_len,
+						SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
 					ts->active = false;
 					return NULL;
 				}
@@ -290,20 +394,20 @@ static struct metric_timeseries_state *find_or_create_timeseries(
 			ctx->timeseries_count++;
 
 			LOG_DBG("Created new time series for metric '%s' (total=%u/%u)",
-				ctx->metric->name, ctx->timeseries_count,
-				ctx->timeseries_capacity);
+				ctx->metric->name, ctx->timeseries_count, ctx->timeseries_capacity);
 
 			return ts;
 		}
 	}
 
-	return NULL;  /* Should not reach here */
+	return NULL; /* Should not reach here */
 }
 
 /**
  * @brief Update integer aggregation state
  */
-static void update_aggregation_int(struct metric_timeseries_state *ts, int64_t value)
+static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value)
+
 {
 	ts->count++;
 
@@ -312,8 +416,7 @@ static void update_aggregation_int(struct metric_timeseries_state *ts, int64_t v
 	ts->sum_int += value;
 
 	/* Check for overflow */
-	if ((value > 0 && ts->sum_int < old_sum) ||
-	    (value < 0 && ts->sum_int > old_sum)) {
+	if ((value > 0 && ts->sum_int < old_sum) || (value < 0 && ts->sum_int > old_sum)) {
 		ts->sum_truncated = true;
 	}
 
@@ -329,7 +432,7 @@ static void update_aggregation_int(struct metric_timeseries_state *ts, int64_t v
 /**
  * @brief Update float aggregation state
  */
-static void update_aggregation_float(struct metric_timeseries_state *ts, double value)
+static void update_aggregation_float(struct metric_timeseries_state* ts, double value)
 {
 	ts->count++;
 
@@ -345,124 +448,58 @@ static void update_aggregation_float(struct metric_timeseries_state *ts, double 
 	}
 }
 
-/* Public API Implementation */
-
-int aggregator_register_metric(struct spotflow_metric_base *metric)
+/**
+ * @brief Get aggregation interval in milliseconds
+ */
+static int64_t get_interval_ms(spotflow_agg_interval_t interval)
 {
-	/* Contract: This function MUST be atomic - either full success (returns 0) */
-	/* or full failure (returns -ENOMEM with no side effects). Caller relies on */
-	/* this to safely rollback metric registration on failure. */
-
-	/* Allocate aggregator context */
-	struct metric_aggregator_context *ctx = k_malloc(sizeof(*ctx));
-	if (!ctx) {
-		return -ENOMEM;
+	switch (interval) {
+	case SPOTFLOW_AGG_INTERVAL_NONE:
+		return 0;
+	case SPOTFLOW_AGG_INTERVAL_1MIN:
+		return 60 * 1000;
+	case SPOTFLOW_AGG_INTERVAL_10MIN:
+		return 10 * 60 * 1000;
+	case SPOTFLOW_AGG_INTERVAL_1HOUR:
+		return 60 * 60 * 1000;
+	default:
+		return 60 * 1000; /* Default to 1 minute */
 	}
-
-	/* Allocate time series array */
-	ctx->timeseries = k_calloc(metric->max_timeseries, sizeof(struct metric_timeseries_state));
-	if (!ctx->timeseries) {
-		k_free(ctx);  /* Clean up - maintain atomic semantics */
-		return -ENOMEM;
-	}
-
-	ctx->metric = metric;
-	ctx->timeseries_count = 0;
-	ctx->timeseries_capacity = metric->max_timeseries;
-	ctx->timer_started = false;
-
-	/* Always initialize aggregation timer work structure (even for PT0S) */
-	/* to prevent NULL pointer dereference if work is accidentally accessed */
-	k_work_init_delayable(&ctx->aggregation_work, aggregation_timer_handler);
-
-	metric->aggregator_context = ctx;
-
-	LOG_DBG("Registered aggregator for metric '%s' (max_ts=%u)",
-		metric->name, metric->max_timeseries);
-
-	return 0;
 }
 
-int aggregator_report_value(
-	struct spotflow_metric_base *metric,
-	const spotflow_label_t *labels,
-	uint8_t label_count,
-	int64_t value_int,
-	double value_float)
+/**
+ * @brief Enqueue message to transmission queue
+ *
+ * Called by flush_timeseries() to enqueue encoded messages.
+ *
+ * Memory ownership:
+ * - On success: ownership of payload transfers to queue (processor will free)
+ * - On failure: caller retains ownership and must free payload
+ */
+static int enqueue_metric_message(uint8_t* payload, size_t len)
 {
-	if (metric == NULL || metric->aggregator_context == NULL) {
+	if (payload == NULL || len == 0) {
 		return -EINVAL;
 	}
 
-	struct metric_aggregator_context *ctx = metric->aggregator_context;
-
-	k_mutex_lock(&metric->lock, K_FOREVER);
-
-	/* Find or create time series */
-	struct metric_timeseries_state *ts =
-		find_or_create_timeseries(ctx, labels, label_count);
-
-	if (ts == NULL) {
-		k_mutex_unlock(&metric->lock);
-		LOG_WRN("Time series pool full for metric '%s' (%u/%u)",
-			metric->name, ctx->timeseries_count, ctx->timeseries_capacity);
-		return -ENOSPC;
+	/* Allocate message structure */
+	struct spotflow_mqtt_metrics_msg* msg = k_malloc(sizeof(*msg));
+	if (!msg) {
+		return -ENOMEM;
 	}
 
-	/* Start aggregation timer on first report (sliding window) */
-	/* Use per-metric flag to prevent race condition with labeled metrics */
-	if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE && !ctx->timer_started) {
-		int64_t interval_ms = get_interval_ms(metric->agg_interval);
-		if (interval_ms > 0) {
-			k_work_schedule(&ctx->aggregation_work, K_MSEC(interval_ms));
-			ctx->timer_started = true;
-			LOG_DBG("Started aggregation timer for metric '%s' (interval=%lld ms)",
-				metric->name, interval_ms);
-		}
+	msg->payload = payload;
+	msg->len = len;
+
+	/* Enqueue message (non-blocking) */
+	int rc = k_msgq_put(&g_spotflow_metrics_msgq, &msg, K_NO_WAIT);
+	if (rc != 0) {
+		/* Queue full - free message structure only, caller frees payload */
+		k_free(msg);
+		LOG_WRN("Metrics queue full, dropping message (%zu bytes)", len);
+		return -ENOMEM;
 	}
 
-	/* Update aggregation state */
-	if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
-		update_aggregation_int(ts, value_int);
-	} else {
-		update_aggregation_float(ts, value_float);
-	}
-
-	/* For PT0S (no aggregation), flush immediately with current timestamp */
-	if (metric->agg_interval == SPOTFLOW_AGG_INTERVAL_NONE) {
-		int rc = flush_timeseries(metric, ts, k_uptime_get());
-		k_mutex_unlock(&metric->lock);
-		return rc;
-	}
-
-	k_mutex_unlock(&metric->lock);
+	LOG_DBG("Enqueued metric message (%zu bytes)", len);
 	return 0;
-}
-
-void aggregator_unregister_metric(struct spotflow_metric_base *metric)
-{
-	if (metric == NULL || metric->aggregator_context == NULL) {
-		return;
-	}
-
-	struct metric_aggregator_context *ctx = metric->aggregator_context;
-
-	k_mutex_lock(&metric->lock, K_FOREVER);
-
-	/* Cancel pending timer */
-	if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE) {
-		k_work_cancel_delayable(&ctx->aggregation_work);
-	}
-
-	/* Free time series array */
-	k_free(ctx->timeseries);
-
-	/* Free context */
-	k_free(ctx);
-
-	metric->aggregator_context = NULL;
-
-	k_mutex_unlock(&metric->lock);
-
-	LOG_DBG("Unregistered aggregator for metric '%s'", metric->name);
 }

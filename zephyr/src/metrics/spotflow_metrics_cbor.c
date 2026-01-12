@@ -29,30 +29,11 @@ LOG_MODULE_REGISTER(spotflow_metrics_cbor, CONFIG_SPOTFLOW_METRICS_PROCESSING_LO
 
 /* Message Type */
 #define METRIC_MESSAGE_TYPE        0x05
-
-/**
- * @brief Encode labels as CBOR map
- */
 static bool encode_labels(zcbor_state_t *state,
 			  const struct metric_label_storage *labels,
-			  uint8_t label_count)
-{
-	bool succ = true;
-
-	succ = succ && zcbor_uint32_put(state, KEY_LABELS);
-	succ = succ && zcbor_map_start_encode(state, label_count);
-
-	for (uint8_t i = 0; i < label_count && succ; i++) {
-		succ = succ && zcbor_tstr_put_term(state, labels[i].key,
-						   SPOTFLOW_MAX_LABEL_KEY_LEN);
-		succ = succ && zcbor_tstr_put_term(state, labels[i].value,
-						   SPOTFLOW_MAX_LABEL_VALUE_LEN);
-	}
-
-	succ = succ && zcbor_map_end_encode(state, label_count);
-
-	return succ;
-}
+			  uint8_t label_count);
+static void encode_metric_header(struct spotflow_metric_base* metric, int64_t timestamp_ms,
+			  uint64_t sequence_number, zcbor_state_t state[3], bool* succ);
 
 int spotflow_metrics_cbor_encode(
 	struct spotflow_metric_base *metric,
@@ -66,6 +47,11 @@ int spotflow_metrics_cbor_encode(
 		return -EINVAL;
 	}
 
+	if (metric->agg_interval == SPOTFLOW_AGG_INTERVAL_NONE) {
+		LOG_ERR("This function should not be used for non-aggregated metrics");
+		return -EINVAL; /* This function is for non-aggregated metrics only */
+	}
+
 	uint8_t buffer[CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE];
 	ZCBOR_STATE_E(state, 1, buffer, sizeof(buffer), 1);
 
@@ -73,41 +59,19 @@ int spotflow_metrics_cbor_encode(
 
 	/* Calculate actual map entry count (dynamic map size) */
 	/* Base entries: messageType, metricName, aggregationInterval, deviceUptimeMs,
-	 *               sequenceNumber, sum = 6 */
-	uint32_t map_entries = 6;
+	 *               sequenceNumber, sum = 9 */
+	uint32_t map_entries = 9;
 	if (ts->label_count > 0) {
 		map_entries++;  /* labels */
 	}
 	if (ts->sum_truncated) {
 		map_entries++;  /* sumTruncated */
 	}
-	if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE) {
-		map_entries += 3;  /* count, min, max */
-	}
 
 	/* Start CBOR map with exact entry count */
 	succ = succ && zcbor_map_start_encode(state, map_entries);
 
-	/* messageType */
-	succ = succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
-	succ = succ && zcbor_uint32_put(state, METRIC_MESSAGE_TYPE);
-
-	/* metricName */
-	succ = succ && zcbor_uint32_put(state, KEY_METRIC_NAME);
-	succ = succ && zcbor_tstr_put_term(state, metric->name, sizeof(metric->name));
-
-	/* aggregationInterval */
-	succ = succ && zcbor_uint32_put(state, KEY_AGGREGATION_INTERVAL);
-	succ = succ && zcbor_uint32_put(state, metric->agg_interval);
-
-	/* deviceUptimeMs - 64-bit signed integer per cloud documentation */
-	/* Timestamp is captured by aggregator when window closes, not at encoding time */
-	succ = succ && zcbor_uint32_put(state, KEY_DEVICE_UPTIME_MS);
-	succ = succ && zcbor_int64_put(state, timestamp_ms);
-
-	/* sequenceNumber (per-metric, passed by caller who increments under mutex) */
-	succ = succ && zcbor_uint32_put(state, KEY_SEQUENCE_NUMBER);
-	succ = succ && zcbor_uint64_put(state, sequence_number);
+	encode_metric_header(metric, timestamp_ms, sequence_number, state, &succ);
 
 	/* labels (if labeled metric) */
 	if (ts->label_count > 0) {
@@ -182,3 +146,150 @@ int spotflow_metrics_cbor_encode(
 
 	return 0;
 }
+
+
+int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* metric,
+						const spotflow_label_t* labels, uint8_t label_count,
+						int64_t value_int, double value_float,
+						int64_t timestamp_ms, uint64_t sequence_number,
+						uint8_t** cbor_data, size_t* cbor_len)
+{
+	if (metric == NULL || cbor_data == NULL || cbor_len == NULL) {
+		return -EINVAL;
+	}
+
+	if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE) {
+		LOG_ERR("This function should not be used for aggregated metrics");
+		return -EINVAL; /* This function is for non-aggregated metrics only */
+	}
+
+	uint8_t buffer[CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE];
+	ZCBOR_STATE_E(state, 1, buffer, sizeof(buffer), 1);
+
+	bool succ = true;
+
+	/* Calculate map entry count */
+	/* Base: messageType, metricName, aggregationInterval, deviceUptimeMs,
+  *       sequenceNumber =5 */
+	uint32_t map_entries = 5;
+	if (label_count > 0) {
+		map_entries++; /* labels */
+	}
+
+	/* Start CBOR map */
+	succ = succ && zcbor_map_start_encode(state, map_entries);
+
+	encode_metric_header(metric, timestamp_ms, sequence_number, state, &succ);
+
+	/* labels (if present) */
+	if (label_count > 0) {
+		succ = succ && zcbor_uint32_put(state, KEY_LABELS);
+		succ = succ && zcbor_map_start_encode(state, label_count);
+
+		for (uint8_t i = 0; i < label_count && succ; i++) {
+			/* Validate and copy key */
+			if (!labels[i].key) {
+				LOG_ERR("Label key is NULL");
+				continue;
+			}
+			size_t key_len = strlen(labels[i].key);
+			if (key_len >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
+				LOG_ERR("Label key too long: %zu chars (max %d)", key_len,
+					SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
+			}
+			if (!labels[i].value) {
+				LOG_ERR("Label value is NULL");
+				continue;
+			}
+			succ = succ &&
+			    zcbor_tstr_put_term(state, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN);
+			succ = succ &&
+			    zcbor_tstr_put_term(state, labels[i].value,
+						SPOTFLOW_MAX_LABEL_VALUE_LEN);
+		}
+
+		succ = succ && zcbor_map_end_encode(state, label_count);
+	}
+
+	/* value (single data point) */
+	succ = succ && zcbor_uint32_put(state, KEY_SUM);
+	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+		succ = succ && zcbor_float64_put(state, value_float);
+	} else {
+		succ = succ && zcbor_int64_put(state, value_int);
+	}
+
+	/* End CBOR map */
+	succ = succ && zcbor_map_end_encode(state, map_entries);
+
+	if (!succ) {
+		LOG_ERR("CBOR encoding failed for raw metric: %d", zcbor_peek_error(state));
+		return -EINVAL;
+	}
+
+	/* Allocate and copy */
+	size_t encoded_len = state->payload - buffer;
+	uint8_t* data = k_malloc(encoded_len);
+	if (!data) {
+		return -ENOMEM;
+	}
+
+	memcpy(data, buffer, encoded_len);
+	*cbor_data = data;
+	*cbor_len = encoded_len;
+
+	LOG_DBG("Encoded raw metric '%s' message (%zu bytes, seq=%llu)", metric->name, encoded_len,
+		(unsigned long long)sequence_number);
+
+	return 0;
+}
+
+/**
+ * @brief Encode labels as CBOR map
+ */
+static bool encode_labels(zcbor_state_t *state,
+			  const struct metric_label_storage *labels,
+			  uint8_t label_count)
+{
+	bool succ = true;
+
+	succ = succ && zcbor_uint32_put(state, KEY_LABELS);
+	succ = succ && zcbor_map_start_encode(state, label_count);
+
+	for (uint8_t i = 0; i < label_count && succ; i++) {
+		succ = succ && zcbor_tstr_put_term(state, labels[i].key,
+						   SPOTFLOW_MAX_LABEL_KEY_LEN);
+		succ = succ && zcbor_tstr_put_term(state, labels[i].value,
+						   SPOTFLOW_MAX_LABEL_VALUE_LEN);
+	}
+
+	succ = succ && zcbor_map_end_encode(state, label_count);
+
+	return succ;
+}
+
+static void encode_metric_header(struct spotflow_metric_base* metric, int64_t timestamp_ms,
+			  uint64_t sequence_number, zcbor_state_t state[3], bool* succ)
+{
+	/* messageType */
+	*succ = *succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
+	*succ = *succ && zcbor_uint32_put(state, METRIC_MESSAGE_TYPE);
+
+	/* metricName */
+	*succ = *succ && zcbor_uint32_put(state, KEY_METRIC_NAME);
+	*succ = *succ && zcbor_tstr_put_term(state, metric->name, sizeof(metric->name));
+
+	/* aggregationInterval */
+	*succ = *succ && zcbor_uint32_put(state, KEY_AGGREGATION_INTERVAL);
+	*succ = *succ && zcbor_uint32_put(state, metric->agg_interval);
+
+	/* deviceUptimeMs - 64-bit signed integer per cloud documentation */
+	/* Timestamp is captured by aggregator when window closes, not at encoding time */
+	*succ = *succ && zcbor_uint32_put(state, KEY_DEVICE_UPTIME_MS);
+	*succ = *succ && zcbor_int64_put(state, timestamp_ms);
+
+	/* sequenceNumber (per-metric, passed by caller who increments under mutex) */
+	*succ = *succ && zcbor_uint32_put(state, KEY_SEQUENCE_NUMBER);
+	*succ = *succ && zcbor_uint64_put(state, sequence_number);
+}
+
