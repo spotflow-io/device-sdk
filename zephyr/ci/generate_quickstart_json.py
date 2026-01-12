@@ -13,6 +13,10 @@ from pathlib import Path
 from typing import Dict, Any
 
 
+# Placeholder value for board name in "Other" boards
+BOARD_PLACEHOLDER = "<board>"
+
+
 def load_yaml(filepath: Path) -> Dict[str, Any]:
     with open(filepath, "r") as f:
         return yaml.safe_load(f)
@@ -42,11 +46,18 @@ def compute_board_prefix(board_value: str) -> str:
     return board_value.split("/")[0]
 
 
-def compute_sample_device_id(board_value: str) -> str:
+def compute_sample_device_id(board_value: str, vendor_id: str = None) -> str:
     """
     Example: 'thingy53/nrf5340/cpuapp/ns' -> 'thingy53-001'
     Example: 'frdm_k64f' -> 'frdm-k64f-001'
+    Example: BOARD_PLACEHOLDER with vendor_id='nxp' -> 'nxp-device-001'
+    Example: BOARD_PLACEHOLDER with vendor_id=None -> 'device-001'
     """
+    if board_value == BOARD_PLACEHOLDER:
+        if vendor_id:
+            return f"{vendor_id}-device-001"
+        return "device-001"
+
     prefix = compute_board_prefix(board_value)
     prefix = prefix.replace("_", "-")
     return f"{prefix}-001"
@@ -62,6 +73,7 @@ def transform_board(
     vendor: Dict[str, Any],
     spotflow_paths: Dict[str, str],
     defaults: Dict[str, Any] = None,
+    is_other_board: bool = False,
 ) -> Dict[str, Any]:
     """
     Transform a board entry by applying property inheritance and computing
@@ -75,6 +87,14 @@ def transform_board(
     manifest = get_board_property("manifest", board, vendor, defaults)
     spotflow_path = spotflow_paths.get(manifest, "")
 
+    vendor_id = vendor.get("vendor", None)
+
+    # For "Other" boards, always use ["wifi", "ethernet"] connection
+    if is_other_board:
+        connection = ["wifi", "ethernet"]
+    else:
+        connection = get_board_property("connection", board, vendor, defaults, [])
+
     result = {
         "id": board["id"],
         "name": board["name"],
@@ -82,11 +102,18 @@ def transform_board(
         "manifest": manifest,
         "spotflow_path": spotflow_path,
         "sdk_version": get_board_property("sdk_version", board, vendor, defaults),
-        "sdk_toolchain": get_board_property("sdk_toolchain", board, vendor, defaults),
-        "connection": get_board_property("connection", board, vendor, defaults, []),
-        "zephyr_docs": compute_zephyr_docs_url(vendor["vendor"], board_value),
-        "sample_device_id": compute_sample_device_id(board_value),
+        "connection": connection,
+        "sample_device_id": compute_sample_device_id(board_value, vendor_id),
     }
+
+    # Only include sdk_toolchain if it exists in the hierarchy
+    sdk_toolchain = get_board_property("sdk_toolchain", board, vendor, defaults)
+    if sdk_toolchain:
+        result["sdk_toolchain"] = sdk_toolchain
+
+    # Only include zephyr_docs if board_value is not a placeholder
+    if board_value != BOARD_PLACEHOLDER:
+        result["zephyr_docs"] = compute_zephyr_docs_url(vendor_id, board_value)
 
     callout = get_board_property("callout", board, vendor, defaults, "")
     if callout:
@@ -105,6 +132,14 @@ def transform_board(
     return result
 
 
+def create_other_board(vendor_id: str = None) -> Dict[str, Any]:
+    return {
+        "id": f"other_{vendor_id}" if vendor_id else "other",
+        "name": "Other",
+        "board": BOARD_PLACEHOLDER,
+    }
+
+
 def generate_quickstart(
     boards_config: Dict[str, Any], spotflow_paths: Dict[str, str]
 ) -> Dict[str, Any]:
@@ -121,17 +156,8 @@ def generate_quickstart(
         ]
     }
 
-    # Generate NCS section (filter boards with vendor="nordic")
+    # Generate NCS and Zephyr boards (the latter are nested in vendors)
     ncs_boards = []
-    for vendor in boards_config["vendors"]:
-        if vendor.get("vendor") == "nordic":
-            for board in vendor["boards"]:
-                transformed = transform_board(board, vendor, spotflow_paths, defaults)
-                ncs_boards.append(transformed)
-
-    ncs = {"boards": ncs_boards}
-
-    # Generate Zephyr section (all vendors with nested structure)
     zephyr_vendors = []
     for vendor in boards_config["vendors"]:
         vendor_boards = []
@@ -139,8 +165,26 @@ def generate_quickstart(
             transformed = transform_board(board, vendor, spotflow_paths, defaults)
             vendor_boards.append(transformed)
 
+        # Add "Other" board for this vendor
+        other_board = create_other_board(vendor["vendor"])
+        transformed_other = transform_board(
+            other_board, vendor, spotflow_paths, defaults, is_other_board=True
+        )
+        vendor_boards.append(transformed_other)
+
+        if vendor["vendor"] == "nordic":
+            ncs_boards.extend(vendor_boards)
+
         zephyr_vendors.append({"name": vendor["name"], "boards": vendor_boards})
 
+    # Add standalone "Other" vendor with "Other" board
+    other_board = create_other_board()
+    transformed_other = transform_board(
+        other_board, {}, spotflow_paths, defaults, is_other_board=True
+    )
+    zephyr_vendors.append({"name": "Other", "boards": [transformed_other]})
+
+    ncs = {"boards": ncs_boards}
     zephyr = {"vendors": zephyr_vendors}
 
     return {"esp_idf": esp_idf, "ncs": ncs, "zephyr": zephyr}
