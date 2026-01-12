@@ -533,26 +533,24 @@ Write-Host "Workspace location: " -NoNewline
 Write-Host $workspaceFolder -ForegroundColor Cyan
 Write-Host "Board: " -NoNewline
 Write-Host "$($boardConfig.name) ($($boardConfig.board))" -ForegroundColor Cyan
-Write-Host "Spotflow path: " -NoNewline  
+Write-Host "Spotflow module path: " -NoNewline  
 Write-Host $boardConfig.spotflow_path -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
-Write-Host "  1. Open a new terminal and navigate to the workspace:"
-Write-Host "     " -NoNewline
-Write-Host "cd $workspaceFolder" -ForegroundColor DarkGray
+Write-Host "  1. Open " -NoNewline
+Write-Host "$($boardConfig.spotflow_path)/zephyr/samples/logs/prj.conf" -NoNewline -ForegroundColor DarkGray
+Write-Host " and add the required configuration options."
 Write-Host ""
-Write-Host "  2. Activate the virtual environment:"
-Write-Host "     " -NoNewline
-Write-Host ".venv\Scripts\Activate.ps1" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "  3. Build the Spotflow sample:"
-Write-Host "     " -NoNewline
-$buildCmd = "west build -b $($boardConfig.board) $($boardConfig.spotflow_path)/zephyr/samples/logs"
+Write-Host "  2. Build and flash the Spotflow sample:"
+Write-Host "     cd $($boardConfig.spotflow_path)/zephyr/samples/logs" -ForegroundColor DarkGray
+Write-Host "     west build --pristine --board $($boardConfig.board)" -NoNewline -ForegroundColor DarkGray
 if ($boardConfig.build_extra_args) {
-    $buildCmd += " $($boardConfig.build_extra_args)"
+    Write-Host " $($boardConfig.build_extra_args)" -NoNewline -ForegroundColor DarkGray
 }
-Write-Host $buildCmd -ForegroundColor DarkGray
+Write-Host ""
+Write-Host "     west flash" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "For more information, visit: " -NoNewline
-Write-Host "https://docs.spotflow.io" -ForegroundColor Cyan
+$quickstartUrlSuffix = if ($zephyr) { "zephyr" } else { "nordic-nrf-connect" }
+Write-Host "https://docs.spotflow.io/quickstart/$quickstartUrlSuffix" -ForegroundColor Cyan
 Write-Host ""
