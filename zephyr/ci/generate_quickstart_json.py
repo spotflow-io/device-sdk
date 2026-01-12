@@ -152,7 +152,15 @@ def generate_quickstart(
     esp_idf = {
         "boards": [
             {"name": "ESP32", "target": "esp32"},
+            {"name": "ESP32-C2", "target": "esp32c2"},
             {"name": "ESP32-C3", "target": "esp32c3"},
+            {"name": "ESP32-C5", "target": "esp32c5"},
+            {"name": "ESP32-C6", "target": "esp32c6"},
+            {"name": "ESP32-C61", "target": "esp32c61"},
+            {"name": "ESP32-H2", "target": "esp32h2"},
+            {"name": "ESP32-P4", "target": "esp32p4"},
+            {"name": "ESP32-S2", "target": "esp32s2"},
+            {"name": "ESP32-S3", "target": "esp32s3"},
         ]
     }
 
