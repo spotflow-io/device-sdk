@@ -213,15 +213,23 @@ if ($boardConfig.callout) {
 # Step 3: Determine and confirm workspace folder
 Write-Step "Configuring workspace location..."
 
-$defaultFolder = "C:\spotflow-ws"
+# Detect if running on Windows (works for both Windows PowerShell 5.1 and PowerShell Core)
+$isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
 
-# Check if running on a system where C:\ might not exist (non-Windows emulation)
-if (-not (Test-Path "C:\")) {
-    $defaultFolder = Join-Path $env:USERPROFILE "spotflow-ws"
+# Set default folder based on platform
+if ($isWindowsOS) {
+    $defaultFolder = "C:\spotflow-ws"
+}
+else {
+    # Linux/macOS
+    $defaultFolder = Join-Path $HOME "spotflow-ws"
 }
 
-Write-Info "The workspace will contain all Zephyr/NCS files and your project."
-Write-Warning "Tip: Avoid very long paths on Windows to prevent build issues."
+$sdkDisplayName = if ($zephyr) { "Zephyr" } else { "nRF Connect SDK (NCS)" }
+Write-Info "The workspace will contain all $sdkDisplayName files and your project."
+if ($isWindowsOS) {
+    Write-Warning "Tip: Avoid very long paths on Windows to prevent build issues."
+}
 Write-Host ""
 
 $workspaceFolder = Read-Input "Enter workspace folder path" $defaultFolder
@@ -291,13 +299,24 @@ $toolchainInstalled = $false
 $requiredSdkVersion = $boardConfig.sdk_version
 $requiredToolchain = $boardConfig.sdk_toolchain
 
-# Check common SDK locations
-$sdkLocations = @(
-    "$env:USERPROFILE\zephyr-sdk-$requiredSdkVersion",
-    "$env:USERPROFILE\.local\zephyr-sdk-$requiredSdkVersion",
-    "C:\zephyr-sdk-$requiredSdkVersion",
-    "$env:LOCALAPPDATA\zephyr-sdk-$requiredSdkVersion"
-)
+# Check common SDK locations (platform-specific)
+if ($isWindowsOS) {
+    $sdkLocations = @(
+        "$env:USERPROFILE\zephyr-sdk-$requiredSdkVersion",
+        "$env:USERPROFILE\.local\zephyr-sdk-$requiredSdkVersion",
+        "C:\zephyr-sdk-$requiredSdkVersion",
+        "$env:LOCALAPPDATA\zephyr-sdk-$requiredSdkVersion"
+    )
+}
+else {
+    # Linux/macOS locations
+    $sdkLocations = @(
+        "$HOME/zephyr-sdk-$requiredSdkVersion",
+        "$HOME/.local/zephyr-sdk-$requiredSdkVersion",
+        "/opt/zephyr-sdk-$requiredSdkVersion",
+        "/usr/local/zephyr-sdk-$requiredSdkVersion"
+    )
+}
 
 # Also check ZEPHYR_SDK_INSTALL_DIR environment variable
 if ($env:ZEPHYR_SDK_INSTALL_DIR) {
