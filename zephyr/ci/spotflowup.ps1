@@ -91,6 +91,143 @@ function Exit-WithError {
     exit 1
 }
 
+function Find-NrfUtil {
+    <#
+    .SYNOPSIS
+        Finds nrfutil on PATH or nrfutil-sdk-manager in VS Code/Cursor extensions.
+    .OUTPUTS
+        Hashtable with 'Path' (full path to executable) and 'Type' ('nrfutil' or 'sdk-manager')
+        Returns $null if not found.
+    #>
+    
+    # First, try to find nrfutil on PATH
+    try {
+        $nrfutilPath = Get-Command nrfutil -ErrorAction SilentlyContinue
+        if ($nrfutilPath) {
+            return @{
+                Path = $nrfutilPath.Source
+                Type = "nrfutil"
+            }
+        }
+    }
+    catch {
+        # Continue to check extensions
+    }
+    
+    # Check VS Code and Cursor extension directories for nrfutil-sdk-manager
+    $isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
+    
+    if ($isWindowsOS) {
+        $extensionDirs = @(
+            "$env:USERPROFILE\.vscode\extensions",
+            "$env:USERPROFILE\.cursor\extensions",
+            "$env:USERPROFILE\.vscode-insiders\extensions"
+        )
+        $sdkManagerExe = "nrfutil-sdk-manager.exe"
+    }
+    else {
+        $extensionDirs = @(
+            "$HOME/.vscode/extensions",
+            "$HOME/.cursor/extensions",
+            "$HOME/.vscode-insiders/extensions"
+        )
+        $sdkManagerExe = "nrfutil-sdk-manager"
+    }
+    
+    foreach ($extDir in $extensionDirs) {
+        if (Test-Path $extDir) {
+            # Look for nordic-semiconductor.nrf-connect* extensions
+            $nordicExtensions = Get-ChildItem -Path $extDir -Directory -Filter "nordic-semiconductor.nrf-connect*" -ErrorAction SilentlyContinue
+            foreach ($ext in $nordicExtensions) {
+                # The SDK manager is typically in a bin or nrfutil subdirectory
+                $possiblePaths = @(
+                    (Join-Path $ext.FullName "bin\$sdkManagerExe"),
+                    (Join-Path $ext.FullName "nrfutil\$sdkManagerExe"),
+                    (Join-Path $ext.FullName $sdkManagerExe)
+                )
+                
+                foreach ($path in $possiblePaths) {
+                    if (Test-Path $path) {
+                        return @{
+                            Path = $path
+                            Type = "sdk-manager"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    return $null
+}
+
+function Install-NrfUtilSdkManager {
+    param(
+        [string]$NrfUtilPath
+    )
+    <#
+    .SYNOPSIS
+        Installs the sdk-manager command for nrfutil if not already present.
+    .RETURNS
+        $true if sdk-manager is available (already installed or newly installed), $false otherwise.
+    #>
+    
+    # Check if sdk-manager is already installed
+    try {
+        $null = & $NrfUtilPath sdk-manager --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            return $true
+        }
+    }
+    catch {
+        # Not installed, continue to install
+    }
+    
+    # Install sdk-manager command
+    Write-Info "Installing nrfutil sdk-manager command..."
+    try {
+        & $NrfUtilPath install sdk-manager 2>&1 | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "nrfutil sdk-manager installed"
+            return $true
+        }
+        else {
+            Write-ErrorMessage "Failed to install nrfutil sdk-manager"
+            return $false
+        }
+    }
+    catch {
+        Write-ErrorMessage "Failed to install nrfutil sdk-manager: $($_.Exception.Message)"
+        return $false
+    }
+}
+
+function Get-NcsVersionFromManifest {
+    param(
+        [string]$ManifestPath
+    )
+    <#
+    .SYNOPSIS
+        Extracts the NCS version from the manifest file (revision of the 'nrf' project).
+    .OUTPUTS
+        The NCS version string (e.g., "v3.1.1") or $null if not found.
+    #>
+    
+    if (-not (Test-Path $ManifestPath)) {
+        return $null
+    }
+    
+    $content = Get-Content $ManifestPath -Raw
+    
+    # Parse YAML to find the nrf project revision
+    # Look for pattern: name: nrf followed by revision: <version>
+    if ($content -match 'name:\s*nrf[\s\S]*?revision:\s*([^\s\r\n]+)') {
+        return $matches[1]
+    }
+    
+    return $null
+}
+
 function Confirm-Action {
     param(
         [string]$Message,
@@ -291,83 +428,131 @@ catch {
     Exit-WithError "Git not found" "Please install Git from https://git-scm.com/"
 }
 
-# Step 5: Check if Zephyr SDK is installed
-Write-Step "Checking Zephyr SDK installation..."
-
-$sdkInstalled = $false
-$toolchainInstalled = $false
+# Step 5: Check SDK installation
+$installSdk = $false
+$nrfUtilInfo = $null
 $requiredSdkVersion = $boardConfig.sdk_version
 $requiredToolchain = $boardConfig.sdk_toolchain
 
-# Check common SDK locations (platform-specific)
-if ($isWindowsOS) {
-    $sdkLocations = @(
-        "$env:USERPROFILE\zephyr-sdk-$requiredSdkVersion",
-        "$env:USERPROFILE\.local\zephyr-sdk-$requiredSdkVersion",
-        "C:\zephyr-sdk-$requiredSdkVersion",
-        "$env:LOCALAPPDATA\zephyr-sdk-$requiredSdkVersion"
-    )
-}
-else {
-    # Linux/macOS locations
-    $sdkLocations = @(
-        "$HOME/zephyr-sdk-$requiredSdkVersion",
-        "$HOME/.local/zephyr-sdk-$requiredSdkVersion",
-        "/opt/zephyr-sdk-$requiredSdkVersion",
-        "/usr/local/zephyr-sdk-$requiredSdkVersion"
-    )
-}
-
-# Also check ZEPHYR_SDK_INSTALL_DIR environment variable
-if ($env:ZEPHYR_SDK_INSTALL_DIR) {
-    $additionalSdkLocations = @(
-        $env:ZEPHYR_SDK_INSTALL_DIR,
-        "$env:ZEPHYR_SDK_INSTALL_DIR\zephyr-sdk-$requiredSdkVersion"
-    )
-    $sdkLocations = $additionalSdkLocations + $sdkLocations
-}
-
-foreach ($sdkPath in $sdkLocations) {
-    if (Test-Path "$sdkPath\sdk_version") {
-        Write-Success "Found Zephyr SDK at: $sdkPath"
-        $sdkInstalled = $true
-        
-        # Check if toolchain is installed
-        if ($requiredToolchain) {
-            $toolchainPath = Join-Path $sdkPath $requiredToolchain
-            if (Test-Path $toolchainPath) {
-                Write-Success "Toolchain '$requiredToolchain' is installed"
-                $toolchainInstalled = $true
-            }
-            else {
-                Write-Warning "Toolchain '$requiredToolchain' not found in SDK"
+if ($sdkType -eq "ncs") {
+    # NCS: Check for nrfutil or nrfutil-sdk-manager
+    Write-Step "Checking nRF Connect SDK toolchain setup..."
+    
+    $nrfUtilInfo = Find-NrfUtil
+    
+    if ($nrfUtilInfo) {
+        if ($nrfUtilInfo.Type -eq "nrfutil") {
+            Write-Success "Found nrfutil at: $($nrfUtilInfo.Path)"
+            # Ensure sdk-manager command is installed
+            if (-not (Install-NrfUtilSdkManager -NrfUtilPath $nrfUtilInfo.Path)) {
+                Write-Warning "Could not install nrfutil sdk-manager command."
+                Write-Warning "Toolchain installation will be skipped. Install it manually later."
+                $nrfUtilInfo = $null
             }
         }
         else {
-            $toolchainInstalled = $true # No specific toolchain required
+            Write-Success "Found nrfutil-sdk-manager at: $($nrfUtilInfo.Path)"
         }
-        break
-    }
-}
-
-$installSdk = $false
-if (-not $sdkInstalled -or -not $toolchainInstalled) {
-    Write-Warning "Zephyr SDK $requiredSdkVersion$(if ($requiredToolchain) { " with toolchain '$requiredToolchain'" }) is not installed."
-    Write-Host ""
-    Write-Info "The Zephyr SDK will be installed to your user profile directory."
-    Write-Info "This is a one-time setup that modifies your system."
-    Write-Host ""
-    
-    if (Confirm-Action "Install Zephyr SDK $requiredSdkVersion$(if ($requiredToolchain) { " with '$requiredToolchain' toolchain" })?" $true) {
-        $installSdk = $true
     }
     else {
-        Write-Warning "Skipping SDK installation. You can install it manually later with:"
-        Write-Host "    west sdk install --version $requiredSdkVersion$(if ($requiredToolchain) { " --toolchains $requiredToolchain" })" -ForegroundColor DarkGray
+        Write-Warning "nrfutil not found on PATH and nrfutil-sdk-manager not found in VS Code/Cursor extensions."
+        Write-Host ""
+        Write-Info "The nRF Connect SDK toolchain will need to be installed manually."
+        Write-Info "You can install nrfutil from: https://www.nordicsemi.com/Products/Development-tools/nRF-Util"
+        Write-Info "Or install the nRF Connect for VS Code extension pack."
+        Write-Host ""
+    }
+    
+    if ($nrfUtilInfo) {
+        Write-Host ""
+        Write-Info "The toolchain for the NCS version will be installed after downloading the workspace."
+        Write-Info "This is a one-time setup that may take several minutes."
+        Write-Host ""
+        
+        if (Confirm-Action "Install NCS toolchain after workspace setup?" $true) {
+            $installSdk = $true
+        }
+        else {
+            Write-Warning "Skipping toolchain installation. You can install it manually later."
+        }
     }
 }
 else {
-    Write-Success "Zephyr SDK is properly installed"
+    # Zephyr: Check for Zephyr SDK
+    Write-Step "Checking Zephyr SDK installation..."
+    
+    $sdkInstalled = $false
+    $toolchainInstalled = $false
+    
+    # Check common SDK locations (platform-specific)
+    if ($isWindowsOS) {
+        $sdkLocations = @(
+            "$env:USERPROFILE\zephyr-sdk-$requiredSdkVersion",
+            "$env:USERPROFILE\.local\zephyr-sdk-$requiredSdkVersion",
+            "C:\zephyr-sdk-$requiredSdkVersion",
+            "$env:LOCALAPPDATA\zephyr-sdk-$requiredSdkVersion"
+        )
+    }
+    else {
+        # Linux/macOS locations
+        $sdkLocations = @(
+            "$HOME/zephyr-sdk-$requiredSdkVersion",
+            "$HOME/.local/zephyr-sdk-$requiredSdkVersion",
+            "/opt/zephyr-sdk-$requiredSdkVersion",
+            "/usr/local/zephyr-sdk-$requiredSdkVersion"
+        )
+    }
+    
+    # Also check ZEPHYR_SDK_INSTALL_DIR environment variable
+    if ($env:ZEPHYR_SDK_INSTALL_DIR) {
+        $additionalSdkLocations = @(
+            $env:ZEPHYR_SDK_INSTALL_DIR,
+            "$env:ZEPHYR_SDK_INSTALL_DIR\zephyr-sdk-$requiredSdkVersion"
+        )
+        $sdkLocations = $additionalSdkLocations + $sdkLocations
+    }
+    
+    foreach ($sdkPath in $sdkLocations) {
+        if (Test-Path "$sdkPath\sdk_version") {
+            Write-Success "Found Zephyr SDK at: $sdkPath"
+            $sdkInstalled = $true
+            
+            # Check if toolchain is installed
+            if ($requiredToolchain) {
+                $toolchainPath = Join-Path $sdkPath $requiredToolchain
+                if (Test-Path $toolchainPath) {
+                    Write-Success "Toolchain '$requiredToolchain' is installed"
+                    $toolchainInstalled = $true
+                }
+                else {
+                    Write-Warning "Toolchain '$requiredToolchain' not found in SDK"
+                }
+            }
+            else {
+                $toolchainInstalled = $true # No specific toolchain required
+            }
+            break
+        }
+    }
+    
+    if (-not $sdkInstalled -or -not $toolchainInstalled) {
+        Write-Warning "Zephyr SDK $requiredSdkVersion$(if ($requiredToolchain) { " with toolchain '$requiredToolchain'" }) is not installed."
+        Write-Host ""
+        Write-Info "The Zephyr SDK will be installed to your user profile directory."
+        Write-Info "This is a one-time setup that modifies your system."
+        Write-Host ""
+        
+        if (Confirm-Action "Install Zephyr SDK $requiredSdkVersion$(if ($requiredToolchain) { " with '$requiredToolchain' toolchain" })?" $true) {
+            $installSdk = $true
+        }
+        else {
+            Write-Warning "Skipping SDK installation. You can install it manually later with:"
+            Write-Host "    west sdk install --version $requiredSdkVersion$(if ($requiredToolchain) { " --toolchains $requiredToolchain" })" -ForegroundColor DarkGray
+        }
+    }
+    else {
+        Write-Success "Zephyr SDK is properly installed"
+    }
 }
 
 # Step 6: Create workspace folder and setup virtual environment
@@ -518,27 +703,73 @@ if ($boardConfig.blob) {
     }
 }
 
-# Step 13: Install Zephyr SDK if requested
+# Step 13: Install SDK/toolchain if requested
 if ($installSdk) {
-    Write-Step "Installing Zephyr SDK $requiredSdkVersion..."
-    
-    $sdkArgs = @("sdk", "install", "--version", $requiredSdkVersion)
-    if ($requiredToolchain) {
-        $sdkArgs += @("--toolchains", $requiredToolchain)
-    }
-    
-    Write-Info "Running: west $($sdkArgs -join ' ')"
-    
-    try {
-        & west @sdkArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw "west sdk install failed with exit code $LASTEXITCODE"
+    if ($sdkType -eq "ncs" -and $nrfUtilInfo) {
+        # NCS: Use nrfutil sdk-manager to install toolchain
+        Write-Step "Installing NCS toolchain..."
+        
+        # Find the manifest file to extract NCS version
+        $manifestPath = Join-Path $workspaceFolder "$($boardConfig.spotflow_path)/zephyr/manifests/$($boardConfig.manifest)"
+        $ncsVersion = Get-NcsVersionFromManifest -ManifestPath $manifestPath
+        
+        if (-not $ncsVersion) {
+            Write-ErrorMessage "Could not determine NCS version from manifest"
+            Write-Warning "You can install the toolchain manually with: nrfutil sdk-manager install --ncs-version <version>"
         }
-        Write-Success "Zephyr SDK installed"
+        else {
+            Write-Info "NCS version from manifest: $ncsVersion"
+            
+            # Build the command based on the type of tool found
+            if ($nrfUtilInfo.Type -eq "nrfutil") {
+                $sdkManagerCmd = $nrfUtilInfo.Path
+                $sdkManagerArgs = @("sdk-manager", "install", "--ncs-version", $ncsVersion)
+                $displayCmd = "nrfutil sdk-manager install --ncs-version $ncsVersion"
+            }
+            else {
+                # Direct nrfutil-sdk-manager executable
+                $sdkManagerCmd = $nrfUtilInfo.Path
+                $sdkManagerArgs = @("install", "--ncs-version", $ncsVersion)
+                $displayCmd = "nrfutil-sdk-manager install --ncs-version $ncsVersion"
+            }
+            
+            Write-Info "Running: $displayCmd"
+            
+            try {
+                & $sdkManagerCmd @sdkManagerArgs
+                if ($LASTEXITCODE -ne 0) {
+                    throw "SDK manager install failed with exit code $LASTEXITCODE"
+                }
+                Write-Success "NCS toolchain installed for version $ncsVersion"
+            }
+            catch {
+                Write-ErrorMessage "Failed to install NCS toolchain: $($_.Exception.Message)"
+                Write-Warning "You can try installing it manually with: $displayCmd"
+            }
+        }
     }
-    catch {
-        Write-ErrorMessage "Failed to install Zephyr SDK: $($_.Exception.Message)"
-        Write-Warning "You can try installing it manually later with: west sdk install --version $requiredSdkVersion$(if ($requiredToolchain) { " --toolchains $requiredToolchain" })"
+    else {
+        # Zephyr: Use west sdk install
+        Write-Step "Installing Zephyr SDK $requiredSdkVersion..."
+        
+        $sdkArgs = @("sdk", "install", "--version", $requiredSdkVersion)
+        if ($requiredToolchain) {
+            $sdkArgs += @("--toolchains", $requiredToolchain)
+        }
+        
+        Write-Info "Running: west $($sdkArgs -join ' ')"
+        
+        try {
+            & west @sdkArgs
+            if ($LASTEXITCODE -ne 0) {
+                throw "west sdk install failed with exit code $LASTEXITCODE"
+            }
+            Write-Success "Zephyr SDK installed"
+        }
+        catch {
+            Write-ErrorMessage "Failed to install Zephyr SDK: $($_.Exception.Message)"
+            Write-Warning "You can try installing it manually later with: west sdk install --version $requiredSdkVersion$(if ($requiredToolchain) { " --toolchains $requiredToolchain" })"
+        }
     }
 }
 
