@@ -91,30 +91,32 @@ function Exit-WithError {
     exit 1
 }
 
-function Find-NrfUtil {
+function Test-NrfUtilHasSdkManager {
+    param(
+        [string]$NrfUtilPath
+    )
     <#
     .SYNOPSIS
-        Finds nrfutil on PATH or nrfutil-sdk-manager in VS Code/Cursor extensions.
-    .OUTPUTS
-        Hashtable with 'Path' (full path to executable) and 'Type' ('nrfutil' or 'sdk-manager')
-        Returns $null if not found.
+        Checks if nrfutil has the sdk-manager command installed.
+    .RETURNS
+        $true if sdk-manager is available, $false otherwise.
     #>
-    
-    # First, try to find nrfutil on PATH
     try {
-        $nrfutilPath = Get-Command nrfutil -ErrorAction SilentlyContinue
-        if ($nrfutilPath) {
-            return @{
-                Path = $nrfutilPath.Source
-                Type = "nrfutil"
-            }
-        }
+        $null = & $NrfUtilPath sdk-manager --version 2>&1
+        return ($LASTEXITCODE -eq 0)
     }
     catch {
-        # Continue to check extensions
+        return $false
     }
-    
-    # Check VS Code and Cursor extension directories for nrfutil-sdk-manager
+}
+
+function Find-NrfUtilSdkManagerInExtensions {
+    <#
+    .SYNOPSIS
+        Finds nrfutil-sdk-manager in VS Code/Cursor extensions.
+    .OUTPUTS
+        Full path to the nrfutil-sdk-manager executable, or $null if not found.
+    #>
     $isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
     
     if ($isWindowsOS) {
@@ -123,7 +125,8 @@ function Find-NrfUtil {
             "$env:USERPROFILE\.cursor\extensions",
             "$env:USERPROFILE\.vscode-insiders\extensions"
         )
-        $sdkManagerExe = "nrfutil-sdk-manager.exe"
+        # On Windows, it's in platform/nrfutil/bin subfolder
+        $sdkManagerRelPath = "platform\nrfutil\bin\nrfutil-sdk-manager.exe"
     }
     else {
         $extensionDirs = @(
@@ -131,7 +134,8 @@ function Find-NrfUtil {
             "$HOME/.cursor/extensions",
             "$HOME/.vscode-insiders/extensions"
         )
-        $sdkManagerExe = "nrfutil-sdk-manager"
+        # On Linux/macOS, assumed to be in platform/nrfutil/bin subfolder
+        $sdkManagerRelPath = "platform/nrfutil/bin/nrfutil-sdk-manager"
     }
     
     foreach ($extDir in $extensionDirs) {
@@ -139,22 +143,73 @@ function Find-NrfUtil {
             # Look for nordic-semiconductor.nrf-connect* extensions
             $nordicExtensions = Get-ChildItem -Path $extDir -Directory -Filter "nordic-semiconductor.nrf-connect*" -ErrorAction SilentlyContinue
             foreach ($ext in $nordicExtensions) {
-                # The SDK manager is typically in a bin or nrfutil subdirectory
-                $possiblePaths = @(
-                    (Join-Path $ext.FullName "bin\$sdkManagerExe"),
-                    (Join-Path $ext.FullName "nrfutil\$sdkManagerExe"),
-                    (Join-Path $ext.FullName $sdkManagerExe)
-                )
-                
-                foreach ($path in $possiblePaths) {
-                    if (Test-Path $path) {
-                        return @{
-                            Path = $path
-                            Type = "sdk-manager"
-                        }
-                    }
+                $sdkManagerPath = Join-Path $ext.FullName $sdkManagerRelPath
+                if (Test-Path $sdkManagerPath) {
+                    return $sdkManagerPath
                 }
             }
+        }
+    }
+    
+    return $null
+}
+
+function Find-NrfUtil {
+    <#
+    .SYNOPSIS
+        Finds the best available nrfutil/sdk-manager for NCS toolchain management.
+        Priority:
+        1. nrfutil on PATH with sdk-manager already installed
+        2. nrfutil-sdk-manager from VS Code/Cursor extension
+        3. nrfutil on PATH without sdk-manager (sdk-manager needs to be installed)
+    .OUTPUTS
+        Hashtable with:
+        - 'Path': full path to executable
+        - 'Type': 'nrfutil' or 'sdk-manager'
+        - 'NeedsSdkManagerInstall': $true if sdk-manager command needs to be installed
+        Returns $null if not found.
+    #>
+    
+    $nrfutilOnPath = $null
+    $nrfutilHasSdkManager = $false
+    
+    # Check for nrfutil on PATH
+    try {
+        $nrfutilCmd = Get-Command nrfutil -ErrorAction SilentlyContinue
+        if ($nrfutilCmd) {
+            $nrfutilOnPath = $nrfutilCmd.Source
+            $nrfutilHasSdkManager = Test-NrfUtilHasSdkManager -NrfUtilPath $nrfutilOnPath
+        }
+    }
+    catch {
+        # nrfutil not on PATH
+    }
+    
+    # Priority 1: nrfutil on PATH with sdk-manager already installed
+    if ($nrfutilOnPath -and $nrfutilHasSdkManager) {
+        return @{
+            Path = $nrfutilOnPath
+            Type = "nrfutil"
+            NeedsSdkManagerInstall = $false
+        }
+    }
+    
+    # Priority 2: nrfutil-sdk-manager from VS Code/Cursor extension
+    $extensionSdkManager = Find-NrfUtilSdkManagerInExtensions
+    if ($extensionSdkManager) {
+        return @{
+            Path = $extensionSdkManager
+            Type = "sdk-manager"
+            NeedsSdkManagerInstall = $false
+        }
+    }
+    
+    # Priority 3: nrfutil on PATH without sdk-manager (needs installation)
+    if ($nrfutilOnPath) {
+        return @{
+            Path = $nrfutilOnPath
+            Type = "nrfutil"
+            NeedsSdkManagerInstall = $true
         }
     }
     
@@ -167,23 +222,11 @@ function Install-NrfUtilSdkManager {
     )
     <#
     .SYNOPSIS
-        Installs the sdk-manager command for nrfutil if not already present.
+        Installs the sdk-manager command for nrfutil.
     .RETURNS
-        $true if sdk-manager is available (already installed or newly installed), $false otherwise.
+        $true if sdk-manager was installed successfully, $false otherwise.
     #>
     
-    # Check if sdk-manager is already installed
-    try {
-        $null = & $NrfUtilPath sdk-manager --version 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            return $true
-        }
-    }
-    catch {
-        # Not installed, continue to install
-    }
-    
-    # Install sdk-manager command
     Write-Info "Installing nrfutil sdk-manager command..."
     try {
         & $NrfUtilPath install sdk-manager 2>&1 | Out-Null
@@ -200,6 +243,40 @@ function Install-NrfUtilSdkManager {
         Write-ErrorMessage "Failed to install nrfutil sdk-manager: $($_.Exception.Message)"
         return $false
     }
+}
+
+function Test-NcsToolchainInstalled {
+    param(
+        [string]$NrfUtilPath,
+        [string]$NrfUtilType,
+        [string]$NcsVersion
+    )
+    <#
+    .SYNOPSIS
+        Checks if the NCS toolchain for the specified version is already installed.
+    .RETURNS
+        $true if the toolchain is installed, $false otherwise.
+    #>
+    
+    try {
+        if ($NrfUtilType -eq "nrfutil") {
+            $output = & $NrfUtilPath sdk-manager toolchain list 2>&1
+        }
+        else {
+            # For standalone nrfutil-sdk-manager from VS Code extension
+            $output = & $NrfUtilPath toolchain list 2>&1
+        }
+        
+        if ($LASTEXITCODE -eq 0 -and $output) {
+            # Check if the version is in the output
+            return ($output -match [regex]::Escape($NcsVersion))
+        }
+    }
+    catch {
+        # If command fails, assume toolchain is not installed
+    }
+    
+    return $false
 }
 
 function Get-NcsVersionFromManifest {
@@ -442,12 +519,30 @@ if ($sdkType -eq "ncs") {
     
     if ($nrfUtilInfo) {
         if ($nrfUtilInfo.Type -eq "nrfutil") {
-            Write-Success "Found nrfutil at: $($nrfUtilInfo.Path)"
-            # Ensure sdk-manager command is installed
-            if (-not (Install-NrfUtilSdkManager -NrfUtilPath $nrfUtilInfo.Path)) {
-                Write-Warning "Could not install nrfutil sdk-manager command."
-                Write-Warning "Toolchain installation will be skipped. Install it manually later."
-                $nrfUtilInfo = $null
+            if ($nrfUtilInfo.NeedsSdkManagerInstall) {
+                Write-Info "Found nrfutil at: $($nrfUtilInfo.Path)"
+                Write-Warning "The sdk-manager command is not installed for nrfutil."
+                Write-Host ""
+                Write-Info "The sdk-manager command is required to install the NCS toolchain."
+                Write-Host ""
+                
+                if (Confirm-Action "Install nrfutil sdk-manager command?" $true) {
+                    if (-not (Install-NrfUtilSdkManager -NrfUtilPath $nrfUtilInfo.Path)) {
+                        Write-Warning "Could not install nrfutil sdk-manager command."
+                        Write-Warning "Toolchain installation will be skipped. Install it manually later."
+                        $nrfUtilInfo = $null
+                    }
+                    else {
+                        $nrfUtilInfo.NeedsSdkManagerInstall = $false
+                    }
+                }
+                else {
+                    Write-Warning "Skipping sdk-manager installation. Toolchain will need to be installed manually."
+                    $nrfUtilInfo = $null
+                }
+            }
+            else {
+                Write-Success "Found nrfutil with sdk-manager at: $($nrfUtilInfo.Path)"
             }
         }
         else {
@@ -463,19 +558,9 @@ if ($sdkType -eq "ncs") {
         Write-Host ""
     }
     
-    if ($nrfUtilInfo) {
-        Write-Host ""
-        Write-Info "The toolchain for the NCS version will be installed after downloading the workspace."
-        Write-Info "This is a one-time setup that may take several minutes."
-        Write-Host ""
-        
-        if (Confirm-Action "Install NCS toolchain after workspace setup?" $true) {
-            $installSdk = $true
-        }
-        else {
-            Write-Warning "Skipping toolchain installation. You can install it manually later."
-        }
-    }
+    # Note: We'll check if toolchain is already installed after west update,
+    # when we can extract the NCS version from the manifest.
+    # The $installSdk flag will be set later based on whether toolchain is already installed.
 }
 else {
     # Zephyr: Check for Zephyr SDK
@@ -703,73 +788,90 @@ if ($boardConfig.blob) {
     }
 }
 
-# Step 13: Install SDK/toolchain if requested
-if ($installSdk) {
-    if ($sdkType -eq "ncs" -and $nrfUtilInfo) {
-        # NCS: Use nrfutil sdk-manager to install toolchain
-        Write-Step "Installing NCS toolchain..."
+# Step 13: Install SDK/toolchain
+if ($sdkType -eq "ncs" -and $nrfUtilInfo) {
+    # NCS: Check and install toolchain using nrfutil sdk-manager toolchain
+    Write-Step "Checking NCS toolchain..."
+    
+    # Find the manifest file to extract NCS version
+    $manifestPath = Join-Path $workspaceFolder "$($boardConfig.spotflow_path)\zephyr\manifests\$($boardConfig.manifest)"
+    $ncsVersion = Get-NcsVersionFromManifest -ManifestPath $manifestPath
+    
+    if (-not $ncsVersion) {
+        Write-ErrorMessage "Could not determine NCS version from manifest"
+        Write-Warning "You can install the toolchain manually with: nrfutil sdk-manager toolchain install --ncs-version <version>"
+    }
+    else {
+        Write-Info "NCS version from manifest: $ncsVersion"
         
-        # Find the manifest file to extract NCS version
-        $manifestPath = Join-Path $workspaceFolder "$($boardConfig.spotflow_path)/zephyr/manifests/$($boardConfig.manifest)"
-        $ncsVersion = Get-NcsVersionFromManifest -ManifestPath $manifestPath
+        # Check if toolchain is already installed
+        $toolchainInstalled = Test-NcsToolchainInstalled -NrfUtilPath $nrfUtilInfo.Path -NrfUtilType $nrfUtilInfo.Type -NcsVersion $ncsVersion
         
-        if (-not $ncsVersion) {
-            Write-ErrorMessage "Could not determine NCS version from manifest"
-            Write-Warning "You can install the toolchain manually with: nrfutil sdk-manager install --ncs-version <version>"
+        if ($toolchainInstalled) {
+            Write-Success "NCS toolchain for $ncsVersion is already installed"
         }
         else {
-            Write-Info "NCS version from manifest: $ncsVersion"
+            Write-Warning "NCS toolchain for $ncsVersion is not installed."
+            Write-Host ""
+            Write-Info "The toolchain installation may take several minutes."
+            Write-Host ""
             
-            # Build the command based on the type of tool found
-            if ($nrfUtilInfo.Type -eq "nrfutil") {
-                $sdkManagerCmd = $nrfUtilInfo.Path
-                $sdkManagerArgs = @("sdk-manager", "install", "--ncs-version", $ncsVersion)
-                $displayCmd = "nrfutil sdk-manager install --ncs-version $ncsVersion"
+            if (Confirm-Action "Install NCS toolchain for $ncsVersion?" $true) {
+                # Build the command based on the type of tool found
+                if ($nrfUtilInfo.Type -eq "nrfutil") {
+                    $toolchainCmd = $nrfUtilInfo.Path
+                    $toolchainArgs = @("sdk-manager", "toolchain", "install", "--ncs-version", $ncsVersion)
+                    $displayCmd = "nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
+                }
+                else {
+                    # Direct nrfutil-sdk-manager executable from VS Code extension
+                    $toolchainCmd = $nrfUtilInfo.Path
+                    $toolchainArgs = @("toolchain", "install", "--ncs-version", $ncsVersion)
+                    $displayCmd = "nrfutil-sdk-manager toolchain install --ncs-version $ncsVersion"
+                }
+                
+                Write-Info "Running: $displayCmd"
+                
+                try {
+                    & $toolchainCmd @toolchainArgs
+                    if ($LASTEXITCODE -ne 0) {
+                        throw "Toolchain install failed with exit code $LASTEXITCODE"
+                    }
+                    Write-Success "NCS toolchain installed for version $ncsVersion"
+                }
+                catch {
+                    Write-ErrorMessage "Failed to install NCS toolchain: $($_.Exception.Message)"
+                    Write-Warning "You can try installing it manually with: $displayCmd"
+                }
             }
             else {
-                # Direct nrfutil-sdk-manager executable
-                $sdkManagerCmd = $nrfUtilInfo.Path
-                $sdkManagerArgs = @("install", "--ncs-version", $ncsVersion)
-                $displayCmd = "nrfutil-sdk-manager install --ncs-version $ncsVersion"
-            }
-            
-            Write-Info "Running: $displayCmd"
-            
-            try {
-                & $sdkManagerCmd @sdkManagerArgs
-                if ($LASTEXITCODE -ne 0) {
-                    throw "SDK manager install failed with exit code $LASTEXITCODE"
-                }
-                Write-Success "NCS toolchain installed for version $ncsVersion"
-            }
-            catch {
-                Write-ErrorMessage "Failed to install NCS toolchain: $($_.Exception.Message)"
-                Write-Warning "You can try installing it manually with: $displayCmd"
+                Write-Warning "Skipping toolchain installation. You can install it manually later with:"
+                Write-Host "    nrfutil sdk-manager toolchain install --ncs-version $ncsVersion" -ForegroundColor DarkGray
             }
         }
     }
-    else {
-        # Zephyr: Use west sdk install
-        Write-Step "Installing Zephyr SDK $requiredSdkVersion..."
-        
-        $sdkArgs = @("sdk", "install", "--version", $requiredSdkVersion)
-        if ($requiredToolchain) {
-            $sdkArgs += @("--toolchains", $requiredToolchain)
+}
+elseif ($installSdk) {
+    # Zephyr: Use west sdk install
+    Write-Step "Installing Zephyr SDK $requiredSdkVersion..."
+    
+    $sdkArgs = @("sdk", "install", "--version", $requiredSdkVersion)
+    if ($requiredToolchain) {
+        $sdkArgs += @("--toolchains", $requiredToolchain)
+    }
+    
+    Write-Info "Running: west $($sdkArgs -join ' ')"
+    
+    try {
+        & west @sdkArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "west sdk install failed with exit code $LASTEXITCODE"
         }
-        
-        Write-Info "Running: west $($sdkArgs -join ' ')"
-        
-        try {
-            & west @sdkArgs
-            if ($LASTEXITCODE -ne 0) {
-                throw "west sdk install failed with exit code $LASTEXITCODE"
-            }
-            Write-Success "Zephyr SDK installed"
-        }
-        catch {
-            Write-ErrorMessage "Failed to install Zephyr SDK: $($_.Exception.Message)"
-            Write-Warning "You can try installing it manually later with: west sdk install --version $requiredSdkVersion$(if ($requiredToolchain) { " --toolchains $requiredToolchain" })"
-        }
+        Write-Success "Zephyr SDK installed"
+    }
+    catch {
+        Write-ErrorMessage "Failed to install Zephyr SDK: $($_.Exception.Message)"
+        Write-Warning "You can try installing it manually later with: west sdk install --version $requiredSdkVersion$(if ($requiredToolchain) { " --toolchains $requiredToolchain" })"
     }
 }
 
