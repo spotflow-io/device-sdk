@@ -161,6 +161,7 @@ def generate_quickstart(
             {"name": "ESP32-P4", "target": "esp32p4"},
             {"name": "ESP32-S2", "target": "esp32s2"},
             {"name": "ESP32-S3", "target": "esp32s3"},
+            {"name": "Other", "target": "<your-board-target>"},
         ]
     }
 
