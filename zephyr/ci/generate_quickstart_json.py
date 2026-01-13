@@ -27,6 +27,16 @@ def extract_spotflow_path(manifest_filepath: Path) -> str:
     return manifest_data.get("manifest", {}).get("self", {}).get("path", "")
 
 
+def extract_nrf_revision(manifest_filepath: Path) -> str:
+    """Extract the revision of the 'nrf' project from a manifest file."""
+    manifest_data = load_yaml(manifest_filepath)
+    projects = manifest_data.get("manifest", {}).get("projects", [])
+    for project in projects:
+        if project.get("name") == "nrf":
+            return project.get("revision", "")
+    return ""
+
+
 def get_board_property(
     key: str,
     board: Dict[str, Any],
@@ -74,6 +84,7 @@ def transform_board(
     spotflow_paths: Dict[str, str],
     defaults: Dict[str, Any] = None,
     is_other_board: bool = False,
+    ncs_version: str = None,
 ) -> Dict[str, Any]:
     """
     Transform a board entry by applying property inheritance and computing
@@ -115,6 +126,10 @@ def transform_board(
     if board_value != BOARD_PLACEHOLDER:
         result["zephyr_docs"] = compute_zephyr_docs_url(vendor_id, board_value)
 
+    # Include ncs_version for Nordic boards
+    if ncs_version:
+        result["ncs_version"] = ncs_version
+
     callout = get_board_property("callout", board, vendor, defaults, "")
     if callout:
         result["callout"] = callout
@@ -141,7 +156,7 @@ def create_other_board(vendor_id: str = None) -> Dict[str, Any]:
 
 
 def generate_quickstart(
-    boards_config: Dict[str, Any], spotflow_paths: Dict[str, str]
+    boards_config: Dict[str, Any], spotflow_paths: Dict[str, str], ncs_version: str = ""
 ) -> Dict[str, Any]:
     """Generate the complete quickstart.json structure."""
 
@@ -170,18 +185,33 @@ def generate_quickstart(
     zephyr_vendors = []
     for vendor in boards_config["vendors"]:
         vendor_boards = []
+
+        is_nordic = vendor["vendor"] == "nordic"
+        ncs_version = ncs_version if is_nordic else None
+
         for board in vendor["boards"]:
-            transformed = transform_board(board, vendor, spotflow_paths, defaults)
+            transformed = transform_board(
+                board,
+                vendor,
+                spotflow_paths,
+                defaults,
+                ncs_version=ncs_version,
+            )
             vendor_boards.append(transformed)
 
         # Add "Other" board for this vendor
         other_board = create_other_board(vendor["vendor"])
         transformed_other = transform_board(
-            other_board, vendor, spotflow_paths, defaults, is_other_board=True
+            other_board,
+            vendor,
+            spotflow_paths,
+            defaults,
+            is_other_board=True,
+            ncs_version=ncs_version,
         )
         vendor_boards.append(transformed_other)
 
-        if vendor["vendor"] == "nordic":
+        if is_nordic:
             ncs_boards.extend(vendor_boards)
 
         zephyr_vendors.append({"name": vendor["name"], "boards": vendor_boards})
@@ -217,8 +247,13 @@ def main():
         spotflow_paths[manifest_name] = spotflow_path
         print(f"  {manifest_name}: spotflow_path = {spotflow_path}")
 
+    # Extract NCS version from west-ncs.yml manifest
+    ncs_manifest_path = manifests_dir / "west-ncs.yml"
+    ncs_version = extract_nrf_revision(ncs_manifest_path)
+    print(f"  NCS version (nrf revision): {ncs_version}")
+
     print("Generating quickstart.json...")
-    quickstart_data = generate_quickstart(boards_config, spotflow_paths)
+    quickstart_data = generate_quickstart(boards_config, spotflow_paths, ncs_version)
 
     print(f"Writing output to {output_path}")
     with open(output_path, "w") as f:
