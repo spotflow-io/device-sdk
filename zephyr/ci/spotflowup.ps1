@@ -279,32 +279,6 @@ function Test-NcsToolchainInstalled {
     return $false
 }
 
-function Get-NcsVersionFromManifest {
-    param(
-        [string]$ManifestPath
-    )
-    <#
-    .SYNOPSIS
-        Extracts the NCS version from the manifest file (revision of the 'nrf' project).
-    .OUTPUTS
-        The NCS version string (e.g., "v3.1.1") or $null if not found.
-    #>
-    
-    if (-not (Test-Path $ManifestPath)) {
-        return $null
-    }
-    
-    $content = Get-Content $ManifestPath -Raw
-    
-    # Parse YAML to find the nrf project revision
-    # Look for pattern: name: nrf followed by revision: <version>
-    if ($content -match 'name:\s*nrf[\s\S]*?revision:\s*([^\s\r\n]+)') {
-        return $matches[1]
-    }
-    
-    return $null
-}
-
 function Confirm-Action {
     param(
         [string]$Message,
@@ -416,6 +390,9 @@ if ($boardConfig.sdk_toolchain) {
 if ($boardConfig.blob) {
     Write-Info "Blob: $($boardConfig.blob)"
 }
+if ($boardConfig.ncs_version) {
+    Write-Info "NCS version: $($boardConfig.ncs_version)"
+}
 
 # Show callout if present (strip HTML for console display)
 if ($boardConfig.callout) {
@@ -507,9 +484,11 @@ catch {
 
 # Step 5: Check SDK installation
 $installSdk = $false
+$installNcsToolchain = $false
 $nrfUtilInfo = $null
 $requiredSdkVersion = $boardConfig.sdk_version
 $requiredToolchain = $boardConfig.sdk_toolchain
+$ncsVersion = $boardConfig.ncs_version
 
 if ($sdkType -eq "ncs") {
     # NCS: Check for nrfutil or nrfutil-sdk-manager
@@ -558,9 +537,33 @@ if ($sdkType -eq "ncs") {
         Write-Host ""
     }
     
-    # Note: We'll check if toolchain is already installed after west update,
-    # when we can extract the NCS version from the manifest.
-    # The $installSdk flag will be set later based on whether toolchain is already installed.
+    # Check if NCS toolchain is already installed and prompt for installation
+    if ($nrfUtilInfo -and $ncsVersion) {
+        $toolchainInstalled = Test-NcsToolchainInstalled -NrfUtilPath $nrfUtilInfo.Path -NrfUtilType $nrfUtilInfo.Type -NcsVersion $ncsVersion
+        
+        if ($toolchainInstalled) {
+            Write-Success "NCS toolchain for $ncsVersion is already installed"
+        }
+        else {
+            Write-Warning "NCS toolchain for $ncsVersion is not installed."
+            Write-Host ""
+            Write-Info "The NCS toolchain installation modifies your system."
+            Write-Info "The installation may take several minutes."
+            Write-Host ""
+            
+            if (Confirm-Action "Install NCS toolchain for $($ncsVersion)?" $true) {
+                $installNcsToolchain = $true
+            }
+            else {
+                Write-Warning "Skipping toolchain installation. You can install it manually later with:"
+                Write-Host "    nrfutil sdk-manager toolchain install --ncs-version $ncsVersion" -ForegroundColor DarkGray
+            }
+        }
+    }
+    elseif (-not $ncsVersion) {
+        Write-Warning "NCS version not specified in board configuration."
+        Write-Info "Toolchain installation will need to be done manually."
+    }
 }
 else {
     # Zephyr: Check for Zephyr SDK
@@ -789,66 +792,35 @@ if ($boardConfig.blob) {
 }
 
 # Step 13: Install SDK/toolchain
-if ($sdkType -eq "ncs" -and $nrfUtilInfo) {
-    # NCS: Check and install toolchain using nrfutil sdk-manager toolchain
-    Write-Step "Checking NCS toolchain..."
+if ($installNcsToolchain -and $nrfUtilInfo -and $ncsVersion) {
+    # NCS: Install toolchain using nrfutil sdk-manager toolchain
+    Write-Step "Installing NCS toolchain for $ncsVersion..."
     
-    # Find the manifest file to extract NCS version
-    $manifestPath = Join-Path $workspaceFolder "$($boardConfig.spotflow_path)\zephyr\manifests\$($boardConfig.manifest)"
-    $ncsVersion = Get-NcsVersionFromManifest -ManifestPath $manifestPath
-    
-    if (-not $ncsVersion) {
-        Write-ErrorMessage "Could not determine NCS version from manifest"
-        Write-Warning "You can install the toolchain manually with: nrfutil sdk-manager toolchain install --ncs-version <version>"
+    # Build the command based on the type of tool found
+    if ($nrfUtilInfo.Type -eq "nrfutil") {
+        $toolchainCmd = $nrfUtilInfo.Path
+        $toolchainArgs = @("sdk-manager", "toolchain", "install", "--ncs-version", $ncsVersion)
+        $displayCmd = "nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
     }
     else {
-        Write-Info "NCS version from manifest: $ncsVersion"
-        
-        # Check if toolchain is already installed
-        $toolchainInstalled = Test-NcsToolchainInstalled -NrfUtilPath $nrfUtilInfo.Path -NrfUtilType $nrfUtilInfo.Type -NcsVersion $ncsVersion
-        
-        if ($toolchainInstalled) {
-            Write-Success "NCS toolchain for $ncsVersion is already installed"
+        # Direct nrfutil-sdk-manager executable from VS Code extension
+        $toolchainCmd = $nrfUtilInfo.Path
+        $toolchainArgs = @("toolchain", "install", "--ncs-version", $ncsVersion)
+        $displayCmd = "nrfutil-sdk-manager toolchain install --ncs-version $ncsVersion"
+    }
+    
+    Write-Info "Running: $displayCmd"
+    
+    try {
+        & $toolchainCmd @toolchainArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "Toolchain install failed with exit code $LASTEXITCODE"
         }
-        else {
-            Write-Warning "NCS toolchain for $ncsVersion is not installed."
-            Write-Host ""
-            Write-Info "The toolchain installation may take several minutes."
-            Write-Host ""
-            
-            if (Confirm-Action "Install NCS toolchain for $ncsVersion?" $true) {
-                # Build the command based on the type of tool found
-                if ($nrfUtilInfo.Type -eq "nrfutil") {
-                    $toolchainCmd = $nrfUtilInfo.Path
-                    $toolchainArgs = @("sdk-manager", "toolchain", "install", "--ncs-version", $ncsVersion)
-                    $displayCmd = "nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
-                }
-                else {
-                    # Direct nrfutil-sdk-manager executable from VS Code extension
-                    $toolchainCmd = $nrfUtilInfo.Path
-                    $toolchainArgs = @("toolchain", "install", "--ncs-version", $ncsVersion)
-                    $displayCmd = "nrfutil-sdk-manager toolchain install --ncs-version $ncsVersion"
-                }
-                
-                Write-Info "Running: $displayCmd"
-                
-                try {
-                    & $toolchainCmd @toolchainArgs
-                    if ($LASTEXITCODE -ne 0) {
-                        throw "Toolchain install failed with exit code $LASTEXITCODE"
-                    }
-                    Write-Success "NCS toolchain installed for version $ncsVersion"
-                }
-                catch {
-                    Write-ErrorMessage "Failed to install NCS toolchain: $($_.Exception.Message)"
-                    Write-Warning "You can try installing it manually with: $displayCmd"
-                }
-            }
-            else {
-                Write-Warning "Skipping toolchain installation. You can install it manually later with:"
-                Write-Host "    nrfutil sdk-manager toolchain install --ncs-version $ncsVersion" -ForegroundColor DarkGray
-            }
-        }
+        Write-Success "NCS toolchain installed for version $ncsVersion"
+    }
+    catch {
+        Write-ErrorMessage "Failed to install NCS toolchain: $($_.Exception.Message)"
+        Write-Warning "You can try installing it manually with: $displayCmd"
     }
 }
 elseif ($installSdk) {
