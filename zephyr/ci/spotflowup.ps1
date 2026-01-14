@@ -82,14 +82,6 @@ function Write-ErrorMessage {
     Write-Host $Message -ForegroundColor Red
 }
 
-function Write-Banner {
-    Write-Host ""
-    Write-Host "╔══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║         Spotflow Device SDK - Workspace Setup            ║" -ForegroundColor Cyan
-    Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
-    Write-Host ""
-}
-
 function Exit-WithError {
     param(
         [string]$Message,
@@ -338,9 +330,13 @@ function Test-NcsToolchainInstalled {
     return $false
 }
 
-# Validate arguments
-Write-Banner
+Write-Host ""
+Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+Write-Host "║            Spotflow Device SDK - Workspace Setup             ║" -ForegroundColor Cyan
+Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host ""
 
+# Validate arguments
 if ($zephyr -and $ncs) {
     $errorMsg = "Cannot specify both -zephyr and -ncs"
     $details = "Please use only one of these options."
@@ -929,10 +925,17 @@ elseif ($installSdk) {
 }
 
 # Summary
+$samplePath = "$($boardConfig.spotflow_path)/zephyr/samples/logs"
+$configPath = "$samplePath/prj.conf"
+$buildCmd = "west build --pristine --board $($boardConfig.board)"
+if ($boardConfig.build_extra_args) {
+    $buildCmd += " $($boardConfig.build_extra_args)"
+}
+$quickstartUrlSuffix = if ($zephyr) { "zephyr" } else { "nordic-nrf-connect" }
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║                  Setup Complete!                         ║" -ForegroundColor Green
-Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║                       Setup Complete!                        ║" -ForegroundColor Green
+Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 Write-Host "Workspace location: " -NoNewline
 Write-Host $workspaceFolder -ForegroundColor Cyan
@@ -942,22 +945,21 @@ Write-Host "Spotflow module path: " -NoNewline
 Write-Host $boardConfig.spotflow_path -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
-$configPath = "$($boardConfig.spotflow_path)/zephyr/samples/logs/prj.conf"
 Write-Host "  1. Open " -NoNewline
 Write-Host $configPath -NoNewline -ForegroundColor DarkGray
 Write-Host " and add the required configuration options."
 Write-Host ""
-Write-Host "  2. Build and flash the Spotflow sample:"
-$samplePath = "$($boardConfig.spotflow_path)/zephyr/samples/logs"
-Write-Host "     cd $samplePath" -ForegroundColor DarkGray
-$buildCmd = "west build --pristine --board $($boardConfig.board)"
-if ($boardConfig.build_extra_args) {
-    $buildCmd += " $($boardConfig.build_extra_args)"
+if ($zephyr) {
+    Write-Host "  2. Build and flash the Spotflow sample:"
 }
+else {
+    Write-Host "  2. In a terminal with the nRF Connect toolchain environment, " -NoNewline
+    Write-Host "build and flash the Spotflow sample:"
+}
+Write-Host "     cd $samplePath" -ForegroundColor DarkGray
 Write-Host "     $buildCmd" -ForegroundColor DarkGray
 Write-Host "     west flash" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "For more information, visit: " -NoNewline
-$quickstartUrlSuffix = if ($zephyr) { "zephyr" } else { "nordic-nrf-connect" }
 Write-Host "https://docs.spotflow.io/quickstart/$quickstartUrlSuffix" -ForegroundColor Cyan
 Write-Host ""
