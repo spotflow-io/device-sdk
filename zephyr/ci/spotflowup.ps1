@@ -19,6 +19,9 @@
 .PARAMETER workspaceFolder
     The workspace folder path. If not specified, the script will prompt for it.
 
+.PARAMETER spotflowRevision
+    The Spotflow module revision to checkout. If not specified, the script will use the latest revision.
+
 .PARAMETER autoConfirm
     Automatically confirm all actions without prompting (useful for CI/automated environments).
 
@@ -39,6 +42,7 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$board,
     [string]$workspaceFolder = "",
+    [string]$spotflowRevision = "",
     [switch]$autoConfirm
 )
 
@@ -759,7 +763,12 @@ Write-Info "Manifest URL: $ManifestBaseUrl"
 Write-Info "Manifest file: $manifestFile"
 
 try {
-    $westInitOutput = & west init --manifest-url $ManifestBaseUrl --manifest-file $manifestFile . 2>&1
+    $additionalArgs = @()
+    if ($spotflowRevision) {
+        $additionalArgs += @("--clone-opt=--revision=$spotflowRevision")
+    }
+
+    $westInitOutput = & west init --manifest-url $ManifestBaseUrl --manifest-file $manifestFile . $additionalArgs 2>&1
     if ($LASTEXITCODE -ne 0) {
         # Check if it's just already initialized
         if ($westInitOutput -match "already initialized") {

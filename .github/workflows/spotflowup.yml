@@ -80,6 +80,7 @@ jobs:
           ./zephyr/ci/spotflowup.ps1 ${{ matrix.config.sdk_flag }} `
             -board ${{ matrix.config.board }} `
             -workspaceFolder test-workspace `
+            -spotflowRevision ${{ github.sha }} `
             -autoConfirm
 
       - name: Configure application
@@ -98,8 +99,11 @@ jobs:
         working-directory: test-workspace
         run: |
           # Activate virtual environment
-          $activateScript = if ($IsWindows) { ".venv/Scripts/Activate.ps1" } else { ".venv/bin/Activate.ps1" }
-          . $activateScript
+          if ($IsWindows) {
+            .venv/Scripts/Activate.ps1
+          } else {
+            .venv/bin/Activate.ps1
+          }
 
           Set-Location "${{ matrix.config.module_path }}/zephyr/samples/logs"
           west build --board ${{ matrix.config.board_target }}
