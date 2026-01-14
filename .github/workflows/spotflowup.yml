@@ -30,8 +30,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
-        config:
+        environment:
+          - os: ubuntu-latest
+            workspace_dir: test-workspace
+          - os: windows-latest
+            workspace_dir: D:\test-workspace
+        example:
           - sdk_flag: -ncs
             board: nrf7002dk
             board_target: nrf7002dk/nrf5340/cpuapp/ns
@@ -41,7 +45,7 @@ jobs:
             board_target: frdm_rw612
             module_path: modules/lib/spotflow
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.environment.os }}
 
     steps:
       - name: Checkout repository
@@ -60,7 +64,7 @@ jobs:
         run: choco install wget
 
       - name: Install nRF Util
-        if: matrix.config.sdk_flag == '-ncs'
+        if: matrix.example.sdk_flag == '-ncs'
         shell: pwsh
         run: |
           $baseUrl = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables"
@@ -89,27 +93,28 @@ jobs:
       - name: Run spotflowup.ps1
         shell: pwsh
         run: |
-          ./zephyr/ci/spotflowup.ps1 ${{ matrix.config.sdk_flag }} `
-            -board ${{ matrix.config.board }} `
-            -workspaceFolder test-workspace `
+          ./zephyr/ci/spotflowup.ps1 ${{ matrix.example.sdk_flag }} `
+            -board ${{ matrix.example.board }} `
+            -workspaceFolder ${{ matrix.environment.workspace_dir }} `
             -spotflowRevision ${{ github.sha }} `
             -autoConfirm
 
       - name: Configure application
         shell: pwsh
-        working-directory: test-workspace/${{ matrix.config.module_path }}/zephyr/samples/logs
+        working-directory: ${{ matrix.environment.workspace_dir }}
         run: |
+          $configFile = "${{ matrix.example.module_path }}/zephyr/samples/logs/credentials.conf"
           @"
           CONFIG_NET_WIFI_SSID="TODOTODO"
           CONFIG_NET_WIFI_PASSWORD="TODOTODO"
-          CONFIG_SPOTFLOW_DEVICE_ID="${{ matrix.config.board }}_${{ github.run_id }}"
+          CONFIG_SPOTFLOW_DEVICE_ID="${{ matrix.example.board }}_${{ github.run_id }}"
           CONFIG_SPOTFLOW_INGEST_KEY="TODO"
-          "@ | Set-Content -Path credentials.conf
+          "@ | Set-Content -Path $configFile
 
       - name: Build Zephyr application
-        if: matrix.config.sdk_flag == '-zephyr'
+        if: matrix.example.sdk_flag == '-zephyr'
         shell: pwsh
-        working-directory: test-workspace
+        working-directory: ${{ matrix.environment.workspace_dir }}
         run: |
           # Activate virtual environment
           if ($IsWindows) {
@@ -118,16 +123,16 @@ jobs:
             .venv/bin/Activate.ps1
           }
 
-          Set-Location "${{ matrix.config.module_path }}/zephyr/samples/logs"
-          west build --board ${{ matrix.config.board_target }}
+          Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
+          west build --board ${{ matrix.example.board_target }}
 
       - name: Build nRF Connect SDK application
-        if: matrix.config.sdk_flag == '-ncs'
+        if: matrix.example.sdk_flag == '-ncs'
         shell: pwsh
-        working-directory: test-workspace
+        working-directory: ${{ matrix.environment.workspace_dir }}
         run: |
           $ncsVersion = cat nrf/VERSION
 
-          Set-Location "${{ matrix.config.module_path }}/zephyr/samples/logs"
+          Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
           nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
-            west build --board ${{ matrix.config.board_target }}
+            west build --board ${{ matrix.example.board_target }}
