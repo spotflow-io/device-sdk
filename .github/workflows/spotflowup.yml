@@ -1,0 +1,105 @@
+name: Test spotflowup.ps1
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'zephyr/ci/spotflowup.ps1'
+      - 'zephyr/ci/boards.yml'
+      - 'zephyr/ci/generate_quickstart_json.py'
+      - 'zephyr/manifests/**'
+      - '.github/workflows/spotflowup.yml'
+  pull_request:
+    paths:
+      - 'zephyr/ci/spotflowup.ps1'
+      - 'zephyr/ci/boards.yml'
+      - 'zephyr/ci/generate_quickstart_json.py'
+      - 'zephyr/manifests/**'
+      - '.github/workflows/spotflowup.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        config:
+          - sdk_flag: -ncs
+            board: nrf7002dk
+            board_target: nrf7002dk/nrf5340/cpuapp/ns
+            module_path: spotflow
+          - sdk_flag: -zephyr
+            board: frdm_rw612
+            board_target: frdm_rw612
+            module_path: modules/lib/spotflow
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install nRF Util
+        if: matrix.config.sdk_flag == '-ncs'
+        shell: pwsh
+        run: |
+          if ($IsWindows) {
+            $url = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables/x86_64-pc-windows-msvc/nrfutil.exe"
+            $output = "nrfutil.exe"
+          } else {
+            $url = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables/x86_64-unknown-linux-gnu/nrfutil"
+            $output = "nrfutil"
+          }
+          
+          Write-Host "Downloading nrfutil from $url"
+          Invoke-WebRequest -Uri $url -OutFile $output
+          
+          if (-not $IsWindows) {
+            chmod +x $output
+          }
+          
+          # Add to PATH for subsequent steps
+          $nrfutilDir = (Get-Item $output).DirectoryName
+          echo "$nrfutilDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          
+          # Verify installation
+          & ./$output --version
+
+      - name: Run spotflowup.ps1
+        shell: pwsh
+        run: |
+         # Provide input for interactive prompts:
+          # 1. Workspace path
+          # 2-3. Confirmation of SDK installation
+         $input = @("test-workspace", "Y", "Y")
+         $input | & ./zephyr/ci/spotflowup.ps1 ${{ matrix.config.sdk_flag }} -board ${{ matrix.config.board }}
+
+      - name: Configure application
+        shell: pwsh
+        working-directory: test-workspace/${{ matrix.config.module_path }}/zephyr/samples/logs
+        run: |
+          @"
+          CONFIG_NET_WIFI_SSID="TODOTODO"
+          CONFIG_NET_WIFI_PASSWORD="TODOTODO"
+          CONFIG_SPOTFLOW_DEVICE_ID="${{ matrix.config.board }}_${{ github.run_id }}"
+          CONFIG_SPOTFLOW_INGEST_KEY="TODO"
+          "@ | Set-Content -Path credentials.conf
+
+      - name: Build application
+        shell: pwsh
+        working-directory: test-workspace
+        run: |
+          # Activate virtual environment
+          $activateScript = if ($IsWindows) { ".venv/Scripts/Activate.ps1" } else { ".venv/bin/Activate.ps1" }
+          . $activateScript
+
+          Set-Location "${{ matrix.config.module_path }}/zephyr/samples/logs"
+          west build --board ${{ matrix.config.board_target }}
