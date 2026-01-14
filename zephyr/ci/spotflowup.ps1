@@ -743,7 +743,6 @@ catch {
 Write-Step "Installing West..."
 
 try {
-    & pip install --upgrade pip wheel 2>&1 | Out-Null
     & pip install west
     if ($LASTEXITCODE -ne 0) {
         throw "pip install west failed with exit code $LASTEXITCODE"
