@@ -1,7 +1,7 @@
 #Requires -Version 5.1
 <#
 .SYNOPSIS
-    Spotflow Device SDK workspace setup script for Zephyr and nRF Connect SDK (NCS).
+    Spotflow Device SDK workspace setup script for Zephyr and nRF Connect SDK.
 
 .DESCRIPTION
     This script automates the creation of a west workspace for building
@@ -53,31 +53,31 @@ $ManifestBaseUrl = "https://github.com/spotflow-io/device-sdk"
 # Colors and formatting
 function Write-Step {
     param([string]$Message)
-    Write-Host "`n▶ " -ForegroundColor Cyan -NoNewline
+    Write-Host "`n> " -ForegroundColor Cyan -NoNewline
     Write-Host $Message -ForegroundColor White
 }
 
 function Write-Info {
     param([string]$Message)
-    Write-Host "  ℹ " -ForegroundColor Blue -NoNewline
+    Write-Host "  [i] " -ForegroundColor Blue -NoNewline
     Write-Host $Message -ForegroundColor Gray
 }
 
 function Write-Success {
     param([string]$Message)
-    Write-Host "  ✓ " -ForegroundColor Green -NoNewline
+    Write-Host "  [+] " -ForegroundColor Green -NoNewline
     Write-Host $Message -ForegroundColor White
 }
 
 function Write-Warning {
     param([string]$Message)
-    Write-Host "  ⚠ " -ForegroundColor Yellow -NoNewline
+    Write-Host "  [!] " -ForegroundColor Yellow -NoNewline
     Write-Host $Message -ForegroundColor Yellow
 }
 
 function Write-ErrorMessage {
     param([string]$Message)
-    Write-Host "  ✗ " -ForegroundColor Red -NoNewline
+    Write-Host "  [x] " -ForegroundColor Red -NoNewline
     Write-Host $Message -ForegroundColor Red
 }
 
@@ -111,14 +111,14 @@ function Confirm-Action {
         [string]$Message,
         [bool]$DefaultYes = $true
     )
-    # If autoConfirm is enabled, automatically return the default value
+    
     if ($autoConfirm) {
         Write-Info "$Message (auto-confirmed)"
         return $true
     }
     
     $suffix = if ($DefaultYes) { "[Y/n]" } else { "[y/N]" }
-    Write-Host "  ? " -ForegroundColor Magenta -NoNewline
+    Write-Host "  [?] " -ForegroundColor Magenta -NoNewline
     Write-Host "$Message $suffix " -NoNewline
     $response = Read-Host
     if ([string]::IsNullOrWhiteSpace($response)) {
@@ -133,19 +133,18 @@ function Read-Input {
         [string]$Default,
         [string]$ProvidedValue = ""
     )
-    # If a value was provided (e.g., via parameter), use it directly
+    
     if (-not [string]::IsNullOrWhiteSpace($ProvidedValue)) {
         Write-Info "$Prompt (provided: $ProvidedValue)"
         return $ProvidedValue
     }
     
-    # If autoConfirm is enabled, use the default without prompting
     if ($autoConfirm) {
         Write-Info "$Prompt (using default: $Default)"
         return $Default
     }
-    
-    Write-Host "  ? " -ForegroundColor Magenta -NoNewline
+
+    Write-Host "  [?] " -ForegroundColor Magenta -NoNewline
     Write-Host "$Prompt " -NoNewline
     if ($Default) {
         Write-Host "[$Default] " -ForegroundColor DarkGray -NoNewline
@@ -158,13 +157,11 @@ function Read-Input {
 }
 
 function Test-NrfUtilHasSdkManager {
-    param(
-        [string]$NrfUtilPath
-    )
+    param([string]$NrfUtilPath)
     <#
     .SYNOPSIS
         Checks if nrfutil has the sdk-manager command installed.
-    .RETURNS
+    .OUTPUTS
         $true if sdk-manager is available, $false otherwise.
     #>
     try {
@@ -191,7 +188,6 @@ function Find-NrfUtilSdkManagerInExtensions {
             "$env:USERPROFILE\.cursor\extensions",
             "$env:USERPROFILE\.vscode-insiders\extensions"
         )
-        # On Windows, it's in platform/nrfutil/bin subfolder
         $sdkManagerRelPath = "platform\nrfutil\bin\nrfutil-sdk-manager.exe"
     }
     else {
@@ -200,19 +196,22 @@ function Find-NrfUtilSdkManagerInExtensions {
             "$HOME/.cursor/extensions",
             "$HOME/.vscode-insiders/extensions"
         )
-        # On Linux/macOS, assumed to be in platform/nrfutil/bin subfolder
         $sdkManagerRelPath = "platform/nrfutil/bin/nrfutil-sdk-manager"
     }
     
     foreach ($extDir in $extensionDirs) {
-        if (Test-Path $extDir) {
-            # Look for nordic-semiconductor.nrf-connect* extensions
-            $nordicExtensions = Get-ChildItem -Path $extDir -Directory -Filter "nordic-semiconductor.nrf-connect*" -ErrorAction SilentlyContinue
-            foreach ($ext in $nordicExtensions) {
-                $sdkManagerPath = Join-Path $ext.FullName $sdkManagerRelPath
-                if (Test-Path $sdkManagerPath) {
-                    return $sdkManagerPath
-                }
+        if (-not (Test-Path $extDir)) {
+            continue
+        }
+        
+        $filterPattern = "nordic-semiconductor.nrf-connect*"
+        $nordicExtensions = Get-ChildItem -Path $extDir -Directory `
+            -Filter $filterPattern -ErrorAction SilentlyContinue
+        
+        foreach ($ext in $nordicExtensions) {
+            $sdkManagerPath = Join-Path $ext.FullName $sdkManagerRelPath
+            if (Test-Path $sdkManagerPath) {
+                return $sdkManagerPath
             }
         }
     }
@@ -223,76 +222,71 @@ function Find-NrfUtilSdkManagerInExtensions {
 function Find-NrfUtil {
     <#
     .SYNOPSIS
-        Finds the best available nrfutil/sdk-manager for NCS toolchain management.
+        Finds the best available nrfutil/sdk-manager for nRF Connect SDK
+        toolchain management.
         Priority:
         1. nrfutil on PATH with sdk-manager already installed
         2. nrfutil-sdk-manager from VS Code/Cursor extension
-        3. nrfutil on PATH without sdk-manager (sdk-manager needs to be installed)
+        3. nrfutil on PATH without sdk-manager (needs installation)
     .OUTPUTS
         Hashtable with:
         - 'Path': full path to executable
         - 'Type': 'nrfutil' or 'sdk-manager'
-        - 'NeedsSdkManagerInstall': $true if sdk-manager command needs to be installed
+        - 'NeedsSdkManagerInstall': $true if sdk-manager needs installation
         Returns $null if not found.
     #>
-    
+
     $nrfutilOnPath = $null
     $nrfutilHasSdkManager = $false
-    
-    # Check for nrfutil on PATH
+
     try {
         $nrfutilCmd = Get-Command nrfutil -ErrorAction SilentlyContinue
         if ($nrfutilCmd) {
             $nrfutilOnPath = $nrfutilCmd.Source
-            $nrfutilHasSdkManager = Test-NrfUtilHasSdkManager -NrfUtilPath $nrfutilOnPath
+            $nrfutilHasSdkManager = Test-NrfUtilHasSdkManager $nrfutilOnPath
         }
     }
     catch {
         # nrfutil not on PATH
     }
-    
-    # Priority 1: nrfutil on PATH with sdk-manager already installed
+
     if ($nrfutilOnPath -and $nrfutilHasSdkManager) {
         return @{
-            Path = $nrfutilOnPath
-            Type = "nrfutil"
+            Path                   = $nrfutilOnPath
+            Type                   = "nrfutil"
             NeedsSdkManagerInstall = $false
         }
     }
-    
-    # Priority 2: nrfutil-sdk-manager from VS Code/Cursor extension
+
     $extensionSdkManager = Find-NrfUtilSdkManagerInExtensions
     if ($extensionSdkManager) {
         return @{
-            Path = $extensionSdkManager
-            Type = "sdk-manager"
+            Path                   = $extensionSdkManager
+            Type                   = "sdk-manager"
             NeedsSdkManagerInstall = $false
         }
     }
-    
-    # Priority 3: nrfutil on PATH without sdk-manager (needs installation)
+
     if ($nrfutilOnPath) {
         return @{
-            Path = $nrfutilOnPath
-            Type = "nrfutil"
+            Path                   = $nrfutilOnPath
+            Type                   = "nrfutil"
             NeedsSdkManagerInstall = $true
         }
     }
-    
+
     return $null
 }
 
 function Install-NrfUtilSdkManager {
-    param(
-        [string]$NrfUtilPath
-    )
+    param([string]$NrfUtilPath)
     <#
     .SYNOPSIS
         Installs the sdk-manager command for nrfutil.
-    .RETURNS
+    .OUTPUTS
         $true if sdk-manager was installed successfully, $false otherwise.
     #>
-    
+
     Write-Info "Installing nrfutil sdk-manager command..."
     try {
         & $NrfUtilPath install sdk-manager 2>&1 | Out-Null
@@ -300,13 +294,12 @@ function Install-NrfUtilSdkManager {
             Write-Success "nrfutil sdk-manager installed"
             return $true
         }
-        else {
-            Write-ErrorMessage "Failed to install nrfutil sdk-manager"
-            return $false
-        }
+        Write-ErrorMessage "Failed to install nrfutil sdk-manager"
+        return $false
     }
     catch {
-        Write-ErrorMessage "Failed to install nrfutil sdk-manager: $($_.Exception.Message)"
+        $errorMsg = "Failed to install nrfutil sdk-manager: $($_.Exception.Message)"
+        Write-ErrorMessage $errorMsg
         return $false
     }
 }
@@ -319,29 +312,28 @@ function Test-NcsToolchainInstalled {
     )
     <#
     .SYNOPSIS
-        Checks if the NCS toolchain for the specified version is already installed.
-    .RETURNS
+        Checks if the nRF Connect SDK toolchain for the specified version
+        is already installed.
+    .OUTPUTS
         $true if the toolchain is installed, $false otherwise.
     #>
-    
+
     try {
-        if ($NrfUtilType -eq "nrfutil") {
-            $output = & $NrfUtilPath sdk-manager toolchain list 2>&1
+        $output = if ($NrfUtilType -eq "nrfutil") {
+            & $NrfUtilPath sdk-manager toolchain list 2>&1
         }
         else {
-            # For standalone nrfutil-sdk-manager from VS Code extension
-            $output = & $NrfUtilPath toolchain list 2>&1
+            & $NrfUtilPath toolchain list 2>&1
         }
         
         if ($LASTEXITCODE -eq 0 -and $output) {
-            # Check if the version is in the output
             return ($output -match [regex]::Escape($NcsVersion))
         }
     }
     catch {
         # If command fails, assume toolchain is not installed
     }
-    
+
     return $false
 }
 
@@ -349,15 +341,20 @@ function Test-NcsToolchainInstalled {
 Write-Banner
 
 if ($zephyr -and $ncs) {
-    Exit-WithError "Cannot specify both -zephyr and -ncs" "Please use only one of these options."
+    $errorMsg = "Cannot specify both -zephyr and -ncs"
+    $details = "Please use only one of these options."
+    Exit-WithError $errorMsg $details
 }
 
 if (-not $zephyr -and -not $ncs) {
-    Exit-WithError "Must specify either -zephyr or -ncs" "Use -zephyr for upstream Zephyr or -ncs for nRF Connect SDK."
+    $errorMsg = "Must specify either -zephyr or -ncs"
+    $details = "Use -zephyr for upstream Zephyr or -ncs for nRF Connect SDK."
+    Exit-WithError $errorMsg $details
 }
 
 $sdkType = if ($zephyr) { "zephyr" } else { "ncs" }
-Write-Info "SDK type: $($sdkType.ToUpper())"
+$sdkDisplayType = if ($zephyr) { "Zephyr" } else { "nRF Connect SDK" }
+Write-Info "SDK type: $sdkDisplayType"
 Write-Info "Board ID: $board"
 
 # Step 1: Download and parse quickstart.json
@@ -375,23 +372,23 @@ catch {
 Write-Step "Looking up board '$board'..."
 
 $boardConfig = $null
+$vendorName = $null
 
-if ($sdkType -eq "ncs") {
-    # NCS boards are directly in ncs.boards array
-    if ($quickstartJson.ncs -and $quickstartJson.ncs.boards) {
-        $boardConfig = $quickstartJson.ncs.boards | Where-Object { $_.id -eq $board } | Select-Object -First 1
-    }
+if ($sdkType -eq "ncs" -and $quickstartJson.ncs -and $quickstartJson.ncs.boards) {
+    $boardConfig = $quickstartJson.ncs.boards | 
+        Where-Object { $_.id -eq $board } | 
+        Select-Object -First 1
 }
-else {
-    # Zephyr boards are nested in zephyr.vendors[*].boards
-    if ($quickstartJson.zephyr -and $quickstartJson.zephyr.vendors) {
-        foreach ($vendor in $quickstartJson.zephyr.vendors) {
-            $found = $vendor.boards | Where-Object { $_.id -eq $board } | Select-Object -First 1
-            if ($found) {
-                $boardConfig = $found
-                $vendorName = $vendor.name
-                break
-            }
+elseif ($sdkType -eq "zephyr" -and $quickstartJson.zephyr -and 
+        $quickstartJson.zephyr.vendors) {
+    foreach ($vendor in $quickstartJson.zephyr.vendors) {
+        $found = $vendor.boards | 
+            Where-Object { $_.id -eq $board } | 
+            Select-Object -First 1
+        if ($found) {
+            $boardConfig = $found
+            $vendorName = $vendor.name
+            break
         }
     }
 }
@@ -406,9 +403,10 @@ if (-not $boardConfig) {
             $availableBoards += $vendor.boards | ForEach-Object { $_.id }
         }
     }
-    
+
     $boardList = ($availableBoards | Where-Object { $_ }) -join ", "
-    Exit-WithError "Board '$board' not found in $($sdkType.ToUpper()) configuration" "Available boards: $boardList"
+    $errorMsg = "Board '$board' not found in $sdkDisplayType configuration"
+    Exit-WithError $errorMsg "Available boards: $boardList"
 }
 
 Write-Success "Found board: $($boardConfig.name)"
@@ -425,7 +423,7 @@ if ($boardConfig.blob) {
     Write-Info "Blob: $($boardConfig.blob)"
 }
 if ($boardConfig.ncs_version) {
-    Write-Info "NCS version: $($boardConfig.ncs_version)"
+    Write-Info "nRF Connect SDK version: $($boardConfig.ncs_version)"
 }
 
 # Show callout if present (strip HTML for console display)
@@ -450,8 +448,7 @@ else {
     $defaultFolder = Join-Path $HOME "spotflow-ws"
 }
 
-$sdkDisplayName = if ($zephyr) { "Zephyr" } else { "nRF Connect SDK (NCS)" }
-Write-Info "The workspace will contain all $sdkDisplayName files and your project."
+Write-Info "The workspace will contain all $sdkDisplayType files and your project."
 if ($isWindowsOS) {
     Write-Warning "Tip: Avoid very long paths on Windows to prevent build issues."
 }
@@ -464,13 +461,17 @@ if ([string]::IsNullOrWhiteSpace($workspaceFolder)) {
 }
 
 # Normalize path (resolve relative paths against PowerShell's CWD)
-$workspaceFolder = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PWD.Path, $workspaceFolder))
+$workspaceFolder = [System.IO.Path]::GetFullPath(
+    [System.IO.Path]::Combine($PWD.Path, $workspaceFolder)
+)
 
 if (Test-Path $workspaceFolder) {
-    $items = Get-ChildItem -Path $workspaceFolder -Force -ErrorAction SilentlyContinue
+    $items = Get-ChildItem -Path $workspaceFolder -Force `
+        -ErrorAction SilentlyContinue
     if ($items.Count -gt 0) {
         Write-Warning "Folder '$workspaceFolder' already exists and is not empty."
-        if (-not (Confirm-Action "Continue anyway? This may cause issues." $false)) {
+        $confirmMsg = "Continue anyway? This may cause issues."
+        if (-not (Confirm-Action $confirmMsg $false)) {
             Write-Info "Setup cancelled by user."
             exit 0
         }
@@ -494,12 +495,14 @@ foreach ($cmd in @("python", "python3")) {
         }
     }
     catch {
-        # Continue to next command
+        continue
     }
 }
 
 if (-not $pythonCmd) {
-    Exit-WithError "Python not found" "Please install Python 3.10+ from https://www.python.org/ or follow Zephyr's Getting Started Guide."
+    $details = "Please install Python 3.10+ from https://www.python.org/ " +
+               "or follow Zephyr's Getting Started Guide."
+    Exit-WithError "Python not found" $details
 }
 
 # Check Git
@@ -525,24 +528,28 @@ $requiredToolchain = $boardConfig.sdk_toolchain
 $ncsVersion = $boardConfig.ncs_version
 
 if ($sdkType -eq "ncs") {
-    # NCS: Check for nrfutil or nrfutil-sdk-manager
     Write-Step "Checking nRF Connect SDK toolchain setup..."
-    
+
     $nrfUtilInfo = Find-NrfUtil
-    
+
     if ($nrfUtilInfo) {
         if ($nrfUtilInfo.Type -eq "nrfutil") {
             if ($nrfUtilInfo.NeedsSdkManagerInstall) {
                 Write-Info "Found nrfutil at: $($nrfUtilInfo.Path)"
                 Write-Warning "The sdk-manager command is not installed for nrfutil."
                 Write-Host ""
-                Write-Info "The sdk-manager command is required to install the NCS toolchain."
+                $msg = "The sdk-manager command is required to install " +
+                       "the nRF Connect SDK toolchain."
+                Write-Info $msg
                 Write-Host ""
-                
+
                 if (Confirm-Action "Install nrfutil sdk-manager command?" $true) {
-                    if (-not (Install-NrfUtilSdkManager -NrfUtilPath $nrfUtilInfo.Path)) {
+                    $installed = Install-NrfUtilSdkManager $nrfUtilInfo.Path
+                    if (-not $installed) {
                         Write-Warning "Could not install nrfutil sdk-manager command."
-                        Write-Warning "Toolchain installation will be skipped. Install it manually later."
+                        $msg = "Toolchain installation will be skipped. " +
+                            "Install it manually later."
+                        Write-Warning $msg
                         $nrfUtilInfo = $null
                     }
                     else {
@@ -550,7 +557,9 @@ if ($sdkType -eq "ncs") {
                     }
                 }
                 else {
-                    Write-Warning "Skipping sdk-manager installation. Toolchain will need to be installed manually."
+                    $msg = "Skipping sdk-manager installation. " +
+                           "Toolchain will need to be installed manually."
+                    Write-Warning $msg
                     $nrfUtilInfo = $null
                 }
             }
@@ -563,52 +572,63 @@ if ($sdkType -eq "ncs") {
         }
     }
     else {
-        Write-Warning "nrfutil not found on PATH and nrfutil-sdk-manager not found in VS Code/Cursor extensions."
+        $msg = "nrfutil not found on PATH and nrfutil-sdk-manager not found " +
+               "in VS Code/Cursor extensions."
+        Write-Warning $msg
         Write-Host ""
         Write-Info "The nRF Connect SDK toolchain will need to be installed manually."
-        Write-Info "You can install nrfutil from: https://www.nordicsemi.com/Products/Development-tools/nRF-Util"
+        $url = "https://www.nordicsemi.com/Products/Development-tools/nRF-Util"
+        Write-Info "You can install nrfutil from: $url"
         Write-Info "Or install the nRF Connect for VS Code extension pack."
         Write-Host ""
     }
-    
-    # Check if NCS toolchain is already installed and prompt for installation
+
+    # Check if nRF Connect SDK toolchain is installed and prompt for installation
     if ($nrfUtilInfo -and $ncsVersion) {
-        $toolchainInstalled = Test-NcsToolchainInstalled -NrfUtilPath $nrfUtilInfo.Path -NrfUtilType $nrfUtilInfo.Type -NcsVersion $ncsVersion
-        
+        $toolchainInstalled = Test-NcsToolchainInstalled `
+            -NrfUtilPath $nrfUtilInfo.Path `
+            -NrfUtilType $nrfUtilInfo.Type `
+            -NcsVersion $ncsVersion
+
         if ($toolchainInstalled) {
-            Write-Success "NCS toolchain for $ncsVersion is already installed"
+            $msg = "nRF Connect SDK toolchain for $ncsVersion is already installed"
+            Write-Success $msg
         }
         else {
-            Write-Warning "NCS toolchain for $ncsVersion is not installed."
+            $msg = "nRF Connect SDK toolchain for $ncsVersion is not installed."
+            Write-Warning $msg
             Write-Host ""
-            Write-Info "The NCS toolchain installation modifies your system."
+            Write-Info "The nRF Connect SDK toolchain installation modifies your system."
             Write-Info "The installation may take several minutes."
             Write-Host ""
             
-            if (Confirm-Action "Install NCS toolchain for $($ncsVersion)?" $true) {
+            $confirmMsg = "Install nRF Connect SDK toolchain for $($ncsVersion)?"
+            if (Confirm-Action $confirmMsg $true) {
                 $installNcsToolchain = $true
             }
             else {
-                Write-Warning "Skipping toolchain installation. You can install it manually later with:"
-                Write-Host "    nrfutil sdk-manager toolchain install --ncs-version $ncsVersion" -ForegroundColor DarkGray
+                $msg = "Skipping toolchain installation. " +
+                       "You can install it manually later with:"
+                Write-Warning $msg
+                $cmd = "nrfutil sdk-manager toolchain install " +
+                       "--ncs-version $ncsVersion"
+                Write-Host "    $cmd" -ForegroundColor DarkGray
             }
         }
     }
     elseif (-not $ncsVersion) {
-        Write-Warning "NCS version not specified in board configuration."
+        Write-Warning "nRF Connect SDK version not specified in board configuration."
         Write-Info "Toolchain installation will need to be done manually."
     }
 }
 else {
-    # Zephyr: Check for Zephyr SDK
     Write-Step "Checking Zephyr SDK installation..."
-    
+
     $sdkInstalled = $false
     $toolchainInstalled = $false
-    
-    # Check common SDK locations (platform-specific)
-    if ($isWindowsOS) {
-        $sdkLocations = @(
+
+    $sdkLocations = if ($isWindowsOS) {
+        @(
             "$env:USERPROFILE\zephyr-sdk-$requiredSdkVersion",
             "$env:USERPROFILE\.local\zephyr-sdk-$requiredSdkVersion",
             "C:\zephyr-sdk-$requiredSdkVersion",
@@ -616,30 +636,27 @@ else {
         )
     }
     else {
-        # Linux/macOS locations
-        $sdkLocations = @(
+        @(
             "$HOME/zephyr-sdk-$requiredSdkVersion",
             "$HOME/.local/zephyr-sdk-$requiredSdkVersion",
             "/opt/zephyr-sdk-$requiredSdkVersion",
             "/usr/local/zephyr-sdk-$requiredSdkVersion"
         )
     }
-    
-    # Also check ZEPHYR_SDK_INSTALL_DIR environment variable
+
     if ($env:ZEPHYR_SDK_INSTALL_DIR) {
-        $additionalSdkLocations = @(
+        $additionalLocations = @(
             $env:ZEPHYR_SDK_INSTALL_DIR,
             "$env:ZEPHYR_SDK_INSTALL_DIR\zephyr-sdk-$requiredSdkVersion"
         )
-        $sdkLocations = $additionalSdkLocations + $sdkLocations
+        $sdkLocations = $additionalLocations + $sdkLocations
     }
-    
+
     foreach ($sdkPath in $sdkLocations) {
         if (Test-Path "$sdkPath\sdk_version") {
             Write-Success "Found Zephyr SDK at: $sdkPath"
             $sdkInstalled = $true
             
-            # Check if toolchain is installed
             if ($requiredToolchain) {
                 $toolchainPath = Join-Path $sdkPath $requiredToolchain
                 if (Test-Path $toolchainPath) {
@@ -651,25 +668,41 @@ else {
                 }
             }
             else {
-                $toolchainInstalled = $true # No specific toolchain required
+                $toolchainInstalled = $true
             }
             break
         }
     }
-    
+
     if (-not $sdkInstalled -or -not $toolchainInstalled) {
-        Write-Warning "Zephyr SDK $requiredSdkVersion$(if ($requiredToolchain) { " with toolchain '$requiredToolchain'" }) is not installed."
+        $warningMsg = "Zephyr SDK $requiredSdkVersion"
+        if ($requiredToolchain) {
+            $warningMsg += " with toolchain '$requiredToolchain'"
+        }
+        $warningMsg += " is not installed."
+        Write-Warning $warningMsg
         Write-Host ""
         Write-Info "The Zephyr SDK will be installed to your user profile directory."
         Write-Info "This is a one-time setup that modifies your system."
         Write-Host ""
-        
-        if (Confirm-Action "Install Zephyr SDK $requiredSdkVersion$(if ($requiredToolchain) { " with '$requiredToolchain' toolchain" })?" $true) {
+
+        $confirmMsg = "Install Zephyr SDK $requiredSdkVersion"
+        if ($requiredToolchain) {
+            $confirmMsg += " with '$requiredToolchain' toolchain"
+        }
+        $confirmMsg += "?"
+        if (Confirm-Action $confirmMsg $true) {
             $installSdk = $true
         }
         else {
-            Write-Warning "Skipping SDK installation. You can install it manually later with:"
-            Write-Host "    west sdk install --version $requiredSdkVersion$(if ($requiredToolchain) { " --toolchains $requiredToolchain" })" -ForegroundColor DarkGray
+            $msg = "Skipping SDK installation. " +
+                   "You can install it manually later with:"
+            Write-Warning $msg
+            $manualCmd = "west sdk install --version $requiredSdkVersion"
+            if ($requiredToolchain) {
+                $manualCmd += " --toolchains $requiredToolchain"
+            }
+            Write-Host "    $manualCmd" -ForegroundColor DarkGray
         }
     }
     else {
@@ -762,14 +795,14 @@ Write-Info "Manifest URL: $ManifestBaseUrl"
 Write-Info "Manifest file: $manifestFile"
 
 try {
-    $additionalArgs = @()
+    $westInitArgs = @("init", "--manifest-url", $ManifestBaseUrl, 
+                      "--manifest-file", $manifestFile, ".")
     if ($spotflowRevision) {
-        $additionalArgs += @("--clone-opt=--revision=$spotflowRevision")
+        $westInitArgs += "--clone-opt=--revision=$spotflowRevision"
     }
 
-    $westInitOutput = & west init --manifest-url $ManifestBaseUrl --manifest-file $manifestFile . $additionalArgs 2>&1
+    $westInitOutput = & west @westInitArgs 2>&1
     if ($LASTEXITCODE -ne 0) {
-        # Check if it's just already initialized
         if ($westInitOutput -match "already initialized") {
             Write-Warning "Workspace already initialized, continuing..."
         }
@@ -831,47 +864,50 @@ if ($boardConfig.blob) {
 
 # Step 13: Install SDK/toolchain
 if ($installNcsToolchain -and $nrfUtilInfo -and $ncsVersion) {
-    # NCS: Install toolchain using nrfutil sdk-manager toolchain
-    Write-Step "Installing NCS toolchain for $ncsVersion..."
-    
-    # Build the command based on the type of tool found
-    if ($nrfUtilInfo.Type -eq "nrfutil") {
-        $toolchainCmd = $nrfUtilInfo.Path
-        $toolchainArgs = @("sdk-manager", "toolchain", "install", "--ncs-version", $ncsVersion)
-        $displayCmd = "nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
+    Write-Step "Installing nRF Connect SDK toolchain for $ncsVersion..."
+
+    $toolchainCmd = $nrfUtilInfo.Path
+    $toolchainArgs = if ($nrfUtilInfo.Type -eq "nrfutil") {
+        @("sdk-manager", "toolchain", "install", "--ncs-version", $ncsVersion)
     }
     else {
-        # Direct nrfutil-sdk-manager executable from VS Code extension
-        $toolchainCmd = $nrfUtilInfo.Path
-        $toolchainArgs = @("toolchain", "install", "--ncs-version", $ncsVersion)
-        $displayCmd = "nrfutil-sdk-manager toolchain install --ncs-version $ncsVersion"
+        @("toolchain", "install", "--ncs-version", $ncsVersion)
     }
     
+    $displayCmd = if ($nrfUtilInfo.Type -eq "nrfutil") {
+        "nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
+    }
+    else {
+        "nrfutil-sdk-manager toolchain install --ncs-version $ncsVersion"
+    }
+
     Write-Info "Running: $displayCmd"
-    
+
     try {
         & $toolchainCmd @toolchainArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Toolchain install failed with exit code $LASTEXITCODE"
         }
-        Write-Success "NCS toolchain installed for version $ncsVersion"
+        $msg = "nRF Connect SDK toolchain installed for version $ncsVersion"
+        Write-Success $msg
     }
     catch {
-        Write-ErrorMessage "Failed to install NCS toolchain: $($_.Exception.Message)"
+        $msg = "Failed to install nRF Connect SDK toolchain: " +
+               "$($_.Exception.Message)"
+        Write-ErrorMessage $msg
         Write-Warning "You can try installing it manually with: $displayCmd"
     }
 }
 elseif ($installSdk) {
-    # Zephyr: Use west sdk install
     Write-Step "Installing Zephyr SDK $requiredSdkVersion..."
-    
+
     $sdkArgs = @("sdk", "install", "--version", $requiredSdkVersion)
     if ($requiredToolchain) {
         $sdkArgs += @("--toolchains", $requiredToolchain)
     }
-    
+
     Write-Info "Running: west $($sdkArgs -join ' ')"
-    
+
     try {
         & west @sdkArgs
         if ($LASTEXITCODE -ne 0) {
@@ -880,15 +916,20 @@ elseif ($installSdk) {
         Write-Success "Zephyr SDK installed"
     }
     catch {
-        Write-ErrorMessage "Failed to install Zephyr SDK: $($_.Exception.Message)"
-        Write-Warning "You can try installing it manually later with: west sdk install --version $requiredSdkVersion$(if ($requiredToolchain) { " --toolchains $requiredToolchain" })"
+        $errorMsg = "Failed to install Zephyr SDK: $($_.Exception.Message)"
+        Write-ErrorMessage $errorMsg
+        $manualCmd = "west sdk install --version $requiredSdkVersion"
+        if ($requiredToolchain) {
+            $manualCmd += " --toolchains $requiredToolchain"
+        }
+        Write-Warning "You can try installing it manually later with: $manualCmd"
     }
 }
 
 # Summary
 Write-Host ""
 Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║                    Setup Complete! ✓                         ║" -ForegroundColor Green
+Write-Host "║                    Setup Complete!                           ║" -ForegroundColor Green
 Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 Write-Host "Workspace location: " -NoNewline
@@ -899,17 +940,19 @@ Write-Host "Spotflow module path: " -NoNewline
 Write-Host $boardConfig.spotflow_path -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
+$configPath = "$($boardConfig.spotflow_path)/zephyr/samples/logs/prj.conf"
 Write-Host "  1. Open " -NoNewline
-Write-Host "$($boardConfig.spotflow_path)/zephyr/samples/logs/prj.conf" -NoNewline -ForegroundColor DarkGray
+Write-Host $configPath -NoNewline -ForegroundColor DarkGray
 Write-Host " and add the required configuration options."
 Write-Host ""
 Write-Host "  2. Build and flash the Spotflow sample:"
-Write-Host "     cd $($boardConfig.spotflow_path)/zephyr/samples/logs" -ForegroundColor DarkGray
-Write-Host "     west build --pristine --board $($boardConfig.board)" -NoNewline -ForegroundColor DarkGray
+$samplePath = "$($boardConfig.spotflow_path)/zephyr/samples/logs"
+Write-Host "     cd $samplePath" -ForegroundColor DarkGray
+$buildCmd = "west build --pristine --board $($boardConfig.board)"
 if ($boardConfig.build_extra_args) {
-    Write-Host " $($boardConfig.build_extra_args)" -NoNewline -ForegroundColor DarkGray
+    $buildCmd += " $($boardConfig.build_extra_args)"
 }
-Write-Host ""
+Write-Host "     $buildCmd" -ForegroundColor DarkGray
 Write-Host "     west flash" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "For more information, visit: " -NoNewline
