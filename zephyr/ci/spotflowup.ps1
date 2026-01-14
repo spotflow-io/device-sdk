@@ -429,8 +429,8 @@ if ([string]::IsNullOrWhiteSpace($workspaceFolder)) {
     Exit-WithError "Workspace folder path cannot be empty"
 }
 
-# Normalize path
-$workspaceFolder = [System.IO.Path]::GetFullPath($workspaceFolder)
+# Normalize path (resolve relative paths against PowerShell's CWD)
+$workspaceFolder = [System.IO.Path]::GetFullPath([System.IO.Path]::Combine($PWD.Path, $workspaceFolder))
 
 if (Test-Path $workspaceFolder) {
     $items = Get-ChildItem -Path $workspaceFolder -Force -ErrorAction SilentlyContinue
