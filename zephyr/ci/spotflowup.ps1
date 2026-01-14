@@ -20,7 +20,8 @@
     The workspace folder path. If not specified, the script will prompt for it.
 
 .PARAMETER spotflowRevision
-    The Spotflow module revision to checkout. If not specified, the script will use the latest revision.
+    The Spotflow module revision to checkout. If not specified, the script will use the latest
+    revision.
 
 .PARAMETER autoConfirm
     Automatically confirm all actions without prompting (useful for CI/automated environments).
@@ -83,9 +84,9 @@ function Write-ErrorMessage {
 
 function Write-Banner {
     Write-Host ""
-    Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-    Write-Host "║           Spotflow Device SDK - Workspace Setup              ║" -ForegroundColor Cyan
-    Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+    Write-Host "╔══════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
+    Write-Host "║         Spotflow Device SDK - Workspace Setup            ║" -ForegroundColor Cyan
+    Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
     Write-Host ""
 }
 
@@ -111,12 +112,12 @@ function Confirm-Action {
         [string]$Message,
         [bool]$DefaultYes = $true
     )
-    
+
     if ($autoConfirm) {
         Write-Info "$Message (auto-confirmed)"
         return $true
     }
-    
+
     $suffix = if ($DefaultYes) { "[Y/n]" } else { "[y/N]" }
     Write-Host "  [?] " -ForegroundColor Magenta -NoNewline
     Write-Host "$Message $suffix " -NoNewline
@@ -133,12 +134,12 @@ function Read-Input {
         [string]$Default,
         [string]$ProvidedValue = ""
     )
-    
+
     if (-not [string]::IsNullOrWhiteSpace($ProvidedValue)) {
         Write-Info "$Prompt (provided: $ProvidedValue)"
         return $ProvidedValue
     }
-    
+
     if ($autoConfirm) {
         Write-Info "$Prompt (using default: $Default)"
         return $Default
@@ -181,7 +182,7 @@ function Find-NrfUtilSdkManagerInExtensions {
         Full path to the nrfutil-sdk-manager executable, or $null if not found.
     #>
     $isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
-    
+
     if ($isWindowsOS) {
         $extensionDirs = @(
             "$env:USERPROFILE\.vscode\extensions",
@@ -198,16 +199,16 @@ function Find-NrfUtilSdkManagerInExtensions {
         )
         $sdkManagerRelPath = "platform/nrfutil/bin/nrfutil-sdk-manager"
     }
-    
+
     foreach ($extDir in $extensionDirs) {
         if (-not (Test-Path $extDir)) {
             continue
         }
-        
+
         $filterPattern = "nordic-semiconductor.nrf-connect*"
         $nordicExtensions = Get-ChildItem -Path $extDir -Directory `
             -Filter $filterPattern -ErrorAction SilentlyContinue
-        
+
         foreach ($ext in $nordicExtensions) {
             $sdkManagerPath = Join-Path $ext.FullName $sdkManagerRelPath
             if (Test-Path $sdkManagerPath) {
@@ -215,7 +216,7 @@ function Find-NrfUtilSdkManagerInExtensions {
             }
         }
     }
-    
+
     return $null
 }
 
@@ -325,7 +326,7 @@ function Test-NcsToolchainInstalled {
         else {
             & $NrfUtilPath toolchain list 2>&1
         }
-        
+
         if ($LASTEXITCODE -eq 0 -and $output) {
             return ($output -match [regex]::Escape($NcsVersion))
         }
@@ -375,15 +376,15 @@ $boardConfig = $null
 $vendorName = $null
 
 if ($sdkType -eq "ncs" -and $quickstartJson.ncs -and $quickstartJson.ncs.boards) {
-    $boardConfig = $quickstartJson.ncs.boards | 
-        Where-Object { $_.id -eq $board } | 
+    $boardConfig = $quickstartJson.ncs.boards |
+        Where-Object { $_.id -eq $board } |
         Select-Object -First 1
 }
-elseif ($sdkType -eq "zephyr" -and $quickstartJson.zephyr -and 
+elseif ($sdkType -eq "zephyr" -and $quickstartJson.zephyr -and
         $quickstartJson.zephyr.vendors) {
     foreach ($vendor in $quickstartJson.zephyr.vendors) {
-        $found = $vendor.boards | 
-            Where-Object { $_.id -eq $board } | 
+        $found = $vendor.boards |
+            Where-Object { $_.id -eq $board } |
             Select-Object -First 1
         if ($found) {
             $boardConfig = $found
@@ -454,7 +455,8 @@ if ($isWindowsOS) {
 }
 Write-Host ""
 
-$workspaceFolder = Read-Input "Enter workspace folder path" $defaultFolder -ProvidedValue $workspaceFolder
+$workspaceFolder = `
+    Read-Input "Enter workspace folder path" $defaultFolder -ProvidedValue $workspaceFolder
 
 if ([string]::IsNullOrWhiteSpace($workspaceFolder)) {
     Exit-WithError "Workspace folder path cannot be empty"
@@ -601,7 +603,7 @@ if ($sdkType -eq "ncs") {
             Write-Info "The nRF Connect SDK toolchain installation modifies your system."
             Write-Info "The installation may take several minutes."
             Write-Host ""
-            
+
             $confirmMsg = "Install nRF Connect SDK toolchain for $($ncsVersion)?"
             if (Confirm-Action $confirmMsg $true) {
                 $installNcsToolchain = $true
@@ -656,7 +658,7 @@ else {
         if (Test-Path "$sdkPath\sdk_version") {
             Write-Success "Found Zephyr SDK at: $sdkPath"
             $sdkInstalled = $true
-            
+
             if ($requiredToolchain) {
                 $toolchainPath = Join-Path $sdkPath $requiredToolchain
                 if (Test-Path $toolchainPath) {
@@ -795,7 +797,7 @@ Write-Info "Manifest URL: $ManifestBaseUrl"
 Write-Info "Manifest file: $manifestFile"
 
 try {
-    $westInitArgs = @("init", "--manifest-url", $ManifestBaseUrl, 
+    $westInitArgs = @("init", "--manifest-url", $ManifestBaseUrl,
                       "--manifest-file", $manifestFile, ".")
     if ($spotflowRevision) {
         $westInitArgs += "--clone-opt=--revision=$spotflowRevision"
@@ -849,7 +851,7 @@ catch {
 # Step 12: Fetch blobs if required
 if ($boardConfig.blob) {
     Write-Step "Fetching binary blobs for $($boardConfig.blob)..."
-    
+
     try {
         & west blobs fetch $boardConfig.blob --auto-accept
         if ($LASTEXITCODE -ne 0) {
@@ -873,7 +875,7 @@ if ($installNcsToolchain -and $nrfUtilInfo -and $ncsVersion) {
     else {
         @("toolchain", "install", "--ncs-version", $ncsVersion)
     }
-    
+
     $displayCmd = if ($nrfUtilInfo.Type -eq "nrfutil") {
         "nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
     }
@@ -928,15 +930,15 @@ elseif ($installSdk) {
 
 # Summary
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║                    Setup Complete!                           ║" -ForegroundColor Green
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "╔══════════════════════════════════════════════════════════╗" -ForegroundColor Green
+Write-Host "║                  Setup Complete!                         ║" -ForegroundColor Green
+Write-Host "╚══════════════════════════════════════════════════════════╝" -ForegroundColor Green
 Write-Host ""
 Write-Host "Workspace location: " -NoNewline
 Write-Host $workspaceFolder -ForegroundColor Cyan
 Write-Host "Board: " -NoNewline
 Write-Host "$($boardConfig.name) ($($boardConfig.board))" -ForegroundColor Cyan
-Write-Host "Spotflow module path: " -NoNewline  
+Write-Host "Spotflow module path: " -NoNewline
 Write-Host $boardConfig.spotflow_path -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Yellow
