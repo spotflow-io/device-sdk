@@ -16,11 +16,20 @@
 .PARAMETER board
     The board ID to configure the workspace for (e.g., frdm_rw612, nrf7002dk).
 
+.PARAMETER workspaceFolder
+    The workspace folder path. If not specified, the script will prompt for it.
+
+.PARAMETER autoConfirm
+    Automatically confirm all actions without prompting (useful for CI/automated environments).
+
 .EXAMPLE
     .\spotflowup.ps1 -zephyr -board frdm_rw612
 
 .EXAMPLE
     .\spotflowup.ps1 -ncs -board nrf7002dk
+
+.EXAMPLE
+    .\spotflowup.ps1 -zephyr -board frdm_rw612 -workspaceFolder "C:\my-workspace" -autoConfirm
 #>
 
 [CmdletBinding()]
@@ -28,7 +37,9 @@ param(
     [switch]$zephyr,
     [switch]$ncs,
     [Parameter(Mandatory = $true)]
-    [string]$board
+    [string]$board,
+    [string]$workspaceFolder = "",
+    [switch]$autoConfirm
 )
 
 # Configuration
@@ -89,6 +100,57 @@ function Exit-WithError {
     Write-Host "  https://github.com/spotflow-io/device-sdk/issues" -ForegroundColor Cyan
     Write-Host ""
     exit 1
+}
+
+function Confirm-Action {
+    param(
+        [string]$Message,
+        [bool]$DefaultYes = $true
+    )
+    # If autoConfirm is enabled, automatically return the default value
+    if ($autoConfirm) {
+        Write-Info "$Message (auto-confirmed)"
+        return $true
+    }
+    
+    $suffix = if ($DefaultYes) { "[Y/n]" } else { "[y/N]" }
+    Write-Host "  ? " -ForegroundColor Magenta -NoNewline
+    Write-Host "$Message $suffix " -NoNewline
+    $response = Read-Host
+    if ([string]::IsNullOrWhiteSpace($response)) {
+        return $DefaultYes
+    }
+    return $response -match "^[Yy]"
+}
+
+function Read-Input {
+    param(
+        [string]$Prompt,
+        [string]$Default,
+        [string]$ProvidedValue = ""
+    )
+    # If a value was provided (e.g., via parameter), use it directly
+    if (-not [string]::IsNullOrWhiteSpace($ProvidedValue)) {
+        Write-Info "$Prompt (provided: $ProvidedValue)"
+        return $ProvidedValue
+    }
+    
+    # If autoConfirm is enabled, use the default without prompting
+    if ($autoConfirm) {
+        Write-Info "$Prompt (using default: $Default)"
+        return $Default
+    }
+    
+    Write-Host "  ? " -ForegroundColor Magenta -NoNewline
+    Write-Host "$Prompt " -NoNewline
+    if ($Default) {
+        Write-Host "[$Default] " -ForegroundColor DarkGray -NoNewline
+    }
+    $response = Read-Host
+    if ([string]::IsNullOrWhiteSpace($response)) {
+        return $Default
+    }
+    return $response
 }
 
 function Test-NrfUtilHasSdkManager {
@@ -279,38 +341,6 @@ function Test-NcsToolchainInstalled {
     return $false
 }
 
-function Confirm-Action {
-    param(
-        [string]$Message,
-        [bool]$DefaultYes = $true
-    )
-    $suffix = if ($DefaultYes) { "[Y/n]" } else { "[y/N]" }
-    Write-Host "  ? " -ForegroundColor Magenta -NoNewline
-    Write-Host "$Message $suffix " -NoNewline
-    $response = Read-Host
-    if ([string]::IsNullOrWhiteSpace($response)) {
-        return $DefaultYes
-    }
-    return $response -match "^[Yy]"
-}
-
-function Read-Input {
-    param(
-        [string]$Prompt,
-        [string]$Default
-    )
-    Write-Host "  ? " -ForegroundColor Magenta -NoNewline
-    Write-Host "$Prompt " -NoNewline
-    if ($Default) {
-        Write-Host "[$Default] " -ForegroundColor DarkGray -NoNewline
-    }
-    $response = Read-Host
-    if ([string]::IsNullOrWhiteSpace($response)) {
-        return $Default
-    }
-    return $response
-}
-
 # Validate arguments
 Write-Banner
 
@@ -423,7 +453,7 @@ if ($isWindowsOS) {
 }
 Write-Host ""
 
-$workspaceFolder = Read-Input "Enter workspace folder path" $defaultFolder
+$workspaceFolder = Read-Input "Enter workspace folder path" $defaultFolder -ProvidedValue $workspaceFolder
 
 if ([string]::IsNullOrWhiteSpace($workspaceFolder)) {
     Exit-WithError "Workspace folder path cannot be empty"

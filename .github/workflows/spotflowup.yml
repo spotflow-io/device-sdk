@@ -51,36 +51,36 @@ jobs:
         if: matrix.config.sdk_flag == '-ncs'
         shell: pwsh
         run: |
+          $baseUrl = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables"
           if ($IsWindows) {
-            $url = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables/x86_64-pc-windows-msvc/nrfutil.exe"
+            $url = "$baseUrl/x86_64-pc-windows-msvc/nrfutil.exe"
             $output = "nrfutil.exe"
           } else {
-            $url = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables/x86_64-unknown-linux-gnu/nrfutil"
+            $url = "$baseUrl/x86_64-unknown-linux-gnu/nrfutil"
             $output = "nrfutil"
           }
-          
+
           Write-Host "Downloading nrfutil from $url"
           Invoke-WebRequest -Uri $url -OutFile $output
-          
+
           if (-not $IsWindows) {
             chmod +x $output
           }
-          
+
           # Add to PATH for subsequent steps
           $nrfutilDir = (Get-Item $output).DirectoryName
           echo "$nrfutilDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-          
+
           # Verify installation
           & ./$output --version
 
       - name: Run spotflowup.ps1
         shell: pwsh
         run: |
-         # Provide input for interactive prompts:
-          # 1. Workspace path
-          # 2-3. Confirmation of SDK installation
-         $input = @("test-workspace", "Y", "Y")
-         $input | & ./zephyr/ci/spotflowup.ps1 ${{ matrix.config.sdk_flag }} -board ${{ matrix.config.board }}
+          ./zephyr/ci/spotflowup.ps1 ${{ matrix.config.sdk_flag }} `
+            -board ${{ matrix.config.board }} `
+            -workspaceFolder test-workspace `
+            -autoConfirm
 
       - name: Configure application
         shell: pwsh
