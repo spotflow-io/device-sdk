@@ -106,7 +106,8 @@ jobs:
           CONFIG_SPOTFLOW_INGEST_KEY="TODO"
           "@ | Set-Content -Path credentials.conf
 
-      - name: Build application
+      - name: Build Zephyr application
+        if: matrix.config.sdk_flag == '-zephyr'
         shell: pwsh
         working-directory: test-workspace
         run: |
@@ -119,3 +120,12 @@ jobs:
 
           Set-Location "${{ matrix.config.module_path }}/zephyr/samples/logs"
           west build --board ${{ matrix.config.board_target }}
+
+      - name: Build nRF Connect SDK application
+        if: matrix.config.sdk_flag == '-ncs'
+        shell: pwsh
+        working-directory: test-workspace
+        run: |
+          $ncsVersion = cat nrf/VERSION
+          nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
+            west build --board ${{ matrix.config.board_target }}
