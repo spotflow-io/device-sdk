@@ -54,6 +54,11 @@ jobs:
         with:
           python-version: '3.10'
 
+      # Needed for Zephyr SDK installation, not available on Windows runner
+      - name: Install wget
+        if: runner.os == 'Windows'
+        run: choco install wget
+
       - name: Install nRF Util
         if: matrix.config.sdk_flag == '-ncs'
         shell: pwsh
