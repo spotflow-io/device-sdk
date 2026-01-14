@@ -127,5 +127,7 @@ jobs:
         working-directory: test-workspace
         run: |
           $ncsVersion = cat nrf/VERSION
+
+          Set-Location "${{ matrix.config.module_path }}/zephyr/samples/logs"
           nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
             west build --board ${{ matrix.config.board_target }}
