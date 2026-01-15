@@ -12,7 +12,23 @@ on:
   #       required: false
 
 jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve version
+        id: version
+        uses: spotflow-io/actions/resolve-version@v1
+        with:
+          # Optional: pass workflow_dispatch input if exists
+          version: ${{ github.event.inputs.version || '' }}
+
   upload_components:
+    needs: init
     permissions:
       id-token: write
     runs-on: ubuntu-latest
@@ -22,31 +38,22 @@ jobs:
           submodules: 'recursive'
           fetch-depth: 0 # Necessary to see tags and history
 
-      - name: Determine Version
+      - name: Determine pre-release behavior
         id: prep
         run: |
-          if [[ "${{ github.ref }}" == refs/tags/* ]]; then
-            # Extract version from tag (e.g., v1.2.3 -> 1.2.3)
-            VERSION=${GITHUB_REF_NAME#v}
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             echo "skip_pre_release=false" >> $GITHUB_OUTPUT
           else
-            BASE_VERSION="0.8.0"
-            # Pre-release logic for branch pushes (e.g., 0.8.0-dev-${{ github.sha }})
-            VERSION="${BASE_VERSION}-dev-${GITHUB_SHA::7}"
             echo "skip_pre_release=true" >> $GITHUB_OUTPUT
           fi
-
-          # Use manual input if provided, otherwise use calculated version
-          FINAL_VERSION=${{ github.event.inputs.version }}
-          echo "version=${FINAL_VERSION:-$VERSION}" >> $GITHUB_OUTPUT
 
       - name: Upload components
         uses: espressif/upload-components-ci-action@v2
         with:
-          version: ${{ steps.prep.outputs.version }}
+          version: ${{ needs.init.outputs.version }}
           components: "device_sdk: esp_idf/spotflow/device_sdk"
           namespace: "spotflow"
           dry_run: ${{ github.event.inputs.dry_run || 'false' }}
           skip_pre_release: ${{ steps.prep.outputs.skip_pre_release }}
           api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
-          # registry_url: "https://components-staging.espressif.com/"
+          # registry_url: "https://components-staging.espressif.com/" # For staging respository
