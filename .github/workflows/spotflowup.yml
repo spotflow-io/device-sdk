@@ -1,4 +1,4 @@
-name: Test spotflowup.ps1
+name: Test spotflowup.ps1 and spotflowup.sh
 
 on:
   push:
@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'zephyr/ci/spotflowup.ps1'
+      - 'zephyr/ci/spotflowup.sh'
       - 'zephyr/ci/boards.yml'
       - 'zephyr/ci/generate_quickstart_json.py'
       - 'zephyr/manifests/**'
@@ -13,6 +14,7 @@ on:
   pull_request:
     paths:
       - 'zephyr/ci/spotflowup.ps1'
+      - 'zephyr/ci/spotflowup.sh'
       - 'zephyr/ci/boards.yml'
       - 'zephyr/ci/generate_quickstart_json.py'
       - 'zephyr/manifests/**'
@@ -30,6 +32,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        script: [powershell, bash]
         environment:
           - os: ubuntu-latest
             workspace_dir: test-workspace
@@ -44,7 +47,10 @@ jobs:
             board: frdm_rw612
             board_target: frdm_rw612
             module_path: modules/lib/spotflow
-        script: [powershell, bash]
+        exclude:
+          - script: bash
+            environment:
+              os: windows-latest
 
     runs-on: ${{ matrix.environment.os }}
 
