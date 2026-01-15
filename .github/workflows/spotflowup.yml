@@ -105,7 +105,7 @@ jobs:
         if: matrix.script == 'powershell'
         shell: pwsh
         env:
-          NRFUTIL_LOG: debug
+          NRFUTIL_LOG: trace
         run: |
           ./zephyr/ci/spotflowup.ps1 -${{ matrix.example.sdk_flag }} `
             -board ${{ matrix.example.board }} `
@@ -117,7 +117,7 @@ jobs:
         if: matrix.script == 'bash'
         shell: bash
         env:
-          NRFUTIL_LOG: debug
+          NRFUTIL_LOG: trace
         run: |
           source ./zephyr/ci/spotflowup.sh --${{ matrix.example.sdk_flag }} \
             --board ${{ matrix.example.board }} \
@@ -146,7 +146,7 @@ jobs:
           if ($IsWindows) {
             .venv/Scripts/Activate.ps1
           } else {
-            source .venv/bin/activate
+            .venv/bin/Activate.ps1
           }
 
           Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
