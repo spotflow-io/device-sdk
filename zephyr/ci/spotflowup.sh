@@ -103,21 +103,22 @@ read_input() {
     local default="$2"
     local provided_value="${3:-}"
     
+    # User messages sent to stderr to split them from the function output
     if [[ -n "$provided_value" ]]; then
-        write_info "$prompt (provided: $provided_value)"
+        write_info "$prompt (provided: $provided_value)" >&2
         echo "$provided_value"
         return 0
     fi
     
     if [[ "$auto_confirm" == true ]]; then
-        write_info "$prompt (using default: $default)"
+        write_info "$prompt (using default: $default)" >&2
         echo "$default"
         return 0
     fi
     
-    echo -ne "  ${COLOR_MAGENTA}[?]${COLOR_RESET} $prompt "
+    echo -ne "  ${COLOR_MAGENTA}[?]${COLOR_RESET} $prompt " >&2
     if [[ -n "$default" ]]; then
-        echo -ne "${COLOR_DARK_GRAY}[$default]${COLOR_RESET} "
+        echo -ne "${COLOR_DARK_GRAY}[$default]${COLOR_RESET} " >&2
     fi
     
     read -r response
@@ -345,7 +346,7 @@ main() {
         jq_query=".zephyr.vendors[] | .boards[] | select(.id == \"$board\")"
     fi
     
-    if ! board_config=$(echo "$quickstart_json" | jq -r "$jq_query" | head -n1); then
+    if ! board_config=$(echo "$quickstart_json" | jq -c "$jq_query" | head -n1); then
         exit_with_error "Failed to parse board configuration" "jq parsing failed"
     fi
     
