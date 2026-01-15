@@ -133,27 +133,27 @@ read_input() {
 # Works on both Linux and macOS
 to_absolute_path() {
     local path="$1"
-    
+
     # Handle empty path
     if [[ -z "$path" ]]; then
         echo "$PWD"
         return
     fi
-    
+
     # Expand tilde to home directory
     if [[ "$path" =~ ^~(/|$) ]]; then
         path="${HOME}${path:1}"
     fi
-    
+
     # If already absolute, use as-is
     if [[ "$path" = /* ]]; then
         echo "$path"
         return
     fi
-    
+
     # Make relative path absolute
     local absolute="$PWD/$path"
-    
+
     echo "$absolute"
 }
 
