@@ -36,14 +36,15 @@ jobs:
           - os: windows-latest
             workspace_dir: D:\test-workspace
         example:
-          - sdk_flag: -ncs
+          - sdk_flag: ncs
             board: nrf7002dk
             board_target: nrf7002dk/nrf5340/cpuapp/ns
             module_path: spotflow
-          - sdk_flag: -zephyr
+          - sdk_flag: zephyr
             board: frdm_rw612
             board_target: frdm_rw612
             module_path: modules/lib/spotflow
+        script: [powershell, bash]
 
     runs-on: ${{ matrix.environment.os }}
 
@@ -64,7 +65,7 @@ jobs:
         run: choco install wget
 
       - name: Install nRF Util
-        if: matrix.example.sdk_flag == '-ncs'
+        if: matrix.example.sdk_flag == 'ncs'
         shell: pwsh
         run: |
           $baseUrl = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables"
@@ -91,13 +92,24 @@ jobs:
           & ./$output --version
 
       - name: Run spotflowup.ps1
+        if: matrix.script == 'powershell'
         shell: pwsh
         run: |
-          ./zephyr/ci/spotflowup.ps1 ${{ matrix.example.sdk_flag }} `
+          ./zephyr/ci/spotflowup.ps1 -${{ matrix.example.sdk_flag }} `
             -board ${{ matrix.example.board }} `
             -workspaceFolder ${{ matrix.environment.workspace_dir }} `
             -spotflowRevision ${{ github.sha }} `
             -autoConfirm
+
+      - name: Run spotflowup.sh
+        if: matrix.script == 'bash'
+        shell: bash
+        run: |
+          ./zephyr/ci/spotflowup.sh --${{ matrix.example.sdk_flag }} \
+            --board ${{ matrix.example.board }} \
+            --workspace-folder ${{ matrix.environment.workspace_dir }} \
+            --spotflow-revision ${{ github.sha }} \
+            --auto-confirm
 
       - name: Configure application
         shell: pwsh
@@ -112,7 +124,7 @@ jobs:
           "@ | Set-Content -Path $configFile
 
       - name: Build Zephyr application
-        if: matrix.example.sdk_flag == '-zephyr'
+        if: matrix.example.sdk_flag == 'zephyr'
         shell: pwsh
         working-directory: ${{ matrix.environment.workspace_dir }}
         run: |
@@ -127,7 +139,7 @@ jobs:
           west build --board ${{ matrix.example.board_target }}
 
       - name: Build nRF Connect SDK application
-        if: matrix.example.sdk_flag == '-ncs'
+        if: matrix.example.sdk_flag == 'ncs'
         shell: pwsh
         working-directory: ${{ matrix.environment.workspace_dir }}
         run: |
