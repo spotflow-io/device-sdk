@@ -36,6 +36,8 @@ jobs:
         environment:
           - os: ubuntu-latest
             workspace_dir: test-workspace
+          - os: macos-latest
+            workspace_dir: test-workspace
           - os: windows-latest
             workspace_dir: D:\test-workspace
         example:
