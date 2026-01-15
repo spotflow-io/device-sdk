@@ -105,7 +105,7 @@ jobs:
         if: matrix.script == 'bash'
         shell: bash
         run: |
-          ./zephyr/ci/spotflowup.sh --${{ matrix.example.sdk_flag }} \
+          source ./zephyr/ci/spotflowup.sh --${{ matrix.example.sdk_flag }} \
             --board ${{ matrix.example.board }} \
             --workspace-folder ${{ matrix.environment.workspace_dir }} \
             --spotflow-revision ${{ github.sha }} \
