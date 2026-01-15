@@ -104,6 +104,8 @@ jobs:
       - name: Run spotflowup.ps1
         if: matrix.script == 'powershell'
         shell: pwsh
+        env:
+          NRFUTIL_LOG: debug
         run: |
           ./zephyr/ci/spotflowup.ps1 -${{ matrix.example.sdk_flag }} `
             -board ${{ matrix.example.board }} `
@@ -114,6 +116,8 @@ jobs:
       - name: Run spotflowup.sh
         if: matrix.script == 'bash'
         shell: bash
+        env:
+          NRFUTIL_LOG: debug
         run: |
           source ./zephyr/ci/spotflowup.sh --${{ matrix.example.sdk_flag }} \
             --board ${{ matrix.example.board }} \
