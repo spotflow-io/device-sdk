@@ -142,7 +142,7 @@ jobs:
           if ($IsWindows) {
             .venv/Scripts/Activate.ps1
           } else {
-            .venv/bin/Activate.ps1
+            source .venv/bin/activate
           }
 
           Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
