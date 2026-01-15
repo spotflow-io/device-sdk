@@ -36,10 +36,13 @@ jobs:
         environment:
           - os: ubuntu-latest
             workspace_dir: test-workspace
+            nrfutil_link: x86_64-unknown-linux-gnu/nrfutil
           - os: macos-latest
             workspace_dir: test-workspace
+            nrfutil_link: universal-apple-darwin/nrfutil
           - os: windows-latest
             workspace_dir: D:\test-workspace
+            nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
         example:
           - sdk_flag: ncs
             board: nrf7002dk
@@ -77,11 +80,10 @@ jobs:
         shell: pwsh
         run: |
           $baseUrl = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables"
+          $url = "$baseUrl/${{ matrix.environment.nrfutil_link }}"
           if ($IsWindows) {
-            $url = "$baseUrl/x86_64-pc-windows-msvc/nrfutil.exe"
             $output = "nrfutil.exe"
           } else {
-            $url = "$baseUrl/x86_64-unknown-linux-gnu/nrfutil"
             $output = "nrfutil"
           }
 
