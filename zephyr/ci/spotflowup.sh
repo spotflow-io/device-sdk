@@ -129,6 +129,34 @@ read_input() {
     fi
 }
 
+# Convert a path to absolute path without requiring it to exist
+# Works on both Linux and macOS
+to_absolute_path() {
+    local path="$1"
+    
+    # Handle empty path
+    if [[ -z "$path" ]]; then
+        echo "$PWD"
+        return
+    fi
+    
+    # Expand tilde to home directory
+    if [[ "$path" =~ ^~(/|$) ]]; then
+        path="${HOME}${path:1}"
+    fi
+    
+    # If already absolute, use as-is
+    if [[ "$path" = /* ]]; then
+        echo "$path"
+        return
+    fi
+    
+    # Make relative path absolute
+    local absolute="$PWD/$path"
+    
+    echo "$absolute"
+}
+
 test_nrfutil_has_sdk_manager() {
     local nrfutil_path="$1"
     "$nrfutil_path" sdk-manager --version &>/dev/null
@@ -430,7 +458,7 @@ main() {
     fi
 
     # Resolve to absolute path
-    workspace_folder=$(realpath -m "$workspace_folder")
+    workspace_folder=$(to_absolute_path "$workspace_folder")
 
     if [[ -d "$workspace_folder" ]] && [[ -n "$(ls -A "$workspace_folder" 2>/dev/null)" ]]; then
         write_warning "Folder '$workspace_folder' already exists and is not empty."
