@@ -536,9 +536,7 @@ if ($sdkType -eq "ncs") {
                 Write-Info "Found nrfutil at: $($nrfUtilInfo.Path)"
                 Write-Warning "The sdk-manager command is not installed for nrfutil."
                 Write-Host ""
-                $msg = "The sdk-manager command is required to install " +
-                       "the nRF Connect SDK toolchain."
-                Write-Info $msg
+                Write-Info "This command is required to install the nRF Connect SDK toolchain."
                 Write-Host ""
 
                 if (Confirm-Action "Install nrfutil sdk-manager command?" $true) {
@@ -596,7 +594,6 @@ if ($sdkType -eq "ncs") {
             $msg = "nRF Connect SDK toolchain for $ncsVersion is not installed."
             Write-Warning $msg
             Write-Host ""
-            Write-Info "The nRF Connect SDK toolchain installation modifies your system."
             Write-Info "The installation may take several minutes."
             Write-Host ""
 
@@ -681,7 +678,6 @@ else {
         Write-Warning $warningMsg
         Write-Host ""
         Write-Info "The Zephyr SDK will be installed to your user profile directory."
-        Write-Info "This is a one-time setup that modifies your system."
         Write-Host ""
 
         $confirmMsg = "Install Zephyr SDK $requiredSdkVersion"
