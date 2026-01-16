@@ -187,7 +187,6 @@ def generate_quickstart(
         vendor_boards = []
 
         is_nordic = vendor["vendor"] == "nordic"
-        ncs_version = ncs_version if is_nordic else None
 
         for board in vendor["boards"]:
             transformed = transform_board(
@@ -195,7 +194,7 @@ def generate_quickstart(
                 vendor,
                 spotflow_paths,
                 defaults,
-                ncs_version=ncs_version,
+                ncs_version=ncs_version if is_nordic else None,
             )
             vendor_boards.append(transformed)
 
@@ -207,7 +206,7 @@ def generate_quickstart(
             spotflow_paths,
             defaults,
             is_other_board=True,
-            ncs_version=ncs_version,
+            ncs_version=ncs_version if is_nordic else None,
         )
         vendor_boards.append(transformed_other)
 
