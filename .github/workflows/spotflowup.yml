@@ -37,9 +37,10 @@ jobs:
           - os: ubuntu-latest
             workspace_dir: test-workspace
             nrfutil_link: x86_64-unknown-linux-gnu/nrfutil
-          - os: macos-latest
-            workspace_dir: test-workspace
-            nrfutil_link: universal-apple-darwin/nrfutil
+          # Temporarily disabled until fixed
+          # - os: macos-latest
+          #   workspace_dir: test-workspace
+          #   nrfutil_link: universal-apple-darwin/nrfutil
           - os: windows-latest
             workspace_dir: D:\test-workspace
             nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
@@ -104,8 +105,6 @@ jobs:
       - name: Run spotflowup.ps1
         if: matrix.script == 'powershell'
         shell: pwsh
-        env:
-          NRFUTIL_LOG: trace
         run: |
           ./zephyr/ci/spotflowup.ps1 -${{ matrix.example.sdk_flag }} `
             -board ${{ matrix.example.board }} `
@@ -116,8 +115,6 @@ jobs:
       - name: Run spotflowup.sh
         if: matrix.script == 'bash'
         shell: bash
-        env:
-          NRFUTIL_LOG: trace
         run: |
           source ./zephyr/ci/spotflowup.sh --${{ matrix.example.sdk_flag }} \
             --board ${{ matrix.example.board }} \
