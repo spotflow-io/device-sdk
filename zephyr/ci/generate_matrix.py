@@ -10,7 +10,7 @@ import json
 import os
 import yaml
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 
 def get_property(
@@ -29,7 +29,9 @@ def load_yaml(filepath: Path) -> Dict[str, Any]:
         return yaml.safe_load(f)
 
 
-def generate_matrix(boards_yml_path: Path) -> Dict[str, Any]:
+def generate_matrix(
+    boards_yml_path: Path, default_built_samples: List[str] = []
+) -> Dict[str, Any]:
     """Generate the GitHub Actions matrix from boards configuration."""
     config = load_yaml(boards_yml_path)
     defaults = config.get("defaults", {})
@@ -38,6 +40,10 @@ def generate_matrix(boards_yml_path: Path) -> Dict[str, Any]:
     for vendor in config["vendors"]:
         for board in vendor["boards"]:
             build_samples = get_property("build_samples", board, vendor, defaults, [])
+
+            missing_default_samples = default_built_samples - build_samples
+            build_samples = build_samples + missing_default_samples
+
             for sample in build_samples:
                 entry = {
                     "board": board.get("board", board["id"]),
@@ -67,8 +73,12 @@ def main():
     script_dir = Path(__file__).parent
     boards_yml_path = script_dir / "boards.yml"
 
+    build_logs_for_all = os.environ.get("BUILD_LOGS_FOR_ALL_BOARDS", "False") == "True"
+    default_built_samples = ["logs"] if build_logs_for_all else []
+
     print(f"Loading boards configuration from {boards_yml_path}")
-    matrix = generate_matrix(boards_yml_path)
+    print(f"Build logging sample for all boards: {build_logs_for_all}")
+    matrix = generate_matrix(boards_yml_path, default_built_samples)
 
     matrix_json = json.dumps(matrix)
     write_github_output("matrix", matrix_json)
