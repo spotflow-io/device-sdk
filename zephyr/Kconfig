@@ -33,6 +33,8 @@ if SPOTFLOW
 rsource "src/logging/KConfig"
 rsource "src/coredumps/KConfig"
 rsource "src/metrics/Kconfig"
+rsource "src/metrics/system/Kconfig"
+
 
 config SPOTFLOW_GENERATE_BUILD_ID
 	bool "Generate build ID"

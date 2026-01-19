@@ -37,7 +37,7 @@ config SPOTFLOW_METRICS_SYSTEM_CPU
 	bool "Enable CPU utilization metrics"
 	select THREAD_RUNTIME_STATS
 	select THREAD_RUNTIME_STATS_USE_TIMING_FUNCTIONS
-	default n
+	default y
 	help
 	  Collect CPU utilization percentage.
 	  WARNING: Enabling this adds overhead to thread scheduling.
@@ -59,13 +59,47 @@ config SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
 	  Event-driven metric (reported once on boot, not periodic).
 	  Requires HWINFO support in the platform.
 
+config SPOTFLOW_METRICS_SYSTEM_STACK
+	bool "Enable thread stack metrics"
+	select THREAD_STACK_INFO
+	select INIT_STACKS
+	default y
+	help
+	  Collect thread stack usage statistics (free bytes per thread).
+	  Requires CONFIG_THREAD_STACK_INFO to be enabled.
+	  Uses k_thread_stack_space_get() API to measure unused stack space.
+	  Reports metric: thread_stack_free_bytes (labeled by thread name or ID).
+
+if SPOTFLOW_METRICS_SYSTEM_STACK
+
+config SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
+	bool "Automatically track all threads"
+	default y
+	select THREAD_MONITOR
+	help
+	  Automatically collect stack metrics for all threads in the system.
+	  If disabled, use spotflow_metrics_system_enable_thread_stack() to
+	  track specific threads at runtime.
+
+config SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS
+	int "Maximum number of tracked threads"
+	range 1 128
+	default 32
+	help
+	  Maximum number of threads for stack metrics.
+	  This sets the max time series allocated for the metric.
+	  When automatic tracking is disabled, also limits the
+	  number of threads that can be manually registered.
+
+endif # SPOTFLOW_METRICS_SYSTEM_STACK
+
 config SPOTFLOW_METRICS_SYSTEM_INTERVAL
 	int "System metrics collection interval (seconds)"
-	range 10 3600
-	default 10
+	default 60
 	help
-	  How often to collect and report system metrics (10-3600 seconds).
-	  Default is 60 seconds (1 minute).
+	  How often to collect and report system metrics.
+	  Allowed values: 60 (1 minute), 600 (10 minutes), 3600 (1 hour).
+	  This also sets the metric aggregation interval (PT1M, PT10M, PT1H).
 	  Lower values increase network/CPU overhead.
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
@@ -86,5 +120,7 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
 
 	  This is added to CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 	  which is for application metrics.
+
+
 
 endif # SPOTFLOW_METRICS_SYSTEM

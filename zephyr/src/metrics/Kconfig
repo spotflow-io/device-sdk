@@ -84,6 +84,4 @@ config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
 	  3 = INFO
 	  4 = DEBUG
 
-rsource "Kconfig.system"
-
 endif # SPOTFLOW_METRICS

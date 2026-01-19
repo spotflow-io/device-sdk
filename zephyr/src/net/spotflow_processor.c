@@ -22,7 +22,7 @@
 #ifdef CONFIG_SPOTFLOW_METRICS
 #include "metrics/spotflow_metrics_net.h"
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
-#include "metrics/spotflow_metrics_system.h"
+#include "../metrics/system/spotflow_metrics_system.h"
 #endif
 #endif /* CONFIG_SPOTFLOW_METRICS */
 

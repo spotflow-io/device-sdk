@@ -1,4 +1,4 @@
-﻿#include "spotflow_metrics_backend.h"
+﻿#include "metrics/spotflow_metrics_backend.h"
 #include "zephyr/logging/log.h"
 
 #include <zephyr/drivers/hwinfo.h>
