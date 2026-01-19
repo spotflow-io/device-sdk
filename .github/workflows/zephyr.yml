@@ -30,45 +30,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
-          sparse-checkout: zephyr/ci/boards.yml
+          sparse-checkout: |
+            zephyr/ci/boards.yml
+            zephyr/ci/generate_matrix.py
           sparse-checkout-cone-mode: false
 
       - name: Generate matrix
         id: generate
-        run: |
-          python3 << 'EOF'
-          import yaml
-          import json
-          import os
-
-          def get_property(key, board, vendor, defaults, default=None):
-              """Get property with priority: board > vendor > defaults > default."""
-              return board.get(key, vendor.get(key, defaults.get(key, default)))
-
-          with open('zephyr/ci/boards.yml') as f:
-              config = yaml.safe_load(f)
-
-          defaults = config.get('defaults', {})
-          matrix_entries = []
-
-          for vendor in config['vendors']:
-              for board in vendor['boards']:
-                  entry = {
-                      'board': board.get('board', board['id']),
-                      'manifest': get_property('manifest', board, vendor, defaults),
-                      'sdk_version': get_property('sdk_version', board, vendor, defaults),
-                      'sdk_toolchain': get_property('sdk_toolchain', board, vendor, defaults),
-                      'blob': get_property('blob', board, vendor, defaults, ''),
-                      'build_extra_args': get_property(
-                        'build_extra_args', board, vendor, defaults, ''
-                      )
-                  }
-                  matrix_entries.append(entry)
-
-          matrix_json = json.dumps({'include': matrix_entries})
-          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
-              f.write(f'matrix={matrix_json}\n')
-          EOF
+        run: python3 zephyr/ci/generate_matrix.py
 
   build:
     needs: generate-matrix
