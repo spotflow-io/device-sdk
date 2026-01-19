@@ -6,6 +6,7 @@ This script reads the board configuration from boards.yml and generates
 a matrix JSON for GitHub Actions workflows.
 """
 
+import argparse
 import json
 import os
 import yaml
@@ -70,10 +71,20 @@ def write_github_output(key: str, value: str):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="Generate GitHub Actions matrix from boards.yml"
+    )
+    parser.add_argument(
+        "--build-logs-for-all-boards",
+        action="store_true",
+        help="Build logging sample for all boards",
+    )
+    args = parser.parse_args()
+
     script_dir = Path(__file__).parent
     boards_yml_path = script_dir / "boards.yml"
 
-    build_logs_for_all = os.environ.get("BUILD_LOGS_FOR_ALL_BOARDS", "false") == "true"
+    build_logs_for_all = args.build_logs_for_all_boards
     default_built_samples = ["logs"] if build_logs_for_all else []
 
     print(f"Loading boards configuration from {boards_yml_path}")

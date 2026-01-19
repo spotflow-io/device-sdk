@@ -13,7 +13,7 @@ on:
       - '.github/workflows/zephyr.yml'
   workflow_dispatch:
     inputs:
-      build_logs_for_all_boards:
+      build_logs_all_boards:
         description: 'Build logging sample for all boards'
         required: false
         type: boolean
@@ -44,9 +44,9 @@ jobs:
 
       - name: Generate matrix
         id: generate
-        env:
-          BUILD_LOGS_FOR_ALL_BOARDS: ${{ github.event.inputs.build_logs_for_all_boards == 'true' }}
-        run: python3 zephyr/ci/generate_matrix.py
+        run: >-
+          python3 zephyr/ci/generate_matrix.py 
+          ${{ github.event.inputs.build_logs_all_boards && '--build-logs-for-all-boards' || '' }}
 
   build:
     needs: generate-matrix
