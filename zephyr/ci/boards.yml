@@ -7,28 +7,67 @@ vendors:
   - name: Espressif
     vendor: espressif
     manifest: west-zephyr-espressif.yml
-    sdk_toolchain: riscv64-zephyr-elf
     blob: hal_espressif
     connection: ["wifi"]
     boards:
 
+      - id: esp32_devkitc
+        name: ESP32-DevKitC
+        board: esp32_devkitc/esp32/appcpu
+        sdk_toolchain: xtensa-espressif_esp32_zephyr-elf
+
+      - id: esp32_ethernet_kit
+        name: ESP32-Ethernet-Kit
+        board: esp32_ethernet_kit/esp32/appcpu
+        sdk_toolchain: xtensa-espressif_esp32_zephyr-elf
+        connection: ["ethernet", "wifi"]
+
       - id: esp32c3_devkitc
         name: ESP32-C3-DevKitC
+        sdk_toolchain: riscv64-zephyr-elf
 
       - id: esp32c3_devkitm
         name: ESP32-C3-DevKitM
+        sdk_toolchain: riscv64-zephyr-elf
         build_samples: ["logs"]
+
+      - id: esp32c3_rust
+        name: ESP32-C3-DevKit-RUST
+        sdk_toolchain: riscv64-zephyr-elf
 
       - id: esp32c6_devkitc
         name: ESP32-C6-DevKitC
         board: esp32c6_devkitc/esp32c6/hpcore
+        sdk_toolchain: riscv64-zephyr-elf
         build_samples: ["logs"]
+
+      - id: esp32s2_devkitc
+        name: ESP32-S2-DevKitC
+        sdk_toolchain: xtensa-espressif_esp32s2_zephyr-elf
+
+      - id: esp32s2_saola
+        name: ESP32-S2-Saola
+        sdk_toolchain: xtensa-espressif_esp32s2_zephyr-elf
 
       - id: esp32s3_devkitc
         name: ESP32-S3-DevKitC
         board: esp32s3_devkitc/esp32s3/procpu
         sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
         build_samples: ["logs"]
+
+      - id: esp32s3_eye
+        name: ESP32-S3-Eye
+        board: esp32s3_eye/esp32s3/appcpu
+        sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
+
+      - id: esp8684_devkitm
+        name: ESP8684-DevKitM
+        sdk_toolchain: riscv64-zephyr-elf
+
+      - id: esp_wrover_kit
+        name: ESP-WROVER-KIT
+        board: esp_wrover_kit/esp32/appcpu
+        sdk_toolchain: xtensa-espressif_esp32_zephyr-elf
 
   - name: Infineon
     vendor: infineon
@@ -89,7 +128,7 @@ vendors:
       - id: frdm_rw612
         name: FRDM-RW612
         blob: hal_nxp
-        connection: ["wifi", "ethernet"]
+        connection: ["ethernet", "wifi"]
         build_samples: ["logs"]
 
       - id: imx8mm_evk
