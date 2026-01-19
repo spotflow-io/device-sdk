@@ -41,8 +41,8 @@ def generate_matrix(
         for board in vendor["boards"]:
             build_samples = get_property("build_samples", board, vendor, defaults, [])
 
-            missing_default_samples = default_built_samples - build_samples
-            build_samples = build_samples + missing_default_samples
+            missing_default_samples = set(default_built_samples) - set(build_samples)
+            build_samples = build_samples + list(missing_default_samples)
 
             for sample in build_samples:
                 entry = {
