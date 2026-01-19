@@ -45,7 +45,7 @@ jobs:
       - name: Generate matrix
         id: generate
         run: >-
-          python3 zephyr/ci/generate_matrix.py 
+          python3 zephyr/ci/generate_matrix.py
           ${{ github.event.inputs.build_logs_all_boards && '--build-logs-for-all-boards' || '' }}
 
   build:
