@@ -142,7 +142,7 @@ jobs:
             --toolchains ${{ matrix.sdk_toolchain }}
 
       - name: Configure application
-        working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/logs
+        working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/${{ matrix.sample }}
         run: |
           cat <<EOF > credentials.conf
           CONFIG_NET_WIFI_SSID="TODOTODO"
@@ -152,6 +152,6 @@ jobs:
           EOF
 
       - name: Build application
-        working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/logs
+        working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/${{ matrix.sample }}
         run: |
           west build --board ${{ matrix.board }} ${{ matrix.build_extra_args }}

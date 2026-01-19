@@ -15,13 +15,16 @@ vendors:
         name: ESP32-C3-DevKitC
       - id: esp32c3_devkitm
         name: ESP32-C3-DevKitM
+        build_samples: ["logs"]
       - id: esp32c6_devkitc
         name: ESP32-C6-DevKitC
         board: esp32c6_devkitc/esp32c6/hpcore
+        build_samples: ["logs"]
       - id: esp32s3_devkitc
         name: ESP32-S3-DevKitC
         board: esp32s3_devkitc/esp32s3/procpu
         sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
+        build_samples: ["logs"]
 
   - name: Infineon
     vendor: infineon
@@ -32,6 +35,7 @@ vendors:
     boards:
       - id: cy8cproto_062_4343w
         name: CY8CProto-062-4343W
+        build_samples: ["logs"]
 
   - name: Nordic Semiconductor
     vendor: nordic
@@ -43,6 +47,7 @@ vendors:
       - id: nrf7002dk
         name: nRF7002 DK
         board: nrf7002dk/nrf5340/cpuapp/ns
+        build_samples: ["logs"]
       - id: thingy53_nrf7002eb
         name: Thingy:53 with nRF7002 EB shield
         board: thingy53/nrf5340/cpuapp/ns
@@ -58,6 +63,7 @@ vendors:
       - id: frdm_rw612
         name: FRDM-RW612
         connection: ["wifi", "ethernet"]
+        build_samples: ["logs"]
       - id: frdm_k64f
         name: FRDM-K64F
 
@@ -75,3 +81,4 @@ vendors:
           Zephyr 4.2.1 is used because of the
           <a href='https://github.com/zephyrproject-rtos/zephyr/issues/96224'>regression</a>
           in Zephyr 4.3.0.
+        build_samples: ["logs"]

@@ -37,17 +37,22 @@ def generate_matrix(boards_yml_path: Path) -> Dict[str, Any]:
 
     for vendor in config["vendors"]:
         for board in vendor["boards"]:
-            entry = {
-                "board": board.get("board", board["id"]),
-                "manifest": get_property("manifest", board, vendor, defaults),
-                "sdk_version": get_property("sdk_version", board, vendor, defaults),
-                "sdk_toolchain": get_property("sdk_toolchain", board, vendor, defaults),
-                "blob": get_property("blob", board, vendor, defaults, ""),
-                "build_extra_args": get_property(
-                    "build_extra_args", board, vendor, defaults, ""
-                ),
-            }
-            matrix_entries.append(entry)
+            build_samples = get_property("build_samples", board, vendor, defaults, [])
+            for sample in build_samples:
+                entry = {
+                    "board": board.get("board", board["id"]),
+                    "sample": sample,
+                    "manifest": get_property("manifest", board, vendor, defaults),
+                    "sdk_version": get_property("sdk_version", board, vendor, defaults),
+                    "sdk_toolchain": get_property(
+                        "sdk_toolchain", board, vendor, defaults
+                    ),
+                    "blob": get_property("blob", board, vendor, defaults, ""),
+                    "build_extra_args": get_property(
+                        "build_extra_args", board, vendor, defaults, ""
+                    ),
+                }
+                matrix_entries.append(entry)
 
     return {"include": matrix_entries}
 
