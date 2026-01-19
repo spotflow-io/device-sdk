@@ -11,15 +11,19 @@ vendors:
     blob: hal_espressif
     connection: ["wifi"]
     boards:
+
       - id: esp32c3_devkitc
         name: ESP32-C3-DevKitC
+
       - id: esp32c3_devkitm
         name: ESP32-C3-DevKitM
         build_samples: ["logs"]
+
       - id: esp32c6_devkitc
         name: ESP32-C6-DevKitC
         board: esp32c6_devkitc/esp32c6/hpcore
         build_samples: ["logs"]
+
       - id: esp32s3_devkitc
         name: ESP32-S3-DevKitC
         board: esp32s3_devkitc/esp32s3/procpu
@@ -33,6 +37,7 @@ vendors:
     blob: hal_infineon
     connection: ["wifi"]
     boards:
+
       - id: cy8cproto_062_4343w
         name: CY8CProto-062-4343W
         build_samples: ["logs"]
@@ -44,10 +49,12 @@ vendors:
     sdk_toolchain: arm-zephyr-eabi
     connection: ["wifi"]
     boards:
+
       - id: nrf7002dk
         name: nRF7002 DK
         board: nrf7002dk/nrf5340/cpuapp/ns
         build_samples: ["logs"]
+
       - id: thingy53_nrf7002eb
         name: Thingy:53 with nRF7002 EB shield
         board: thingy53/nrf5340/cpuapp/ns
@@ -59,91 +66,119 @@ vendors:
     sdk_toolchain: arm-zephyr-eabi
     connection: ["ethernet"]
     boards:
+
       - id: frdm_imx91
         name: FRDM-IMX91
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: frdm_imx93
         name: FRDM-IMX93
         board: frdm_imx93/mimx9352/a55
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: frdm_k64f
         name: FRDM-K64F
+
       - id: frdm_mcxe247
         name: FRDM-MCXE247
+
       - id: frdm_mcxn947
         name: FRDM-MCXN947
         board: frdm_mcxn947/mcxn947/cpu0
+
       - id: frdm_rw612
         name: FRDM-RW612
         blob: hal_nxp
         connection: ["wifi", "ethernet"]
         build_samples: ["logs"]
+
       - id: imx8mm_evk
         name: i.MX8MM EVK
         board: imx8mm_evk/mimx8mm6/a53
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: imx8mn_evk
         name: i.MX8MN EVK
         board: imx8mn_evk/mimx8mn6/a53
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: imx8mp_evk
         name: i.MX8MP EVK
         board: imx8mp_evk/mimx8ml8/a53
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: imx91_evk
         name: i.MX91 EVK
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: imx93_evk
         name: i.MX93 EVK
         board: imx93_evk/mimx9352/a55
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: imx943_evk
         name: i.MX943 EVK
         board: imx943_evk/mimx94398/a55
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: imx95_evk
         name: i.MX95 EVK
         board: imx95_evk/mimx9596/a55
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: imx95_evk_15x15
         name: i.MX95 EVK 15x15
         board: imx95_evk_15x15/mimx9596/a55
         sdk_toolchain: aarch64-zephyr-elf
+
       - id: mcx_n5xx_evk
         name: MCX-N5XX-EVK
         board: mcx_n5xx_evk/mcxn547/cpu0
+
       - id: mcx_n9xx_evk
         name: MCX-N9XX-EVK
         board: mcx_n9xx_evk/mcxn947/cpu0
+
       - id: mimxrt1020_evk
         name: MIMXRT1020-EVK
+
       - id: mimxrt1024_evk
         name: MIMXRT1024-EVK
+
       - id: mimxrt1040_evk
         name: MIMXRT1040-EVK
+
       - id: mimxrt1050_evk
         name: MIMXRT1050-EVK
         board: mimxrt1050_evk/mimxrt1052/hyperflash
+
       - id: mimxrt1060_evk
         name: MIMXRT1060-EVK
         board: mimxrt1060_evk@C/mimxrt1062/hyperflash
+
       - id: mimxrt1064_evk
         name: MIMXRT1064-EVK
+
       - id: mimxrt1160_evk
         name: MIMXRT1160-EVK
         board: mimxrt1160_evk/mimxrt1166/cm4
+
       - id: mimxrt1170_evk
         name: MIMXRT1170-EVK
         board: mimxrt1170_evk@B/mimxrt1176/cm4
+
       - id: mimxrt1180_evk/mimxrt1189/cm7
         name: MIMXRT1180-EVK
         board: mimxrt1180_evk/mimxrt1189/cm7
+
       - id: mr_canhubk3
         name: MR-CANHUBK3
+
       - id: s32k148_evb_adtja1101
         name: S32K148 EVB with ADTJA1101-RMII shield
         board: s32k148_evb
         build_extra_args: --shield nxp_adtja1101
+
       - id: vmu_rt1170
         name: VMU RT1170
         board: vmu_rt1170/mimxrt1176/cm7
@@ -155,6 +190,7 @@ vendors:
     blob: hal_infineon
     connection: ["wifi"]
     boards:
+
       - id: rpi_pico
         name: Raspberry Pi Pico W
         board: rpi_pico/rp2040/w
