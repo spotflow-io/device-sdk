@@ -73,7 +73,7 @@ def main():
     script_dir = Path(__file__).parent
     boards_yml_path = script_dir / "boards.yml"
 
-    build_logs_for_all = os.environ.get("BUILD_LOGS_FOR_ALL_BOARDS", "False") == "True"
+    build_logs_for_all = os.environ.get("BUILD_LOGS_FOR_ALL_BOARDS", "false") == "true"
     default_built_samples = ["logs"] if build_logs_for_all else []
 
     print(f"Loading boards configuration from {boards_yml_path}")
