@@ -16,6 +16,7 @@
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 static spotflow_metric_int_t *g_stack_metric;
+static spotflow_metric_int_t *g_stack_used_metric;
 
 #ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 static struct k_thread *g_tracked_threads[CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS];
@@ -32,7 +33,14 @@ int spotflow_metrics_system_stack_init(void)
 	g_stack_metric = spotflow_register_metric_int_with_labels(
 		"thread_stack_free_bytes", SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR, max_threads, 1);
 	if (!g_stack_metric) {
-		LOG_ERR("Failed to register stack metric");
+		LOG_ERR("Failed to register stack free metric");
+		return -ENOMEM;
+	}
+
+	g_stack_used_metric = spotflow_register_metric_int_with_labels(
+		"thread_stack_used_bytes", SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR, max_threads, 1);
+	if (!g_stack_used_metric) {
+		LOG_ERR("Failed to register stack used metric");
 		return -ENOMEM;
 	}
 
@@ -130,6 +138,9 @@ static void report_thread_stack(const struct k_thread *thread, void *user_data)
 		return;
 	}
 
+	size_t stack_size = thread->stack_info.size;
+	size_t used_bytes = stack_size - unused_bytes;
+
 	char thread_label[32];
 #ifdef CONFIG_THREAD_NAME
 	const char *name = k_thread_name_get((k_tid_t)thread);
@@ -144,11 +155,16 @@ static void report_thread_stack(const struct k_thread *thread, void *user_data)
 #endif
 
 	spotflow_label_t labels[] = {{.key = "thread", .value = thread_label}};
-	rc = spotflow_report_metric_int_with_labels(g_stack_metric, (int64_t)unused_bytes, labels,
-						    1);
+
+	rc = spotflow_report_metric_int_with_labels(g_stack_metric, (int64_t)unused_bytes, labels, 1);
 	if (rc < 0) {
-		LOG_ERR("Failed to report stack metric for %s: %d", thread_label, rc);
-	} else {
-		LOG_DBG("Stack: thread=%s, free=%zu bytes", thread_label, unused_bytes);
+		LOG_ERR("Failed to report stack free metric for %s: %d", thread_label, rc);
 	}
+
+	rc = spotflow_report_metric_int_with_labels(g_stack_used_metric, (int64_t)used_bytes, labels, 1);
+	if (rc < 0) {
+		LOG_ERR("Failed to report stack used metric for %s: %d", thread_label, rc);
+	}
+
+	LOG_DBG("Stack: thread=%s, used=%zu, free=%zu bytes", thread_label, used_bytes, unused_bytes);
 }

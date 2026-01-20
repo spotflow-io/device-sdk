@@ -63,12 +63,14 @@ config SPOTFLOW_METRICS_SYSTEM_STACK
 	bool "Enable thread stack metrics"
 	select THREAD_STACK_INFO
 	select INIT_STACKS
+	imply THREAD_NAME
 	default y
 	help
 	  Collect thread stack usage statistics (free bytes per thread).
 	  Requires CONFIG_THREAD_STACK_INFO to be enabled.
 	  Uses k_thread_stack_space_get() API to measure unused stack space.
 	  Reports metric: thread_stack_free_bytes (labeled by thread name or ID).
+	  Recommended to keep CONFIG_THREAD_NAME enabled for easier identification.
 
 if SPOTFLOW_METRICS_SYSTEM_STACK
 

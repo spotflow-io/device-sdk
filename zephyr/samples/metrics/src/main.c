@@ -48,7 +48,14 @@ static void report_counter_metric(void);
 static void report_counter_metric(void);
 static void report_temperature_metric(void);
 static void report_request_duration_metric(void);
+static void temperature_thread_entry();
 
+#define TEMPERATURE_THREAD_STACK_SIZE 2048
+#define TEMPERATURE_THREAD_PRIORITY 5
+
+K_THREAD_DEFINE(temperature_thread, TEMPERATURE_THREAD_STACK_SIZE,
+		temperature_thread_entry, NULL, NULL, NULL,
+		TEMPERATURE_THREAD_PRIORITY, 0, 0);
 
 int main(void)
 {
@@ -94,10 +101,7 @@ int main(void)
 		/* Report label-less counter every iteration */
 		report_counter_metric();
 
-		/* Report temperature every 10 seconds (immediate transmission) */
-		if (iteration % 5 == 0) {
-			report_temperature_metric();
-		}
+		/* Temperature is reported by temperature_thread every 10 seconds */
 
 		/* Report multiple HTTP requests to demonstrate labeled metrics */
 		for (int req = 0; req < 3; req++) {
@@ -134,13 +138,6 @@ static int init_application_metrics(void)
 	}
 	LOG_INF("Registered metric: app_counter (int, PT1M)");
 
-	/* Register label-less float metric - immediate (no aggregation) */
-	g_temperature_metric = spotflow_register_metric_float("temperature_celsius", "PT0S");
-	if (!g_temperature_metric) {
-		LOG_ERR("Failed to register temperature metric");
-		return -ENOMEM;
-	}
-	LOG_INF("Registered metric: temperature_celsius (float, PT0S)");
 
 	/* Register labeled float metric - aggregated over 1 minute */
 	/* Supports up to 18 unique label combinations (3 endpoints × 2 methods × 3 statuses) */
@@ -190,6 +187,27 @@ static void report_temperature_metric(void)
 		LOG_ERR("Failed to report temperature: %d", rc);
 	} else {
 		LOG_INF("Reported temperature: %.2f C", temperature);
+	}
+}
+
+/**
+ * @brief Temperature monitoring thread entry point
+ *
+ * Reports temperature metric every 10 seconds in a dedicated thread.
+ */
+static void temperature_thread_entry()
+{
+	/* Register label-less float metric - immediate (no aggregation) */
+	g_temperature_metric = spotflow_register_metric_float("temperature_celsius", "PT0S");
+	if (!g_temperature_metric) {
+		LOG_ERR("Failed to register temperature metric");
+		return;
+	}
+	LOG_INF("Registered metric: temperature_celsius (float, PT0S)");
+
+	while (true) {
+		report_temperature_metric();
+		k_sleep(K_SECONDS(10));
 	}
 }
 
