@@ -95,6 +95,9 @@ jobs:
         run: |
           Copy-Item .\quickstart-artifact\quickstart.json C:\inetpub\wwwroot\
 
+          curl -v http://localhost/quickstart.json
+          curl -v http://localhost/
+
       # Windows runner contains Python 3.9, update to the minimum required version
       - name: Install Python
         if: runner.os == 'Windows'
