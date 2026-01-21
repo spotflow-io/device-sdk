@@ -111,9 +111,9 @@ jobs:
           $nginxPath = "C:\tools\nginx-*"
           $nginxDir = (Get-Item $nginxPath).FullName
           $htmlDir = Join-Path $nginxDir "html"
-          
+
           Copy-Item ./quickstart-artifact/quickstart.json $htmlDir/
-          
+
           $confPath = Join-Path $nginxDir "conf\nginx.conf"
           $conf = @"
           events {
@@ -131,7 +131,7 @@ jobs:
           }
           "@
           Set-Content -Path $confPath -Value $conf
-          
+
           Start-Process -FilePath (Join-Path $nginxDir "nginx.exe") -WorkingDirectory $nginxDir
           Start-Sleep -Seconds 2
           Invoke-WebRequest -Uri http://localhost:8080/quickstart.json -UseBasicParsing
