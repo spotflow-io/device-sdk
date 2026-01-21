@@ -1,2 +1,3 @@
 EXCLUDED_DIRECTORIES:
   - .github
+  - esp_idf
