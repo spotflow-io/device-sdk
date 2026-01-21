@@ -102,6 +102,13 @@ jobs:
           Start-Process -FilePath (Join-Path $nginxDir "nginx.exe") -WorkingDirectory $nginxDir
           Start-Sleep -Seconds 2
 
+          Write-Host $nginxDir
+          $confPath = Join-Path $nginxDir "conf\nginx.conf"
+          Write-Host $confPath
+          Get-Content $confPath | Write-Host
+          Get-ChildItem -Path $htmlDir | Write-Host
+          curl -v http://localhost/quickstart.json
+
       # Windows runner contains Python 3.9, update to the minimum required version
       - name: Install Python
         if: runner.os == 'Windows'
