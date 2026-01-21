@@ -1,0 +1,2 @@
+EXCLUDED_DIRECTORIES:
+  - .github
