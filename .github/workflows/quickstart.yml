@@ -39,7 +39,8 @@ jobs:
           name: quickstart-json
           path: zephyr/ci/quickstart.json
 
-  test:
+  test-spotflowup:
+    needs: generate-quickstart-json
     strategy:
       fail-fast: false
       matrix:
@@ -74,6 +75,66 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
+
+      - name: Download quickstart.json artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quickstart-json
+          path: ./quickstart-artifact
+
+      - name: Setup and start nginx (Ubuntu)
+        if: matrix.environment.os == 'ubuntu-latest'
+        run: |
+          sudo mkdir -p /var/www/quickstart
+          sudo cp ./quickstart-artifact/quickstart.json /var/www/quickstart/
+          sudo tee /etc/nginx/sites-available/quickstart > /dev/null <<EOF
+          server {
+              listen 8080;
+              server_name localhost;
+              root /var/www/quickstart;
+              location / {
+                  add_header Access-Control-Allow-Origin *;
+              }
+          }
+          EOF
+          sudo ln -sf /etc/nginx/sites-available/quickstart /etc/nginx/sites-enabled/quickstart
+          sudo rm -f /etc/nginx/sites-enabled/default
+          sudo nginx -t
+          sudo systemctl restart nginx
+          sleep 2
+          curl -v http://localhost:8080/quickstart.json
+
+      - name: Setup and start nginx (Windows)
+        if: matrix.environment.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $nginxPath = "C:\tools\nginx-*"
+          $nginxDir = (Get-Item $nginxPath).FullName
+          $htmlDir = Join-Path $nginxDir "html"
+          
+          Copy-Item ./quickstart-artifact/quickstart.json $htmlDir/
+          
+          $confPath = Join-Path $nginxDir "conf\nginx.conf"
+          $conf = @"
+          events {
+              worker_connections 1024;
+          }
+          http {
+              server {
+                  listen 8080;
+                  server_name localhost;
+                  root html;
+                  location / {
+                      add_header Access-Control-Allow-Origin *;
+                  }
+              }
+          }
+          "@
+          Set-Content -Path $confPath -Value $conf
+          
+          Start-Process -FilePath (Join-Path $nginxDir "nginx.exe") -WorkingDirectory $nginxDir
+          Start-Sleep -Seconds 2
+          Invoke-WebRequest -Uri http://localhost:8080/quickstart.json -UseBasicParsing
 
       # Windows runner contains Python 3.9, update to the minimum required version
       - name: Install Python
@@ -121,6 +182,7 @@ jobs:
             -board ${{ matrix.example.board }} `
             -workspaceFolder ${{ matrix.environment.workspace_dir }} `
             -spotflowRevision ${{ github.sha }} `
+            -quickstartJsonUrl "http://localhost:8080/quickstart.json" `
             -autoConfirm
 
       - name: Run spotflowup.sh
@@ -131,6 +193,7 @@ jobs:
             --board ${{ matrix.example.board }} \
             --workspace-folder ${{ matrix.environment.workspace_dir }} \
             --spotflow-revision ${{ github.sha }} \
+            --quickstart-json-url "http://localhost:8080/quickstart.json" \
             --auto-confirm
 
       - name: Configure application

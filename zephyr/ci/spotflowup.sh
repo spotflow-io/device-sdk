@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # Configuration
-readonly QUICKSTART_JSON_URL="https://rhusakazurepocstorage.z6.web.core.windows.net/quickstart.json"
+readonly DEFAULT_QUICKSTART_JSON_URL="https://rhusakazurepocstorage.z6.web.core.windows.net/quickstart.json"
 readonly MANIFEST_BASE_URL="https://github.com/spotflow-io/device-sdk"
 
 # Global variables
@@ -22,6 +22,7 @@ board=""
 workspace_folder=""
 spotflow_revision=""
 auto_confirm=false
+quickstart_json_url=""
 
 # ANSI color codes
 readonly COLOR_RESET='\033[0m'
@@ -261,18 +262,20 @@ show_usage() {
 Usage: $0 [OPTIONS]
 
 Options:
-    --zephyr                  Use upstream Zephyr RTOS configuration
-    --ncs                     Use Nordic nRF Connect SDK configuration
-    --board BOARD             Board ID to configure (required)
-    --workspace-folder DIR    Workspace folder path
-    --spotflow-revision REV   Spotflow module revision to checkout
-    --auto-confirm            Automatically confirm all actions
-    -h, --help                Show this help message
+    --zephyr                    Use upstream Zephyr RTOS configuration
+    --ncs                       Use Nordic nRF Connect SDK configuration
+    --board BOARD               Board ID to configure (required)
+    --workspace-folder DIR      Workspace folder path
+    --spotflow-revision REV     Spotflow module revision to checkout
+    --quickstart-json-url URL   Override quickstart.json URL
+    --auto-confirm              Automatically confirm all actions
+    -h, --help                  Show this help message
 
 Examples:
     $0 --zephyr --board frdm_rw612
     $0 --ncs --board nrf7002dk
     $0 --zephyr --board frdm_rw612 --workspace-folder ~/my-workspace --auto-confirm
+    $0 --zephyr --board frdm_rw612 --quickstart-json-url http://localhost:8080/quickstart.json
 EOF
 }
 
@@ -304,6 +307,10 @@ parse_args() {
                 ;;
             --spotflow-revision)
                 spotflow_revision="$2"
+                shift 2
+                ;;
+            --quickstart-json-url)
+                quickstart_json_url="$2"
                 shift 2
                 ;;
             --auto-confirm)
@@ -356,10 +363,13 @@ main() {
     # Step 1: Download and parse quickstart.json
     write_step "Downloading board configuration..."
 
+    # Use provided URL or default
+    local json_url="${quickstart_json_url:-$DEFAULT_QUICKSTART_JSON_URL}"
+
     local quickstart_json
-    if ! quickstart_json=$(curl -fsSL "$QUICKSTART_JSON_URL"); then
+    if ! quickstart_json=$(curl -fsSL "$json_url"); then
         exit_with_error "Failed to download board configuration" \
-            "Could not fetch $QUICKSTART_JSON_URL"
+            "Could not fetch $json_url"
     fi
     write_success "Configuration downloaded successfully"
 

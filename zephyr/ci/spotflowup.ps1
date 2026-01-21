@@ -44,11 +44,12 @@ param(
     [string]$board,
     [string]$workspaceFolder = "",
     [string]$spotflowRevision = "",
+    [string]$quickstartJsonUrl = "",
     [switch]$autoConfirm
 )
 
 # Configuration
-$QuickstartJsonUrl = "https://rhusakazurepocstorage.z6.web.core.windows.net/quickstart.json"
+$DefaultQuickstartJsonUrl = "https://rhusakazurepocstorage.z6.web.core.windows.net/quickstart.json"
 $ManifestBaseUrl = "https://github.com/spotflow-io/device-sdk"
 
 # Colors and formatting
@@ -357,8 +358,11 @@ Write-Info "Board ID: $board"
 # Step 1: Download and parse quickstart.json
 Write-Step "Downloading board configuration..."
 
+# Use provided URL or default
+$jsonUrl = if ($quickstartJsonUrl) { $quickstartJsonUrl } else { $DefaultQuickstartJsonUrl }
+
 try {
-    $quickstartJson = Invoke-RestMethod -Uri $QuickstartJsonUrl -UseBasicParsing -ErrorAction Stop
+    $quickstartJson = Invoke-RestMethod -Uri $jsonUrl -UseBasicParsing -ErrorAction Stop
     Write-Success "Configuration downloaded successfully"
 }
 catch {
