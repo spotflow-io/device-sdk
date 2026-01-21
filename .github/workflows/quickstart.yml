@@ -101,6 +101,7 @@ jobs:
 
           # Replace IIS listening on port 80 by nginx
           Stop-Service -Name w3svc
+          Set-Service -Name nginx -StartupType Manual
           Start-Service -Name nginx
           Start-Sleep -Seconds 2
 
