@@ -13,7 +13,7 @@
 set -euo pipefail
 
 # Configuration
-readonly DEFAULT_QUICKSTART_JSON_URL="https://rhusakazurepocstorage.z6.web.core.windows.net/quickstart.json"
+readonly DEFAULT_QUICKSTART_JSON_URL="https://downloads.spotflow.io/quickstart.json"
 readonly MANIFEST_BASE_URL="https://github.com/spotflow-io/device-sdk"
 
 # Global variables

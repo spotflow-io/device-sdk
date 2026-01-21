@@ -49,7 +49,7 @@ param(
 )
 
 # Configuration
-$DefaultQuickstartJsonUrl = "https://rhusakazurepocstorage.z6.web.core.windows.net/quickstart.json"
+$DefaultQuickstartJsonUrl = "https://downloads.spotflow.io/quickstart.json"
 $ManifestBaseUrl = "https://github.com/spotflow-io/device-sdk"
 
 # Colors and formatting
