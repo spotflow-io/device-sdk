@@ -105,8 +105,6 @@ jobs:
           Start-Service -Name nginx
           Start-Sleep -Seconds 2
 
-          curl -v http://localhost/quickstart.json
-
       # Windows runner contains Python 3.9, update to the minimum required version
       - name: Install Python
         if: runner.os == 'Windows'
