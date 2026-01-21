@@ -1,0 +1,59 @@
+name: Push ESP IDF component to component registry
+on:
+  push:
+    tags:
+      - 'v*'            # Trigger on tags starting with v (e.g., v1.0.0)
+    paths:
+      - 'esp_idf/**'    # Trigger on changes within the esp_idf directory
+  # workflow_dispatch:    # Keep manual trigger for flexibility
+  #   inputs:
+  #     version:
+  #       description: 'Manual version override'
+  #       required: false
+
+jobs:
+  init:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Resolve version
+        id: version
+        uses: spotflow-io/actions/resolve-version@v1
+        with:
+          # Optional: pass workflow_dispatch input if exists
+          version: ${{ github.event.inputs.version || '' }}
+
+  upload_components:
+    needs: init
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+          fetch-depth: 0 # Necessary to see tags and history
+
+      - name: Determine pre-release behavior
+        id: prep
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "skip_pre_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip_pre_release=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Upload components
+        uses: espressif/upload-components-ci-action@v2
+        with:
+          version: ${{ needs.init.outputs.version }}
+          components: "device_sdk: esp_idf/spotflow/device_sdk"
+          namespace: "spotflow"
+          dry_run: ${{ github.event.inputs.dry_run || 'false' }}
+          skip_pre_release: ${{ steps.prep.outputs.skip_pre_release }}
+          api_token: ${{ secrets.IDF_COMPONENT_API_TOKEN }}
+          # registry_url: "https://components-staging.espressif.com/" # For staging respository
