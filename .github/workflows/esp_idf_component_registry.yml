@@ -5,6 +5,9 @@ on:
       - 'v*'            # Trigger on tags starting with v (e.g., v1.0.0)
     paths:
       - 'esp_idf/**'    # Trigger on changes within the esp_idf directory
+  pull_request:
+    paths:
+      - 'esp_idf/**'    # Trigger on PRs with changes in esp_idf directory
   # workflow_dispatch:    # Keep manual trigger for flexibility
   #   inputs:
   #     version:
@@ -22,13 +25,16 @@ jobs:
           fetch-depth: 0
       - name: Resolve version
         id: version
-        uses: spotflow-io/actions/resolve-version@v1
+        uses: ./.github/actions/resolve-version
         with:
           # Optional: pass workflow_dispatch input if exists
           version: ${{ github.event.inputs.version || '' }}
+      - run: echo ${{ steps.resolve-version.outputs.version }}
 
   upload_components:
     needs: init
+    # Only run this job when triggered by a tag push
+    if: startsWith(github.ref, 'refs/tags/')
     permissions:
       id-token: write
     runs-on: ubuntu-latest
