@@ -82,32 +82,18 @@ jobs:
           name: quickstart-json
           path: ./quickstart-artifact
 
-      - name: Setup and start nginx (Ubuntu)
+      - name: Serve quickstart.json using nginx
         if: matrix.environment.os == 'ubuntu-latest'
         run: |
           sudo cp ./quickstart-artifact/quickstart.json /var/www/html/
           sudo systemctl restart nginx
           sleep 2
 
-      - name: Setup and start nginx (Windows)
+      - name: Serve quickstart.json using IIS
         if: matrix.environment.os == 'windows-latest'
         shell: pwsh
         run: |
-          $nginxPath = "C:\tools\nginx-*"
-          $nginxDir = (Get-Item $nginxPath).FullName
-          $htmlDir = Join-Path $nginxDir "html"
-
-          Copy-Item ./quickstart-artifact/quickstart.json $htmlDir/
-
-          Start-Process -FilePath (Join-Path $nginxDir "nginx.exe") -WorkingDirectory $nginxDir
-          Start-Sleep -Seconds 2
-
-          Write-Host $nginxDir
-          $confPath = Join-Path $nginxDir "conf\nginx.conf"
-          Write-Host $confPath
-          Get-Content $confPath | Write-Host
-          Get-ChildItem -Path $htmlDir | Write-Host
-          curl -v http://localhost/quickstart.json
+          Copy-Item .\quickstart-artifact\quickstart.json C:\inetpub\wwwroot\
 
       # Windows runner contains Python 3.9, update to the minimum required version
       - name: Install Python
