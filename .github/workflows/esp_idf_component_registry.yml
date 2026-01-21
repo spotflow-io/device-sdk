@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - 'esp_idf/**'    # Trigger on PRs with changes in esp_idf directory
+      - '.github/workflows/**'  # Trigger on PRs with workflow changes
   # workflow_dispatch:    # Keep manual trigger for flexibility
   #   inputs:
   #     version:
