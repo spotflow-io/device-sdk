@@ -27,9 +27,6 @@ jobs:
       - name: Resolve version
         id: version
         uses: ./.github/actions/resolve-version
-        with:
-          # Optional: pass workflow_dispatch input if exists
-          version: ${{ github.event.inputs.version || '' }}
       - run: echo ${{ steps.resolve-version.outputs.version }}
 
   upload_components:
