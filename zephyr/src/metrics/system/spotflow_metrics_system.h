@@ -20,6 +20,17 @@
 #define SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL SPOTFLOW_AGG_INTERVAL_1HOUR
 #endif
 
+/* System metric names */
+#define SPOTFLOW_METRIC_NAME_CONNECTION     "connection_mqtt_connected"
+#define SPOTFLOW_METRIC_NAME_HEAP_FREE      "heap_free_bytes"
+#define SPOTFLOW_METRIC_NAME_HEAP_ALLOCATED "heap_allocated_bytes"
+#define SPOTFLOW_METRIC_NAME_CPU            "cpu_utilization_percent"
+#define SPOTFLOW_METRIC_NAME_STACK_FREE     "thread_stack_free_bytes"
+#define SPOTFLOW_METRIC_NAME_STACK_USED     "thread_stack_used_percent"
+#define SPOTFLOW_METRIC_NAME_NETWORK_TX     "network_tx_bytes"
+#define SPOTFLOW_METRIC_NAME_NETWORK_RX     "network_rx_bytes"
+#define SPOTFLOW_METRIC_NAME_BOOT_RESET     "boot_reset"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

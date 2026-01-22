@@ -31,14 +31,14 @@ int spotflow_metrics_system_stack_init(void)
 	uint16_t max_threads = CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS;
 
 	g_stack_metric = spotflow_register_metric_int_with_labels(
-		"thread_stack_free_bytes", SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, max_threads, 1);
+		SPOTFLOW_METRIC_NAME_STACK_FREE, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, max_threads, 1);
 	if (!g_stack_metric) {
 		LOG_ERR("Failed to register stack free metric");
 		return -ENOMEM;
 	}
 
 	g_stack_used_metric = spotflow_register_metric_float_with_labels(
-		"thread_stack_used_percent", SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, max_threads, 1);
+		SPOTFLOW_METRIC_NAME_STACK_USED, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, max_threads, 1);
 	if (!g_stack_used_metric) {
 		LOG_ERR("Failed to register stack used percent metric");
 		return -ENOMEM;

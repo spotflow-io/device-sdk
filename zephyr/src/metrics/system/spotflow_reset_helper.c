@@ -1,4 +1,5 @@
-﻿#include "metrics/spotflow_metrics_backend.h"
+﻿#include "spotflow_metrics_system.h"
+#include "metrics/spotflow_metrics_backend.h"
 #include "zephyr/logging/log.h"
 
 #include <zephyr/drivers/hwinfo.h>
@@ -47,7 +48,7 @@ void report_reboot_reason(void)
 
 	/* Report as immediate event metric */
 	static struct spotflow_metric_int* reset_cause_metric;
-	reset_cause_metric = spotflow_register_metric_int_with_labels("boot_reset", SPOTFLOW_AGG_INTERVAL_NONE, 1, 1);
+	reset_cause_metric = spotflow_register_metric_int_with_labels(SPOTFLOW_METRIC_NAME_BOOT_RESET, SPOTFLOW_AGG_INTERVAL_NONE, 1, 1);
 	if (!reset_cause_metric) {
 		LOG_ERR("Failed to register reset cause metric");
 		return;

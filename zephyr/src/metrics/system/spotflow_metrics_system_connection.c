@@ -5,6 +5,7 @@
  */
 
 #include "spotflow_metrics_system_connection.h"
+#include "spotflow_metrics_system.h"
 #include "metrics/spotflow_metrics_backend.h"
 #include "metrics/spotflow_metrics_types.h"
 
@@ -18,7 +19,7 @@ static struct spotflow_metric_int *g_connection_state_metric;
 int spotflow_metrics_system_connection_init(void)
 {
 	g_connection_state_metric =
-		spotflow_register_metric_int("connection_mqtt_connected", SPOTFLOW_AGG_INTERVAL_NONE);
+		spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_CONNECTION, SPOTFLOW_AGG_INTERVAL_NONE);
 	if (!g_connection_state_metric) {
 		LOG_ERR("Failed to register connection state metric");
 		return -ENOMEM;
