@@ -265,11 +265,20 @@ jobs:
           --content-type 'application/powershell'
           --overwrite
 
-      - name: Purge CDN
+      - name: Purge quickstart.json in CDN
         run: >
           az cdn endpoint purge
           --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
           --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
           --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
-          --content-paths 'quickstart.json spotflowup.sh spotflowup.ps1'
+          --content-paths 'quickstart.json'
+          --no-wait
+
+      - name: Purge spotflowup.sh and spotflowup.ps1 in CDN
+        run: >
+          az cdn endpoint purge
+          --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
+          --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
+          --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
+          --content-paths 'spotflowup.*'
           --no-wait
