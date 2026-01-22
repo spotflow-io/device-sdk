@@ -131,19 +131,19 @@ static int init_application_metrics(void)
 	 */
 
 	/* Register label-less integer metric - aggregated over 1 minute */
-	g_app_counter_metric = spotflow_register_metric_int("app_counter", "PT1M");
+	g_app_counter_metric = spotflow_register_metric_int("app_counter", SPOTFLOW_AGG_INTERVAL_1MIN);
 	if (!g_app_counter_metric) {
 		LOG_ERR("Failed to register app_counter metric");
 		return -ENOMEM;
 	}
-	LOG_INF("Registered metric: app_counter (int, PT1M)");
+	LOG_INF("Registered metric: app_counter (int, 1MIN)");
 
 
 	/* Register labeled float metric - aggregated over 1 minute */
 	/* Supports up to 18 unique label combinations (3 endpoints × 2 methods × 3 statuses) */
 	g_request_duration_metric = spotflow_register_metric_float_with_labels(
 		"http_request_duration_ms",
-		"PT1M",
+		SPOTFLOW_AGG_INTERVAL_1MIN,
 		18,  /* max_timeseries: 3 endpoints × 2 methods × 3 statuses = 18 */
 		3    /* max_labels */
 	);
@@ -151,7 +151,7 @@ static int init_application_metrics(void)
 		LOG_ERR("Failed to register request_duration metric");
 		return -ENOMEM;
 	}
-	LOG_INF("Registered metric: http_request_duration_ms (float, labeled, PT1M)");
+	LOG_INF("Registered metric: http_request_duration_ms (float, labeled, 1MIN)");
 
 	return 0;
 }
@@ -198,12 +198,12 @@ static void report_temperature_metric(void)
 static void temperature_thread_entry()
 {
 	/* Register label-less float metric - immediate (no aggregation) */
-	g_temperature_metric = spotflow_register_metric_float("temperature_celsius", "PT0S");
+	g_temperature_metric = spotflow_register_metric_float("temperature_celsius", SPOTFLOW_AGG_INTERVAL_NONE);
 	if (!g_temperature_metric) {
 		LOG_ERR("Failed to register temperature metric");
 		return;
 	}
-	LOG_INF("Registered metric: temperature_celsius (float, PT0S)");
+	LOG_INF("Registered metric: temperature_celsius (float, NONE)");
 
 	while (true) {
 		report_temperature_metric();

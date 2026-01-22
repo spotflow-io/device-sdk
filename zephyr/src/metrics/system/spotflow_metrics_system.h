@@ -9,14 +9,15 @@
 
 #include <stdbool.h>
 #include <zephyr/kernel.h>
+#include "../spotflow_metrics_types.h"
 
-/* Map collection interval to ISO 8601 duration string for metric aggregation */
+/* Map collection interval to aggregation interval enum */
 #if CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL == 60
-#define SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR "PT1M"
+#define SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL SPOTFLOW_AGG_INTERVAL_1MIN
 #elif CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL == 600
-#define SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR "PT10M"
+#define SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL SPOTFLOW_AGG_INTERVAL_10MIN
 #elif CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL == 3600
-#define SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR "PT1H"
+#define SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL SPOTFLOW_AGG_INTERVAL_1HOUR
 #endif
 
 #ifdef __cplusplus

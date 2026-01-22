@@ -44,7 +44,7 @@ int spotflow_metrics_cbor_encode(
 
 int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* metric,
 						const spotflow_label_t* labels, uint8_t label_count,
-						int64_t value_int, double value_float,
+						int64_t value_int, float value_float,
 						int64_t timestamp_ms, uint64_t sequence_number,
 					uint8_t** cbor_data, size_t* cbor_len);
 

@@ -35,13 +35,10 @@ config SPOTFLOW_METRICS_SYSTEM_NETWORK
 
 config SPOTFLOW_METRICS_SYSTEM_CPU
 	bool "Enable CPU utilization metrics"
-	select THREAD_RUNTIME_STATS
-	select THREAD_RUNTIME_STATS_USE_TIMING_FUNCTIONS
+	select CPU_LOAD
 	default y
 	help
-	  Collect CPU utilization percentage.
-	  WARNING: Enabling this adds overhead to thread scheduling.
-	  Only enable if CPU utilization monitoring is required.
+	  Collect CPU utilization percentage using Zephyr's cpu_load module.
 
 config SPOTFLOW_METRICS_SYSTEM_CONNECTION
 	bool "Enable connection state metrics"

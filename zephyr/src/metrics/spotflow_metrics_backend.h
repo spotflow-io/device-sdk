@@ -30,32 +30,35 @@ int spotflow_metrics_init(void);
  * @brief Register a label-less integer metric
  *
  * @param name Metric name (max 255 chars, will be normalized to lowercase/alphanumeric/_)
- * @param agg_interval Aggregation interval (PT0S, PT1M, PT10M, PT1H)
+ * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
+ *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
  *
  * @return Metric handle on success, NULL on failure
  *         Failures: -ENOMEM (registry full or allocation failed), -EINVAL (invalid params)
  */
 spotflow_metric_int_t *spotflow_register_metric_int(
 	const char *name,
-	const char *agg_interval);
+	spotflow_agg_interval_t agg_interval);
 
 /**
  * @brief Register a label-less float metric
  *
  * @param name Metric name (max 255 chars, will be normalized to lowercase/alphanumeric/_)
- * @param agg_interval Aggregation interval (PT0S, PT1M, PT10M, PT1H)
+ * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
+ *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
  *
  * @return Metric handle on success, NULL on failure
  */
 spotflow_metric_float_t *spotflow_register_metric_float(
 	const char *name,
-	const char *agg_interval);
+	spotflow_agg_interval_t agg_interval);
 
 /**
  * @brief Register a labeled integer metric
  *
  * @param name Metric name (max 255 chars, will be normalized)
- * @param agg_interval Aggregation interval
+ * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
+ *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
  * @param max_timeseries Maximum number of unique label combinations (1-256)
  * @param max_labels Maximum labels per report (1-8)
  *
@@ -63,7 +66,7 @@ spotflow_metric_float_t *spotflow_register_metric_float(
  */
 spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
 	const char *name,
-	const char *agg_interval,
+	spotflow_agg_interval_t agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels);
 
@@ -71,7 +74,8 @@ spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
  * @brief Register a labeled float metric
  *
  * @param name Metric name (max 255 chars, will be normalized)
- * @param agg_interval Aggregation interval
+ * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
+ *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
  * @param max_timeseries Maximum number of unique label combinations (1-256)
  * @param max_labels Maximum labels per report (1-8)
  *
@@ -79,7 +83,7 @@ spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
  */
 spotflow_metric_float_t *spotflow_register_metric_float_with_labels(
 	const char *name,
-	const char *agg_interval,
+	spotflow_agg_interval_t agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels);
 
@@ -107,7 +111,7 @@ int spotflow_report_metric_int(
  */
 int spotflow_report_metric_float(
 	spotflow_metric_float_t *metric,
-	double value);
+	float value);
 
 /**
  * @brief Report a labeled integer metric value
@@ -140,7 +144,7 @@ int spotflow_report_metric_int_with_labels(
  */
 int spotflow_report_metric_float_with_labels(
 	spotflow_metric_float_t *metric,
-	double value,
+	float value,
 	const spotflow_label_t *labels,
 	uint8_t label_count);
 

@@ -16,7 +16,7 @@
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 static spotflow_metric_int_t *g_stack_metric;
-static spotflow_metric_int_t *g_stack_used_metric;
+static spotflow_metric_float_t *g_stack_used_metric;
 
 #ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 static struct k_thread *g_tracked_threads[CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS];
@@ -31,16 +31,16 @@ int spotflow_metrics_system_stack_init(void)
 	uint16_t max_threads = CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS;
 
 	g_stack_metric = spotflow_register_metric_int_with_labels(
-		"thread_stack_free_bytes", SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR, max_threads, 1);
+		"thread_stack_free_bytes", SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, max_threads, 1);
 	if (!g_stack_metric) {
 		LOG_ERR("Failed to register stack free metric");
 		return -ENOMEM;
 	}
 
-	g_stack_used_metric = spotflow_register_metric_int_with_labels(
-		"thread_stack_used_bytes", SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR, max_threads, 1);
+	g_stack_used_metric = spotflow_register_metric_float_with_labels(
+		"thread_stack_used_percent", SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, max_threads, 1);
 	if (!g_stack_used_metric) {
-		LOG_ERR("Failed to register stack used metric");
+		LOG_ERR("Failed to register stack used percent metric");
 		return -ENOMEM;
 	}
 
@@ -161,10 +161,14 @@ static void report_thread_stack(const struct k_thread *thread, void *user_data)
 		LOG_ERR("Failed to report stack free metric for %s: %d", thread_label, rc);
 	}
 
-	rc = spotflow_report_metric_int_with_labels(g_stack_used_metric, (int64_t)used_bytes, labels, 1);
+	float used_percent = (float)used_bytes / (float)stack_size * 100.0f;
+	rc = spotflow_report_metric_float_with_labels(g_stack_used_metric, used_percent, labels, 1);
 	if (rc < 0) {
-		LOG_ERR("Failed to report stack used metric for %s: %d", thread_label, rc);
+		LOG_ERR("Failed to report stack used percent metric for %s: %d", thread_label, rc);
 	}
 
-	LOG_DBG("Stack: thread=%s, used=%zu, free=%zu bytes", thread_label, used_bytes, unused_bytes);
+	/* Log using integer format to avoid float-to-double promotion (Zephyr convention) */
+	int pct_int = (int)used_percent;
+	int pct_frac = (int)((used_percent - pct_int) * 10);
+	LOG_DBG("Stack: thread=%s, used=%d.%01d%%, free=%zu bytes", thread_label, pct_int, pct_frac, unused_bytes);
 }

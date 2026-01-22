@@ -18,7 +18,7 @@ static spotflow_metric_int_t *g_connection_state_metric;
 int spotflow_metrics_system_connection_init(void)
 {
 	g_connection_state_metric =
-		spotflow_register_metric_int("connection_mqtt_connected", "PT0S");
+		spotflow_register_metric_int("connection_mqtt_connected", SPOTFLOW_AGG_INTERVAL_NONE);
 	if (!g_connection_state_metric) {
 		LOG_ERR("Failed to register connection state metric");
 		return -ENOMEM;

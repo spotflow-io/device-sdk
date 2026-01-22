@@ -52,8 +52,12 @@ int spotflow_metrics_cbor_encode(
 		return -EINVAL; /* This function is for non-aggregated metrics only */
 	}
 
-	uint8_t buffer[CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE];
-	ZCBOR_STATE_E(state, 1, buffer, sizeof(buffer), 1);
+	uint8_t *buffer = k_malloc(CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE);
+	if (!buffer) {
+		LOG_ERR("Failed to allocate CBOR encoding buffer");
+		return -ENOMEM;
+	}
+	ZCBOR_STATE_E(state, 1, buffer, CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE, 1);
 
 	bool succ = true;
 
@@ -120,6 +124,7 @@ int spotflow_metrics_cbor_encode(
 
 	if (!succ) {
 		LOG_ERR("CBOR encoding failed: %d", zcbor_peek_error(state));
+		k_free(buffer);
 		return -EINVAL;
 	}
 
@@ -134,10 +139,12 @@ int spotflow_metrics_cbor_encode(
 	size_t encoded_len = state->payload - buffer;
 	uint8_t *data = k_malloc(encoded_len);
 	if (!data) {
+		k_free(buffer);
 		return -ENOMEM;
 	}
 
 	memcpy(data, buffer, encoded_len);
+	k_free(buffer);
 	*cbor_data = data;
 	*cbor_len = encoded_len;
 
@@ -150,7 +157,7 @@ int spotflow_metrics_cbor_encode(
 
 int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* metric,
 						const spotflow_label_t* labels, uint8_t label_count,
-						int64_t value_int, double value_float,
+						int64_t value_int, float value_float,
 						int64_t timestamp_ms, uint64_t sequence_number,
 						uint8_t** cbor_data, size_t* cbor_len)
 {
@@ -163,8 +170,12 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 		return -EINVAL; /* This function is for non-aggregated metrics only */
 	}
 
-	uint8_t buffer[CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE];
-	ZCBOR_STATE_E(state, 1, buffer, sizeof(buffer), 1);
+	uint8_t *buffer = k_malloc(CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE);
+	if (!buffer) {
+		LOG_ERR("Failed to allocate CBOR encoding buffer");
+		return -ENOMEM;
+	}
+	ZCBOR_STATE_E(state, 1, buffer, CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE, 1);
 
 	bool succ = true;
 
@@ -224,6 +235,7 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 
 	if (!succ) {
 		LOG_ERR("CBOR encoding failed for raw metric: %d", zcbor_peek_error(state));
+		k_free(buffer);
 		return -EINVAL;
 	}
 
@@ -231,10 +243,12 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 	size_t encoded_len = state->payload - buffer;
 	uint8_t* data = k_malloc(encoded_len);
 	if (!data) {
+		k_free(buffer);
 		return -ENOMEM;
 	}
 
 	memcpy(data, buffer, encoded_len);
+	k_free(buffer);
 	*cbor_data = data;
 	*cbor_len = encoded_len;
 

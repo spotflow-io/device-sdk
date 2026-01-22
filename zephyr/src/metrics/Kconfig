@@ -10,11 +10,13 @@ if SPOTFLOW_METRICS
 
 config SPOTFLOW_METRICS_QUEUE_SIZE
 	int "Metrics message queue size"
-	range 4 64
+	range 4 128
+	default 64 if SPOTFLOW_METRICS_SYSTEM
 	default 16
 	help
 	  Maximum number of encoded metric messages buffered before transmission.
-	  Messages are dropped if queue is full. Default 16 messages.
+	  Messages are dropped if queue is full. Default 64 when system metrics
+	  are enabled (to handle burst from multiple time series), otherwise 16.
 
 config SPOTFLOW_METRICS_CBOR_BUFFER_SIZE
 	int "CBOR encoding buffer size (bytes)"
@@ -34,15 +36,15 @@ config SPOTFLOW_METRICS_MAX_REGISTERED
 	  Each metric consumes heap memory for aggregation context and time series storage.
 
 config SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL
-	int "Default aggregation interval (enum)"
-	range 0 3
-	default 1
+	int "Default aggregation interval (seconds)"
+	default 60
 	help
 	  Default aggregation period for metrics registered without explicit interval.
-	  0 = PT0S (no aggregation, immediate)
-	  1 = PT1M (1 minute, recommended default)
-	  2 = PT10M (10 minutes)
-	  3 = PT1H (1 hour)
+	  Allowed values: 0, 60, 600, 3600 (validated at build time).
+	  0 = PT0S (no aggregation, immediate - not recommended for production)
+	  60 = PT1M (1 minute, recommended default)
+	  600 = PT10M (10 minutes)
+	  3600 = PT1H (1 hour)
 
 config SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC
 	int "Maximum labels per metric"
@@ -74,10 +76,11 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 
 config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
 	int "Metrics subsystem log level"
-	default 2
+  	default SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	range 0 4
 	help
 	  Log level for metrics subsystem:
+	  Defaults to SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL.
 	  0 = OFF
 	  1 = ERROR
 	  2 = WARNING (default)

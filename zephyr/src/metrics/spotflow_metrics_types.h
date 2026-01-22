@@ -51,9 +51,8 @@ typedef struct {
  *
  * These opaque handles enforce type safety at compile time:
  * - spotflow_metric_int_t: Only accepts int64_t values
- * - spotflow_metric_float_t: Only accepts double values
+ * - spotflow_metric_float_t: Only accepts float values
  *
- * Internal structure is defined in spotflow_metrics_backend.c
  */
 typedef struct spotflow_metric_int spotflow_metric_int_t;
 typedef struct spotflow_metric_float spotflow_metric_float_t;
@@ -86,15 +85,15 @@ struct metric_timeseries_state {
 	/* Aggregation state */
 	union {
 		int64_t sum_int;
-		double sum_float;
+		float sum_float;
 	};
 	union {
 		int64_t min_int;
-		double min_float;
+		float min_float;
 	};
 	union {
 		int64_t max_int;
-		double max_float;
+		float max_float;
 	};
 	uint64_t count;                    /* Number of values aggregated */
 	bool sum_truncated;                /* Sum overflow flag */
@@ -140,7 +139,7 @@ struct spotflow_metric_int {
 /**
  * @brief Float metric structure (internal use)
  *
- * Type-specific wrapper ensuring only double values can be reported.
+ * Type-specific wrapper ensuring only float values can be reported.
  */
 struct spotflow_metric_float {
 	struct spotflow_metric_base base;

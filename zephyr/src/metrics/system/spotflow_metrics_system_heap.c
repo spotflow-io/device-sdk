@@ -23,14 +23,14 @@ extern struct sys_heap _system_heap;
 int spotflow_metrics_system_heap_init(void)
 {
 	g_heap_free_metric = spotflow_register_metric_int("heap_free_bytes",
-							    SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR);
+							    SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL);
 	if (!g_heap_free_metric) {
 		LOG_ERR("Failed to register heap free metric");
 		return -ENOMEM;
 	}
 
 	g_heap_allocated_metric = spotflow_register_metric_int("heap_allocated_bytes",
-							        SPOTFLOW_METRICS_SYSTEM_INTERVAL_STR);
+							        SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL);
 	if (!g_heap_allocated_metric) {
 		LOG_ERR("Failed to register heap allocated metric");
 		return -ENOMEM;

@@ -9,6 +9,7 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/random/random.h>
 #include <string.h>
 #include <limits.h>
 #include <float.h>
@@ -21,7 +22,7 @@ extern struct k_msgq g_spotflow_metrics_msgq;
 static bool labels_equal(const struct metric_timeseries_state* ts, const spotflow_label_t* labels,
 			 uint8_t label_count);
 static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value);
-static void update_aggregation_float(struct metric_timeseries_state* ts, double value);
+static void update_aggregation_float(struct metric_timeseries_state* ts, float value);
 static int64_t get_interval_ms(spotflow_agg_interval_t interval);
 static int enqueue_metric_message(uint8_t* payload, size_t len);
 static struct metric_timeseries_state*
@@ -31,7 +32,7 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 			    int64_t timestamp_ms);
 static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 				       const spotflow_label_t* labels, uint8_t label_count,
-				       int64_t value_int, double value_float);
+				       int64_t value_int, float value_float);
 static void aggregation_timer_handler(struct k_work* work);
 
 /* Public API Implementation */
@@ -73,7 +74,7 @@ int aggregator_register_metric(struct spotflow_metric_base* metric)
 }
 
 int aggregator_report_value(struct spotflow_metric_base* metric, const spotflow_label_t* labels,
-			    uint8_t label_count, int64_t value_int, double value_float)
+			    uint8_t label_count, int64_t value_int, float value_float)
 {
 	if (metric == NULL || metric->aggregator_context == NULL) {
 		return -EINVAL;
@@ -104,10 +105,12 @@ int aggregator_report_value(struct spotflow_metric_base* metric, const spotflow_
 	if (!ctx->timer_started) {
 		int64_t interval_ms = get_interval_ms(metric->agg_interval);
 		if (interval_ms > 0) {
-			k_work_schedule(&ctx->aggregation_work, K_MSEC(interval_ms));
+			/* Add 0-10% jitter to first flush to spread out across metrics */
+			int32_t jitter_ms = sys_rand32_get() % (interval_ms / 10);
+			k_work_schedule(&ctx->aggregation_work, K_MSEC(interval_ms - jitter_ms));
 			ctx->timer_started = true;
-			LOG_DBG("Started aggregation timer for metric '%s' (interval=%lld ms)",
-				metric->name, interval_ms);
+			LOG_DBG("Started aggregation timer for metric '%s' (interval=%lld ms, jitter=-%d ms)",
+				metric->name, interval_ms, jitter_ms);
 		}
 	}
 
@@ -175,7 +178,7 @@ static bool labels_equal(const struct metric_timeseries_state* ts, const spotflo
 
 static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 				       const spotflow_label_t* labels, uint8_t label_count,
-				       int64_t value_int, double value_float)
+				       int64_t value_int, float value_float)
 {
 	uint8_t* cbor_data = NULL;
 	size_t cbor_len = 0;
@@ -260,9 +263,9 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 		ts->min_int = INT64_MAX;
 		ts->max_int = INT64_MIN;
 	} else {
-		ts->sum_float = 0.0;
-		ts->min_float = DBL_MAX;
-		ts->max_float = -DBL_MAX;
+		ts->sum_float = 0.0f;
+		ts->min_float = FLT_MAX;
+		ts->max_float = -FLT_MAX;
 	}
 
 	return 0;
@@ -387,8 +390,8 @@ find_or_create_timeseries(struct metric_aggregator_context* ctx, const spotflow_
 				ts->min_int = INT64_MAX;
 				ts->max_int = INT64_MIN;
 			} else {
-				ts->min_float = DBL_MAX;
-				ts->max_float = -DBL_MAX;
+				ts->min_float = FLT_MAX;
+				ts->max_float = -FLT_MAX;
 			}
 
 			ctx->timeseries_count++;
@@ -432,7 +435,7 @@ static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t v
 /**
  * @brief Update float aggregation state
  */
-static void update_aggregation_float(struct metric_timeseries_state* ts, double value)
+static void update_aggregation_float(struct metric_timeseries_state* ts, float value)
 {
 	ts->count++;
 

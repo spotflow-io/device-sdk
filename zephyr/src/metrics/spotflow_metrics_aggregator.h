@@ -47,7 +47,7 @@ int aggregator_report_value(
 	const spotflow_label_t *labels,
 	uint8_t label_count,
 	int64_t value_int,
-	double value_float);
+	float value_float);
 
 /**
  * @brief Unregister metric from aggregator

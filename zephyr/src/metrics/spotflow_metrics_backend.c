@@ -32,29 +32,6 @@ static struct k_mutex g_registry_lock;
 static atomic_t g_metrics_init_state = ATOMIC_INIT(0);
 
 /**
- * @brief Parse ISO 8601 duration string to enum
- */
-static spotflow_agg_interval_t parse_aggregation_interval(const char *interval_str)
-{
-	if (interval_str == NULL) {
-		return CONFIG_SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL;
-	}
-
-	if (strcmp(interval_str, "PT0S") == 0) {
-		return SPOTFLOW_AGG_INTERVAL_NONE;
-	} else if (strcmp(interval_str, "PT1M") == 0) {
-		return SPOTFLOW_AGG_INTERVAL_1MIN;
-	} else if (strcmp(interval_str, "PT10M") == 0) {
-		return SPOTFLOW_AGG_INTERVAL_10MIN;
-	} else if (strcmp(interval_str, "PT1H") == 0) {
-		return SPOTFLOW_AGG_INTERVAL_1HOUR;
-	} else {
-		LOG_WRN("Invalid aggregation interval '%s', using default", interval_str);
-		return CONFIG_SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL;
-	}
-}
-
-/**
  * @brief Normalize metric name to lowercase alphanumeric with underscores
  */
 static void normalize_metric_name(const char *input, char *output, size_t output_size)
@@ -116,7 +93,7 @@ static struct spotflow_metric_base *find_metric_by_name(const char *normalized_n
 static struct spotflow_metric_base *register_metric_common(
 	const char *name,
 	spotflow_metric_type_t type,
-	const char *agg_interval_str,
+	spotflow_agg_interval_t agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels)
 {
@@ -182,7 +159,7 @@ static struct spotflow_metric_base *register_metric_common(
 	metric->name[sizeof(metric->name) - 1] = '\0';
 
 	metric->type = type;
-	metric->agg_interval = parse_aggregation_interval(agg_interval_str);
+	metric->agg_interval = agg_interval;
 	metric->max_timeseries = max_timeseries;
 	metric->max_labels = max_labels;
 	metric->sequence_number = 0;
@@ -244,7 +221,7 @@ int spotflow_metrics_init(void)
 
 spotflow_metric_int_t *spotflow_register_metric_int(
 	const char *name,
-	const char *agg_interval)
+	spotflow_agg_interval_t agg_interval)
 {
 	struct spotflow_metric_base *base = register_metric_common(
 		name, SPOTFLOW_METRIC_TYPE_INT, agg_interval, 1, 0);
@@ -257,7 +234,7 @@ spotflow_metric_int_t *spotflow_register_metric_int(
 
 spotflow_metric_float_t *spotflow_register_metric_float(
 	const char *name,
-	const char *agg_interval)
+	spotflow_agg_interval_t agg_interval)
 {
 	struct spotflow_metric_base *base = register_metric_common(
 		name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval, 1, 0);
@@ -269,7 +246,7 @@ spotflow_metric_float_t *spotflow_register_metric_float(
 
 spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
 	const char *name,
-	const char *agg_interval,
+	spotflow_agg_interval_t agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels)
 {
@@ -288,7 +265,7 @@ spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
 
 spotflow_metric_float_t *spotflow_register_metric_float_with_labels(
 	const char *name,
-	const char *agg_interval,
+	spotflow_agg_interval_t agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels)
 {
@@ -327,7 +304,7 @@ int spotflow_report_metric_int(
 
 int spotflow_report_metric_float(
 	spotflow_metric_float_t *metric,
-	double value)
+	float value)
 {
 	if (metric == NULL) {
 		return -EINVAL;
@@ -375,7 +352,7 @@ int spotflow_report_metric_int_with_labels(
 
 int spotflow_report_metric_float_with_labels(
 	spotflow_metric_float_t *metric,
-	double value,
+	float value,
 	const spotflow_label_t *labels,
 	uint8_t label_count)
 {
