@@ -271,7 +271,7 @@ jobs:
           --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
           --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
           --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
-          --content-paths 'quickstart.json'
+          --content-paths '/quickstart.json'
           --no-wait
 
       - name: Purge spotflowup.sh and spotflowup.ps1 in CDN
@@ -280,5 +280,5 @@ jobs:
           --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
           --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
           --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
-          --content-paths 'spotflowup.*'
+          --content-paths '/spotflowup.*'
           --no-wait
