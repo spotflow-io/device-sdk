@@ -92,8 +92,8 @@ static struct spotflow_metric_base *find_metric_by_name(const char *normalized_n
  */
 static struct spotflow_metric_base *register_metric_common(
 	const char *name,
-	spotflow_metric_type_t type,
-	spotflow_agg_interval_t agg_interval,
+	enum spotflow_metric_type type,
+	enum spotflow_agg_interval agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels)
 {
@@ -219,9 +219,9 @@ int spotflow_metrics_init(void)
 	return 0;
 }
 
-spotflow_metric_int_t *spotflow_register_metric_int(
+struct spotflow_metric_int *spotflow_register_metric_int(
 	const char *name,
-	spotflow_agg_interval_t agg_interval)
+	enum spotflow_agg_interval agg_interval)
 {
 	struct spotflow_metric_base *base = register_metric_common(
 		name, SPOTFLOW_METRIC_TYPE_INT, agg_interval, 1, 0);
@@ -229,24 +229,24 @@ spotflow_metric_int_t *spotflow_register_metric_int(
 		return NULL;
 	}
 	/* The base is the first member of spotflow_metric_int, so we can safely cast */
-	return (spotflow_metric_int_t *)base;
+	return (struct spotflow_metric_int *)base;
 }
 
-spotflow_metric_float_t *spotflow_register_metric_float(
+struct spotflow_metric_float *spotflow_register_metric_float(
 	const char *name,
-	spotflow_agg_interval_t agg_interval)
+	enum spotflow_agg_interval agg_interval)
 {
 	struct spotflow_metric_base *base = register_metric_common(
 		name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval, 1, 0);
 	if (base == NULL) {
 		return NULL;
 	}
-	return (spotflow_metric_float_t *)base;
+	return (struct spotflow_metric_float *)base;
 }
 
-spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
+struct spotflow_metric_int *spotflow_register_metric_int_with_labels(
 	const char *name,
-	spotflow_agg_interval_t agg_interval,
+	enum spotflow_agg_interval agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels)
 {
@@ -260,12 +260,12 @@ spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
 	if (base == NULL) {
 		return NULL;
 	}
-	return (spotflow_metric_int_t *)base;
+	return (struct spotflow_metric_int *)base;
 }
 
-spotflow_metric_float_t *spotflow_register_metric_float_with_labels(
+struct spotflow_metric_float *spotflow_register_metric_float_with_labels(
 	const char *name,
-	spotflow_agg_interval_t agg_interval,
+	enum spotflow_agg_interval agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels)
 {
@@ -279,11 +279,11 @@ spotflow_metric_float_t *spotflow_register_metric_float_with_labels(
 	if (base == NULL) {
 		return NULL;
 	}
-	return (spotflow_metric_float_t *)base;
+	return (struct spotflow_metric_float *)base;
 }
 
 int spotflow_report_metric_int(
-	spotflow_metric_int_t *metric,
+	struct spotflow_metric_int *metric,
 	int64_t value)
 {
 	if (metric == NULL) {
@@ -303,7 +303,7 @@ int spotflow_report_metric_int(
 }
 
 int spotflow_report_metric_float(
-	spotflow_metric_float_t *metric,
+	struct spotflow_metric_float *metric,
 	float value)
 {
 	if (metric == NULL) {
@@ -323,9 +323,9 @@ int spotflow_report_metric_float(
 }
 
 int spotflow_report_metric_int_with_labels(
-	spotflow_metric_int_t *metric,
+	struct spotflow_metric_int *metric,
 	int64_t value,
-	const spotflow_label_t *labels,
+	const struct spotflow_label *labels,
 	uint8_t label_count)
 {
 	if (metric == NULL || labels == NULL) {
@@ -351,9 +351,9 @@ int spotflow_report_metric_int_with_labels(
 }
 
 int spotflow_report_metric_float_with_labels(
-	spotflow_metric_float_t *metric,
+	struct spotflow_metric_float *metric,
 	float value,
-	const spotflow_label_t *labels,
+	const struct spotflow_label *labels,
 	uint8_t label_count)
 {
 	if (metric == NULL || labels == NULL) {
@@ -378,7 +378,7 @@ int spotflow_report_metric_float_with_labels(
 	return aggregator_report_value(base, labels, label_count, 0, value);
 }
 
-int spotflow_report_event(spotflow_metric_int_t *metric)
+int spotflow_report_event(struct spotflow_metric_int *metric)
 {
 	if (metric == NULL) {
 		return -EINVAL;
@@ -397,8 +397,8 @@ int spotflow_report_event(spotflow_metric_int_t *metric)
 }
 
 int spotflow_report_event_with_labels(
-	spotflow_metric_int_t *metric,
-	const spotflow_label_t *labels,
+	struct spotflow_metric_int *metric,
+	const struct spotflow_label *labels,
 	uint8_t label_count)
 {
 	if (metric == NULL || labels == NULL) {

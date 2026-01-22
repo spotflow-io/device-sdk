@@ -36,9 +36,9 @@ int spotflow_metrics_init(void);
  * @return Metric handle on success, NULL on failure
  *         Failures: -ENOMEM (registry full or allocation failed), -EINVAL (invalid params)
  */
-spotflow_metric_int_t *spotflow_register_metric_int(
+struct spotflow_metric_int *spotflow_register_metric_int(
 	const char *name,
-	spotflow_agg_interval_t agg_interval);
+	enum spotflow_agg_interval agg_interval);
 
 /**
  * @brief Register a label-less float metric
@@ -49,9 +49,9 @@ spotflow_metric_int_t *spotflow_register_metric_int(
  *
  * @return Metric handle on success, NULL on failure
  */
-spotflow_metric_float_t *spotflow_register_metric_float(
+struct spotflow_metric_float *spotflow_register_metric_float(
 	const char *name,
-	spotflow_agg_interval_t agg_interval);
+	enum spotflow_agg_interval agg_interval);
 
 /**
  * @brief Register a labeled integer metric
@@ -64,9 +64,9 @@ spotflow_metric_float_t *spotflow_register_metric_float(
  *
  * @return Metric handle on success, NULL on failure
  */
-spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
+struct spotflow_metric_int *spotflow_register_metric_int_with_labels(
 	const char *name,
-	spotflow_agg_interval_t agg_interval,
+	enum spotflow_agg_interval agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels);
 
@@ -81,9 +81,9 @@ spotflow_metric_int_t *spotflow_register_metric_int_with_labels(
  *
  * @return Metric handle on success, NULL on failure
  */
-spotflow_metric_float_t *spotflow_register_metric_float_with_labels(
+struct spotflow_metric_float *spotflow_register_metric_float_with_labels(
 	const char *name,
-	spotflow_agg_interval_t agg_interval,
+	enum spotflow_agg_interval agg_interval,
 	uint16_t max_timeseries,
 	uint8_t max_labels);
 
@@ -98,7 +98,7 @@ spotflow_metric_float_t *spotflow_register_metric_float_with_labels(
  *         -EAGAIN: Aggregator busy (rare, retry)
  */
 int spotflow_report_metric_int(
-	spotflow_metric_int_t *metric,
+	struct spotflow_metric_int *metric,
 	int64_t value);
 
 /**
@@ -110,7 +110,7 @@ int spotflow_report_metric_int(
  * @return 0 on success, negative errno on failure
  */
 int spotflow_report_metric_float(
-	spotflow_metric_float_t *metric,
+	struct spotflow_metric_float *metric,
 	float value);
 
 /**
@@ -127,9 +127,9 @@ int spotflow_report_metric_float(
  *         -EAGAIN: Aggregator busy (rare, retry)
  */
 int spotflow_report_metric_int_with_labels(
-	spotflow_metric_int_t *metric,
+	struct spotflow_metric_int *metric,
 	int64_t value,
-	const spotflow_label_t *labels,
+	const struct spotflow_label *labels,
 	uint8_t label_count);
 
 /**
@@ -143,9 +143,9 @@ int spotflow_report_metric_int_with_labels(
  * @return 0 on success, negative errno on failure
  */
 int spotflow_report_metric_float_with_labels(
-	spotflow_metric_float_t *metric,
+	struct spotflow_metric_float *metric,
 	float value,
-	const spotflow_label_t *labels,
+	const struct spotflow_label *labels,
 	uint8_t label_count);
 
 /**
@@ -161,7 +161,7 @@ int spotflow_report_metric_float_with_labels(
  *         -EINVAL: Invalid metric handle or metric is labeled
  *         -ENOMEM: Metric queue is full
  */
-int spotflow_report_event(spotflow_metric_int_t *metric);
+int spotflow_report_event(struct spotflow_metric_int *metric);
 
 /**
  * @brief Report an event with labels for a labeled metric
@@ -180,8 +180,8 @@ int spotflow_report_event(spotflow_metric_int_t *metric);
  *         -ENOSPC: Time series pool is full
  */
 int spotflow_report_event_with_labels(
-	spotflow_metric_int_t *metric,
-	const spotflow_label_t *labels,
+	struct spotflow_metric_int *metric,
+	const struct spotflow_label *labels,
 	uint8_t label_count);
 
 #ifdef __cplusplus

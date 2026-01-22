@@ -13,7 +13,7 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static spotflow_metric_int_t *g_connection_state_metric;
+static struct spotflow_metric_int *g_connection_state_metric;
 
 int spotflow_metrics_system_connection_init(void)
 {

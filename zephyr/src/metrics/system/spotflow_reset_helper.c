@@ -46,7 +46,7 @@ void report_reboot_reason(void)
 	}
 
 	/* Report as immediate event metric */
-	static spotflow_metric_int_t* reset_cause_metric;
+	static struct spotflow_metric_int* reset_cause_metric;
 	reset_cause_metric = spotflow_register_metric_int_with_labels("boot_reset", SPOTFLOW_AGG_INTERVAL_NONE, 1, 1);
 	if (!reset_cause_metric) {
 		LOG_ERR("Failed to register reset cause metric");
@@ -54,7 +54,7 @@ void report_reboot_reason(void)
 	}
 
 	reset_cause_to_string(cause, reset_str, sizeof(reset_str));
-	spotflow_label_t labels[] = { { .key = "reason", .value = reset_str } };
+	struct spotflow_label labels[] = { { .key = "reason", .value = reset_str } };
 	rc = spotflow_report_metric_int_with_labels(reset_cause_metric, 1, labels, 1);
 
 	if (rc < 0) {

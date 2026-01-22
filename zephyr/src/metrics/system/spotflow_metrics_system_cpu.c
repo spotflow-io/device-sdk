@@ -15,7 +15,7 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static spotflow_metric_float_t *g_cpu_utilization_metric;
+static struct spotflow_metric_float *g_cpu_utilization_metric;
 
 int spotflow_metrics_system_cpu_init(void)
 {

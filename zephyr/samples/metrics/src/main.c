@@ -35,9 +35,9 @@ LOG_MODULE_REGISTER(metrics_sample, LOG_LEVEL_INF);
 }*/
 
 /* Metric handles - using type-specific handles */
-static spotflow_metric_int_t *g_app_counter_metric;
-static spotflow_metric_float_t *g_temperature_metric;
-static spotflow_metric_float_t *g_request_duration_metric;
+static struct spotflow_metric_int *g_app_counter_metric;
+static struct spotflow_metric_float *g_temperature_metric;
+static struct spotflow_metric_float *g_request_duration_metric;
 
 #ifdef CONFIG_SPOTFLOW_USE_ETH
 static void turn_on_dhcp_when_device_is_up();
@@ -229,7 +229,7 @@ static void report_request_duration_metric(void)
 	double duration_ms = 10.0 + ((double)(sys_rand32_get() % 4900) / 10.0);
 
 	/* Define labels */
-	spotflow_label_t labels[] = {
+	struct spotflow_label labels[] = {
 		{.key = "endpoint", .value = endpoint},
 		{.key = "method", .value = method},
 		{.key = "status", .value = status}

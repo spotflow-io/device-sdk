@@ -15,8 +15,8 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static spotflow_metric_int_t *g_stack_metric;
-static spotflow_metric_float_t *g_stack_used_metric;
+static struct spotflow_metric_int *g_stack_metric;
+static struct spotflow_metric_float *g_stack_used_metric;
 
 #ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 static struct k_thread *g_tracked_threads[CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS];
@@ -154,7 +154,7 @@ static void report_thread_stack(const struct k_thread *thread, void *user_data)
 	snprintf(thread_label, sizeof(thread_label), "%p", (void *)thread);
 #endif
 
-	spotflow_label_t labels[] = {{.key = "thread", .value = thread_label}};
+	struct spotflow_label labels[] = {{.key = "thread", .value = thread_label}};
 
 	rc = spotflow_report_metric_int_with_labels(g_stack_metric, (int64_t)unused_bytes, labels, 1);
 	if (rc < 0) {

@@ -19,19 +19,19 @@ LOG_MODULE_REGISTER(spotflow_metrics_agg, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG
 /* External message queue (defined in spotflow_metrics_net.c) */
 extern struct k_msgq g_spotflow_metrics_msgq;
 
-static bool labels_equal(const struct metric_timeseries_state* ts, const spotflow_label_t* labels,
+static bool labels_equal(const struct metric_timeseries_state* ts, const struct spotflow_label* labels,
 			 uint8_t label_count);
 static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value);
 static void update_aggregation_float(struct metric_timeseries_state* ts, float value);
-static int64_t get_interval_ms(spotflow_agg_interval_t interval);
+static int64_t get_interval_ms(enum spotflow_agg_interval interval);
 static int enqueue_metric_message(uint8_t* payload, size_t len);
 static struct metric_timeseries_state*
-find_or_create_timeseries(struct metric_aggregator_context* ctx, const spotflow_label_t* labels,
+find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct spotflow_label* labels,
 			  uint8_t label_count);
 static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_timeseries_state* ts,
 			    int64_t timestamp_ms);
 static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
-				       const spotflow_label_t* labels, uint8_t label_count,
+				       const struct spotflow_label* labels, uint8_t label_count,
 				       int64_t value_int, float value_float);
 static void aggregation_timer_handler(struct k_work* work);
 
@@ -73,7 +73,7 @@ int aggregator_register_metric(struct spotflow_metric_base* metric)
 	return 0;
 }
 
-int aggregator_report_value(struct spotflow_metric_base* metric, const spotflow_label_t* labels,
+int aggregator_report_value(struct spotflow_metric_base* metric, const struct spotflow_label* labels,
 			    uint8_t label_count, int64_t value_int, float value_float)
 {
 	if (metric == NULL || metric->aggregator_context == NULL) {
@@ -159,7 +159,7 @@ void aggregator_unregister_metric(struct spotflow_metric_base* metric)
  * Direct string comparison is used instead of hashing since labels are
  * sufficiently small (max 8 labels, key max 16 chars, value max 32 chars).
  */
-static bool labels_equal(const struct metric_timeseries_state* ts, const spotflow_label_t* labels,
+static bool labels_equal(const struct metric_timeseries_state* ts, const struct spotflow_label* labels,
 			 uint8_t label_count)
 {
 	if (ts->label_count != label_count) {
@@ -177,7 +177,7 @@ static bool labels_equal(const struct metric_timeseries_state* ts, const spotflo
 }
 
 static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
-				       const spotflow_label_t* labels, uint8_t label_count,
+				       const struct spotflow_label* labels, uint8_t label_count,
 				       int64_t value_int, float value_float)
 {
 	uint8_t* cbor_data = NULL;
@@ -322,7 +322,7 @@ static void aggregation_timer_handler(struct k_work* work)
  * is acceptable since max_timeseries ≤ 256 and labels are small.
  */
 static struct metric_timeseries_state*
-find_or_create_timeseries(struct metric_aggregator_context* ctx, const spotflow_label_t* labels,
+find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct spotflow_label* labels,
 			  uint8_t label_count)
 {
 	/* First, try to find existing time series with matching labels */
@@ -454,7 +454,7 @@ static void update_aggregation_float(struct metric_timeseries_state* ts, float v
 /**
  * @brief Get aggregation interval in milliseconds
  */
-static int64_t get_interval_ms(spotflow_agg_interval_t interval)
+static int64_t get_interval_ms(enum spotflow_agg_interval interval)
 {
 	switch (interval) {
 	case SPOTFLOW_AGG_INTERVAL_NONE:

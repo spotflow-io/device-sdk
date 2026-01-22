@@ -20,20 +20,20 @@ extern "C" {
  *
  * Maps to ISO 8601 duration strings as specified in the ingestion protocol.
  */
-typedef enum {
+enum spotflow_agg_interval {
 	SPOTFLOW_AGG_INTERVAL_NONE = 0,   /* PT0S - No aggregation */
 	SPOTFLOW_AGG_INTERVAL_1MIN = 1,   /* PT1M - 1 minute */
 	SPOTFLOW_AGG_INTERVAL_10MIN = 2,  /* PT10M - 10 minutes */
 	SPOTFLOW_AGG_INTERVAL_1HOUR = 3   /* PT1H - 1 hour */
-} spotflow_agg_interval_t;
+};
 
 /**
  * @brief Metric value type enumeration
  */
-typedef enum {
+enum spotflow_metric_type {
 	SPOTFLOW_METRIC_TYPE_INT = 0,
 	SPOTFLOW_METRIC_TYPE_FLOAT = 1
-} spotflow_metric_type_t;
+};
 
 /**
  * @brief Label key-value pair
@@ -41,21 +41,10 @@ typedef enum {
  * Both key and value are null-terminated strings.
  * Maximum lengths: key=16 chars, value=32 chars (including null terminator).
  */
-typedef struct {
+struct spotflow_label {
 	const char *key;
 	const char *value;
-} spotflow_label_t;
-
-/**
- * @brief Type-specific metric handles
- *
- * These opaque handles enforce type safety at compile time:
- * - spotflow_metric_int_t: Only accepts int64_t values
- * - spotflow_metric_float_t: Only accepts float values
- *
- */
-typedef struct spotflow_metric_int spotflow_metric_int_t;
-typedef struct spotflow_metric_float spotflow_metric_float_t;
+};
 
 /**
  * @brief Internal label storage (copied strings)
@@ -109,8 +98,8 @@ struct metric_timeseries_state {
 struct spotflow_metric_base {
 	/* Metric identification */
 	char name[256];                    /* Normalized metric name */
-	spotflow_metric_type_t type;       /* INT or FLOAT */
-	spotflow_agg_interval_t agg_interval;
+	enum spotflow_metric_type type;    /* INT or FLOAT */
+	enum spotflow_agg_interval agg_interval;
 
 	/* Labeled metric configuration */
 	uint16_t max_timeseries;           /* Maximum time series (1 for label-less) */

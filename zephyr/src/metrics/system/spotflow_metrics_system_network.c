@@ -16,8 +16,8 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static spotflow_metric_int_t *g_network_tx_metric;
-static spotflow_metric_int_t *g_network_rx_metric;
+static struct spotflow_metric_int *g_network_tx_metric;
+static struct spotflow_metric_int *g_network_rx_metric;
 
 static void report_network_interface_metrics(struct net_if *iface, void *user_data);
 
@@ -76,7 +76,7 @@ static void report_network_interface_metrics(struct net_if *iface, void *user_da
 	uint64_t tx_bytes = stats->bytes.sent;
 	uint64_t rx_bytes = stats->bytes.received;
 
-	spotflow_label_t labels[] = {{.key = "interface", .value = if_name}};
+	struct spotflow_label labels[] = {{.key = "interface", .value = if_name}};
 
 	int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, (int64_t)tx_bytes,
 							labels, 1);

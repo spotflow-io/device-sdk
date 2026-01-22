@@ -15,8 +15,8 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static spotflow_metric_int_t *g_heap_free_metric;
-static spotflow_metric_int_t *g_heap_allocated_metric;
+static struct spotflow_metric_int *g_heap_free_metric;
+static struct spotflow_metric_int *g_heap_allocated_metric;
 
 extern struct sys_heap _system_heap;
 
