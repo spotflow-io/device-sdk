@@ -205,8 +205,7 @@ jobs:
             west build --board ${{ matrix.example.board_target }}
 
   publish-downloads:
-    # needs: test-spotflowup (TODO: After debugged)
-    needs: generate-quickstart-json
+    needs: test-spotflowup
     # TODO: Eventually run also only on main (and allow the cdn environment only there)
     # Don't run in forks
     if: github.repository == 'spotflow-io/device-sdk'
