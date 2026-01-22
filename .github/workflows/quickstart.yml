@@ -146,23 +146,23 @@ jobs:
       - name: Run spotflowup.ps1
         if: matrix.script == 'powershell'
         shell: pwsh
-        run: |
-          ./zephyr/ci/spotflowup.ps1 -${{ matrix.example.sdk_flag }} `
-            -board ${{ matrix.example.board }} `
-            -workspaceFolder ${{ matrix.environment.workspace_dir }} `
-            -spotflowRevision ${{ github.sha }} `
-            -quickstartJsonUrl "http://localhost/quickstart.json" `
+        run: >-
+          ./zephyr/ci/spotflowup.ps1 -${{ matrix.example.sdk_flag }}
+            -board ${{ matrix.example.board }}
+            -workspaceFolder ${{ matrix.environment.workspace_dir }}
+            -spotflowRevision ${{ github.sha }}
+            -quickstartJsonUrl "http://localhost/quickstart.json"
             -autoConfirm
 
       - name: Run spotflowup.sh
         if: matrix.script == 'bash'
         shell: bash
-        run: |
-          source ./zephyr/ci/spotflowup.sh --${{ matrix.example.sdk_flag }} \
-            --board ${{ matrix.example.board }} \
-            --workspace-folder ${{ matrix.environment.workspace_dir }} \
-            --spotflow-revision ${{ github.sha }} \
-            --quickstart-json-url "http://localhost/quickstart.json" \
+        run: >-
+          source ./zephyr/ci/spotflowup.sh --${{ matrix.example.sdk_flag }}
+            --board ${{ matrix.example.board }}
+            --workspace-folder ${{ matrix.environment.workspace_dir }}
+            --spotflow-revision ${{ github.sha }}
+            --quickstart-json-url "http://localhost/quickstart.json"
             --auto-confirm
 
       - name: Configure application
@@ -202,3 +202,71 @@ jobs:
           Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
           nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
             west build --board ${{ matrix.example.board_target }}
+
+  publish-downloads:
+    # TODO: Eventually run also only on main (and allow the cdn environment only there)
+    # Don't run in forks
+    if: github.repository == 'spotflow-io/device-sdk'
+    # needs: test-spotflowup
+    needs: generate-quickstart-json
+    runs-on: ubuntu-latest
+    environment: cdn
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download quickstart.json artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quickstart-json
+          path: ./quickstart-artifact
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.DOWNLOADS_CDN_SUBSCRIPTION_ID }}
+
+      - name: Publish quickstart.json
+        run: >
+          az storage blob upload
+            --auth-mode login
+            --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
+            --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
+            --name 'quickstart.json'
+            --file './quickstart-artifact/quickstart.json'
+            --content-type 'application/json'
+            --overwrite
+
+      - name: Publish spotflowup.sh
+        run: >
+          az storage blob upload
+            --auth-mode login
+            --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
+            --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
+            --name 'spotflowup.sh'
+            --file './zephyr/ci/spotflowup.sh'
+            --content-type 'text/x-shellscript'
+            --overwrite
+
+      - name: Publish spotflowup.ps1
+        run: >
+          az storage blob upload
+            --auth-mode login
+            --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
+            --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
+            --name 'spotflowup.ps1'
+            --file './zephyr/ci/spotflowup.ps1'
+            --content-type 'application/powershell'
+            --overwrite
+
+      - name: Purge CDN
+        run: >
+          az cdn endpoint purge
+            --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
+            --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
+            --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
+            --content-paths 'quickstart.json spotflowup.sh spotflowup.ps1'
+            --no-wait
