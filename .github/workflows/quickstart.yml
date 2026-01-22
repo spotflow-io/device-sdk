@@ -250,7 +250,7 @@ jobs:
           --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
           --name 'spotflowup.sh'
           --file './zephyr/ci/spotflowup.sh'
-          --content-type 'text/x-shellscript'
+          --content-type 'application/x-shellscript'
           --overwrite
 
       - name: Publish spotflowup.ps1
