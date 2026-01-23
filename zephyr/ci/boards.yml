@@ -247,11 +247,151 @@ vendors:
     connection: ["wifi"]
     boards:
 
-      - id: rpi_pico
+      - id: rpi_pico_w
         name: Raspberry Pi Pico W
         board: rpi_pico/rp2040/w
+        manifest: west-zephyr-raspberrypi-pico-w.yml
         callout: >-
           Zephyr 4.2.1 should be used because of the
           <a href='https://github.com/zephyrproject-rtos/zephyr/issues/96224'>regression</a>
           in Zephyr 4.3.0.
         build_samples: ["logs"]
+
+      - id: rpi_pico2_w
+        name: Raspberry Pi Pico 2 W
+        board: rpi_pico2/rp2350a/m33/w
+
+  - name: Renesas
+    vendor: renesas
+    sdk_toolchain: arm-zephyr-eabi
+    connection: ["ethernet"]
+    boards:
+
+      - id: fpb_ra6e1
+        name: RA6E1 Fast Prototyping Board
+
+      - id: ek_ra6m3
+        name: RA6M3 Evaluation Kit
+
+      - id: ek_ra6m4
+        name: RA6M4 Evaluation Kit
+
+      - id: ek_ra6m5
+        name: RA6M5 Evaluation Kit
+
+      - id: ek_ra8d1
+        name: RA8D1 Evaluation Kit
+
+      - id: ek_ra8m1
+        name: RA8M1 Evaluation Kit
+
+      - id: mck_ra8t1
+        name: RA8T1 Motor Control Kit
+
+  - name: Silicon Labs
+    vendor: silabs
+    sdk_toolchain: arm-zephyr-eabi
+    connection: ["wifi"]
+    boards:
+
+      - id: slstk3701a
+        name: EFM32 Giant Gecko 11 (SLSTK3701A)
+        connection: ["ethernet"]
+
+      - id: siwx917_rb4342a
+        name: SiWx917 Radio Board (SLWRB4342A)
+
+      - id: siwx917_rb4338a
+        name: SiWx917 Radio Board (SLWRB4338A)
+
+      - id: siwx917_dk2605a
+        name: SiWx917 Dev Kit (BRD2605A)
+
+  - name: STMicroelectronics
+    vendor: st
+    sdk_toolchain: arm-zephyr-eabi
+    connection: ["ethernet"]
+    boards:
+
+      - id: nucleo_f207zg
+        name: Nucleo F207ZG
+
+      - id: nucleo_f439zi
+        name: Nucleo F439ZI
+
+      - id: nucleo_f756zg
+        name: Nucleo F756ZG
+
+      - id: nucleo_f767zi
+        name: Nucleo F767ZI
+
+      - id: nucleo_h563zi
+        name: Nucleo H563ZI
+
+      - id: nucleo_h723zg
+        name: Nucleo H723ZG
+
+      - id: nucleo_h755zi_q
+        name: Nucleo H755ZI-Q
+
+      - id: nucleo_h753zi
+        name: Nucleo H753ZI
+
+      - id: nucleo_h7a3zi_q
+        name: Nucleo H7A3ZI-Q
+
+      - id: nucleo_h7s3l8
+        name: Nucleo H7S3L8
+
+      - id: nucleo_n657x0_q
+        name: Nucleo N657X0-Q
+
+      - id: stm32f4_disco
+        name: STM32F4 Discovery
+
+      - id: stm32f429i_disc1
+        name: STM32F429I Discovery
+
+      - id: stm32f469i_disco
+        name: STM32F469I Discovery
+
+      - id: stm32f746g_disco
+        name: STM32F746G Discovery
+
+      - id: stm32f769i_disco
+        name: STM32F769I Discovery
+
+      - id: stm32h573i_dk
+        name: STM32H573I-DK Discovery
+
+      - id: stm32h735g_disco
+        name: STM32H735G Discovery
+
+      - id: stm32h745i_disco
+        name: STM32H745I Discovery
+        board: stm32h745i_disco/stm32h745xx/m4
+
+      - id: stm32h747i_disco
+        name: STM32H747I Discovery
+        board: stm32h747i_disco/stm32h747xx/m4
+
+      - id: stm32h750b_dk
+        name: STM32H750B Discovery Kit
+        board: stm32h750b_dk/stm32h750xx
+
+      - id: stm32h757i_eval
+        name: STM32H757I Eval
+        board: stm32h757i_eval/stm32h757xx/m4
+
+      - id: stm32h7b3i_dk
+        name: STM32H7B3I Discovery Kit
+
+      - id: stm32h7s78_dk
+        name: STM32H7S78-DK Discovery
+        board: stm32h7s78_dk/stm32h7s7xx
+
+      - id: stm32mp135f_dk
+        name: STM32MP135F-DK Discovery
+
+      - id: stm32n6570_dk
+        name: STM32N6570-DK
