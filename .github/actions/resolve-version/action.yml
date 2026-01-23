@@ -1,0 +1,37 @@
+name: 'Resolve SemVer2 version'
+description: 'Test local and anchor links in Markdown documents.'
+inputs:
+  git-version-tool-version:
+    type: string
+    default: 6.5.0
+    description: 'Version of the GitVersion.Tool'
+  tag-prefix:
+    type: string
+    default: ''
+    description: 'Optional prefix for the tag to filter.'
+outputs:
+  version:
+    description: "Resolved SemVer2 version"
+    value: ${{ steps.version.outputs.version }}
+runs:
+  using: "composite"
+  steps:
+    - name: Test GitVersion.yml
+      run: if(Test-Path -Path ./GitVersion.yml) { $file = $(Resolve-Path ./GitVersion.yml); Write-Host "::warning file=$file::Git version config '$file' is not used" }
+      shell: pwsh
+    - name: Install dotnet-version
+      run: |
+        echo ":/github/home/.dotnet/tools" >> $GITHUB_PATH
+        dotnet tool install -g GitVersion.Tool --version "${{ inputs.git-version-tool-version }}" --ignore-failed-sources
+      shell: bash
+    - run: echo "${{ github.action_path }}" >> $GITHUB_PATH
+      shell: bash
+    - run: Resolve-Path "${{ github.action_path }}/GitVersion.yml"
+      shell: pwsh
+    - run: Get-Content "${{ github.action_path }}/GitVersion.yml"
+      shell: pwsh
+    - name: Resolve version via dotnet-gitversion
+      id: version
+      run: Resolve-Version.ps1 -GhRunNumber '${{ github.run_number }}' -GhRunAttempt '${{ github.run_attempt }}' -GhEventName '${{ github.event_name }}' -GitVersionConfigPath "${{ github.action_path }}/GitVersion.yml" -TagPrefix '${{ inputs.tag-prefix }}'
+      shell: pwsh
+
