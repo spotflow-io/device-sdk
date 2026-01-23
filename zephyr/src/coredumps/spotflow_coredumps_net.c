@@ -39,9 +39,10 @@ int spotflow_poll_and_process_enqueued_coredump_chunks()
 			}
 			/*Removing message from buffer after successful publish*/
 			if (k_msgq_get(&g_spotflow_core_dumps_msgq, &msg_ptr, K_NO_WAIT) == 0) {
+				bool is_last_chunk = msg_ptr->coredump_last_chunk;
 				k_free(msg_ptr->payload);
 				k_free(msg_ptr);
-				if (msg_ptr->coredump_last_chunk) {
+				if (is_last_chunk) {
 					LOG_INF("Coredump sucessfully sent.");
 					spotflow_coredump_sent();
 				}
