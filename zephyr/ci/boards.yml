@@ -73,13 +73,30 @@ vendors:
     vendor: infineon
     manifest: west-zephyr-infineon.yml
     sdk_toolchain: arm-zephyr-eabi
-    blob: hal_infineon
-    connection: ["wifi"]
     boards:
 
       - id: cy8cproto_062_4343w
         name: CY8CProto-062-4343W
+        blob: hal_infineon
+        connection: ["wifi"]
         build_samples: ["logs"]
+
+      - id: xmc45_relax_kit
+        name: XMC45-Relax-Kit
+        connection: ["ethernet"]
+
+      - id: xmc47_relax_kit
+        name: XMC47-Relax-Kit
+        connection: ["ethernet"]
+
+  - name: Microchip
+    vendor: microchip
+    sdk_toolchain: arm-zephyr-eabi
+    boards:
+
+      - id: sama7g54_ek
+        name: SAMA7G54 Evaluation Kit
+        connection: ["ethernet"]
 
   - name: Nordic Semiconductor
     vendor: nordic
