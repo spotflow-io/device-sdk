@@ -9,9 +9,9 @@ The following reasons motivated the creation of this file:
 
 - We wanted to have a single source of truth for the boards we support and present them to the users only when we know we can (at least) compile the module for them.
 - Many dependencies affect the compilation process, such as the Zephyr version, the Zephyr SDK version, downloaded blobs, etc.
-  Capturing all the dependencies of each board allows us to setup the user's workspace consistently with the CI pipeline.
+  Capturing all the dependencies of each board allows us to set up the user's workspace consistently with the CI pipeline.
 - Neither our CI pipeline nor the user should download dependencies that are not needed for the selected board.
-  Therefore, we should specify only the necessary dependencies (Zephyr modules, blobs, etc.) for each board.
+  Therefore, we should specify only the necessary dependencies for each board.
 
 As the single source of truth, `boards.yml` is used in two workflows:
 
@@ -21,7 +21,7 @@ As the single source of truth, `boards.yml` is used in two workflows:
    - `spotflowup.sh` and `spotflowup.ps1` (see [below](#workspace-setup-scripts)) use it to obtain the workspace setup details for the selected board.
 
 The boards are grouped by vendors.
-Because the boards from the same vendor often have similar properties, we can define defaults for the vendor that are inherited by the boards.
+Because boards from the same vendor often share similar properties, we can define vendor defaults that are inherited by the boards.
 Furthermore, certain properties are common to most vendors (e.g., the Zephyr SDK version), so they are defined as global defaults.
 
 Board properties:
@@ -75,8 +75,8 @@ west update --fetch-opt=--depth=1 --narrow
 west packages pip --install
 ```
 
-The manifest `west-zephyr.yml` references the latest stable Zephyr version with all its dependencies.
-While this should enable you to build our samples for most boards, you'll end up downloading many modules that you don't need.
+The manifest `west-zephyr.yml` references the latest stable Zephyr version with all dependencies.
+This setup builds samples on most boards, but downloads many unneeded modules.
 Therefore, we prepared [custom manifests for each vendor](../manifests) containing only the necessary modules.
 The setup scripts use the appropriate manifest based on the selected board.
 
