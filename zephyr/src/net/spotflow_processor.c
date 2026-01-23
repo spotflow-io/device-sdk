@@ -24,6 +24,9 @@
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
 #include "../metrics/system/spotflow_metrics_system.h"
 #endif
+#ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+#include "../metrics/spotflow_metrics_heartbeat.h"
+#endif
 #endif /* CONFIG_SPOTFLOW_METRICS */
 
 #define APP_CONNECT_TIMEOUT_MS 10000
@@ -73,6 +76,9 @@ static void spotflow_mqtt_thread_entry(void)
 #endif
 #ifdef CONFIG_SPOTFLOW_METRICS
 	spotflow_metrics_net_init();
+#ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+	spotflow_metrics_heartbeat_init();
+#endif
 #endif
 
 	/* 1) OUTER LOOP: keep trying until mqtt_connected == true, reconnect if connection failed */

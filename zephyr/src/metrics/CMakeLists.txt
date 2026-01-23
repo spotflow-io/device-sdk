@@ -15,6 +15,10 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_METRICS
         spotflow_metrics_net.c
 )
 
+zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+        spotflow_metrics_heartbeat.c
+)
+
 if(CONFIG_SPOTFLOW_METRICS_SYSTEM)
     add_subdirectory(system)
 endif()

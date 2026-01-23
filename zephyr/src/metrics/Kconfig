@@ -87,4 +87,19 @@ config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
 	  3 = INFO
 	  4 = DEBUG
 
+config SPOTFLOW_METRICS_HEARTBEAT
+	bool "Enable device heartbeat"
+	default y
+	help
+	  Send periodic heartbeat messages with device uptime.
+	  Heartbeats have higher priority than regular metrics.
+
+config SPOTFLOW_METRICS_HEARTBEAT_INTERVAL
+	int "Heartbeat interval (seconds)"
+	depends on SPOTFLOW_METRICS_HEARTBEAT
+	default 60
+	range 10 3600
+	help
+	  How often to send heartbeat messages.
+
 endif # SPOTFLOW_METRICS

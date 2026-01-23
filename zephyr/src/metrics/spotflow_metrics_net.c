@@ -7,6 +7,10 @@
 #include "spotflow_metrics_net.h"
 #include "../net/spotflow_mqtt.h"
 
+#ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+#include "spotflow_metrics_heartbeat.h"
+#endif
+
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -26,9 +30,18 @@ void spotflow_metrics_net_init(void)
 int spotflow_poll_and_process_enqueued_metrics(void)
 {
 	struct spotflow_mqtt_metrics_msg *msg;
+	int rc;
+
+#ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+	/* Heartbeat has higher priority - process first */
+	rc = spotflow_poll_and_process_heartbeat();
+	if (rc != 0) {
+		return rc;  /* Processed heartbeat or error */
+	}
+#endif
 
 	/* Try to dequeue one message */
-	int rc = k_msgq_get(&g_spotflow_metrics_msgq, &msg, K_NO_WAIT);
+	rc = k_msgq_get(&g_spotflow_metrics_msgq, &msg, K_NO_WAIT);
 	if (rc != 0) {
 		return 0;  /* No message available */
 	}
