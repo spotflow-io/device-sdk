@@ -205,7 +205,7 @@ jobs:
             west build --board ${{ matrix.example.board_target }}
 
   publish-downloads:
-    needs: generate-quickstart-json
+    needs: test-spotflowup
     # TODO: Eventually run also only on main (and allow the cdn environment only there)
     # Don't run in forks
     if: github.repository == 'spotflow-io/device-sdk'
@@ -275,7 +275,6 @@ jobs:
           --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
           --content-paths '/quickstart.json'
           --no-wait
-          --verbose
 
       - name: Purge spotflowup.sh in CDN
         run: >
