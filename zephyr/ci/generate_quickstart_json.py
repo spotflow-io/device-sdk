@@ -14,7 +14,7 @@ from typing import Dict, Any
 
 
 # Placeholder value for board name in "Other" boards
-BOARD_PLACEHOLDER = "<board>"
+BOARD_PLACEHOLDER = "<your-board>"
 
 
 def load_yaml(filepath: Path) -> Dict[str, Any]:
