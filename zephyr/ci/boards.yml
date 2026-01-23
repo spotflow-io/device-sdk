@@ -233,8 +233,8 @@ vendors:
       - id: rpi_pico
         name: Raspberry Pi Pico W
         board: rpi_pico/rp2040/w
-        callout: >
-          Zephyr 4.2.1 is used because of the
+        callout: >-
+          Zephyr 4.2.1 should be used because of the
           <a href='https://github.com/zephyrproject-rtos/zephyr/issues/96224'>regression</a>
           in Zephyr 4.3.0.
         build_samples: ["logs"]
