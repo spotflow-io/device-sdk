@@ -23,6 +23,10 @@
     The Spotflow module revision to checkout. If not specified, the script will use the latest
     revision.
 
+.PARAMETER quickstartJsonUrl
+    The URL of the quickstart.json file to use. If not specified, the script will use the default
+    URL.
+
 .PARAMETER autoConfirm
     Automatically confirm all actions without prompting (useful for CI/automated environments).
 
