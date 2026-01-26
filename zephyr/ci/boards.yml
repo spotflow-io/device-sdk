@@ -217,12 +217,12 @@ vendors:
 
       - id: mimxrt1160_evk
         name: MIMXRT1160-EVK
-        board: mimxrt1160_evk/mimxrt1166/cm4
+        board: mimxrt1160_evk/mimxrt1166/cm7
         build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: mimxrt1170_evk
         name: MIMXRT1170-EVK
-        board: mimxrt1170_evk@B/mimxrt1176/cm4
+        board: mimxrt1170_evk@B/mimxrt1176/cm7
         build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: mimxrt1180_evk/mimxrt1189/cm7
@@ -346,7 +346,6 @@ vendors:
       - id: nucleo_h7s3l8
         name: Nucleo H7S3L8
         build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
-
 
       - id: nucleo_n657x0_q
         name: Nucleo N657X0-Q
