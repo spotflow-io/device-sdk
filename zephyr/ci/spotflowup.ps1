@@ -101,6 +101,10 @@ function Exit-WithError {
     Write-Host "If you believe this is a bug, please report it at:" -ForegroundColor Gray
     Write-Host "  https://github.com/spotflow-io/device-sdk/issues" -ForegroundColor Cyan
     Write-Host ""
+    Write-Host "You can also contact us on Discord:" -ForegroundColor Gray
+    Write-Host "  https://discord.com/channels/1372202003635114125/1379411086163574864"`
+        -ForegroundColor Cyan
+    Write-Host ""
     exit 1
 }
 

@@ -60,6 +60,7 @@ write_error() {
 exit_with_error() {
     local message="$1"
     local details="${2:-}"
+    local discord_url="https://discord.com/channels/1372202003635114125/1379411086163574864"
 
     echo ""
     write_error "$message"
@@ -69,6 +70,9 @@ exit_with_error() {
     echo ""
     echo -e "${COLOR_GRAY}If you believe this is a bug, please report it at:${COLOR_RESET}"
     echo -e "  ${COLOR_CYAN}https://github.com/spotflow-io/device-sdk/issues${COLOR_RESET}"
+    echo ""
+    echo -e "${COLOR_GRAY}You can also contact us on Discord:${COLOR_RESET}"
+    echo -e "  ${COLOR_CYAN}${discord_url}${COLOR_RESET}"
     echo ""
     exit 1
 }
