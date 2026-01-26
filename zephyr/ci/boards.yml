@@ -15,14 +15,12 @@ vendors:
         name: ESP32-DevKitC
         board: esp32_devkitc/esp32/appcpu
         sdk_toolchain: xtensa-espressif_esp32_zephyr-elf
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: esp32_ethernet_kit
         name: ESP32-Ethernet-Kit
         board: esp32_ethernet_kit/esp32/appcpu
         sdk_toolchain: xtensa-espressif_esp32_zephyr-elf
         connection: ["ethernet", "wifi"]
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: esp32c3_devkitc
         name: ESP32-C3-DevKitC
@@ -46,12 +44,10 @@ vendors:
       - id: esp32s2_devkitc
         name: ESP32-S2-DevKitC
         sdk_toolchain: xtensa-espressif_esp32s2_zephyr-elf
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: esp32s2_saola
         name: ESP32-S2-Saola
         sdk_toolchain: xtensa-espressif_esp32s2_zephyr-elf
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: esp32s3_devkitc
         name: ESP32-S3-DevKitC
@@ -67,7 +63,6 @@ vendors:
       - id: esp8684_devkitm
         name: ESP8684-DevKitM
         sdk_toolchain: riscv64-zephyr-elf
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: esp_wrover_kit
         name: ESP-WROVER-KIT
@@ -223,10 +218,12 @@ vendors:
       - id: mimxrt1160_evk
         name: MIMXRT1160-EVK
         board: mimxrt1160_evk/mimxrt1166/cm4
+        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: mimxrt1170_evk
         name: MIMXRT1170-EVK
         board: mimxrt1170_evk@B/mimxrt1176/cm4
+        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: mimxrt1180_evk/mimxrt1189/cm7
         name: MIMXRT1180-EVK
@@ -348,6 +345,8 @@ vendors:
 
       - id: nucleo_h7s3l8
         name: Nucleo H7S3L8
+        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
+
 
       - id: nucleo_n657x0_q
         name: Nucleo N657X0-Q
@@ -384,6 +383,7 @@ vendors:
       - id: stm32h750b_dk
         name: STM32H750B Discovery Kit
         board: stm32h750b_dk/stm32h750xx
+        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: stm32h757i_eval
         name: STM32H757I Eval
