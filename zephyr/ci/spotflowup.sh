@@ -343,9 +343,9 @@ parse_args() {
 
 main() {
     echo ""
-    echo -e "${COLOR_CYAN}╔════════════════════════════════════════════════════════╗${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}║         Spotflow Device SDK - Workspace Setup          ║${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}╚════════════════════════════════════════════════════════╝${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}+--------------------------------------------------------+${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}|         Spotflow Device SDK - Workspace Setup          |${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}+--------------------------------------------------------+${COLOR_RESET}"
     echo ""
 
     parse_args "$@"
@@ -831,9 +831,9 @@ main() {
         quickstart_url_suffix="nordic-nrf-connect"
     fi
     echo ""
-    echo -e "${COLOR_GREEN}╔════════════════════════════════════════════════════════╗${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}║                     Setup Complete!                    ║${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}╚════════════════════════════════════════════════════════╝${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}+--------------------------------------------------------+${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}|                     Setup Complete!                    |${COLOR_RESET}"
+    echo -e "${COLOR_GREEN}+--------------------------------------------------------+${COLOR_RESET}"
     echo ""
     echo -n "Workspace location: "
     echo -e "${COLOR_CYAN}$workspace_folder${COLOR_RESET}"

@@ -332,9 +332,9 @@ function Test-NcsToolchainInstalled {
 }
 
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Cyan
-Write-Host "║            Spotflow Device SDK - Workspace Setup             ║" -ForegroundColor Cyan
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Cyan
+Write-Host "+--------------------------------------------------------------+" -ForegroundColor Cyan
+Write-Host "|            Spotflow Device SDK - Workspace Setup             |" -ForegroundColor Cyan
+Write-Host "+--------------------------------------------------------------+" -ForegroundColor Cyan
 Write-Host ""
 
 # Validate arguments
@@ -933,9 +933,9 @@ if ($boardConfig.build_extra_args) {
 }
 $quickstartUrlSuffix = if ($zephyr) { "zephyr" } else { "nordic-nrf-connect" }
 Write-Host ""
-Write-Host "╔══════════════════════════════════════════════════════════════╗" -ForegroundColor Green
-Write-Host "║                       Setup Complete!                        ║" -ForegroundColor Green
-Write-Host "╚══════════════════════════════════════════════════════════════╝" -ForegroundColor Green
+Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
+Write-Host "|                       Setup Complete!                        |" -ForegroundColor Green
+Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
 Write-Host ""
 Write-Host "Workspace location: " -NoNewline
 Write-Host $workspaceFolder -ForegroundColor Cyan
