@@ -68,12 +68,6 @@ static void spotflow_mqtt_thread_entry(void)
 	spotflow_tls_init();
 
 	LOG_DBG("Spotflow registered TLS credentials");
-#ifdef CONFIG_SPOTFLOW_COREDUMPS
-	spotflow_init_core_dumps_polling();
-#endif
-#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
-	init_logs_polling();
-#endif
 #ifdef CONFIG_SPOTFLOW_METRICS
 	spotflow_metrics_net_init();
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT

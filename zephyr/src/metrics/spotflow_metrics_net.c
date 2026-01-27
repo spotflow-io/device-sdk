@@ -36,37 +36,27 @@ int spotflow_poll_and_process_enqueued_metrics(void)
 	/* Heartbeat has higher priority - process first */
 	rc = spotflow_poll_and_process_heartbeat();
 	if (rc != 0) {
-		return rc;  /* Processed heartbeat or error */
+		return rc;
 	}
 #endif
 
-	/* Try to dequeue one message */
-	rc = k_msgq_get(&g_spotflow_metrics_msgq, &msg, K_NO_WAIT);
-	if (rc != 0) {
-		return 0;  /* No message available */
+	/* Peek without removing - returns non-zero if queue empty */
+	if (k_msgq_peek(&g_spotflow_metrics_msgq, &msg) != 0) {
+		return 0;  /* Queue empty */
 	}
 
-	/* Memory Ownership: Processor thread ALWAYS frees message memory */
-	/* (success or failure) after dequeue completes */
+	/* Publish while message is still safely in queue */
+	rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
+	if (rc < 0) {
+		LOG_WRN("Failed to publish metric: %d", rc);
+		return rc;  /* Message stays in queue for retry */
+	}
 
-	/* Infinite retry loop for transient errors (preserves message ordering) */
-	do {
-		rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
-		if (rc == -EAGAIN) {
-			LOG_DBG("MQTT busy, retrying...");
-			k_sleep(K_MSEC(10));  /* Small delay before retry */
-		}
-	} while (rc == -EAGAIN);
+	/* Only remove after successful publish */
+	k_msgq_get(&g_spotflow_metrics_msgq, &msg, K_NO_WAIT);
 
-	/* ALWAYS free message memory (success or permanent failure) */
 	k_free(msg->payload);
 	k_free(msg);
 
-	if (rc < 0) {
-		LOG_WRN("Failed to publish metric message: %d", rc);
-		/* Permanent error - message lost */
-		return rc;
-	}
-
-	return 1;  /* Processed one message */
+	return 1;
 }
