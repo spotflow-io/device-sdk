@@ -794,9 +794,9 @@ main() {
             display_cmd="nrfutil-sdk-manager toolchain install --ncs-version $ncs_version"
         fi
 
-        write_info "Running: $display_cmd"
+        write_info "Running: sudo $display_cmd"
 
-        if "$nrfutil_path" "${toolchain_args[@]}"; then
+        if sudo "$nrfutil_path" "${toolchain_args[@]}"; then
             write_success "nRF Connect SDK toolchain installed for version $ncs_version"
         else
             write_error "Failed to install nRF Connect SDK toolchain"

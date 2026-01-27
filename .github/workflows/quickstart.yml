@@ -50,10 +50,9 @@ jobs:
           - os: ubuntu-latest
             workspace_dir: test-workspace
             nrfutil_link: x86_64-unknown-linux-gnu/nrfutil
-          # Temporarily disabled until fixed
-          # - os: macos-latest
-          #   workspace_dir: test-workspace
-          #   nrfutil_link: universal-apple-darwin/nrfutil
+          - os: macos-latest
+            workspace_dir: test-workspace
+            nrfutil_link: universal-apple-darwin/nrfutil
           - os: windows-latest
             workspace_dir: D:\test-workspace
             nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
