@@ -44,6 +44,8 @@ jobs:
     runs-on: ${{ matrix.environment.os }}
     strategy:
       fail-fast: false
+      # Running too many jobs in parallel can cause rate limiting by GitHub during west update
+      max-parallel: 4
       matrix:
         script: [powershell, bash]
         environment:
