@@ -434,6 +434,11 @@ main() {
     if [[ -n "$vendor_name" ]]; then
         write_info "Vendor: $vendor_name"
     fi
+    local connection_methods
+    connection_methods=$(echo "$board_config" | jq -r '.connection[]?' | tr '\n' ', ' | sed 's/,$//')
+    if [[ -n "$connection_methods" ]]; then
+        write_info "Connection methods: $connection_methods"
+    fi
     write_info "Board target: $board_target"
     write_info "Manifest: $manifest"
     write_info "SDK version: $sdk_version"
@@ -821,18 +826,54 @@ main() {
         fi
     fi
 
-    # Summary
-    local sample_path="$spotflow_path/zephyr/samples/logs"
-    local config_path="$sample_path/prj.conf"
-    local build_cmd="west build --pristine --board $board_target"
-    if [[ -n "$build_extra_args" ]]; then
-        build_cmd+=" $build_extra_args"
-    fi
     local quickstart_url_suffix
     if [[ "$sdk_type" == "zephyr" ]]; then
         quickstart_url_suffix="zephyr"
     else
         quickstart_url_suffix="nordic-nrf-connect"
+    fi
+    local quickstart_url="https://docs.spotflow.io/quickstart/$quickstart_url_suffix"
+
+    # Step 14: Add connection-specific configuration placeholders
+    write_step "Adding configuration placeholders to prj.conf..."
+
+    local sample_path="$spotflow_path/zephyr/samples/logs"
+    local config_path="$sample_path/prj.conf"
+    local config_content
+    config_content=$(cat "$config_path")
+
+    if echo "$config_content" | grep -q "CONFIG_SPOTFLOW_DEVICE_ID"; then
+        write_warning "CONFIG_SPOTFLOW_DEVICE_ID already exists in prj.conf, skipping"
+    else
+        local prepended_config_content=""
+        local connection_methods
+        connection_methods=$(echo "$board_config" | jq -r '.connection[]?' 2>/dev/null)
+        
+        if echo "$connection_methods" | grep -q "wifi"; then
+            prepended_config_content+="CONFIG_NET_WIFI_SSID=\"<Your Wi-Fi SSID>\"\n"
+            prepended_config_content+="CONFIG_NET_WIFI_PASSWORD=\"<Your Wi-Fi Password>\"\n\n"
+        fi
+        
+        local sample_device_id
+        sample_device_id=$(echo "$board_config" | jq -r '.sample_device_id')
+        prepended_config_content+="CONFIG_SPOTFLOW_DEVICE_ID=\"$sample_device_id\"\n"
+        prepended_config_content+="CONFIG_SPOTFLOW_INGEST_KEY=\"<Your Spotflow Ingest Key>\"\n\n"
+
+        config_content="${prepended_config_content}${config_content}"
+
+        if echo -e "$config_content" > "$config_path"; then
+            write_success "Configuration placeholders added to prj.conf"
+        else
+            write_error "Failed to add configuration placeholders to prj.conf"
+            write_warning \
+                "See the quickstart guide for the list of configuration options: $quickstart_url"
+        fi
+    fi
+
+    # Summary
+    local build_cmd="west build --pristine --board $board_target"
+    if [[ -n "$build_extra_args" ]]; then
+        build_cmd+=" $build_extra_args"
     fi
     echo ""
     echo -e "${COLOR_GREEN}+--------------------------------------------------------+${COLOR_RESET}"
@@ -846,10 +887,11 @@ main() {
     echo -n "Spotflow module path: "
     echo -e "${COLOR_CYAN}$spotflow_path${COLOR_RESET}"
     echo ""
-    echo -e "${COLOR_YELLOW}Next steps:${COLOR_RESET}"
+    echo -e "${COLOR_YELLOW}Next steps to finish the quickstart:${COLOR_RESET}"
+    echo ""
     echo -n "  1. Open "
     echo -ne "${COLOR_DARK_GRAY}$config_path${COLOR_RESET}"
-    echo " and add the required configuration options."
+    echo " and fill in the required configuration options."
     echo ""
     if [[ "$sdk_type" == "zephyr" ]]; then
         echo "  2. Build and flash the Spotflow sample:"
@@ -857,12 +899,13 @@ main() {
         echo -n "  2. In a terminal with the nRF Connect toolchain environment, "
         echo "build and flash the Spotflow sample:"
     fi
+    echo ""
     echo -e "     ${COLOR_DARK_GRAY}cd $sample_path${COLOR_RESET}"
     echo -e "     ${COLOR_DARK_GRAY}$build_cmd${COLOR_RESET}"
     echo -e "     ${COLOR_DARK_GRAY}west flash${COLOR_RESET}"
     echo ""
     echo -n "For more information, visit: "
-    echo -e "${COLOR_CYAN}https://docs.spotflow.io/quickstart/$quickstart_url_suffix${COLOR_RESET}"
+    echo -e "${COLOR_CYAN}$quickstart_url${COLOR_RESET}"
     echo ""
 }
 

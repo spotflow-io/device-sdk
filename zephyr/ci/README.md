@@ -35,7 +35,7 @@ Board properties:
 | `sdk_version` | Yes | Zephyr SDK version |
 | `sdk_toolchain` | Yes | SDK toolchain to install |
 | `blob` | No | Binary blob to download (e.g., `hal_espressif`, `hal_nxp`) |
-| `connection` | Yes | Supported connection types (Wi-Fi, Ethernet) |
+| `connection` | Yes | Supported connection methods (Wi-Fi, Ethernet) |
 | `build_samples` | No | Samples to build in CI (e.g., `["logs"]`) by default (building the logs sample can be manually triggered for all boards) |
 | `build_extra_args` | No | Additional arguments for `west build` |
 | `callout` | No | HTML callout displayed in quickstart |
@@ -102,3 +102,17 @@ west sdk install --version 0.17.4 --toolchains arm-zephyr-eabi
 ```bash
 nrfutil sdk-manager toolchain install --ncs-version 3.2.1
 ```
+
+**4. Add placeholders for the configuration options:**
+
+Add the following placeholders to the `prj.conf` file of the Zephyr sample `logs` in the Spotflow module:
+
+```
+CONFIG_NET_WIFI_SSID="<Your Wi-Fi SSID>"
+CONFIG_NET_WIFI_PASSWORD="<Your Wi-Fi Password>"
+
+CONFIG_SPOTFLOW_DEVICE_ID="device-001"
+CONFIG_SPOTFLOW_INGEST_KEY="<Your Spotflow Ingest Key>"
+```
+
+The first two placeholders are only needed if the board supports Wi-Fi.

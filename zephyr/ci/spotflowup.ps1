@@ -422,6 +422,7 @@ Write-Success "Found board: $($boardConfig.name)"
 if ($vendorName) {
     Write-Info "Vendor: $vendorName"
 }
+Write-Info "Connection methods: $($boardConfig.connection -join ", ")"
 Write-Info "Board target: $($boardConfig.board)"
 Write-Info "Manifest: $($boardConfig.manifest)"
 Write-Info "SDK version: $($boardConfig.sdk_version)"
@@ -932,14 +933,47 @@ elseif ($installSdk) {
     }
 }
 
-# Summary
+$quickstartUrlSuffix = if ($zephyr) { "zephyr" } else { "nordic-nrf-connect" }
+$quickstartUrl = "https://docs.spotflow.io/quickstart/$quickstartUrlSuffix"
+
+# Step 14: Add connection-specific configuration placeholders
+Write-Step "Adding configuration placeholders to prj.conf..."
+
 $samplePath = "$($boardConfig.spotflow_path)/zephyr/samples/logs"
 $configPath = "$samplePath/prj.conf"
+$configContent = Get-Content $configPath -Raw
+
+if ($configContent -match "CONFIG_SPOTFLOW_DEVICE_ID") {
+    Write-Warning "CONFIG_SPOTFLOW_DEVICE_ID already exists in prj.conf, skipping"
+}
+else {
+    $prependedConfigContent = ""
+    if ($boardConfig.connection -contains "wifi") {
+        $prependedConfigContent += "CONFIG_NET_WIFI_SSID=""<Your Wi-Fi SSID>""`n"
+        $prependedConfigContent += "CONFIG_NET_WIFI_PASSWORD=""<Your Wi-Fi Password>""`n`n"
+    }
+    $prependedConfigContent += "CONFIG_SPOTFLOW_DEVICE_ID=""$($boardConfig.sample_device_id)""`n"
+    $prependedConfigContent += "CONFIG_SPOTFLOW_INGEST_KEY=""<Your Spotflow Ingest Key>""`n`n"
+
+    $configContent = $prependedConfigContent + $configContent
+
+    try {
+        Set-Content -Path $configPath -Value $configContent
+        Write-Success "Configuration placeholders added to prj.conf"
+    }
+    catch {
+        $errorMsg = "Failed to add configuration placeholders to prj.conf: $($_.Exception.Message)"
+        Write-ErrorMessage $errorMsg
+        Write-Warning `
+            "See the quickstart guide for the list of configuration options: $quickstartUrl"
+    }
+}
+
+# Summary
 $buildCmd = "west build --pristine --board $($boardConfig.board)"
 if ($boardConfig.build_extra_args) {
     $buildCmd += " $($boardConfig.build_extra_args)"
 }
-$quickstartUrlSuffix = if ($zephyr) { "zephyr" } else { "nordic-nrf-connect" }
 Write-Host ""
 Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
 Write-Host "|                       Setup Complete!                        |" -ForegroundColor Green
@@ -952,10 +986,11 @@ Write-Host "$($boardConfig.name) ($($boardConfig.board))" -ForegroundColor Cyan
 Write-Host "Spotflow module path: " -NoNewline
 Write-Host $boardConfig.spotflow_path -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Next steps:" -ForegroundColor Yellow
+Write-Host "Next steps to finish the quickstart:" -ForegroundColor Yellow
+Write-Host ""
 Write-Host "  1. Open " -NoNewline
 Write-Host $configPath -NoNewline -ForegroundColor DarkGray
-Write-Host " and add the required configuration options."
+Write-Host " and fill in the required configuration options."
 Write-Host ""
 if ($zephyr) {
     Write-Host "  2. Build and flash the Spotflow sample:"
@@ -964,10 +999,11 @@ else {
     Write-Host "  2. In a terminal with the nRF Connect toolchain environment, " -NoNewline
     Write-Host "build and flash the Spotflow sample:"
 }
+Write-Host ""
 Write-Host "     cd $samplePath" -ForegroundColor DarkGray
 Write-Host "     $buildCmd" -ForegroundColor DarkGray
 Write-Host "     west flash" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "For more information, visit: " -NoNewline
-Write-Host "https://docs.spotflow.io/quickstart/$quickstartUrlSuffix" -ForegroundColor Cyan
+Write-Host $quickstartUrl -ForegroundColor Cyan
 Write-Host ""

@@ -166,18 +166,6 @@ jobs:
           --quickstart-json-url "http://localhost/quickstart.json"
           --auto-confirm
 
-      - name: Configure application
-        shell: pwsh
-        working-directory: ${{ matrix.environment.workspace_dir }}
-        run: |
-          $configFile = "${{ matrix.example.module_path }}/zephyr/samples/logs/credentials.conf"
-          @"
-          CONFIG_NET_WIFI_SSID="TODOTODO"
-          CONFIG_NET_WIFI_PASSWORD="TODOTODO"
-          CONFIG_SPOTFLOW_DEVICE_ID="${{ matrix.example.board }}_${{ github.run_id }}"
-          CONFIG_SPOTFLOW_INGEST_KEY="TODO"
-          "@ | Set-Content -Path $configFile
-
       - name: Build Zephyr application
         if: matrix.example.sdk_flag == 'zephyr'
         shell: pwsh
