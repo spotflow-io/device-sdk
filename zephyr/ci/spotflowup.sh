@@ -435,10 +435,8 @@ main() {
         write_info "Vendor: $vendor_name"
     fi
     local connection_methods
-    connection_methods=$(echo "$board_config" | jq -r '.connection[]?' | tr '\n' ', ' | sed 's/,$//')
-    if [[ -n "$connection_methods" ]]; then
-        write_info "Connection methods: $connection_methods"
-    fi
+    connection_methods=$(echo "$board_config" | jq -r '.connection[]' | tr '\n' ', ' | sed 's/,$//')
+    write_info "Connection methods: $connection_methods"
     write_info "Board target: $board_target"
     write_info "Manifest: $manifest"
     write_info "SDK version: $sdk_version"
@@ -848,12 +846,12 @@ main() {
         local prepended_config_content=""
         local connection_methods
         connection_methods=$(echo "$board_config" | jq -r '.connection[]?' 2>/dev/null)
-        
+
         if echo "$connection_methods" | grep -q "wifi"; then
             prepended_config_content+="CONFIG_NET_WIFI_SSID=\"<Your Wi-Fi SSID>\"\n"
             prepended_config_content+="CONFIG_NET_WIFI_PASSWORD=\"<Your Wi-Fi Password>\"\n\n"
         fi
-        
+
         local sample_device_id
         sample_device_id=$(echo "$board_config" | jq -r '.sample_device_id')
         prepended_config_content+="CONFIG_SPOTFLOW_DEVICE_ID=\"$sample_device_id\"\n"
