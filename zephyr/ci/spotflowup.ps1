@@ -618,7 +618,7 @@ if ($sdkType -eq "ncs") {
                 $msg = "Skipping toolchain installation. " +
                        "You can install it manually later with:"
                 Write-Warning $msg
-                $cmd = "sudo nrfutil sdk-manager toolchain install " +
+                $cmd = "nrfutil sdk-manager toolchain install " +
                        "--ncs-version $ncsVersion"
                 Write-Host "    $cmd" -ForegroundColor DarkGray
             }
@@ -882,16 +882,16 @@ if ($installNcsToolchain -and $nrfUtilInfo -and $ncsVersion) {
     }
 
     $displayCmd = if ($nrfUtilInfo.Type -eq "nrfutil") {
-        "sudo nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
+        "nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
     }
     else {
-        "sudo nrfutil-sdk-manager toolchain install --ncs-version $ncsVersion"
+        "nrfutil-sdk-manager toolchain install --ncs-version $ncsVersion"
     }
 
     Write-Info "Running: $displayCmd"
 
     try {
-        & sudo $toolchainCmd @toolchainArgs
+        & $toolchainCmd @toolchainArgs
         if ($LASTEXITCODE -ne 0) {
             throw "Toolchain install failed with exit code $LASTEXITCODE"
         }

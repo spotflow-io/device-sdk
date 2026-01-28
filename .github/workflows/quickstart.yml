@@ -55,10 +55,9 @@ jobs:
           - os: macos-latest
             workspace_dir: test-workspace
             nrfutil_link: universal-apple-darwin/nrfutil
-          # TODO: Re-enable after admin right issues on macOS are resolved
-          # - os: windows-latest
-          #   workspace_dir: D:\test-workspace
-          #   nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
+          - os: windows-latest
+            workspace_dir: D:\test-workspace
+            nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
         example:
           - sdk_flag: ncs
             board: nrf7002dk
@@ -153,6 +152,12 @@ jobs:
           # Verify installation
           & ./$output --version
 
+          # Prevent infinite wait for admin consent to create this folder on macOS
+          if ($IsMacOS) {
+            sudo mkdir -p /opt/nordic/ncs
+            sudo chmod -R 777 /opt/nordic/ncs
+          }
+
       - name: Run spotflowup.ps1
         if: matrix.script == 'powershell'
         shell: pwsh
@@ -204,7 +209,7 @@ jobs:
           $ncsVersion = cat nrf/VERSION
 
           Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
-          sudo nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
+          nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
             west build --board ${{ matrix.example.board_target }}
 
   publish-downloads:
