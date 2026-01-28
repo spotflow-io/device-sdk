@@ -152,7 +152,6 @@ jobs:
           -board ${{ matrix.example.board }}
           -workspaceFolder ${{ matrix.environment.workspace_dir }}
           -spotflowRevision ${{ github.sha }}
-          -quickstartJsonUrl "http://localhost/quickstart.json"
           -autoConfirm
 
       - name: Run spotflowup.sh
@@ -164,7 +163,6 @@ jobs:
           --board ${{ matrix.example.board }}
           --workspace-folder ${{ matrix.environment.workspace_dir }}
           --spotflow-revision ${{ github.sha }}
-          --quickstart-json-url "http://localhost/quickstart.json"
           --auto-confirm
 
       - name: Build Zephyr application
