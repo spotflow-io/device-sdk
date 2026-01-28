@@ -95,7 +95,7 @@ jobs:
         run: |
           brew install nginx
 
-          cp ./quickstart-artifact/quickstart.json /usr/local/var/www/
+          cp ./quickstart-artifact/quickstart.json /opt/homebrew/var/www/
           brew services start nginx
           sleep 2
 
@@ -169,12 +169,14 @@ jobs:
         if: matrix.script == 'bash'
         shell: bash
         run: >
+          local nginx_port="${{ matrix.environment.os == 'macos-latest' && '8080' || '80' }}"
+
           source ./zephyr/ci/spotflowup.sh
           --${{ matrix.example.sdk_flag }}
           --board ${{ matrix.example.board }}
           --workspace-folder ${{ matrix.environment.workspace_dir }}
           --spotflow-revision ${{ github.sha }}
-          --quickstart-json-url "http://localhost/quickstart.json"
+          --quickstart-json-url "http://localhost:$nginx_port/quickstart.json"
           --auto-confirm
 
       - name: Build Zephyr application
