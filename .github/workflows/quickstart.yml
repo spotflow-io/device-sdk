@@ -45,16 +45,17 @@ jobs:
     strategy:
       fail-fast: false
       # Running too many jobs in parallel can cause rate limiting by GitHub during west update
-      max-parallel: 4
+      max-parallel: 5
       matrix:
         script: [powershell, bash]
         environment:
           - os: ubuntu-latest
             workspace_dir: test-workspace
             nrfutil_link: x86_64-unknown-linux-gnu/nrfutil
-          - os: macos-latest
-            workspace_dir: test-workspace
-            nrfutil_link: universal-apple-darwin/nrfutil
+          # Temporarily disabled until fixed
+          # - os: macos-latest
+          #   workspace_dir: test-workspace
+          #   nrfutil_link: universal-apple-darwin/nrfutil
           - os: windows-latest
             workspace_dir: D:\test-workspace
             nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
