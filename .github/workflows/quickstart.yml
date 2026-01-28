@@ -90,6 +90,15 @@ jobs:
           sudo systemctl restart nginx
           sleep 2
 
+      - name: Serve quickstart.json using nginx (macOS)
+        if: matrix.environment.os == 'macos-latest'
+        run: |
+          brew install nginx
+
+          cp ./quickstart-artifact/quickstart.json /usr/local/var/www/
+          brew services start nginx
+          sleep 2
+
       - name: Serve quickstart.json using nginx (Windows)
         if: matrix.environment.os == 'windows-latest'
         shell: pwsh
@@ -153,9 +162,8 @@ jobs:
           -board ${{ matrix.example.board }}
           -workspaceFolder ${{ matrix.environment.workspace_dir }}
           -spotflowRevision ${{ github.sha }}
+          -quickstartJsonUrl "http://localhost/quickstart.json"
           -autoConfirm
-        # TODO: Return after admin right issues on macOS are resolved:
-        # -quickstartJsonUrl "http://localhost/quickstart.json"
 
       - name: Run spotflowup.sh
         if: matrix.script == 'bash'
@@ -166,9 +174,8 @@ jobs:
           --board ${{ matrix.example.board }}
           --workspace-folder ${{ matrix.environment.workspace_dir }}
           --spotflow-revision ${{ github.sha }}
+          --quickstart-json-url "http://localhost/quickstart.json"
           --auto-confirm
-        # TODO: Return after admin right issues on macOS are resolved:
-        # --quickstart-json-url "http://localhost/quickstart.json"
 
       - name: Build Zephyr application
         if: matrix.example.sdk_flag == 'zephyr'
