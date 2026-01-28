@@ -83,14 +83,14 @@ jobs:
           name: quickstart-json
           path: ./quickstart-artifact
 
-      - name: Serve quickstart.json using nginx (Ubuntu)
+      - name: Serve quickstart.json using nginx on default port 80 (Ubuntu)
         if: matrix.environment.os == 'ubuntu-latest'
         run: |
           sudo cp ./quickstart-artifact/quickstart.json /var/www/html/
           sudo systemctl restart nginx
           sleep 2
 
-      - name: Serve quickstart.json using nginx (macOS)
+      - name: Serve quickstart.json using nginx on default port 8080 (macOS)
         if: matrix.environment.os == 'macos-latest'
         run: |
           brew install nginx
@@ -99,7 +99,7 @@ jobs:
           brew services start nginx
           sleep 2
 
-      - name: Serve quickstart.json using nginx (Windows)
+      - name: Serve quickstart.json using nginx on default port 80 (Windows)
         if: matrix.environment.os == 'windows-latest'
         shell: pwsh
         run: |
@@ -157,19 +157,21 @@ jobs:
         if: matrix.script == 'powershell'
         shell: pwsh
         run: >
+          $nginxPort="${{ matrix.environment.os == 'macos-latest' && '8080' || '80' }}"
+
           ./zephyr/ci/spotflowup.ps1
           -${{ matrix.example.sdk_flag }}
           -board ${{ matrix.example.board }}
           -workspaceFolder ${{ matrix.environment.workspace_dir }}
           -spotflowRevision ${{ github.sha }}
-          -quickstartJsonUrl "http://localhost/quickstart.json"
+          -quickstartJsonUrl "http://localhost:$nginxPort/quickstart.json"
           -autoConfirm
 
       - name: Run spotflowup.sh
         if: matrix.script == 'bash'
         shell: bash
         run: >
-          local nginx_port="${{ matrix.environment.os == 'macos-latest' && '8080' || '80' }}"
+          nginx_port="${{ matrix.environment.os == 'macos-latest' && '8080' || '80' }}"
 
           source ./zephyr/ci/spotflowup.sh
           --${{ matrix.example.sdk_flag }}
