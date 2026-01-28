@@ -55,9 +55,10 @@ jobs:
           - os: macos-latest
             workspace_dir: test-workspace
             nrfutil_link: universal-apple-darwin/nrfutil
-          - os: windows-latest
-            workspace_dir: D:\test-workspace
-            nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
+          # TODO: Re-enable after admin right issues on macOS are resolved
+          # - os: windows-latest
+          #   workspace_dir: D:\test-workspace
+          #   nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
         example:
           - sdk_flag: ncs
             board: nrf7002dk
@@ -153,6 +154,8 @@ jobs:
           -workspaceFolder ${{ matrix.environment.workspace_dir }}
           -spotflowRevision ${{ github.sha }}
           -autoConfirm
+        # TODO: Return after admin right issues on macOS are resolved:
+        # -quickstartJsonUrl "http://localhost/quickstart.json"
 
       - name: Run spotflowup.sh
         if: matrix.script == 'bash'
@@ -164,6 +167,8 @@ jobs:
           --workspace-folder ${{ matrix.environment.workspace_dir }}
           --spotflow-revision ${{ github.sha }}
           --auto-confirm
+        # TODO: Return after admin right issues on macOS are resolved:
+        # --quickstart-json-url "http://localhost/quickstart.json"
 
       - name: Build Zephyr application
         if: matrix.example.sdk_flag == 'zephyr'
@@ -188,7 +193,7 @@ jobs:
           $ncsVersion = cat nrf/VERSION
 
           Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
-          nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
+          sudo nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
             west build --board ${{ matrix.example.board_target }}
 
   publish-downloads:
