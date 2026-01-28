@@ -215,9 +215,11 @@ jobs:
 
   publish-downloads:
     needs: test-spotflowup
+    # TODO: Re-enable after dependency on jq is removed cleanly
+    if: false
     # TODO: Eventually run also only on main (and allow the cdn environment only there)
     # Don't run in forks
-    if: github.repository == 'spotflow-io/device-sdk'
+    # if: github.repository == 'spotflow-io/device-sdk'
     runs-on: ubuntu-latest
     permissions:
       id-token: write

@@ -261,6 +261,123 @@ test_ncs_toolchain_installed() {
     return 1
 }
 
+# JSON query helper using Python
+# Usage: json_query <json_string> <query_type> [args...]
+# Query types:
+#   - find_board <sdk_type> <board_id>: Find board config
+#   - list_boards <sdk_type>: List all board IDs
+#   - extract_field <json_obj> <field> [default]: Extract field from JSON object
+#   - extract_array <json_obj> <field>: Extract array field and join with commas
+json_query() {
+    local json_input="$1"
+    local query_type="$2"
+    shift 2
+
+    # Find Python command (python3 or python)
+    local python_exec=""
+    for cmd in python3 python; do
+        if command -v "$cmd" &>/dev/null; then
+            python_exec="$cmd"
+            break
+        fi
+    done
+
+    if [[ -z "$python_exec" ]]; then
+        echo "Error: Python not found. Please install Python 3.10+" >&2
+        return 1
+    fi
+
+    "$python_exec" -c '
+import sys
+import json
+
+def find_board(data, sdk_type, board_id):
+    """Find board configuration by ID."""
+    if sdk_type == "ncs":
+        boards = data.get("ncs", {}).get("boards", [])
+        for board in boards:
+            if board.get("id") == board_id:
+                print(json.dumps(board))
+                return
+    else:  # zephyr
+        vendors = data.get("zephyr", {}).get("vendors", [])
+        for vendor in vendors:
+            boards = vendor.get("boards", [])
+            for board in boards:
+                if board.get("id") == board_id:
+                    print(json.dumps(board))
+                    return
+
+def list_boards(data, sdk_type):
+    """List all board IDs."""
+    board_ids = []
+    if sdk_type == "ncs":
+        boards = data.get("ncs", {}).get("boards", [])
+        board_ids = [b.get("id", "") for b in boards if b.get("id")]
+    else:  # zephyr
+        vendors = data.get("zephyr", {}).get("vendors", [])
+        for vendor in vendors:
+            boards = vendor.get("boards", [])
+            board_ids.extend([b.get("id", "") for b in boards if b.get("id")])
+    print(", ".join(board_ids))
+
+def extract_field(data, field, default=""):
+    """Extract a field from a JSON object."""
+    value = data.get(field, default)
+    if value is None or value == "null":
+        value = default
+    print(value)
+
+def extract_array(data, field):
+    """Extract an array field and join with commas."""
+    array = data.get(field, [])
+    if isinstance(array, list):
+        print(", ".join(str(item) for item in array))
+    else:
+        print("")
+
+def find_vendor_name(data, board_id):
+    """Find vendor name for a board in Zephyr config."""
+    vendors = data.get("zephyr", {}).get("vendors", [])
+    for vendor in vendors:
+        boards = vendor.get("boards", [])
+        for board in boards:
+            if board.get("id") == board_id:
+                print(vendor.get("name", ""))
+                return
+
+try:
+    json_input = sys.stdin.read()
+    data = json.loads(json_input)
+    
+    query_type = sys.argv[1]
+    
+    if query_type == "find_board":
+        sdk_type = sys.argv[2]
+        board_id = sys.argv[3]
+        find_board(data, sdk_type, board_id)
+    elif query_type == "list_boards":
+        sdk_type = sys.argv[2]
+        list_boards(data, sdk_type)
+    elif query_type == "extract_field":
+        field = sys.argv[2]
+        default = sys.argv[3] if len(sys.argv) > 3 else ""
+        extract_field(data, field, default)
+    elif query_type == "extract_array":
+        field = sys.argv[2]
+        extract_array(data, field)
+    elif query_type == "find_vendor_name":
+        board_id = sys.argv[2]
+        find_vendor_name(data, board_id)
+    else:
+        sys.stderr.write(f"Unknown query type: {query_type}\n")
+        sys.exit(1)
+except (json.JSONDecodeError, KeyError, IndexError) as e:
+    sys.stderr.write(f"JSON query error: {e}\n")
+    sys.exit(1)
+' "$query_type" "$@" <<< "$json_input"
+}
+
 show_usage() {
     cat << EOF
 Usage: $0 [OPTIONS]
@@ -382,52 +499,36 @@ main() {
 
     local board_config
     local vendor_name=""
-    local jq_query
 
-    if [[ "$sdk_type" == "ncs" ]]; then
-        jq_query=".ncs.boards[] | select(.id == \"$board\")"
-    else
-        jq_query=".zephyr.vendors[] | .boards[] | select(.id == \"$board\")"
-    fi
-
-    if ! board_config=$(echo "$quickstart_json" | jq -c "$jq_query" | \
-        head -n1); then
+    if ! board_config=$(json_query "$quickstart_json" find_board "$sdk_type" "$board"); then
         exit_with_error "Failed to parse board configuration" \
-            "jq parsing failed"
+            "JSON parsing failed"
     fi
 
     if [[ -z "$board_config" ]] || [[ "$board_config" == "null" ]]; then
         local available_boards
-        if [[ "$sdk_type" == "ncs" ]]; then
-            available_boards=$(echo "$quickstart_json" | \
-                jq -r '.ncs.boards[]?.id' | tr '\n' ', ')
-        else
-            available_boards=$(echo "$quickstart_json" | \
-                jq -r '.zephyr.vendors[]?.boards[]?.id' | tr '\n' ', ')
-        fi
+        available_boards=$(json_query "$quickstart_json" list_boards "$sdk_type")
         exit_with_error \
             "Board '$board' not found in $sdk_display_type configuration" \
-            "Available boards: ${available_boards%, }"
+            "Available boards: $available_boards"
     fi
 
     # Extract board configuration values
     local board_name board_target manifest sdk_version sdk_toolchain
     local blob ncs_version callout spotflow_path build_extra_args
-    board_name=$(echo "$board_config" | jq -r '.name')
-    board_target=$(echo "$board_config" | jq -r '.board')
-    manifest=$(echo "$board_config" | jq -r '.manifest')
-    sdk_version=$(echo "$board_config" | jq -r '.sdk_version')
-    sdk_toolchain=$(echo "$board_config" | jq -r '.sdk_toolchain // empty')
-    blob=$(echo "$board_config" | jq -r '.blob // empty')
-    ncs_version=$(echo "$board_config" | jq -r '.ncs_version // empty')
-    callout=$(echo "$board_config" | jq -r '.callout // empty')
-    spotflow_path=$(echo "$board_config" | jq -r '.spotflow_path')
-    build_extra_args=$(echo "$board_config" | \
-        jq -r '.build_extra_args // empty')
+    board_name=$(json_query "$board_config" extract_field "name")
+    board_target=$(json_query "$board_config" extract_field "board")
+    manifest=$(json_query "$board_config" extract_field "manifest")
+    sdk_version=$(json_query "$board_config" extract_field "sdk_version")
+    sdk_toolchain=$(json_query "$board_config" extract_field "sdk_toolchain")
+    blob=$(json_query "$board_config" extract_field "blob")
+    ncs_version=$(json_query "$board_config" extract_field "ncs_version")
+    callout=$(json_query "$board_config" extract_field "callout")
+    spotflow_path=$(json_query "$board_config" extract_field "spotflow_path")
+    build_extra_args=$(json_query "$board_config" extract_field "build_extra_args")
 
     if [[ "$sdk_type" == "zephyr" ]]; then
-        vendor_name=$(echo "$quickstart_json" | \
-            jq -r ".zephyr.vendors[] | select(.boards[].id == \"$board\") | .name" | head -n1)
+        vendor_name=$(json_query "$quickstart_json" find_vendor_name "$board")
     fi
 
     write_success "Found board: $board_name"
@@ -435,7 +536,7 @@ main() {
         write_info "Vendor: $vendor_name"
     fi
     local connection_methods
-    connection_methods=$(echo "$board_config" | jq -r '.connection[]' | tr '\n' ', ' | sed 's/,$//')
+    connection_methods=$(json_query "$board_config" extract_array "connection")
     write_info "Connection methods: $connection_methods"
     write_info "Board target: $board_target"
     write_info "Manifest: $manifest"
@@ -515,12 +616,6 @@ main() {
     local git_version
     git_version=$(git --version)
     write_success "Git found: $git_version"
-
-    # Check jq (required for JSON parsing)
-    if ! command -v jq &>/dev/null; then
-        exit_with_error "jq not found" \
-            "Please install jq using your package manager (e.g., apt install jq, brew install jq)."
-    fi
 
     # Step 5: Check SDK installation
     local install_sdk=false
@@ -844,16 +939,16 @@ main() {
         write_warning "CONFIG_SPOTFLOW_DEVICE_ID already exists in prj.conf, skipping"
     else
         local prepended_config_content=""
-        local connection_methods
-        connection_methods=$(echo "$board_config" | jq -r '.connection[]?' 2>/dev/null)
+        local connection_methods_config
+        connection_methods_config=$(json_query "$board_config" extract_array "connection")
 
-        if echo "$connection_methods" | grep -q "wifi"; then
+        if echo "$connection_methods_config" | grep -q "wifi"; then
             prepended_config_content+="CONFIG_NET_WIFI_SSID=\"<Your Wi-Fi SSID>\"\n"
             prepended_config_content+="CONFIG_NET_WIFI_PASSWORD=\"<Your Wi-Fi Password>\"\n\n"
         fi
 
         local sample_device_id
-        sample_device_id=$(echo "$board_config" | jq -r '.sample_device_id')
+        sample_device_id=$(json_query "$board_config" extract_field "sample_device_id")
         prepended_config_content+="CONFIG_SPOTFLOW_DEVICE_ID=\"$sample_device_id\"\n"
         prepended_config_content+="CONFIG_SPOTFLOW_INGEST_KEY=\"<Your Spotflow Ingest Key>\"\n\n"
 
