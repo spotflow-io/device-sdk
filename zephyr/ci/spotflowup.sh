@@ -617,8 +617,8 @@ main() {
                             nrfutil_info=""
                         fi
                     else
-                        local msg = "Skipping sdk-manager installation."
-                        msg = "${msg} Toolchain will need to be installed manually."
+                        local msg="Skipping sdk-manager installation."
+                        msg="${msg} Toolchain will need to be installed manually."
                         write_warning $msg
                         nrfutil_info=""
                     fi
@@ -630,12 +630,12 @@ main() {
                 write_success "Found nrfutil-sdk-manager at: $nrfutil_path"
             fi
         else
-            local msg = "nrfutil not found on PATH"
-            msg = "${msg} and nrfutil-sdk-manager not found in VS Code/Cursor extensions."
+            local msg="nrfutil not found on PATH"
+            msg="${msg} and nrfutil-sdk-manager not found in VS Code/Cursor extensions."
             write_warning $msg
             echo ""
             write_info "The nRF Connect SDK toolchain will need to be installed manually."
-            local nrfutil_url = "https://www.nordicsemi.com/Products/Development-tools/nRF-Util"
+            local nrfutil_url="https://www.nordicsemi.com/Products/Development-tools/nRF-Util"
             write_info "You can install nrfutil from: $nrfutil_url"
             write_info "Or install the nRF Connect for VS Code extension pack."
             echo ""
@@ -654,9 +654,9 @@ main() {
                 if confirm_action "Install nRF Connect SDK toolchain for $ncs_version?" true; then
                     install_ncs_toolchain=true
                 else
-                    local msg = "Skipping toolchain installation."
-                    msg = "${msg} You can install it manually later with:"
-                    $command = "nrfutil sdk-manager toolchain install --ncs-version $ncs_version"
+                    local msg="Skipping toolchain installation."
+                    msg="${msg} You can install it manually later with:"
+                    $command="nrfutil sdk-manager toolchain install --ncs-version $ncs_version"
                     write_warning $msg
                     echo -e "    ${COLOR_DARK_GRAY}$command${COLOR_RESET}"
                 fi
