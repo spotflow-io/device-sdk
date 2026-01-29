@@ -44,8 +44,6 @@ jobs:
     runs-on: ${{ matrix.environment.os }}
     strategy:
       fail-fast: false
-      # Running too many jobs in parallel can cause rate limiting by GitHub during west update
-      max-parallel: 4
       matrix:
         script: [powershell, bash]
         environment:
@@ -171,6 +169,7 @@ jobs:
           -workspaceFolder ${{ matrix.environment.workspace_dir }}
           -spotflowRevision ${{ github.sha }}
           -quickstartJsonUrl "http://localhost:$nginxPort/quickstart.json"
+          -gitHubToken ${{ secrets.GITHUB_TOKEN }}
           -autoConfirm
 
       - name: Run spotflowup.sh
@@ -185,6 +184,7 @@ jobs:
           --workspace-folder ${{ matrix.environment.workspace_dir }}
           --spotflow-revision ${{ github.sha }}
           --quickstart-json-url "http://localhost:$nginx_port/quickstart.json"
+          --github-token ${{ secrets.GITHUB_TOKEN }}
           --auto-confirm
 
       - name: Build Zephyr application

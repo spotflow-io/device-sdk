@@ -27,6 +27,9 @@
     The URL of the quickstart.json file to use. If not specified, the script will use the default
     URL.
 
+.PARAMETER gitHubToken
+    The optional GitHub token to use for authentication during Zephyr SDK installation.
+
 .PARAMETER autoConfirm
     Automatically confirm all actions without prompting (useful for CI/automated environments).
 
@@ -49,6 +52,7 @@ param(
     [string]$workspaceFolder = "",
     [string]$spotflowRevision = "",
     [string]$quickstartJsonUrl = "",
+    [string]$gitHubToken = "",
     [switch]$autoConfirm
 )
 
@@ -911,6 +915,9 @@ elseif ($installSdk) {
     $sdkArgs = @("sdk", "install", "--version", $requiredSdkVersion)
     if ($requiredToolchain) {
         $sdkArgs += @("--toolchains", $requiredToolchain)
+    }
+    if ($gitHubToken) {
+        $sdkArgs += @("--personal-access-token", $gitHubToken)
     }
 
     Write-Info "Running: west $($sdkArgs -join ' ')"

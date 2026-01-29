@@ -21,8 +21,9 @@ sdk_type=""
 board=""
 workspace_folder=""
 spotflow_revision=""
-auto_confirm=false
 quickstart_json_url=""
+github_token=""
+auto_confirm=false
 
 # ANSI color codes
 readonly COLOR_RESET='\033[0m'
@@ -354,6 +355,7 @@ Options:
     --workspace-folder DIR      Workspace folder path
     --spotflow-revision REV     Spotflow module revision to checkout
     --quickstart-json-url URL   Override quickstart.json URL
+    --github-token TOKEN       Optional GitHub token for Zephyr SDK installation
     --auto-confirm              Automatically confirm all actions
     -h, --help                  Show this help message
 
@@ -397,6 +399,10 @@ parse_args() {
                 ;;
             --quickstart-json-url)
                 quickstart_json_url="$2"
+                shift 2
+                ;;
+            --github-token)
+                github_token="$2"
                 shift 2
                 ;;
             --auto-confirm)
@@ -868,6 +874,9 @@ main() {
         local sdk_args=(sdk install --version "$sdk_version")
         if [[ -n "$sdk_toolchain" ]]; then
             sdk_args+=(--toolchains "$sdk_toolchain")
+        fi
+        if [[ -n "$github_token" ]]; then
+            sdk_args+=(--personal-access-token "$github_token")
         fi
 
         write_info "Running: west ${sdk_args[*]}"
