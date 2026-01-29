@@ -60,19 +60,21 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 	range 4096 65536
 	help
 	  Heap memory required for metrics subsystem:
-	  - Metric registration (per-metric context: 128 bytes)
-	  - Time series storage (per time series: 96 bytes × max_timeseries)
-	  - CBOR encoding buffers
+	  - Aggregator context per metric: ~80 bytes
+	  - Time series storage: ~420 bytes per timeseries (with MAX_LABELS=8)
+	    Note: Timeseries size depends on MAX_LABELS_PER_METRIC config.
+	    Size = ~36 + (48 × MAX_LABELS_PER_METRIC) bytes
 
 	  Sizing formula:
-	  HEAP_SIZE = 2048 + SUM(128 + 96 × max_timeseries[i]) for all i metrics
+	  HEAP_SIZE = 2048 + SUM(80 + 420 × max_timeseries[i]) for all metrics
 
-	  Examples:
-	  - 10 dimensionless metrics: 2048 + 10×128 = 3.3KB
-	  - 10 dimensional (max_ts=16): 2048 + 10×(128+96×16) = 17.4KB
-	  - 32 metrics (max_ts=16 each): 2048 + 32×(128+96×16) = 53KB
+	  Examples (with MAX_LABELS=8):
+	  - 10 dimensionless metrics: 2048 + 10×500 = 7KB
+	  - 5 dimensional (max_ts=4): 2048 + 5×(80+420×4) = 10.5KB
+	  - 10 dimensional (max_ts=8): 2048 + 10×(80+420×8) = 36KB
 
-	  Default 16KB supports typical mixed workload. Adjust based on your needs.
+	  Default 16KB supports ~30 dimensionless metrics or ~3 dimensional
+	  metrics with 4 timeseries each. Adjust based on your needs.
 
 config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
 	int "Metrics subsystem log level"

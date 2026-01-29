@@ -13,3 +13,4 @@ modules/*west
 **/dependencies.lock
 **/.clangd
 esp_idf/spotflow/dist/*
+.claude/

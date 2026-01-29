@@ -27,7 +27,8 @@ config SPOTFLOW_METRICS_SYSTEM_HEAP
 
 config SPOTFLOW_METRICS_SYSTEM_NETWORK
 	bool "Enable network metrics"
-	depends on NETWORKING && NET_STATISTICS
+	depends on NETWORKING
+	select NET_STATISTICS
 	default y
 	help
 	  Collect network traffic statistics (TX/RX bytes).
@@ -61,7 +62,7 @@ config SPOTFLOW_METRICS_SYSTEM_CONNECTION
 
 config SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
 	bool "Enable reset cause metric"
-	depends on HWINFO
+	select HWINFO
 	default y
 	help
 	  Report device reset cause on boot (power-on, watchdog, etc.).
@@ -115,19 +116,26 @@ config SPOTFLOW_METRICS_SYSTEM_INTERVAL
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
 	int "Additional heap memory pool size for system metrics (bytes)"
-	default 16384
-	range 4096 65536
+	default 32768
+	range 8192 65536
 	help
 	  System metrics auto-collection requires heap memory for:
-	  - Metric registration (7 metrics × 128 bytes context)
-	  - Time series storage (network metrics have 4 time series)
-	  - CBOR encoding buffers
+	  - Aggregator context per metric (~80 bytes)
+	  - Time series storage (~420 bytes per timeseries with 8 labels)
 
-	  Default 16KB is sufficient for all system metrics enabled.
-	  Reduce if only subset of metrics enabled:
-	  - Memory + Connection only: 4KB
-	  - Memory + Network: 8KB
-	  - All metrics: 16KB (default)
+	  Sizing formula per metric:
+	  HEAP = 80 + (max_timeseries × 420)
+
+	  Default estimates (all system metrics enabled):
+	  - Heap metrics (2 × 1 ts): ~1 KB
+	  - Network metrics (2 × 4 ts): ~3.5 KB
+	  - CPU metric (1 ts): ~0.5 KB
+	  - Connection metric (1 ts): ~0.5 KB
+	  - Stack metrics (2 × 32 ts): ~27 KB (dominates!)
+
+	  Total with defaults: ~32 KB
+
+	  To reduce memory usage, lower SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS.
 
 	  This is added to CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 	  which is for application metrics.
