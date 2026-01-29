@@ -45,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       # Running too many jobs in parallel can cause rate limiting by GitHub during west update
-      max-parallel: 5
+      max-parallel: 4
       matrix:
         script: [powershell, bash]
         environment:
