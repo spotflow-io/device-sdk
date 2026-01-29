@@ -116,26 +116,24 @@ config SPOTFLOW_METRICS_SYSTEM_INTERVAL
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
 	int "Additional heap memory pool size for system metrics (bytes)"
-	default 32768
+	default 20480
 	range 8192 65536
 	help
-	  System metrics auto-collection requires heap memory for:
-	  - Aggregator context per metric (~80 bytes)
-	  - Time series storage (~420 bytes per timeseries with 8 labels)
+	  System metrics heap depends on timeseries size (~230 bytes with
+	  MAX_LABELS=4) and number of concurrent timeseries per metric.
 
-	  Sizing formula per metric:
-	  HEAP = 80 + (max_timeseries × 420)
+	  Per-metric heap = 80 + (230 × max_timeseries)
 
 	  Default estimates (all system metrics enabled):
-	  - Heap metrics (2 × 1 ts): ~1 KB
-	  - Network metrics (2 × 4 ts): ~3.5 KB
-	  - CPU metric (1 ts): ~0.5 KB
-	  - Connection metric (1 ts): ~0.5 KB
-	  - Stack metrics (2 × 32 ts): ~27 KB (dominates!)
+	  - Heap metrics (2 metrics × 1 ts): ~0.6 KB
+	  - Network metrics (2 × NETWORK_MAX_INTERFACES=4): ~2 KB
+	  - CPU metric (1 ts): ~0.3 KB
+	  - Connection metric (1 ts): ~0.3 KB
+	  - Stack metrics (2 × STACK_MAX_THREADS=32): ~15 KB (dominates!)
 
-	  Total with defaults: ~32 KB
+	  Total with defaults: ~18 KB
 
-	  To reduce memory usage, lower SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS.
+	  To reduce memory, lower SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS.
 
 	  This is added to CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 	  which is for application metrics.

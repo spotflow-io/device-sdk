@@ -17,10 +17,8 @@
 LOG_MODULE_REGISTER(spotflow_metrics_net, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 /* Message queue for metrics transmission */
-K_MSGQ_DEFINE(g_spotflow_metrics_msgq,
-	      sizeof(struct spotflow_mqtt_metrics_msg *),
-	      CONFIG_SPOTFLOW_METRICS_QUEUE_SIZE,
-	      sizeof(void *));
+K_MSGQ_DEFINE(g_spotflow_metrics_msgq, sizeof(struct spotflow_mqtt_metrics_msg*),
+	      CONFIG_SPOTFLOW_METRICS_QUEUE_SIZE, sizeof(void*));
 
 void spotflow_metrics_net_init(void)
 {
@@ -29,7 +27,7 @@ void spotflow_metrics_net_init(void)
 
 int spotflow_poll_and_process_enqueued_metrics(void)
 {
-	struct spotflow_mqtt_metrics_msg *msg;
+	struct spotflow_mqtt_metrics_msg* msg;
 	int rc;
 
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
@@ -42,14 +40,15 @@ int spotflow_poll_and_process_enqueued_metrics(void)
 
 	/* Peek without removing - returns non-zero if queue empty */
 	if (k_msgq_peek(&g_spotflow_metrics_msgq, &msg) != 0) {
-		return 0;  /* Queue empty */
+		return 0; /* Queue empty */
 	}
 
 	/* Publish while message is still safely in queue */
 	rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
 	if (rc < 0) {
-		LOG_WRN("Failed to publish metric: %d", rc);
-		return rc;  /* Message stays in queue for retry */
+		LOG_WRN("Failed to publish metric: %d -> aborting mqtt connection", rc);
+		spotflow_mqtt_abort_mqtt();
+		return rc; /* Message stays in queue for retry */
 	}
 
 	/* Only remove after successful publish */

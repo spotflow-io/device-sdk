@@ -46,7 +46,7 @@ Hardware
 Software
 ========
 
-- Zephyr SDK version 3.5.0 or later
+- Zephyr SDK version 4.3.0 or later
 - Spotflow account: Sign up at `Spotflow <https://spotflow.io>`_ to get your credentials
 
 Building and Running
@@ -68,6 +68,8 @@ Edit ``credentials.conf``:
    CONFIG_SPOTFLOW_DEVICE_ID="your-device-id"
    CONFIG_SPOTFLOW_INGEST_KEY="your-ingest-key"
 
+Alternatively add your credentials directly in ``prj.conf``.
+
 Build the Sample
 ================
 
@@ -79,11 +81,6 @@ For Wi-Fi boards (e.g., NXP FRDM-RW612):
    :goals: build flash
    :compact:
 
-For Ethernet boards:
-
-.. code-block:: bash
-
-   west build -b your_board samples/metrics -- -DCONFIG_SPOTFLOW_USE_ETH=y -DCONFIG_SPOTFLOW_USE_WIFI=n
 
 Monitor Output
 ==============
@@ -123,10 +120,9 @@ Sample Output
    [00:00:01.240] <inf> metrics_sample:   - Custom dimensionless metrics
    [00:00:01.241] <inf> metrics_sample:   - Custom dimensional metrics
    [00:00:01.242] <inf> metrics_sample:   - Integration with logs
-   [00:00:02.345] <inf> spotflow_metrics: Metrics subsystem initialized (auto-initialized on first use)
-   [00:00:02.346] <inf> metrics_sample: Registered metric: app_counter (int, PT1M)
-   [00:00:02.347] <inf> metrics_sample: Registered metric: temperature_celsius (float, PT0S)
-   [00:00:02.348] <inf> metrics_sample: Registered metric: http_request_duration_ms (float, dimensional, PT1M)
+   [00:00:01.244] <inf> spotflow_metrics: Registered metric 'network_tx_bytes' (type=int, agg=1, max_ts=4, max_labels=1)
+   [00:00:01.250] <inf> spotflow_metrics: Registered metric 'network_rx_bytes' (type=int, agg=1, max_ts=4, max_labels=1)
+   ....
    [00:00:03.456] <inf> metrics_sample: === Iteration 0 ===
    [00:00:03.457] <inf> metrics_sample: Reported temperature: 22.34 °C
 

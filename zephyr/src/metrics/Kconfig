@@ -23,7 +23,7 @@ config SPOTFLOW_METRICS_CBOR_BUFFER_SIZE
 	range 256 2048
 	default 512
 	help
-	  Size of stack-allocated buffer for CBOR encoding.
+	  Size of buffer for CBOR encoding.
 	  Must be large enough for the largest metric message.
 	  Default 512 bytes is sufficient for most use cases.
 
@@ -49,32 +49,32 @@ config SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL
 config SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC
 	int "Maximum labels per metric"
 	range 1 8
-	default 8
+	default 4
 	help
 	  Maximum number of label key-value pairs per metric report.
-	  Affects memory consumption per time series.
+	  Affects memory consumption per time series (~48 bytes per label).
+	  System metrics use only 1 label, so default of 4 is sufficient
+	  for most use cases.
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 	int "Additional heap memory pool size for metrics (bytes)"
-	default 16384
+	default 8192
 	range 4096 65536
 	help
-	  Heap memory required for metrics subsystem:
-	  - Aggregator context per metric: ~80 bytes
-	  - Time series storage: ~420 bytes per timeseries (with MAX_LABELS=8)
-	    Note: Timeseries size depends on MAX_LABELS_PER_METRIC config.
-	    Size = ~36 + (48 × MAX_LABELS_PER_METRIC) bytes
+	  Heap memory for application metrics depends on two factors:
+	  1. Timeseries size = ~36 + (48 × MAX_LABELS_PER_METRIC) bytes
+	     With MAX_LABELS=4: ~230 bytes per timeseries
+	  2. Number of concurrent timeseries (max_timeseries parameter at registration)
 
-	  Sizing formula:
-	  HEAP_SIZE = 2048 + SUM(80 + 420 × max_timeseries[i]) for all metrics
+	  Per-metric heap = 80 + (timeseries_size × max_timeseries)
 
-	  Examples (with MAX_LABELS=8):
-	  - 10 dimensionless metrics: 2048 + 10×500 = 7KB
-	  - 5 dimensional (max_ts=4): 2048 + 5×(80+420×4) = 10.5KB
-	  - 10 dimensional (max_ts=8): 2048 + 10×(80+420×8) = 36KB
+	  Examples (with MAX_LABELS=4, ~230 bytes/ts):
+	  - Dimensionless metric (max_ts=1): 80 + 230 = 310 bytes
+	  - Labeled metric (max_ts=4): 80 + 230×4 = 1KB
+	  - Labeled metric (max_ts=16): 80 + 230×16 = 3.8KB
 
-	  Default 16KB supports ~30 dimensionless metrics or ~3 dimensional
-	  metrics with 4 timeseries each. Adjust based on your needs.
+	  Default 8KB supports ~25 dimensionless metrics or ~8 labeled metrics
+	  with 4 timeseries each. Adjust based on your application needs.
 
 config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
 	int "Metrics subsystem log level"

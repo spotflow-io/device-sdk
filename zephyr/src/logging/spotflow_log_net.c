@@ -5,35 +5,32 @@
 
 LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
-static uint32_t messages_sent_counter = 0;
 
 int poll_and_process_enqueued_logs(void)
 {
 	struct spotflow_mqtt_logs_msg *msg_ptr;
 
-	/* Best-effort: remove message immediately */
-	if (k_msgq_get(&g_spotflow_logs_msgq, &msg_ptr, K_NO_WAIT) != 0) {
+	/* Peek without removing - returns non-zero if queue empty */
+	if (k_msgq_peek(&g_spotflow_logs_msgq, &msg_ptr) != 0) {
 		return 0;  /* Queue empty */
 	}
 
+
 	int rc = spotflow_mqtt_publish_ingest_cbor_msg(msg_ptr->payload, msg_ptr->len);
-
-	/* Always free - logs are best-effort */
-	k_free(msg_ptr->payload);
-	k_free(msg_ptr);
-
 	if (rc < 0) {
-		LOG_DBG("Failed to publish log: %d", rc);
+		LOG_DBG("Failed to publish cbor log message rc: %d -> "
+			"aborting mqtt connection",
+			rc);
+		spotflow_mqtt_abort_mqtt();
+		/* Free the message buffer before breaking */
 		return rc;
 	}
 
-	messages_sent_counter++;
-	if (messages_sent_counter % 100 == 0) {
-		LOG_INF("Sent %" PRIu32 " log messages", messages_sent_counter);
-	}
-	if (messages_sent_counter == UINT32_MAX) {
-		messages_sent_counter = 0;
-	}
+	/* Only remove after successful publish */
+	k_msgq_get(&g_spotflow_logs_msgq, &msg_ptr, K_NO_WAIT);
+
+	k_free(msg_ptr->payload);
+	k_free(msg_ptr);
 
 	return 1;
 }
