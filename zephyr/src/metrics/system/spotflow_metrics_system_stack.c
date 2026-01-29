@@ -53,7 +53,7 @@ int spotflow_metrics_system_stack_init(void)
 #endif
 
 	LOG_INF("Registered stack metrics");
-	return 1;
+	return 2;
 }
 
 void spotflow_metrics_system_stack_collect(void)

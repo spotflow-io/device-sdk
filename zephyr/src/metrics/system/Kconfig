@@ -33,6 +33,18 @@ config SPOTFLOW_METRICS_SYSTEM_NETWORK
 	  Collect network traffic statistics (TX/RX bytes).
 	  Requires networking and network statistics to be enabled.
 
+if SPOTFLOW_METRICS_SYSTEM_NETWORK
+
+config SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES
+	int "Maximum number of network interfaces to track"
+	range 1 16
+	default 4
+	help
+	  Maximum number of network interfaces for metrics collection.
+	  Each interface is tracked with separate TX/RX metrics.
+
+endif # SPOTFLOW_METRICS_SYSTEM_NETWORK
+
 config SPOTFLOW_METRICS_SYSTEM_CPU
 	bool "Enable CPU utilization metrics"
 	select CPU_LOAD

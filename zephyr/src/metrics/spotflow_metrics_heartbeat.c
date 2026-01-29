@@ -175,13 +175,21 @@ int spotflow_poll_and_process_heartbeat(void)
 		return 0;  /* No heartbeat pending */
 	}
 
-	/* Publish heartbeat (with retry on transient errors) */
+	/* Publish heartbeat with exponential backoff on transient errors */
+	static const int retry_delays_ms[] = {10, 100, 1000, 5000};
 	int rc;
+	int retry = 0;
+
 	do {
 		rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
 		if (rc == -EAGAIN) {
-			LOG_DBG("MQTT busy, retrying heartbeat...");
-			k_sleep(K_MSEC(10));
+			if (retry >= ARRAY_SIZE(retry_delays_ms)) {
+				LOG_WRN("Heartbeat publish failed after %d retries, skipping", retry);
+				break;
+			}
+			LOG_DBG("MQTT busy, retrying heartbeat in %d ms...", retry_delays_ms[retry]);
+			k_sleep(K_MSEC(retry_delays_ms[retry]));
+			retry++;
 		}
 	} while (rc == -EAGAIN);
 

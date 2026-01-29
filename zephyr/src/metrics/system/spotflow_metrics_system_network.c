@@ -24,14 +24,16 @@ static void report_network_interface_metrics(struct net_if *iface, void *user_da
 int spotflow_metrics_system_network_init(void)
 {
 	g_network_tx_metric = spotflow_register_metric_int_with_labels(
-		SPOTFLOW_METRIC_NAME_NETWORK_TX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, 4, 1);
+		SPOTFLOW_METRIC_NAME_NETWORK_TX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+		CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1);
 	if (!g_network_tx_metric) {
 		LOG_ERR("Failed to register network TX metric");
 		return -ENOMEM;
 	}
 
 	g_network_rx_metric = spotflow_register_metric_int_with_labels(
-		SPOTFLOW_METRIC_NAME_NETWORK_RX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, 4, 1);
+		SPOTFLOW_METRIC_NAME_NETWORK_RX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+		CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1);
 	if (!g_network_rx_metric) {
 		LOG_ERR("Failed to register network RX metric");
 		return -ENOMEM;
