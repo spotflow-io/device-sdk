@@ -261,17 +261,22 @@ test_ncs_toolchain_installed() {
     return 1
 }
 
-# JSON query helper using Python
-# Usage: json_query <json_string> <query_type> [args...]
-# Query types:
-#   - find_board <sdk_type> <board_id>: Find board config
-#   - list_boards <sdk_type>: List all board IDs
-#   - extract_field <json_obj> <field> [default]: Extract field from JSON object
-#   - extract_array <json_obj> <field>: Extract array field and join with commas
-json_query() {
+# Extracts board configuration from quickstart.json to a simple format
+# Usage: extract_board_config <json_string> <sdk_type> <board_id>
+# Returns:
+#   If not found:
+#     available_boards=esp32_devkitc, esp32_ethernet_kit, ...
+#   If found:
+#     vendor_name=NXP   (only if sdk_type is "zephyr")
+#     id=frdm_rw612
+#     name=FRDM-RW612
+#     board=frdm_rw612
+#     connection=ethernet, wifi
+#     ... (remaining fields)
+extract_board_config() {
     local json_input="$1"
-    local query_type="$2"
-    shift 2
+    local sdk_type="$2"
+    local board_id="$3"
 
     # Find Python command (python3 or python)
     local python_exec=""
@@ -287,95 +292,55 @@ json_query() {
         return 1
     fi
 
+    # Use Python to avoid introducing new dependencies like jq
     "$python_exec" -c '
 import sys
 import json
 
-def find_board(data, sdk_type, board_id):
-    """Find board configuration by ID."""
+try:
+    data = json.load(sys.stdin)
+
+    sdk_type = sys.argv[1]
+    board_id = sys.argv[2]
+
     if sdk_type == "ncs":
-        boards = data.get("ncs", {}).get("boards", [])
-        for board in boards:
-            if board.get("id") == board_id:
-                print(json.dumps(board))
-                return
-    else:  # zephyr
-        vendors = data.get("zephyr", {}).get("vendors", [])
-        for vendor in vendors:
-            boards = vendor.get("boards", [])
-            for board in boards:
-                if board.get("id") == board_id:
-                    print(json.dumps(board))
-                    return
-
-def list_boards(data, sdk_type):
-    """List all board IDs."""
-    board_ids = []
-    if sdk_type == "ncs":
-        boards = data.get("ncs", {}).get("boards", [])
-        board_ids = [b.get("id", "") for b in boards if b.get("id")]
-    else:  # zephyr
-        vendors = data.get("zephyr", {}).get("vendors", [])
-        for vendor in vendors:
-            boards = vendor.get("boards", [])
-            board_ids.extend([b.get("id", "") for b in boards if b.get("id")])
-    print(", ".join(board_ids))
-
-def extract_field(data, field, default=""):
-    """Extract a field from a JSON object."""
-    value = data.get(field, default)
-    if value is None or value == "null":
-        value = default
-    print(value)
-
-def extract_array(data, field):
-    """Extract an array field and join with commas."""
-    array = data.get(field, [])
-    if isinstance(array, list):
-        print(", ".join(str(item) for item in array))
+        vendors = [data.get("ncs", {})]
     else:
-        print("")
+        vendors = data.get("zephyr", {}).get("vendors", [])
 
-def find_vendor_name(data, board_id):
-    """Find vendor name for a board in Zephyr config."""
-    vendors = data.get("zephyr", {}).get("vendors", [])
+    available_boards = []
     for vendor in vendors:
+        vendor_name = vendor.get("name", "")
         boards = vendor.get("boards", [])
         for board in boards:
-            if board.get("id") == board_id:
-                print(vendor.get("name", ""))
-                return
+            available_boards.append(board["id"])
 
-try:
-    json_input = sys.stdin.read()
-    data = json.loads(json_input)
-    
-    query_type = sys.argv[1]
-    
-    if query_type == "find_board":
-        sdk_type = sys.argv[2]
-        board_id = sys.argv[3]
-        find_board(data, sdk_type, board_id)
-    elif query_type == "list_boards":
-        sdk_type = sys.argv[2]
-        list_boards(data, sdk_type)
-    elif query_type == "extract_field":
-        field = sys.argv[2]
-        default = sys.argv[3] if len(sys.argv) > 3 else ""
-        extract_field(data, field, default)
-    elif query_type == "extract_array":
-        field = sys.argv[2]
-        extract_array(data, field)
-    elif query_type == "find_vendor_name":
-        board_id = sys.argv[2]
-        find_vendor_name(data, board_id)
-    else:
-        sys.stderr.write(f"Unknown query type: {query_type}\n")
-        sys.exit(1)
-except (json.JSONDecodeError, KeyError, IndexError) as e:
-    sys.stderr.write(f"JSON query error: {e}\n")
+            if board["id"] == board_id:
+                print("vendor_name=%s" % vendor_name)
+
+                board["connection"] = ", ".join(board.get("connection", []))
+                for key, value in board.items():
+                    print("%s=%s" % (key, value))
+
+                sys.exit(0)
+
+    print("available_boards=%s" % ", ".join(available_boards))
+
+except Exception as e:
+    sys.stderr.write(f"JSON parsing error: {e}\n")
     sys.exit(1)
-' "$query_type" "$@" <<< "$json_input"
+' "$sdk_type" "$board_id" <<< "$json_input"
+}
+
+# Extracts a parameter from the board configuration string
+# Usage: extract_board_parameter <board_config> <parameter>
+# Returns:
+#   The value of the parameter or empty string if not found
+extract_board_parameter() {
+    local board_config="$1"
+    local parameter="$2"
+
+    echo "$board_config" | grep "^$parameter=" | cut -d'=' -f2- || true
 }
 
 show_usage() {
@@ -500,43 +465,43 @@ main() {
     local board_config
     local vendor_name=""
 
-    if ! board_config=$(json_query "$quickstart_json" find_board "$sdk_type" "$board"); then
+    if ! board_config=$(extract_board_config "$quickstart_json" "$sdk_type" "$board"); then
         exit_with_error "Failed to parse board configuration" \
             "JSON parsing failed"
     fi
 
-    if [[ -z "$board_config" ]] || [[ "$board_config" == "null" ]]; then
-        local available_boards
-        available_boards=$(json_query "$quickstart_json" list_boards "$sdk_type")
+    local available_boards
+    available_boards=$(extract_board_parameter "$board_config" "available_boards")
+
+    if [[ -n "$available_boards" ]]; then
         exit_with_error \
             "Board '$board' not found in $sdk_display_type configuration" \
             "Available boards: $available_boards"
     fi
 
     # Extract board configuration values
-    local board_name board_target manifest sdk_version sdk_toolchain
-    local blob ncs_version callout spotflow_path build_extra_args
-    board_name=$(json_query "$board_config" extract_field "name")
-    board_target=$(json_query "$board_config" extract_field "board")
-    manifest=$(json_query "$board_config" extract_field "manifest")
-    sdk_version=$(json_query "$board_config" extract_field "sdk_version")
-    sdk_toolchain=$(json_query "$board_config" extract_field "sdk_toolchain")
-    blob=$(json_query "$board_config" extract_field "blob")
-    ncs_version=$(json_query "$board_config" extract_field "ncs_version")
-    callout=$(json_query "$board_config" extract_field "callout")
-    spotflow_path=$(json_query "$board_config" extract_field "spotflow_path")
-    build_extra_args=$(json_query "$board_config" extract_field "build_extra_args")
+    local board_name board_target manifest sdk_version sdk_toolchain blob
+    local ncs_version callout spotflow_path build_extra_args connection_methods
+    board_name=$(extract_board_parameter "$board_config" "name")
+    board_target=$(extract_board_parameter "$board_config" "board")
+    manifest=$(extract_board_parameter "$board_config" "manifest")
+    sdk_version=$(extract_board_parameter "$board_config" "sdk_version")
+    connection_methods=$(extract_board_parameter "$board_config" "connection")
+    sdk_toolchain=$(extract_board_parameter "$board_config" "sdk_toolchain")
+    blob=$(extract_board_parameter "$board_config" "blob")
+    ncs_version=$(extract_board_parameter "$board_config" "ncs_version")
+    callout=$(extract_board_parameter "$board_config" "callout")
+    spotflow_path=$(extract_board_parameter "$board_config" "spotflow_path")
+    build_extra_args=$(extract_board_parameter "$board_config" "build_extra_args")
 
     if [[ "$sdk_type" == "zephyr" ]]; then
-        vendor_name=$(json_query "$quickstart_json" find_vendor_name "$board")
+        vendor_name=$(extract_board_parameter "$board_config" "vendor_name")
     fi
 
     write_success "Found board: $board_name"
     if [[ -n "$vendor_name" ]]; then
         write_info "Vendor: $vendor_name"
     fi
-    local connection_methods
-    connection_methods=$(json_query "$board_config" extract_array "connection")
     write_info "Connection methods: $connection_methods"
     write_info "Board target: $board_target"
     write_info "Manifest: $manifest"
@@ -939,16 +904,14 @@ main() {
         write_warning "CONFIG_SPOTFLOW_DEVICE_ID already exists in prj.conf, skipping"
     else
         local prepended_config_content=""
-        local connection_methods_config
-        connection_methods_config=$(json_query "$board_config" extract_array "connection")
 
-        if echo "$connection_methods_config" | grep -q "wifi"; then
+        if echo "$connection_methods" | grep -q "wifi"; then
             prepended_config_content+="CONFIG_NET_WIFI_SSID=\"<Your Wi-Fi SSID>\"\n"
             prepended_config_content+="CONFIG_NET_WIFI_PASSWORD=\"<Your Wi-Fi Password>\"\n\n"
         fi
 
         local sample_device_id
-        sample_device_id=$(json_query "$board_config" extract_field "sample_device_id")
+        sample_device_id=$(extract_board_parameter "$board_config" "sample_device_id")
         prepended_config_content+="CONFIG_SPOTFLOW_DEVICE_ID=\"$sample_device_id\"\n"
         prepended_config_content+="CONFIG_SPOTFLOW_INGEST_KEY=\"<Your Spotflow Ingest Key>\"\n\n"
 
