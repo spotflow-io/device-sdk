@@ -80,15 +80,15 @@ int aggregator_report_value(struct spotflow_metric_base* metric, const struct sp
 		return -EINVAL;
 	}
 
+	struct metric_aggregator_context* ctx = metric->aggregator_context;
+
+	k_mutex_lock(&metric->lock, K_FOREVER);
+
 	if (metric->agg_interval == SPOTFLOW_AGG_INTERVAL_NONE) {
 		int rc = flush_no_aggregation_metric(metric, labels, label_count, value_int, value_float);
 		k_mutex_unlock(&metric->lock);
 		return rc;
 	}
-
-	struct metric_aggregator_context* ctx = metric->aggregator_context;
-
-	k_mutex_lock(&metric->lock, K_FOREVER);
 
 	/* Find or create time series */
 	struct metric_timeseries_state* ts = find_or_create_timeseries(ctx, labels, label_count);
