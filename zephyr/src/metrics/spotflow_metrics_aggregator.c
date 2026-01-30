@@ -292,91 +292,104 @@ static void aggregation_timer_handler(struct k_work* work)
  *
  * Uses direct string comparison for label matching. O(n) linear search
  * is acceptable since max_timeseries ≤ 256 and labels are small.
+ *
+ * When pool is full, attempts to evict a timeseries with count == 0
+ * (no values reported in current aggregation window).
  */
 static struct metric_timeseries_state*
 find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct spotflow_label* labels,
 			  uint8_t label_count)
 {
-	/* First, try to find existing time series with matching labels */
+	struct metric_timeseries_state* inactive_slot = NULL;
+	struct metric_timeseries_state* evictable_slot = NULL;
+
+	/* Scan all slots: find matching, inactive, or evictable (count == 0) */
 	for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
-		if (ctx->timeseries[i].active &&
-		    labels_equal(&ctx->timeseries[i], labels, label_count)) {
-			return &ctx->timeseries[i];
+		struct metric_timeseries_state* ts = &ctx->timeseries[i];
+
+		if (ts->active) {
+			if (labels_equal(ts, labels, label_count)) {
+				return ts; /* Found existing match */
+			}
+			if (ts->count == 0 && evictable_slot == NULL) {
+				evictable_slot = ts; /* Candidate for eviction */
+			}
+		} else if (inactive_slot == NULL) {
+			inactive_slot = ts; /* First inactive slot */
 		}
 	}
 
-	/* Not found - create new time series if space available */
-	if (ctx->timeseries_count >= ctx->timeseries_capacity) {
-		return NULL; /* Pool full */
-	}
-
-	/* Find first inactive slot */
-	for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
-		if (!ctx->timeseries[i].active) {
-			struct metric_timeseries_state* ts = &ctx->timeseries[i];
-
-			/* Initialize new time series */
-			memset(ts, 0, sizeof(*ts));
-			ts->active = true;
-			ts->label_count = label_count;
-
-			/* Copy labels with validation */
-			for (uint8_t j = 0; j < label_count; j++) {
-				/* Validate and copy key */
-				if (!labels[j].key) {
-					LOG_ERR("Label key is NULL");
-					ts->active = false;
-					return NULL;
-				}
-				size_t key_len = strlen(labels[j].key);
-				if (key_len >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
-					LOG_ERR("Label key too long: %zu chars (max %d)", key_len,
-						SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
-					ts->active = false;
-					return NULL;
-				}
-				strncpy(ts->labels[j].key, labels[j].key,
-					SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
-				ts->labels[j].key[SPOTFLOW_MAX_LABEL_KEY_LEN - 1] = '\0';
-
-				/* Validate and copy value */
-				if (!labels[j].value) {
-					LOG_ERR("Label value is NULL");
-					ts->active = false;
-					return NULL;
-				}
-				size_t value_len = strlen(labels[j].value);
-				if (value_len >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
-					LOG_ERR("Label value too long: %zu chars (max %d)",
-						value_len, SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
-					ts->active = false;
-					return NULL;
-				}
-				strncpy(ts->labels[j].value, labels[j].value,
-					SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
-				ts->labels[j].value[SPOTFLOW_MAX_LABEL_VALUE_LEN - 1] = '\0';
-			}
-
-			/* Initialize aggregation state */
-			if (ctx->metric->type == SPOTFLOW_METRIC_TYPE_INT) {
-				ts->min_int = INT64_MAX;
-				ts->max_int = INT64_MIN;
-			} else {
-				ts->min_float = FLT_MAX;
-				ts->max_float = -FLT_MAX;
-			}
-
-			ctx->timeseries_count++;
-
-			LOG_DBG("Created new time series for metric '%s' (total=%u/%u)",
-				ctx->metric->name, ctx->timeseries_count, ctx->timeseries_capacity);
-
-			return ts;
+	/* Prefer inactive slot, fall back to evicting idle timeseries */
+	struct metric_timeseries_state* ts = inactive_slot;
+	if (ts == NULL) {
+		ts = evictable_slot;
+		if (ts != NULL) {
+			LOG_DBG("Evicting idle timeseries for metric '%s'", ctx->metric->name);
+			/* Evicting active slot - count stays same */
 		}
+	} else {
+		ctx->timeseries_count++;
 	}
 
-	return NULL; /* Should not reach here */
+	if (ts == NULL) {
+		return NULL; /* Pool full, no evictable slots */
+	}
+
+	/* Initialize time series */
+	memset(ts, 0, sizeof(*ts));
+	ts->active = true;
+	ts->label_count = label_count;
+
+	/* Copy labels with validation */
+	for (uint8_t j = 0; j < label_count; j++) {
+		/* Validate and copy key */
+		if (!labels[j].key) {
+			LOG_ERR("Label key is NULL");
+			ts->active = false;
+			return NULL;
+		}
+		size_t key_len = strlen(labels[j].key);
+		if (key_len >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
+			LOG_ERR("Label key too long: %zu chars (max %d)", key_len,
+				SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
+			ts->active = false;
+			return NULL;
+		}
+		strncpy(ts->labels[j].key, labels[j].key, SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
+		ts->labels[j].key[SPOTFLOW_MAX_LABEL_KEY_LEN - 1] = '\0';
+
+		/* Validate and copy value */
+		if (!labels[j].value) {
+			LOG_ERR("Label value is NULL");
+			ts->active = false;
+			return NULL;
+		}
+		size_t value_len = strlen(labels[j].value);
+		if (value_len >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
+			LOG_ERR("Label value too long: %zu chars (max %d)",
+				value_len, SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
+			ts->active = false;
+			return NULL;
+		}
+		strncpy(ts->labels[j].value, labels[j].value, SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
+		ts->labels[j].value[SPOTFLOW_MAX_LABEL_VALUE_LEN - 1] = '\0';
+	}
+
+	/* Initialize aggregation state */
+	if (ctx->metric->type == SPOTFLOW_METRIC_TYPE_INT) {
+		ts->min_int = INT64_MAX;
+		ts->max_int = INT64_MIN;
+	} else {
+		ts->min_float = FLT_MAX;
+		ts->max_float = -FLT_MAX;
+	}
+
+	LOG_DBG("Initialized time series for metric '%s' (active=%u/%u)",
+		ctx->metric->name, ctx->timeseries_count, ctx->timeseries_capacity);
+
+	return ts;
 }
+
 
 /**
  * @brief Update integer aggregation state
