@@ -154,7 +154,6 @@ int spotflow_metrics_cbor_encode(
 	return 0;
 }
 
-
 int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* metric,
 						const struct spotflow_label* labels, uint8_t label_count,
 						int64_t value_int, float value_float,

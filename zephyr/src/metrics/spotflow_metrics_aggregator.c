@@ -390,12 +390,10 @@ find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct sp
 	return ts;
 }
 
-
 /**
  * @brief Update integer aggregation state
  */
 static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value)
-
 {
 	ts->count++;
 
