@@ -42,7 +42,7 @@ extern "C" {
  * starts periodic collection timer.
  *
  * Should be called once during system initialization, after
- * spotflow_metrics_init() and network initialization.
+ * network initialization.
  *
  * @return 0 on success, negative errno on failure
  */

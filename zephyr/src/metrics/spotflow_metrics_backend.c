@@ -9,7 +9,6 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/sys/atomic.h>
 #include <string.h>
 #include <ctype.h>
 
@@ -22,14 +21,7 @@ union metric_registry_entry {
 };
 
 static union metric_registry_entry g_metric_registry[CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED];
-static struct k_mutex g_registry_lock;
-
-/* Initialization state:
- * 0 = not initialized
- * 1 = initialization in progress
- * 2 = fully initialized
- */
-static atomic_t g_metrics_init_state = ATOMIC_INIT(0);
+static K_MUTEX_DEFINE(g_registry_lock);
 
 /* Forward declarations of static functions */
 static void normalize_metric_name(const char *input, char *output, size_t output_size);
@@ -42,34 +34,6 @@ static struct spotflow_metric_base *register_metric_common(const char *name,
 							   uint8_t max_labels);
 
 /* Public API Implementation */
-
-int spotflow_metrics_init(void)
-{
-	/* Fast path: already fully initialized */
-	if (atomic_get(&g_metrics_init_state) == 2) {
-		return 0;
-	}
-
-	/* Try to claim initialization (0 -> 1) */
-	if (atomic_cas(&g_metrics_init_state, 0, 1)) {
-		/* We won the race - perform initialization */
-		k_mutex_init(&g_registry_lock);
-		memset(g_metric_registry, 0, sizeof(g_metric_registry));
-
-		/* Mark as fully initialized */
-		atomic_set(&g_metrics_init_state, 2);
-
-		LOG_INF("Metrics subsystem initialized");
-		return 0;
-	}
-
-	/* Another thread is initializing - wait for completion */
-	while (atomic_get(&g_metrics_init_state) != 2) {
-		k_yield();
-	}
-
-	return 0;
-}
 
 struct spotflow_metric_int *spotflow_register_metric_int(const char *name,
 							 enum spotflow_agg_interval agg_interval)
@@ -325,15 +289,6 @@ static struct spotflow_metric_base *register_metric_common(const char *name,
 	if (name == NULL) {
 		LOG_ERR("Metric name cannot be NULL");
 		return NULL;
-	}
-
-	/* Auto-initialize metrics subsystem on first use (thread-safe) */
-	if (atomic_get(&g_metrics_init_state) != 2) {
-		int rc = spotflow_metrics_init();
-		if (rc < 0) {
-			LOG_ERR("Failed to auto-initialize metrics subsystem: %d", rc);
-			return NULL;
-		}
 	}
 
 	/* Validate parameters */

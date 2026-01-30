@@ -18,12 +18,11 @@ config SPOTFLOW_METRICS_SYSTEM_MEMORY
 
 config SPOTFLOW_METRICS_SYSTEM_HEAP
 	bool "Enable heap metrics"
-	depends on HEAP_MEM_POOL_SIZE > 0
 	imply SYS_HEAP_RUNTIME_STATS
 	default y
 	help
 	  Collect heap memory statistics (free/allocated bytes).
-	  Requires heap memory pool to be configured.
+	  Requires a system heap (via HEAP_MEM_POOL_SIZE or HEAP_MEM_POOL_ADD_*).
 
 config SPOTFLOW_METRICS_SYSTEM_NETWORK
 	bool "Enable network metrics"

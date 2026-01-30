@@ -14,19 +14,6 @@ extern "C" {
 #endif
 
 /**
- * @brief Initialize metrics subsystem
- *
- * OPTIONAL: The metrics subsystem auto-initializes on first metric registration.
- * You can call this explicitly if you want to control initialization timing,
- * but it's not required.
- *
- * Thread-safe: Yes (idempotent, safe to call multiple times)
- *
- * @return 0 on success, negative errno on failure
- */
-int spotflow_metrics_init(void);
-
-/**
  * @brief Register a label-less integer metric
  *
  * @param name Metric name (max 255 chars). The name is normalized before registration:

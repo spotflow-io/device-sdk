@@ -124,11 +124,6 @@ int main(void)
  */
 static int init_application_metrics(void)
 {
-	/*
-	 * Note: No need to explicitly call spotflow_metrics_init() - the metrics
-	 * subsystem auto-initializes on first metric registration (lazy initialization).
-	 */
-
 	/* Register label-less integer metric - aggregated over 1 minute */
 	g_app_counter_metric = spotflow_register_metric_int("app_counter", SPOTFLOW_AGG_INTERVAL_1MIN);
 	if (!g_app_counter_metric) {
