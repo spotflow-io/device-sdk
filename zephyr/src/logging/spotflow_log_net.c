@@ -17,12 +17,13 @@ int poll_and_process_enqueued_logs(void)
 
 
 	int rc = spotflow_mqtt_publish_ingest_cbor_msg(msg_ptr->payload, msg_ptr->len);
+	if (rc == -EAGAIN) {
+		/* Temporary, retry later without aborting connection */
+		return rc;
+	}
 	if (rc < 0) {
-		LOG_DBG("Failed to publish cbor log message rc: %d -> "
-			"aborting mqtt connection",
-			rc);
+		LOG_DBG("Failed to publish log message: %d, aborting connection", rc);
 		spotflow_mqtt_abort_mqtt();
-		/* Free the message buffer before breaking */
 		return rc;
 	}
 

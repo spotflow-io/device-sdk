@@ -23,10 +23,12 @@ int spotflow_poll_and_process_enqueued_coredump_chunks(void)
 
 	/* Publish while message is still safely in queue */
 	int rc = spotflow_mqtt_publish_ingest_cbor_msg(msg_ptr->payload, msg_ptr->len);
+	if (rc == -EAGAIN) {
+		/* Temporary, retry later without aborting connection */
+		return rc;
+	}
 	if (rc < 0) {
-		LOG_DBG("Failed to publish cbor core dump message rc: %d -> "
-					"aborting mqtt connection",
-					rc);
+		LOG_DBG("Failed to publish coredump: %d, aborting connection", rc);
 		spotflow_mqtt_abort_mqtt();
 		return rc;
 	}

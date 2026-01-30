@@ -45,8 +45,12 @@ int spotflow_poll_and_process_enqueued_metrics(void)
 
 	/* Publish while message is still safely in queue */
 	rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
+	if (rc == -EAGAIN) {
+		/* Temporary, retry later without aborting connection */
+		return rc;
+	}
 	if (rc < 0) {
-		LOG_WRN("Failed to publish metric: %d -> aborting mqtt connection", rc);
+		LOG_WRN("Failed to publish metric: %d, aborting connection", rc);
 		spotflow_mqtt_abort_mqtt();
 		return rc; /* Message stays in queue for retry */
 	}
