@@ -29,7 +29,11 @@ int spotflow_metrics_init(void);
 /**
  * @brief Register a label-less integer metric
  *
- * @param name Metric name (max 255 chars, will be normalized to lowercase/alphanumeric/_)
+ * @param name Metric name (max 255 chars). The name is normalized before registration:
+ *             - Alphanumeric characters are converted to lowercase
+ *             - Dashes, dots, and spaces are converted to underscores
+ *             - Other characters are removed
+ *             Example: "My-Metric.Name" becomes "my_metric_name"
  * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
  *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
  *
@@ -43,7 +47,11 @@ struct spotflow_metric_int *spotflow_register_metric_int(
 /**
  * @brief Register a label-less float metric
  *
- * @param name Metric name (max 255 chars, will be normalized to lowercase/alphanumeric/_)
+ * @param name Metric name (max 255 chars). The name is normalized before registration:
+ *             - Alphanumeric characters are converted to lowercase
+ *             - Dashes, dots, and spaces are converted to underscores
+ *             - Other characters are removed
+ *             Example: "My-Metric.Name" becomes "my_metric_name"
  * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
  *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
  *
@@ -56,11 +64,15 @@ struct spotflow_metric_float *spotflow_register_metric_float(
 /**
  * @brief Register a labeled integer metric
  *
- * @param name Metric name (max 255 chars, will be normalized)
+ * @param name Metric name (max 255 chars). The name is normalized before registration:
+ *             - Alphanumeric characters are converted to lowercase
+ *             - Dashes, dots, and spaces are converted to underscores
+ *             - Other characters are removed
+ *             Example: "My-Metric.Name" becomes "my_metric_name"
  * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
  *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
  * @param max_timeseries Maximum number of unique label combinations (1-256)
- * @param max_labels Maximum labels per report (1-8)
+ * @param max_labels Maximum labels per report (1-CONFIG_SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC)
  *
  * @return Metric handle on success, NULL on failure
  */
@@ -73,11 +85,15 @@ struct spotflow_metric_int *spotflow_register_metric_int_with_labels(
 /**
  * @brief Register a labeled float metric
  *
- * @param name Metric name (max 255 chars, will be normalized)
+ * @param name Metric name (max 255 chars). The name is normalized before registration:
+ *             - Alphanumeric characters are converted to lowercase
+ *             - Dashes, dots, and spaces are converted to underscores
+ *             - Other characters are removed
+ *             Example: "My-Metric.Name" becomes "my_metric_name"
  * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
  *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
  * @param max_timeseries Maximum number of unique label combinations (1-256)
- * @param max_labels Maximum labels per report (1-8)
+ * @param max_labels Maximum labels per report (1-CONFIG_SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC)
  *
  * @return Metric handle on success, NULL on failure
  */

@@ -28,6 +28,7 @@ This sample showcases:
 
   - Label-less metrics: Simple counter and temperature sensor
   - Labeled metrics: HTTP request duration with endpoint, method, and status labels
+  - Note: Metric names are normalized (lowercase, alphanumeric, underscores only)
 
 - **Integration with Logs**
 
@@ -128,6 +129,27 @@ Sample Output
 
 Understanding the Metrics
 *************************
+
+Metric Name Normalization
+=========================
+
+All metric names are automatically normalized during registration:
+
+- Alphanumeric characters are converted to lowercase
+- Dashes (``-``), dots (``.``), and spaces are converted to underscores (``_``)
+- Other special characters are removed
+
+Examples:
+
+.. code-block:: none
+
+   "My-Metric.Name"     → "my_metric_name"
+   "Temperature (C)"    → "temperature_c"
+   "HTTP Request/sec"   → "http_requestsec"
+
+This ensures consistent metric names across the Spotflow platform. Two metrics with names
+that normalize to the same string (e.g., "my-metric" and "My_Metric") are considered
+duplicates and the second registration will fail.
 
 Label-less Metrics
 ==================
