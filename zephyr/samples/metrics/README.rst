@@ -227,9 +227,9 @@ Key configuration options in ``prj.conf``:
 
    # Metrics subsystem
    CONFIG_SPOTFLOW_METRICS=y
-   CONFIG_SPOTFLOW_METRICS_QUEUE_SIZE=16              # Message queue size
+   CONFIG_SPOTFLOW_METRICS_QUEUE_SIZE=64              # Message queue size (default with system metrics)
    CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED=32          # Max metrics
-   CONFIG_SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL=1  # PT1M default
+   CONFIG_SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC=4    # Max labels per metric
 
    # System metrics
    CONFIG_SPOTFLOW_METRICS_SYSTEM=y
@@ -245,9 +245,9 @@ Key configuration options in ``prj.conf``:
    CONFIG_SPOTFLOW_METRICS_HEARTBEAT=y
    CONFIG_SPOTFLOW_METRICS_HEARTBEAT_INTERVAL=60      # Heartbeat interval (seconds)
 
-   # Heap sizing (adjust based on your needs)
-   CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS=16384
-   CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM=16384
+   # Heap sizing (auto-calculated, adjust if needed)
+   CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS=8192       # 8KB for app metrics
+   CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM=20480  # 20KB for system metrics
 
 Viewing Metrics in Spotflow Cloud
 *********************************

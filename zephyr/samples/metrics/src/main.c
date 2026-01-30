@@ -45,7 +45,6 @@ static void turn_on_dhcp_when_device_is_up();
 
 static int init_application_metrics(void);
 static void report_counter_metric(void);
-static void report_counter_metric(void);
 static void report_temperature_metric(void);
 static void report_request_duration_metric(void);
 static void temperature_thread_entry();
