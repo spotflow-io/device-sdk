@@ -61,9 +61,9 @@ int aggregator_register_metric(struct spotflow_metric_base* metric)
 	ctx->timeseries_capacity = metric->max_timeseries;
 	ctx->timer_started = false;
 
-	/* Always initialize aggregation timer work structure (even for PT0S) */
-	/* to prevent NULL pointer dereference if work is accidentally accessed */
-	k_work_init_delayable(&ctx->aggregation_work, aggregation_timer_handler);
+	if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE) {
+		k_work_init_delayable(&ctx->aggregation_work, aggregation_timer_handler);
+	}
 
 	metric->aggregator_context = ctx;
 
