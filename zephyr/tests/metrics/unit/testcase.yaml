@@ -1,0 +1,6 @@
+tests:
+  spotflow.metrics.unit:
+    tags: spotflow metrics unit
+    integration_platforms:
+      - native_sim
+    harness: ztest

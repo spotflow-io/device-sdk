@@ -14,3 +14,5 @@ modules/*west
 **/.clangd
 esp_idf/spotflow/dist/*
 .claude/
+zephyr/tests/twister-out*
+
