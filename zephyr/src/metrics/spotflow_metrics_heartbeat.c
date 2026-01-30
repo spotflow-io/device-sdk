@@ -153,9 +153,8 @@ void spotflow_metrics_heartbeat_init(void)
 	k_mutex_init(&g_heartbeat_mutex);
 	k_work_init_delayable(&g_heartbeat_work, heartbeat_work_handler);
 
-	/* Schedule first heartbeat */
-	k_work_schedule(&g_heartbeat_work,
-			K_SECONDS(CONFIG_SPOTFLOW_METRICS_HEARTBEAT_INTERVAL));
+	/* Schedule first heartbeat immediately */
+	k_work_schedule(&g_heartbeat_work, K_NO_WAIT);
 
 	LOG_INF("Heartbeat initialized (interval=%d s)",
 		CONFIG_SPOTFLOW_METRICS_HEARTBEAT_INTERVAL);

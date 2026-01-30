@@ -192,7 +192,7 @@ static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
 
 static inline void print_stat(const struct spotflow_log_context* context)
 {
-	LOG_INF("Total processed %" PRIu32 ", dropped %" PRIu32 " messages", context->message_index,
+	LOG_DBG("Total processed %" PRIu32 ", dropped %" PRIu32 " messages", context->message_index,
 		context->dropped_backend_count);
 }
 
