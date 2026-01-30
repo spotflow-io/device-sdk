@@ -49,16 +49,6 @@ int aggregator_report_value(
 	int64_t value_int,
 	float value_float);
 
-/**
- * @brief Unregister metric from aggregator
- *
- * Frees aggregation context and time series storage.
- * Cancels any pending timers.
- *
- * @param metric Metric base to unregister
- */
-void aggregator_unregister_metric(struct spotflow_metric_base *metric);
-
 #ifdef __cplusplus
 }
 #endif

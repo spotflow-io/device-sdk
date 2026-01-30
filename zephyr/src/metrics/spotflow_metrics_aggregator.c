@@ -125,34 +125,6 @@ int aggregator_report_value(struct spotflow_metric_base* metric, const struct sp
 	return 0;
 }
 
-void aggregator_unregister_metric(struct spotflow_metric_base* metric)
-{
-	if (metric == NULL || metric->aggregator_context == NULL) {
-		return;
-	}
-
-	struct metric_aggregator_context* ctx = metric->aggregator_context;
-
-	k_mutex_lock(&metric->lock, K_FOREVER);
-
-	/* Cancel pending timer */
-	if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE) {
-		k_work_cancel_delayable(&ctx->aggregation_work);
-	}
-
-	/* Free time series array */
-	k_free(ctx->timeseries);
-
-	/* Free context */
-	k_free(ctx);
-
-	metric->aggregator_context = NULL;
-
-	k_mutex_unlock(&metric->lock);
-
-	LOG_DBG("Unregistered aggregator for metric '%s'", metric->name);
-}
-
 /**
  * @brief Compare label arrays for equality
  *
