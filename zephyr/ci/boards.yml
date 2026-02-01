@@ -60,10 +60,6 @@ vendors:
         board: esp32s3_eye/esp32s3/procpu
         sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
 
-      - id: esp8684_devkitm
-        name: ESP8684-DevKitM
-        sdk_toolchain: riscv64-zephyr-elf
-
       - id: esp_wrover_kit
         name: ESP-WROVER-KIT
         board: esp_wrover_kit/esp32/procpu
@@ -221,7 +217,7 @@ vendors:
         board: mimxrt1170_evk@B/mimxrt1176/cm7
         build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
-      - id: mimxrt1180_evk/mimxrt1189/cm7
+      - id: mimxrt1180_evk
         name: MIMXRT1180-EVK
         board: mimxrt1180_evk/mimxrt1189/cm7
 
@@ -338,12 +334,6 @@ vendors:
 
       - id: nucleo_h7a3zi_q
         name: Nucleo H7A3ZI-Q
-
-      # TODO: Consider using latest Zephyr version (main?) to enable ext_flash_app
-      - id: nucleo_h7s3l8
-        name: Nucleo H7S3L8
-        board: nucleo_h7s3l8/stm32h7s3xx/ext_flash_app
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: nucleo_n657x0_q
         name: Nucleo N657X0-Q

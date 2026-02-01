@@ -37,6 +37,7 @@ config SPOTFLOW_USE_WIFI
 config SPOTFLOW_USE_ETH
 	bool "Enable Ethernet for Spotflow samples"
 	imply ETH_DRIVER
+	imply NET_L2_ETHERNET
 	imply NET_L2_ETHERNET_MGMT
 
 endchoice
