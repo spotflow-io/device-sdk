@@ -45,7 +45,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        script: [powershell, sh]
+        script: [powershell, bash]
         environment:
           - os: ubuntu-latest
             workspace_dir: test-workspace
@@ -66,7 +66,7 @@ jobs:
             board_target: frdm_rw612
             module_path: modules/lib/spotflow
         exclude:
-          - script: sh
+          - script: bash
             environment:
               os: windows-latest
 
@@ -173,8 +173,8 @@ jobs:
           -autoConfirm
 
       - name: Run spotflowup.sh
-        if: matrix.script == 'sh'
-        shell: sh
+        if: matrix.script == 'bash'
+        shell: bash
         run: >
           nginx_port="${{ matrix.environment.os == 'macos-latest' && '8080' || '80' }}"
 
