@@ -83,6 +83,7 @@ vendors:
 
   - name: Microchip
     vendor: microchip
+    manifest: west-zephyr-microchip.yml
     sdk_toolchain: arm-zephyr-eabi
     boards:
 
@@ -255,6 +256,7 @@ vendors:
 
   - name: Renesas
     vendor: renesas
+    manifest: west-zephyr-renesas.yml
     sdk_toolchain: arm-zephyr-eabi
     connection: ["ethernet"]
     boards:
@@ -282,6 +284,7 @@ vendors:
 
   - name: Silicon Labs
     vendor: silabs
+    manifest: west-zephyr-silabs.yml
     sdk_toolchain: arm-zephyr-eabi
     connection: ["wifi"]
     boards:
@@ -301,6 +304,7 @@ vendors:
 
   - name: STMicroelectronics
     vendor: st
+    manifest: west-zephyr-st.yml
     sdk_toolchain: arm-zephyr-eabi
     connection: ["ethernet"]
     boards:
