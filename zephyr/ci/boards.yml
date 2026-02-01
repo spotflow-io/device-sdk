@@ -269,6 +269,7 @@ vendors:
 
       - id: ek_ra6m4
         name: RA6M4 Evaluation Kit
+        build_samples: ["logs"]
 
       - id: ek_ra6m5
         name: RA6M5 Evaluation Kit
@@ -295,6 +296,7 @@ vendors:
 
       - id: siwx917_rb4342a
         name: SiWx917 Radio Board (SLWRB4342A)
+        build_samples: ["logs"]
 
       - id: siwx917_rb4338a
         name: SiWx917 Radio Board (SLWRB4338A)
@@ -351,6 +353,7 @@ vendors:
 
       - id: stm32f746g_disco
         name: STM32F746G Discovery
+        build_samples: ["logs"]
 
       - id: stm32f769i_disco
         name: STM32F769I Discovery
