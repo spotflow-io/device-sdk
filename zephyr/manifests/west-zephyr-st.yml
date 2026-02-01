@@ -6,6 +6,7 @@ manifest:
       clone-depth: 1
       import:
         name-allowlist:
+          - cmsis
           - cmsis_6
           - hal_stm32
           - mbedtls

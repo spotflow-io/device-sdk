@@ -6,7 +6,7 @@ manifest:
       clone-depth: 1
       import:
         name-allowlist:
-          - cmsis_6
+          - cmsis
           - hal_microchip
           - mbedtls
           - mcuboot
