@@ -210,12 +210,10 @@ vendors:
       - id: mimxrt1160_evk
         name: MIMXRT1160-EVK
         board: mimxrt1160_evk/mimxrt1166/cm7
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: mimxrt1170_evk
         name: MIMXRT1170-EVK
         board: mimxrt1170_evk@B/mimxrt1176/cm7
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: mimxrt1180_evk
         name: MIMXRT1180-EVK
@@ -370,7 +368,6 @@ vendors:
       - id: stm32h750b_dk
         name: STM32H750B Discovery Kit
         board: stm32h750b_dk/stm32h750xx/ext_flash_app
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: stm32h757i_eval
         name: STM32H757I Eval
@@ -382,7 +379,6 @@ vendors:
       - id: stm32h7s78_dk
         name: STM32H7S78-DK Discovery
         board: stm32h7s78_dk/stm32h7s7xx/ext_flash_app
-        build_extra_args: -- -DCONFIG_SIZE_OPTIMIZATIONS=y
 
       - id: stm32mp135f_dk
         name: STM32MP135F-DK Discovery
