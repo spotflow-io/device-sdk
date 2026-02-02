@@ -340,37 +340,18 @@ find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct sp
 	ts->active = true;
 	ts->label_count = label_count;
 
-	/* Copy labels with validation */
+	/* Copy labels (NULL validation done in backend, truncation via strncpy) */
 	for (uint8_t j = 0; j < label_count; j++) {
-		/* Validate and copy key */
-		if (!labels[j].key) {
-			LOG_ERR("Label key is NULL");
+		/* Defensive NULL check */
+		if (!labels[j].key || !labels[j].value) {
+			LOG_ERR("Label key or value is NULL at index %u", j);
 			ts->active = false;
 			return NULL;
 		}
-		size_t key_len = strlen(labels[j].key);
-		if (key_len >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
-			LOG_ERR("Label key too long: %zu chars (max %d)", key_len,
-				SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
-			ts->active = false;
-			return NULL;
-		}
+
 		strncpy(ts->labels[j].key, labels[j].key, SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
 		ts->labels[j].key[SPOTFLOW_MAX_LABEL_KEY_LEN - 1] = '\0';
 
-		/* Validate and copy value */
-		if (!labels[j].value) {
-			LOG_ERR("Label value is NULL");
-			ts->active = false;
-			return NULL;
-		}
-		size_t value_len = strlen(labels[j].value);
-		if (value_len >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
-			LOG_ERR("Label value too long: %zu chars (max %d)",
-				value_len, SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
-			ts->active = false;
-			return NULL;
-		}
 		strncpy(ts->labels[j].value, labels[j].value, SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
 		ts->labels[j].value[SPOTFLOW_MAX_LABEL_VALUE_LEN - 1] = '\0';
 	}
