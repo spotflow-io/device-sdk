@@ -13,8 +13,8 @@ int spotflow_log_backend(const char* fmt, va_list args)
 	int log_seq_arg = 0;
 	static size_t sequence = 0;
 	struct message_metadata metadata = { 0 };
-	sequence++;
 	metadata.sequence_number = sequence;
+	sequence++;
 
 	// Copy fmt so we can modify it safely
 	char* fmt_copy = strdup(fmt);
