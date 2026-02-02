@@ -181,6 +181,20 @@ int spotflow_report_metric_int_with_labels(struct spotflow_metric_int *metric, i
 		return -EINVAL;
 	}
 
+	/* Validate individual label elements */
+	for (uint8_t i = 0; i < label_count; i++) {
+		if (labels[i].key == NULL || labels[i].value == NULL) {
+			LOG_ERR("Label key or value is NULL at index %u", i);
+			return -EINVAL;
+		}
+		if (strlen(labels[i].key) >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
+			LOG_WRN("Label key at index %u will be truncated", i);
+		}
+		if (strlen(labels[i].value) >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
+			LOG_WRN("Label value at index %u will be truncated", i);
+		}
+	}
+
 	/* Type-safe: int metrics always store int values */
 	return aggregator_report_value(base, labels, label_count, value, 0.0);
 }
@@ -204,6 +218,20 @@ int spotflow_report_metric_float_with_labels(struct spotflow_metric_float *metri
 	if (label_count == 0 || label_count > base->max_labels) {
 		LOG_ERR("Invalid label_count: %u (max %u)", label_count, base->max_labels);
 		return -EINVAL;
+	}
+
+	/* Validate individual label elements */
+	for (uint8_t i = 0; i < label_count; i++) {
+		if (labels[i].key == NULL || labels[i].value == NULL) {
+			LOG_ERR("Label key or value is NULL at index %u", i);
+			return -EINVAL;
+		}
+		if (strlen(labels[i].key) >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
+			LOG_WRN("Label key at index %u will be truncated", i);
+		}
+		if (strlen(labels[i].value) >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
+			LOG_WRN("Label value at index %u will be truncated", i);
+		}
 	}
 
 	/* Type-safe: float metrics always store float values */
@@ -246,6 +274,20 @@ int spotflow_report_event_with_labels(struct spotflow_metric_int *metric,
 	if (label_count == 0 || label_count > base->max_labels) {
 		LOG_ERR("Invalid label_count: %u (max %u)", label_count, base->max_labels);
 		return -EINVAL;
+	}
+
+	/* Validate individual label elements */
+	for (uint8_t i = 0; i < label_count; i++) {
+		if (labels[i].key == NULL || labels[i].value == NULL) {
+			LOG_ERR("Label key or value is NULL at index %u", i);
+			return -EINVAL;
+		}
+		if (strlen(labels[i].key) >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
+			LOG_WRN("Label key at index %u will be truncated", i);
+		}
+		if (strlen(labels[i].value) >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
+			LOG_WRN("Label value at index %u will be truncated", i);
+		}
 	}
 
 	/* Events report value of 1 (event occurred) */

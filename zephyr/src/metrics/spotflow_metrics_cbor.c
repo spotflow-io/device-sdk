@@ -197,20 +197,6 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 		succ = succ && zcbor_map_start_encode(state, label_count);
 
 		for (uint8_t i = 0; i < label_count && succ; i++) {
-			/* Validate and copy key */
-			if (!labels[i].key) {
-				LOG_ERR("Label key is NULL");
-				continue;
-			}
-			size_t key_len = strlen(labels[i].key);
-			if (key_len >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
-				LOG_ERR("Label key too long: %zu chars (max %d)", key_len,
-					SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
-			}
-			if (!labels[i].value) {
-				LOG_ERR("Label value is NULL");
-				continue;
-			}
 			succ = succ &&
 			    zcbor_tstr_put_term(state, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN);
 			succ = succ &&
