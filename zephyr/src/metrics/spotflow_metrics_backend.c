@@ -383,6 +383,10 @@ static int register_metric_common(const char *name,
 	char normalized_name[256];
 	normalize_metric_name(name, normalized_name, sizeof(normalized_name));
 
+	if (strcmp(name, normalized_name) != 0) {
+		LOG_WRN("Metric name '%s' normalized to '%s'", name, normalized_name);
+	}
+
 	if (strlen(normalized_name) == 0) {
 		LOG_ERR("Metric name '%s' normalizes to empty string", name);
 		return -EINVAL;
