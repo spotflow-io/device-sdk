@@ -100,9 +100,9 @@ def transform_board(
 
     vendor_id = vendor.get("vendor", None)
 
-    # For "Other" boards, always use ["wifi", "ethernet"] connection
+    # For "Other" boards, always allow all connection methods
     if is_other_board:
-        connection = ["wifi", "ethernet"]
+        connection = ["ethernet", "wifi"]
     else:
         connection = get_board_property("connection", board, vendor, defaults, [])
 
@@ -117,16 +117,17 @@ def transform_board(
         "sample_device_id": compute_sample_device_id(board_value, vendor_id),
     }
 
-    # Only include sdk_toolchain if it exists in the hierarchy
+    # Optional properties are added to the JSON file only when not empty
+
     sdk_toolchain = get_board_property("sdk_toolchain", board, vendor, defaults)
     if sdk_toolchain:
         result["sdk_toolchain"] = sdk_toolchain
 
-    # Only include zephyr_docs if board_value is not a placeholder
+    # URL made from the placeholder would be invalid
     if board_value != BOARD_PLACEHOLDER:
         result["zephyr_docs"] = compute_zephyr_docs_url(vendor_id, board_value)
 
-    # Include ncs_version for Nordic boards
+    # NCS version is only available for Nordic boards
     if ncs_version:
         result["ncs_version"] = ncs_version
 

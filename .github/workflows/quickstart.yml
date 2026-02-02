@@ -207,7 +207,7 @@ jobs:
         shell: pwsh
         working-directory: ${{ matrix.environment.workspace_dir }}
         run: |
-          $ncsVersion = cat nrf/VERSION
+          $ncsVersion = Get-Content nrf/VERSION
 
           Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
           nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
@@ -215,9 +215,8 @@ jobs:
 
   publish-downloads:
     needs: test-spotflowup
-    # TODO: Eventually run also only on main (and allow the cdn environment only there)
-    # Don't run in forks
-    if: github.repository == 'spotflow-io/device-sdk'
+    # Don't run in forks and PRs
+    if: github.repository == 'spotflow-io/device-sdk' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
       id-token: write

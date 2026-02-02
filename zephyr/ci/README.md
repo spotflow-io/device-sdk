@@ -30,10 +30,10 @@ Board properties:
 |----------|----------|-------------|
 | `id` | Yes | Our unique identifier for the board |
 | `name` | Yes | Human-readable board name |
-| `board` | Yes | Zephyr board target (defaults to `id` if not specified) |
+| `board` | No | Zephyr board target (defaults to `id` if not specified) |
 | `manifest` | Yes | West manifest file to use (see [`manifests`](../manifests) directory) |
 | `sdk_version` | Yes | Zephyr SDK version |
-| `sdk_toolchain` | Yes | SDK toolchain to install |
+| `sdk_toolchain` | No | SDK toolchain to install (all toolchains are installed if not specified) |
 | `blob` | No | Binary blob to download (e.g., `hal_espressif`, `hal_nxp`) |
 | `connection` | Yes | Supported connection methods (Wi-Fi, Ethernet) |
 | `build_samples` | No | Samples to build in CI (e.g., `["logs"]`) by default (building the logs sample can be manually triggered for all boards) |
