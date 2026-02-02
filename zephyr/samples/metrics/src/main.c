@@ -124,26 +124,29 @@ int main(void)
  */
 static int init_application_metrics(void)
 {
+	int rc;
+
 	/* Register label-less integer metric - aggregated over 1 minute */
-	g_app_counter_metric = spotflow_register_metric_int("app_counter", SPOTFLOW_AGG_INTERVAL_1MIN);
-	if (!g_app_counter_metric) {
-		LOG_ERR("Failed to register app_counter metric");
-		return -ENOMEM;
+	rc = spotflow_register_metric_int("app_counter", SPOTFLOW_AGG_INTERVAL_1MIN,
+					  &g_app_counter_metric);
+	if (rc < 0) {
+		LOG_ERR("Failed to register app_counter metric: %d", rc);
+		return rc;
 	}
 	LOG_INF("Registered metric: app_counter (int, 1MIN)");
 
 
 	/* Register labeled float metric - aggregated over 1 minute */
 	/* Supports up to 18 unique label combinations (3 endpoints × 2 methods × 3 statuses) */
-	g_request_duration_metric = spotflow_register_metric_float_with_labels(
+	rc = spotflow_register_metric_float_with_labels(
 		"http_request_duration_ms",
 		SPOTFLOW_AGG_INTERVAL_1MIN,
 		18,  /* max_timeseries: 3 endpoints × 2 methods × 3 statuses = 18 */
-		3    /* max_labels */
-	);
-	if (!g_request_duration_metric) {
-		LOG_ERR("Failed to register request_duration metric");
-		return -ENOMEM;
+		3,   /* max_labels */
+		&g_request_duration_metric);
+	if (rc < 0) {
+		LOG_ERR("Failed to register request_duration metric: %d", rc);
+		return rc;
 	}
 	LOG_INF("Registered metric: http_request_duration_ms (float, labeled, 1MIN)");
 
@@ -192,9 +195,10 @@ static void report_temperature_metric(void)
 static void temperature_thread_entry()
 {
 	/* Register label-less float metric - immediate (no aggregation) */
-	g_temperature_metric = spotflow_register_metric_float("temperature_celsius", SPOTFLOW_AGG_INTERVAL_NONE);
-	if (!g_temperature_metric) {
-		LOG_ERR("Failed to register temperature metric");
+	int rc = spotflow_register_metric_float("temperature_celsius", SPOTFLOW_AGG_INTERVAL_NONE,
+						&g_temperature_metric);
+	if (rc < 0) {
+		LOG_ERR("Failed to register temperature metric: %d", rc);
 		return;
 	}
 	LOG_INF("Registered metric: temperature_celsius (float, NONE)");

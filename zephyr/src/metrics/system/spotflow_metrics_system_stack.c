@@ -28,20 +28,23 @@ static void report_thread_stack(const struct k_thread *thread, void *user_data);
 
 int spotflow_metrics_system_stack_init(void)
 {
+	int rc;
 	uint16_t max_threads = CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS;
 
-	g_stack_metric = spotflow_register_metric_int_with_labels(
-		SPOTFLOW_METRIC_NAME_STACK_FREE, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, max_threads, 1);
-	if (!g_stack_metric) {
-		LOG_ERR("Failed to register stack free metric");
-		return -ENOMEM;
+	rc = spotflow_register_metric_int_with_labels(SPOTFLOW_METRIC_NAME_STACK_FREE,
+						      SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+						      max_threads, 1, &g_stack_metric);
+	if (rc < 0) {
+		LOG_ERR("Failed to register stack free metric: %d", rc);
+		return rc;
 	}
 
-	g_stack_used_metric = spotflow_register_metric_float_with_labels(
-		SPOTFLOW_METRIC_NAME_STACK_USED, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, max_threads, 1);
-	if (!g_stack_used_metric) {
-		LOG_ERR("Failed to register stack used percent metric");
-		return -ENOMEM;
+	rc = spotflow_register_metric_float_with_labels(SPOTFLOW_METRIC_NAME_STACK_USED,
+							SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+							max_threads, 1, &g_stack_used_metric);
+	if (rc < 0) {
+		LOG_ERR("Failed to register stack used percent metric: %d", rc);
+		return rc;
 	}
 
 #ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS

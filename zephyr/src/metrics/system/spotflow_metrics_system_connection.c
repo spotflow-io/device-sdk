@@ -18,11 +18,12 @@ static struct spotflow_metric_int *g_connection_state_metric;
 
 int spotflow_metrics_system_connection_init(void)
 {
-	g_connection_state_metric =
-		spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_CONNECTION, SPOTFLOW_AGG_INTERVAL_NONE);
-	if (!g_connection_state_metric) {
-		LOG_ERR("Failed to register connection state metric");
-		return -ENOMEM;
+	int rc = spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_CONNECTION,
+					      SPOTFLOW_AGG_INTERVAL_NONE,
+					      &g_connection_state_metric);
+	if (rc < 0) {
+		LOG_ERR("Failed to register connection state metric: %d", rc);
+		return rc;
 	}
 
 	LOG_INF("Registered connection state metric");

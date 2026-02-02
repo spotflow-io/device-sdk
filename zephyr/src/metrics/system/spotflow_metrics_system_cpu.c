@@ -19,11 +19,12 @@ static struct spotflow_metric_float *g_cpu_utilization_metric;
 
 int spotflow_metrics_system_cpu_init(void)
 {
-	g_cpu_utilization_metric = spotflow_register_metric_float(
-		SPOTFLOW_METRIC_NAME_CPU, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL);
-	if (!g_cpu_utilization_metric) {
-		LOG_ERR("Failed to register CPU utilization metric");
-		return -ENOMEM;
+	int rc = spotflow_register_metric_float(SPOTFLOW_METRIC_NAME_CPU,
+						SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+						&g_cpu_utilization_metric);
+	if (rc < 0) {
+		LOG_ERR("Failed to register CPU utilization metric: %d", rc);
+		return rc;
 	}
 
 	LOG_INF("Registered CPU utilization metric");
