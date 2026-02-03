@@ -288,6 +288,53 @@ static void aggregation_timer_handler(struct k_work* work)
 }
 
 /**
+ * @brief Copy labels to time series with bounds checking
+ *
+ * @param ts Time series state to copy labels into
+ * @param labels Source labels array
+ * @param label_count Number of labels to copy
+ * @return 0 on success, -1 if any label key/value is NULL
+ */
+static int copy_labels_to_timeseries(struct metric_timeseries_state* ts,
+				     const struct spotflow_label* labels, uint8_t label_count)
+{
+	for (uint8_t i = 0; i < label_count; i++) {
+		if (!labels[i].key || !labels[i].value) {
+			LOG_ERR("Label key or value is NULL at index %u", i);
+			return -1;
+		}
+
+		strncpy(ts->labels[i].key, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
+		ts->labels[i].key[SPOTFLOW_MAX_LABEL_KEY_LEN - 1] = '\0';
+
+		strncpy(ts->labels[i].value, labels[i].value, SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
+		ts->labels[i].value[SPOTFLOW_MAX_LABEL_VALUE_LEN - 1] = '\0';
+	}
+
+	return 0;
+}
+
+/**
+ * @brief Initialize aggregation state for time series
+ *
+ * Sets min/max to sentinel values based on metric type.
+ *
+ * @param ts Time series state to initialize
+ * @param type Metric type (int or float)
+ */
+static void init_timeseries_aggregation_state(struct metric_timeseries_state* ts,
+					      enum spotflow_metric_type type)
+{
+	if (type == SPOTFLOW_METRIC_TYPE_INT) {
+		ts->min_int = INT64_MAX;
+		ts->max_int = INT64_MIN;
+	} else {
+		ts->min_float = FLT_MAX;
+		ts->max_float = -FLT_MAX;
+	}
+}
+
+/**
  * @brief Find or create time series slot
  *
  * Uses direct string comparison for label matching. O(n) linear search
@@ -325,7 +372,6 @@ find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct sp
 		ts = evictable_slot;
 		if (ts != NULL) {
 			LOG_DBG("Evicting idle timeseries for metric '%s'", ctx->metric->name);
-			/* Evicting active slot - count stays same */
 		}
 	} else {
 		ctx->timeseries_count++;
@@ -340,33 +386,15 @@ find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct sp
 	ts->active = true;
 	ts->label_count = label_count;
 
-	/* Copy labels (NULL validation done in backend, truncation via strncpy) */
-	for (uint8_t j = 0; j < label_count; j++) {
-		/* Defensive NULL check */
-		if (!labels[j].key || !labels[j].value) {
-			LOG_ERR("Label key or value is NULL at index %u", j);
-			ts->active = false;
-			return NULL;
-		}
-
-		strncpy(ts->labels[j].key, labels[j].key, SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
-		ts->labels[j].key[SPOTFLOW_MAX_LABEL_KEY_LEN - 1] = '\0';
-
-		strncpy(ts->labels[j].value, labels[j].value, SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
-		ts->labels[j].value[SPOTFLOW_MAX_LABEL_VALUE_LEN - 1] = '\0';
+	if (copy_labels_to_timeseries(ts, labels, label_count) < 0) {
+		ts->active = false;
+		return NULL;
 	}
 
-	/* Initialize aggregation state */
-	if (ctx->metric->type == SPOTFLOW_METRIC_TYPE_INT) {
-		ts->min_int = INT64_MAX;
-		ts->max_int = INT64_MIN;
-	} else {
-		ts->min_float = FLT_MAX;
-		ts->max_float = -FLT_MAX;
-	}
+	init_timeseries_aggregation_state(ts, ctx->metric->type);
 
-	LOG_DBG("Initialized time series for metric '%s' (active=%u/%u)",
-		ctx->metric->name, ctx->timeseries_count, ctx->timeseries_capacity);
+	LOG_DBG("Initialized time series for metric '%s' (active=%u/%u)", ctx->metric->name,
+		ctx->timeseries_count, ctx->timeseries_capacity);
 
 	return ts;
 }
