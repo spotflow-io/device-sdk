@@ -816,27 +816,33 @@ check_ncs_installation() {
     fi
 
     if [[ "$should_install_ncs_toolchain" == true ]]; then
-        if [[ $nrfutil_type == "nrfutil" ]]; then
-            echo "$nrfutil_path sdk-manager"
-        else
-            echo "$nrfutil_path"
-        fi
+        echo "$nrfutil_type|$nrfutil_path"
     fi
 }
 
 install_ncs_toolchain() {
-    local sdk_manager_cmd="$1"
-    local ncs_version="$2"
+    local nrfutil_type="$1"
+    local nrfutil_path="$2"
+    local ncs_version="$3"
 
-    local manager_args="toolchain install --ncs-version $ncs_version"
+    local cmd=""
+    local args=()
+    if [[ "$nrfutil_type" == "nrfutil" ]]; then
+        cmd="$nrfutil_path"
+        args+=("sdk-manager")
+    else
+        cmd="$nrfutil_path"
+    fi
 
-    write_info "Running: $sdk_manager_cmd $manager_args"
+    args+=("toolchain install --ncs-version $ncs_version")
 
-    if "$sdk_manager_cmd" $manager_args; then
+    write_info "Running: $cmd ${args[*]}"
+
+    if "$cmd" "${args[@]}"; then
         write_success "nRF Connect SDK toolchain installed for version $ncs_version"
     else
         write_error "Failed to install nRF Connect SDK toolchain"
-        write_warning "You can try installing it manually with: $sdk_manager_cmd $manager_args"
+        write_warning "You can try installing it manually with: $cmd ${args[*]}"
     fi
 }
 
@@ -952,12 +958,13 @@ main() {
 
     local should_install_zephyr_sdk=false
     local should_install_ncs_toolchain=false
-    local ncs_manager_cmd=""
+    local nrfutil_type=""
+    local nrfutil_path=""
 
     if [[ "$sdk_type" == "ncs" ]]; then
         write_step "Checking nRF Connect SDK toolchain setup..."
-        ncs_manager_cmd=$(check_ncs_installation)
-        if [[ -n "$ncs_manager_cmd" ]]; then
+        IFS='|' read -r nrfutil_type nrfutil_path <<< $(check_ncs_installation)
+        if [[ -n "$nrfutil_type" ]]; then
             should_install_ncs_toolchain=true
         fi
     else
@@ -1000,7 +1007,7 @@ main() {
 
     if [[ "$should_install_ncs_toolchain" == true ]]; then
         write_step "Installing nRF Connect SDK toolchain for $ncs_version..."
-        install_ncs_toolchain "$ncs_manager_cmd" "$ncs_version"
+        install_ncs_toolchain "$nrfutil_type" "$nrfutil_path" "$ncs_version"
     elif [[ "$should_install_zephyr_sdk" == true ]]; then
         write_step "Installing Zephyr SDK $sdk_version..."
         install_zephyr_sdk "$sdk_version" "$sdk_toolchain" "$github_token"
