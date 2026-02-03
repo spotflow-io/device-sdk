@@ -34,6 +34,11 @@ static bool encode_labels(zcbor_state_t *state,
 			  uint8_t label_count);
 static void encode_metric_header(struct spotflow_metric_base* metric, int64_t timestamp_ms,
 			  uint64_t sequence_number, zcbor_state_t state[3], bool* succ);
+static bool encode_aggregation_stats(zcbor_state_t *state,
+				     struct spotflow_metric_base *metric,
+				     struct metric_timeseries_state *ts);
+static int finalize_cbor_output(uint8_t *buffer, zcbor_state_t *state,
+				uint8_t **cbor_data, size_t *cbor_len);
 
 int spotflow_metrics_cbor_encode(
 	struct spotflow_metric_base *metric,
@@ -82,42 +87,8 @@ int spotflow_metrics_cbor_encode(
 		succ = succ && encode_labels(state, ts->labels, ts->label_count);
 	}
 
-	/* sum */
-	succ = succ && zcbor_uint32_put(state, KEY_SUM);
-	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
-		succ = succ && zcbor_float64_put(state, ts->sum_float);
-	} else {
-		succ = succ && zcbor_int64_put(state, ts->sum_int);
-	}
-
-	/* sumTruncated (only if true) */
-	if (ts->sum_truncated) {
-		succ = succ && zcbor_uint32_put(state, KEY_SUM_TRUNCATED);
-		succ = succ && zcbor_bool_put(state, true);
-	}
-
-	/* count, min, max (only for aggregated metrics, not PT0S) */
-	if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE) {
-		/* count */
-		succ = succ && zcbor_uint32_put(state, KEY_COUNT);
-		succ = succ && zcbor_uint64_put(state, ts->count);
-
-		/* min */
-		succ = succ && zcbor_uint32_put(state, KEY_MIN);
-		if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
-			succ = succ && zcbor_float64_put(state, ts->min_float);
-		} else {
-			succ = succ && zcbor_int64_put(state, ts->min_int);
-		}
-
-		/* max */
-		succ = succ && zcbor_uint32_put(state, KEY_MAX);
-		if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
-			succ = succ && zcbor_float64_put(state, ts->max_float);
-		} else {
-			succ = succ && zcbor_int64_put(state, ts->max_int);
-		}
-	}
+	/* Encode aggregation stats: sum, sumTruncated, count, min, max */
+	succ = succ && encode_aggregation_stats(state, metric, ts);
 
 	/* End CBOR map */
 	succ = succ && zcbor_map_end_encode(state, map_entries);
@@ -128,28 +99,13 @@ int spotflow_metrics_cbor_encode(
 		return -EINVAL;
 	}
 
-	/* Memory Ownership Contract: */
-	/* 1. Encoder allocates and returns pointer to caller */
-	/* 2. Caller enqueues pointer to message queue */
-	/* 3. If enqueue fails: caller MUST free immediately */
-	/* 4. If enqueue succeeds: ownership transfers to processor thread */
-	/* 5. Processor thread ALWAYS frees (success or failure) */
-
-	/* Allocate and copy */
-	size_t encoded_len = state->payload - buffer;
-	uint8_t *data = k_malloc(encoded_len);
-	if (!data) {
-		k_free(buffer);
-		return -ENOMEM;
+	int ret = finalize_cbor_output(buffer, state, cbor_data, cbor_len);
+	if (ret != 0) {
+		return ret;
 	}
 
-	memcpy(data, buffer, encoded_len);
-	k_free(buffer);
-	*cbor_data = data;
-	*cbor_len = encoded_len;
-
 	LOG_DBG("Encoded metric '%s' message (%zu bytes, seq=%llu)",
-		metric->name, encoded_len, (unsigned long long)sequence_number);
+		metric->name, *cbor_len, (unsigned long long)sequence_number);
 
 	return 0;
 }
@@ -224,24 +180,65 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 		return -EINVAL;
 	}
 
-	/* Allocate and copy */
-	size_t encoded_len = state->payload - buffer;
-	uint8_t* data = k_malloc(encoded_len);
-	if (!data) {
-		k_free(buffer);
-		return -ENOMEM;
+	int ret = finalize_cbor_output(buffer, state, cbor_data, cbor_len);
+	if (ret != 0) {
+		return ret;
 	}
 
-	memcpy(data, buffer, encoded_len);
-	k_free(buffer);
-	*cbor_data = data;
-	*cbor_len = encoded_len;
-
-	LOG_DBG("Encoded raw metric '%s' message (%zu bytes, seq=%llu)", metric->name, encoded_len,
+	LOG_DBG("Encoded raw metric '%s' message (%zu bytes, seq=%llu)", metric->name, *cbor_len,
 		(unsigned long long)sequence_number);
 
 	return 0;
 }
+
+
+int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t **data, size_t *len)
+{
+	uint8_t buffer[64];  /* Small static buffer for ~40 bytes output */
+	ZCBOR_STATE_E(state, 1, buffer, sizeof(buffer), 1);
+
+	bool succ = true;
+
+	/* Start CBOR map with 4 entries */
+	succ = succ && zcbor_map_start_encode(state, 4);
+
+	/* messageType = 5 */
+	succ = succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
+	succ = succ && zcbor_uint32_put(state, METRIC_MESSAGE_TYPE);
+
+	/* metricName = "uptime_ms" */
+	succ = succ && zcbor_uint32_put(state, KEY_METRIC_NAME);
+	succ = succ && zcbor_tstr_put_lit(state, "uptime_ms");
+
+	/* deviceUptimeMs */
+	succ = succ && zcbor_uint32_put(state, KEY_DEVICE_UPTIME_MS);
+	succ = succ && zcbor_int64_put(state, uptime_ms);
+
+	/* sum = uptime value */
+	succ = succ && zcbor_uint32_put(state, KEY_SUM);
+	succ = succ && zcbor_int64_put(state, uptime_ms);
+
+	succ = succ && zcbor_map_end_encode(state, 4);
+
+	if (!succ) {
+		LOG_ERR("Heartbeat CBOR encoding failed");
+		return -EINVAL;
+	}
+
+	/* Allocate and copy */
+	size_t encoded_len = state->payload - buffer;
+	*data = k_malloc(encoded_len);
+	if (!*data) {
+		LOG_ERR("Failed to allocate heartbeat payload");
+		return -ENOMEM;
+	}
+
+	memcpy(*data, buffer, encoded_len);
+	*len = encoded_len;
+
+	return 0;
+}
+
 
 /**
  * @brief Encode labels as CBOR map
@@ -290,5 +287,66 @@ static void encode_metric_header(struct spotflow_metric_base* metric, int64_t ti
 	/* sequenceNumber (per-metric, passed by caller who increments under mutex) */
 	*succ = *succ && zcbor_uint32_put(state, KEY_SEQUENCE_NUMBER);
 	*succ = *succ && zcbor_uint64_put(state, sequence_number);
+}
+
+static bool encode_aggregation_stats(zcbor_state_t *state,
+				     struct spotflow_metric_base *metric,
+				     struct metric_timeseries_state *ts)
+{
+	bool succ = true;
+
+	/* sum */
+	succ = succ && zcbor_uint32_put(state, KEY_SUM);
+	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+		succ = succ && zcbor_float64_put(state, ts->sum_float);
+	} else {
+		succ = succ && zcbor_int64_put(state, ts->sum_int);
+	}
+
+	/* sumTruncated (only if true) */
+	if (ts->sum_truncated) {
+		succ = succ && zcbor_uint32_put(state, KEY_SUM_TRUNCATED);
+		succ = succ && zcbor_bool_put(state, true);
+	}
+
+	/* count */
+	succ = succ && zcbor_uint32_put(state, KEY_COUNT);
+	succ = succ && zcbor_uint64_put(state, ts->count);
+
+	/* min */
+	succ = succ && zcbor_uint32_put(state, KEY_MIN);
+	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+		succ = succ && zcbor_float64_put(state, ts->min_float);
+	} else {
+		succ = succ && zcbor_int64_put(state, ts->min_int);
+	}
+
+	/* max */
+	succ = succ && zcbor_uint32_put(state, KEY_MAX);
+	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+		succ = succ && zcbor_float64_put(state, ts->max_float);
+	} else {
+		succ = succ && zcbor_int64_put(state, ts->max_int);
+	}
+
+	return succ;
+}
+
+static int finalize_cbor_output(uint8_t *buffer, zcbor_state_t *state,
+				uint8_t **cbor_data, size_t *cbor_len)
+{
+	size_t encoded_len = state->payload - buffer;
+	uint8_t *data = k_malloc(encoded_len);
+	if (!data) {
+		k_free(buffer);
+		return -ENOMEM;
+	}
+
+	memcpy(data, buffer, encoded_len);
+	k_free(buffer);
+	*cbor_data = data;
+	*cbor_len = encoded_len;
+
+	return 0;
 }
 

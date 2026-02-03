@@ -5,26 +5,13 @@
  */
 
 #include "spotflow_metrics_heartbeat.h"
-#include "spotflow_metrics_types.h"
+#include "spotflow_metrics_cbor.h"
 #include "../net/spotflow_mqtt.h"
 
-#include <zcbor_common.h>
-#include <zcbor_encode.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(spotflow_metrics_heartbeat, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
-
-/* CBOR Protocol Keys */
-#define KEY_MESSAGE_TYPE     0x00  /* 0 */
-#define KEY_DEVICE_UPTIME_MS 0x06  /* 6 */
-#define KEY_METRIC_NAME      0x15  /* 21 */
-#define KEY_SUM              0x18  /* 24 */
-
-#define METRIC_MESSAGE_TYPE  0x05
-
-/* Heartbeat metric name */
-#define HEARTBEAT_METRIC_NAME "uptime_ms"
 
 /* Single-slot buffer for pending heartbeat (size 1, silent overwrite) */
 static struct spotflow_mqtt_metrics_msg *g_pending_heartbeat;
@@ -32,69 +19,6 @@ static struct k_mutex g_heartbeat_mutex;
 
 /* Periodic heartbeat work */
 static struct k_work_delayable g_heartbeat_work;
-
-/**
- * @brief Encode a minimal heartbeat CBOR message
- *
- * Output format:
- * {
- *   0x00: 0x05,                    // messageType = 5 (METRIC)
- *   0x15: "device_uptime_ms",      // metricName
- *   0x06: <int64>,                 // deviceUptimeMs
- *   0x18: <int64>                  // sum (same uptime value)
- * }
- *
- * @param uptime_ms Device uptime in milliseconds
- * @param data Output pointer for allocated CBOR data
- * @param len Output pointer for CBOR data length
- * @return 0 on success, negative errno on failure
- */
-static int encode_heartbeat(int64_t uptime_ms, uint8_t **data, size_t *len)
-{
-	uint8_t buffer[64];  /* Small static buffer, sufficient for ~40 bytes output */
-	ZCBOR_STATE_E(state, 1, buffer, sizeof(buffer), 1);
-
-	bool succ = true;
-
-	/* Start CBOR map with 4 entries */
-	succ = succ && zcbor_map_start_encode(state, 4);
-
-	/* messageType = 5 */
-	succ = succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
-	succ = succ && zcbor_uint32_put(state, METRIC_MESSAGE_TYPE);
-
-	/* metricName = "device_uptime_ms" */
-	succ = succ && zcbor_uint32_put(state, KEY_METRIC_NAME);
-	succ = succ && zcbor_tstr_put_lit(state, HEARTBEAT_METRIC_NAME);
-
-	/* deviceUptimeMs */
-	succ = succ && zcbor_uint32_put(state, KEY_DEVICE_UPTIME_MS);
-	succ = succ && zcbor_int64_put(state, uptime_ms);
-
-	/* sum = uptime value */
-	succ = succ && zcbor_uint32_put(state, KEY_SUM);
-	succ = succ && zcbor_int64_put(state, uptime_ms);
-
-	succ = succ && zcbor_map_end_encode(state, 4);
-
-	if (!succ) {
-		LOG_ERR("Heartbeat CBOR encoding failed");
-		return -EINVAL;
-	}
-
-	/* Allocate and copy */
-	size_t encoded_len = state->payload - buffer;
-	*data = k_malloc(encoded_len);
-	if (!*data) {
-		LOG_ERR("Failed to allocate heartbeat payload");
-		return -ENOMEM;
-	}
-
-	memcpy(*data, buffer, encoded_len);
-	*len = encoded_len;
-
-	return 0;
-}
 
 /**
  * @brief Timer handler - generates heartbeat and overwrites pending buffer
@@ -108,7 +32,7 @@ static void heartbeat_work_handler(struct k_work *work)
 	/* Encode heartbeat message */
 	uint8_t *payload = NULL;
 	size_t len = 0;
-	int rc = encode_heartbeat(uptime_ms, &payload, &len);
+	int rc = spotflow_metrics_cbor_encode_heartbeat(uptime_ms, &payload, &len);
 	if (rc != 0) {
 		LOG_ERR("Failed to encode heartbeat: %d", rc);
 		goto reschedule;

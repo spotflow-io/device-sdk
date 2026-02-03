@@ -48,6 +48,26 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 						int64_t timestamp_ms, uint64_t sequence_number,
 					uint8_t** cbor_data, size_t* cbor_len);
 
+/**
+ * @brief Encode a minimal heartbeat CBOR message
+ *
+ * Output format:
+ * {
+ *   0x00: 0x05,                    // messageType = 5 (METRIC)
+ *   0x15: "uptime_ms",             // metricName
+ *   0x06: <int64>,                 // deviceUptimeMs
+ *   0x18: <int64>                  // sum (same uptime value)
+ * }
+ *
+ * @param uptime_ms Device uptime in milliseconds
+ * @param data Output pointer for allocated CBOR data (caller must free if not enqueued)
+ * @param len Output pointer for CBOR data length
+ * @return 0 on success, negative errno on failure
+ *         -EINVAL: CBOR encoding failed
+ *         -ENOMEM: Memory allocation failed
+ */
+int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t **data, size_t *len);
+
 #ifdef __cplusplus
 }
 #endif
