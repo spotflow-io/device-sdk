@@ -68,7 +68,7 @@ int spotflow_metrics_cbor_encode(
 
 	/* Calculate actual map entry count (dynamic map size) */
 	/* Base entries: messageType, metricName, aggregationInterval, deviceUptimeMs,
-	 *               sequenceNumber, sum = 9 */
+	 *               sequenceNumber, sum, count, min, max = 9 */
 	uint32_t map_entries = 9;
 	if (ts->label_count > 0) {
 		map_entries++;  /* labels */
@@ -136,8 +136,8 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 
 	/* Calculate map entry count */
 	/* Base: messageType, metricName, aggregationInterval, deviceUptimeMs,
-  *       sequenceNumber =5 */
-	uint32_t map_entries = 5;
+	 *       sequenceNumber, sum = 6 */
+	uint32_t map_entries = 6;
 	if (label_count > 0) {
 		map_entries++; /* labels */
 	}
