@@ -68,7 +68,7 @@ write_line() {
     if [[ -n "$color" ]]; then
         echo -e "${color}$line${COLOR_RESET}" >&2
     else
-        echo "$line" >&2
+        echo -e "$line" >&2
     fi
 }
 
