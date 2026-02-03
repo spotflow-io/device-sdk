@@ -829,12 +829,12 @@ install_ncs_toolchain() {
     local args=()
     if [[ "$nrfutil_type" == "nrfutil" ]]; then
         cmd="$nrfutil_path"
-        args+=("sdk-manager")
+        args+=(sdk-manager)
     else
         cmd="$nrfutil_path"
     fi
 
-    args+=("toolchain install --ncs-version $ncs_version")
+    args+=(toolchain install --ncs-version "$ncs_version")
 
     write_info "Running: $cmd ${args[*]}"
 
