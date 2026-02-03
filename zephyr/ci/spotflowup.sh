@@ -39,6 +39,7 @@ readonly COLOR_GRAY='\033[0;37m'
 readonly COLOR_DARK_GRAY='\033[1;30m'
 
 # Interaction helper functions
+# Note: All functions must send user messages to stderr to not mix them with returned values.
 
 write_step() {
     echo -e "\n${COLOR_CYAN}>${COLOR_WHITE} $1${COLOR_RESET}" >&2
@@ -111,7 +112,6 @@ read_input() {
     local default="$2"
     local provided_value="${3:-}"
 
-    # User messages sent to stderr to split them from the function output
     if [[ -n "$provided_value" ]]; then
         write_info "$prompt (provided: $provided_value)"
         echo "$provided_value"
@@ -150,7 +150,7 @@ Options:
     --workspace-folder DIR      Workspace folder path
     --spotflow-revision REV     Spotflow module revision to checkout
     --quickstart-json-url URL   Override quickstart.json URL
-    --github-token TOKEN       Optional GitHub token for Zephyr SDK installation
+    --github-token TOKEN        Optional GitHub token for Zephyr SDK installation
     --auto-confirm              Automatically confirm all actions
     -h, --help                  Show this help message
 
@@ -326,7 +326,6 @@ except Exception as e:
 }
 
 # Extracts a parameter from the board configuration string
-# Usage: extract_board_parameter <board_config> <parameter>
 # Returns:
 #   The value of the parameter or empty string if not found
 extract_board_parameter() {
@@ -477,8 +476,9 @@ activate_python_venv() {
         exit_with_error "Virtual environment activation script not found" "$activate_script"
     fi
 
-    # shellcheck disable=SC1090
-    source "$activate_script"
+    if ! source "$activate_script" >&2; then
+        exit_with_error "Failed to activate virtual environment"
+    fi
     write_success "Virtual environment activated"
 }
 
@@ -514,14 +514,14 @@ initialize_west_workspace() {
 }
 
 update_west_workspace() {
-    if ! west update --fetch-opt=--depth=1 --narrow; then
+    if ! west update --fetch-opt=--depth=1 --narrow >&2; then
         exit_with_error "Failed to download dependencies"
     fi
     write_success "Dependencies downloaded"
 }
 
 install_python_packages() {
-    if ! west packages pip --install; then
+    if ! west packages pip --install >&2; then
         exit_with_error "Failed to install Python packages"
     fi
     write_success "Python packages installed"
@@ -530,7 +530,7 @@ install_python_packages() {
 fetch_blobs() {
     local blob="$1"
 
-    if ! west blobs fetch "$blob" --auto-accept; then
+    if ! west blobs fetch "$blob" --auto-accept >&2; then
         exit_with_error "Failed to fetch binary blobs"
     fi
     write_success "Binary blobs fetched"

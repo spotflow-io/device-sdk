@@ -60,7 +60,8 @@ param(
 $DefaultQuickstartJsonUrl = "https://downloads.spotflow.io/quickstart.json"
 $ManifestBaseUrl = "https://github.com/spotflow-io/device-sdk"
 
-# Colors and formatting
+# Interaction helper functions
+
 function Write-Step {
     param([string]$Message)
     Write-Host "`n> " -ForegroundColor Cyan -NoNewline
@@ -106,7 +107,7 @@ function Exit-WithError {
     Write-Host "  https://github.com/spotflow-io/device-sdk/issues" -ForegroundColor Cyan
     Write-Host ""
     Write-Host "You can also contact us on Discord:" -ForegroundColor Gray
-    Write-Host "  https://discord.com/channels/1372202003635114125/1379411086163574864"`
+    Write-Host "  https://discord.com/channels/1372202003635114125/1379411086163574864" `
         -ForegroundColor Cyan
     Write-Host ""
     exit 1
@@ -140,7 +141,6 @@ function Read-Input {
         [string]$ProvidedValue = ""
     )
 
-    # User messages sent to host (stderr equivalent) to split them from the function output
     if (-not [string]::IsNullOrWhiteSpace($ProvidedValue)) {
         Write-Info "$Prompt (provided: $ProvidedValue)"
         return $ProvidedValue
@@ -165,7 +165,7 @@ function Read-Input {
 
 # Arguments
 
-function Set-SdkType {
+function Get-SdkType {
     param(
         [bool]$Zephyr,
         [bool]$Ncs
@@ -186,13 +186,14 @@ function Set-SdkType {
     $sdkType = if ($Zephyr) { "zephyr" } else { "ncs" }
     $sdkDisplayType = if ($Zephyr) { "Zephyr" } else { "nRF Connect SDK" }
 
-    Write-Info "SDK type: $sdkDisplayType"
-    Write-Info "Board ID: $board"
-
     return @{
         Type        = $sdkType
         DisplayType = $sdkDisplayType
     }
+}
+
+function Test-IsWindowsOS {
+    return ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
 }
 
 # Prerequisites
@@ -214,9 +215,8 @@ function Find-Python {
     }
 
     if (-not $pythonCmd) {
-        $details = "Please install Python 3.10+ from https://www.python.org/ " +
-                   "or follow Zephyr's Getting Started Guide."
-        Exit-WithError "Python not found" $details
+        Exit-WithError "Python not found" $details `
+            "Please install Python 3.10+ or follow Zephyr's Getting Started Guide."
     }
 
     return $pythonCmd
@@ -254,7 +254,7 @@ function Get-QuickstartJson {
 
 function Find-BoardConfig {
     param(
-        [object]$QuickstartJson,
+        [object]$Json,
         [string]$SdkType,
         [string]$Board
     )
@@ -262,14 +262,14 @@ function Find-BoardConfig {
     $boardConfig = $null
     $vendorName = $null
 
-    if ($SdkType -eq "ncs" -and $QuickstartJson.ncs -and $QuickstartJson.ncs.boards) {
-        $boardConfig = $QuickstartJson.ncs.boards |
+    if ($SdkType -eq "ncs" -and $Json.ncs -and $Json.ncs.boards) {
+        $boardConfig = $Json.ncs.boards |
             Where-Object { $_.id -eq $Board } |
             Select-Object -First 1
     }
-    elseif ($SdkType -eq "zephyr" -and $QuickstartJson.zephyr -and
-            $QuickstartJson.zephyr.vendors) {
-        foreach ($vendor in $QuickstartJson.zephyr.vendors) {
+    elseif ($SdkType -eq "zephyr" -and $Json.zephyr -and
+            $Json.zephyr.vendors) {
+        foreach ($vendor in $Json.zephyr.vendors) {
             $found = $vendor.boards |
                 Where-Object { $_.id -eq $Board } |
                 Select-Object -First 1
@@ -283,11 +283,11 @@ function Find-BoardConfig {
 
     if (-not $boardConfig) {
         $availableBoards = @()
-        if ($SdkType -eq "ncs" -and $QuickstartJson.ncs -and $QuickstartJson.ncs.boards) {
-            $availableBoards = $QuickstartJson.ncs.boards | ForEach-Object { $_.id }
+        if ($SdkType -eq "ncs" -and $Json.ncs -and $Json.ncs.boards) {
+            $availableBoards = $Json.ncs.boards | ForEach-Object { $_.id }
         }
-        elseif ($SdkType -eq "zephyr" -and $QuickstartJson.zephyr -and $QuickstartJson.zephyr.vendors) {
-            foreach ($vendor in $QuickstartJson.zephyr.vendors) {
+        elseif ($SdkType -eq "zephyr" -and $Json.zephyr -and $Json.zephyr.vendors) {
+            foreach ($vendor in $Json.zephyr.vendors) {
                 $availableBoards += $vendor.boards | ForEach-Object { $_.id }
             }
         }
@@ -326,13 +326,9 @@ function Write-BoardInfo {
     if ($BoardConfig.ncs_version) {
         Write-Info "nRF Connect SDK version: $($BoardConfig.ncs_version)"
     }
-}
 
-function Write-Callout {
-    param([string]$Callout)
-
-    if ($Callout) {
-        $calloutText = $Callout -replace '<[^>]+>', ''
+    if ($BoardConfig.callout) {
+        $calloutText = $BoardConfig.callout -replace '<[^>]+>', ''
         Write-Host ""
         Write-Warning "Note: $calloutText"
     }
@@ -343,11 +339,10 @@ function Write-Callout {
 function Get-WorkspaceFolder {
     param(
         [string]$ProvidedFolder,
-        [string]$SdkDisplayType,
-        [bool]$IsWindowsOS
+        [string]$SdkDisplayType
     )
 
-    $defaultFolder = if ($IsWindowsOS) {
+    $defaultFolder = if (Test-IsWindowsOS) {
         "C:\spotflow-ws"
     }
     else {
@@ -355,12 +350,13 @@ function Get-WorkspaceFolder {
     }
 
     Write-Info "The workspace will contain all $SdkDisplayType files and your project."
-    if ($IsWindowsOS) {
+    if (Test-IsWindowsOS) {
         Write-Warning "Tip: Avoid very long paths on Windows to prevent build issues."
     }
     Write-Host ""
 
-    $workspaceFolder = Read-Input "Enter workspace folder path" $defaultFolder -ProvidedValue $ProvidedFolder
+    $workspaceFolder = Read-Input "Enter workspace folder path" $defaultFolder `
+        -ProvidedValue $ProvidedFolder
 
     if ([string]::IsNullOrWhiteSpace($workspaceFolder)) {
         Exit-WithError "Workspace folder path cannot be empty"
@@ -548,15 +544,14 @@ function Get-Blobs {
 function Test-ZephyrSdkInstallation {
     param(
         [string]$SdkVersion,
-        [string]$SdkToolchain,
-        [bool]$IsWindowsOS
+        [string]$SdkToolchain
     )
 
     $sdkInstalled = $false
     $toolchainInstalled = $false
     $installSdk = $false
 
-    $sdkLocations = if ($IsWindowsOS) {
+    $sdkLocations = if (Test-IsWindowsOS) {
         @(
             "$env:USERPROFILE\zephyr-sdk-$SdkVersion",
             "$env:USERPROFILE\.local\zephyr-sdk-$SdkVersion",
@@ -655,7 +650,8 @@ function Install-ZephyrSdk {
         $sdkArgs += @("--personal-access-token", $GitHubToken)
     }
 
-    Write-Info "Running: west $($sdkArgs -join ' ')"
+    $cmdText = "west $($sdkArgs -join ' ')"
+    Write-Info "Running: $cmdText"
 
     try {
         & west @sdkArgs
@@ -667,11 +663,7 @@ function Install-ZephyrSdk {
     catch {
         $errorMsg = "Failed to install Zephyr SDK: $($_.Exception.Message)"
         Write-ErrorMessage $errorMsg
-        $manualCmd = "west sdk install --version $SdkVersion"
-        if ($SdkToolchain) {
-            $manualCmd += " --toolchains $SdkToolchain"
-        }
-        Write-Warning "You can try installing it manually later with: $manualCmd"
+        Write-Warning "You can try installing it manually later with: $cmdText"
     }
 }
 
@@ -690,9 +682,7 @@ function Test-NrfUtilHasSdkManager {
 }
 
 function Find-NrfUtilSdkManagerInExtensions {
-    $isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
-
-    if ($isWindowsOS) {
+    if (Test-IsWindowsOS) {
         $extensionDirs = @(
             "$env:USERPROFILE\.vscode\extensions",
             "$env:USERPROFILE\.cursor\extensions",
@@ -1016,14 +1006,17 @@ function Add-ConfigurationPlaceholders {
 
 function Main {
     Write-Host ""
-    Write-Host "+--------------------------------------------------------------+" -ForegroundColor Cyan
-    Write-Host "|            Spotflow Device SDK - Workspace Setup             |" -ForegroundColor Cyan
-    Write-Host "+--------------------------------------------------------------+" -ForegroundColor Cyan
+    Write-Host "+----------------------------------------------------------+" -ForegroundColor Cyan
+    Write-Host "|          Spotflow Device SDK - Workspace Setup           |" -ForegroundColor Cyan
+    Write-Host "+----------------------------------------------------------+" -ForegroundColor Cyan
     Write-Host ""
 
-    $sdkInfo = Set-SdkType -Zephyr $zephyr -Ncs $ncs
+    $sdkInfo = Get-SdkType -Zephyr $zephyr -Ncs $ncs
     $sdkType = $sdkInfo.Type
     $sdkDisplayType = $sdkInfo.DisplayType
+
+    Write-Info "SDK type: $sdkDisplayType"
+    Write-Info "Board ID: $board"
 
     Write-Step "Checking prerequisites..."
     $pythonCmd = Find-Python
@@ -1034,21 +1027,16 @@ function Main {
     $quickstartJson = Get-QuickstartJson -JsonUrl $jsonUrl
 
     Write-Step "Looking up board '$board'..."
-    $boardResult = Find-BoardConfig -QuickstartJson $quickstartJson -SdkType $sdkType -Board $board
+    $boardResult = Find-BoardConfig -Json $quickstartJson -SdkType $sdkType -Board $board
     $boardConfig = $boardResult.Config
     $vendorName = $boardResult.VendorName
 
     Write-BoardInfo -BoardConfig $boardConfig -VendorName $vendorName
-    Write-Callout -Callout $boardConfig.callout
-
-    # Detect if running on Windows
-    $isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
 
     Write-Step "Configuring workspace location..."
     $workspaceFolder = Get-WorkspaceFolder `
         -ProvidedFolder $workspaceFolder `
         -SdkDisplayType $sdkDisplayType `
-        -IsWindowsOS $isWindowsOS
 
     $requiredSdkVersion = $boardConfig.sdk_version
     $requiredToolchain = $boardConfig.sdk_toolchain
@@ -1066,7 +1054,6 @@ function Main {
         $installSdk = Test-ZephyrSdkInstallation `
             -SdkVersion $requiredSdkVersion `
             -SdkToolchain $requiredToolchain `
-            -IsWindowsOS $isWindowsOS
     }
 
     Write-Step "Creating workspace folder..."
@@ -1139,9 +1126,9 @@ function Main {
         $buildCmd += " $($boardConfig.build_extra_args)"
     }
     Write-Host ""
-    Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
-    Write-Host "|                       Setup Complete!                        |" -ForegroundColor Green
-    Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
+    Write-Host "+----------------------------------------------------------+" -ForegroundColor Green
+    Write-Host "|                      Setup Complete!                     |" -ForegroundColor Green
+    Write-Host "+----------------------------------------------------------+" -ForegroundColor Green
     Write-Host ""
     Write-Host "Workspace location: " -NoNewline
     Write-Host $workspaceFolder -ForegroundColor Cyan
