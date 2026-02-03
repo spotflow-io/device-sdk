@@ -140,6 +140,7 @@ function Read-Input {
         [string]$ProvidedValue = ""
     )
 
+    # User messages sent to host (stderr equivalent) to split them from the function output
     if (-not [string]::IsNullOrWhiteSpace($ProvidedValue)) {
         Write-Info "$Prompt (provided: $ProvidedValue)"
         return $ProvidedValue
@@ -162,14 +163,523 @@ function Read-Input {
     return $response
 }
 
+# Arguments
+
+function Set-SdkType {
+    param(
+        [bool]$Zephyr,
+        [bool]$Ncs
+    )
+
+    if ($Zephyr -and $Ncs) {
+        $errorMsg = "Cannot specify both -zephyr and -ncs"
+        $details = "Please use only one of these options."
+        Exit-WithError $errorMsg $details
+    }
+
+    if (-not $Zephyr -and -not $Ncs) {
+        $errorMsg = "Must specify either -zephyr or -ncs"
+        $details = "Use -zephyr for upstream Zephyr or -ncs for nRF Connect SDK."
+        Exit-WithError $errorMsg $details
+    }
+
+    $sdkType = if ($Zephyr) { "zephyr" } else { "ncs" }
+    $sdkDisplayType = if ($Zephyr) { "Zephyr" } else { "nRF Connect SDK" }
+
+    Write-Info "SDK type: $sdkDisplayType"
+    Write-Info "Board ID: $board"
+
+    return @{
+        Type        = $sdkType
+        DisplayType = $sdkDisplayType
+    }
+}
+
+# Prerequisites
+
+function Find-Python {
+    $pythonCmd = $null
+    foreach ($cmd in @("python", "python3")) {
+        try {
+            $version = & $cmd --version 2>&1
+            if ($LASTEXITCODE -eq 0) {
+                $pythonCmd = $cmd
+                Write-Success "Python found: $version"
+                break
+            }
+        }
+        catch {
+            continue
+        }
+    }
+
+    if (-not $pythonCmd) {
+        $details = "Please install Python 3.10+ from https://www.python.org/ " +
+                   "or follow Zephyr's Getting Started Guide."
+        Exit-WithError "Python not found" $details
+    }
+
+    return $pythonCmd
+}
+
+function Test-Git {
+    try {
+        $gitVersion = & git --version 2>&1
+        if ($LASTEXITCODE -eq 0) {
+            Write-Success "Git found: $gitVersion"
+        }
+        else {
+            throw "Git not found"
+        }
+    }
+    catch {
+        Exit-WithError "Git not found" "Please install Git from https://git-scm.com/"
+    }
+}
+
+# Board configuration
+
+function Get-QuickstartJson {
+    param([string]$JsonUrl)
+
+    try {
+        $quickstartJson = Invoke-RestMethod -Uri $JsonUrl -UseBasicParsing -ErrorAction Stop
+        Write-Success "Configuration downloaded successfully"
+        return $quickstartJson
+    }
+    catch {
+        Exit-WithError "Failed to download board configuration" $_.Exception.Message
+    }
+}
+
+function Find-BoardConfig {
+    param(
+        [object]$QuickstartJson,
+        [string]$SdkType,
+        [string]$Board
+    )
+
+    $boardConfig = $null
+    $vendorName = $null
+
+    if ($SdkType -eq "ncs" -and $QuickstartJson.ncs -and $QuickstartJson.ncs.boards) {
+        $boardConfig = $QuickstartJson.ncs.boards |
+            Where-Object { $_.id -eq $Board } |
+            Select-Object -First 1
+    }
+    elseif ($SdkType -eq "zephyr" -and $QuickstartJson.zephyr -and
+            $QuickstartJson.zephyr.vendors) {
+        foreach ($vendor in $QuickstartJson.zephyr.vendors) {
+            $found = $vendor.boards |
+                Where-Object { $_.id -eq $Board } |
+                Select-Object -First 1
+            if ($found) {
+                $boardConfig = $found
+                $vendorName = $vendor.name
+                break
+            }
+        }
+    }
+
+    if (-not $boardConfig) {
+        $availableBoards = @()
+        if ($SdkType -eq "ncs" -and $QuickstartJson.ncs -and $QuickstartJson.ncs.boards) {
+            $availableBoards = $QuickstartJson.ncs.boards | ForEach-Object { $_.id }
+        }
+        elseif ($SdkType -eq "zephyr" -and $QuickstartJson.zephyr -and $QuickstartJson.zephyr.vendors) {
+            foreach ($vendor in $QuickstartJson.zephyr.vendors) {
+                $availableBoards += $vendor.boards | ForEach-Object { $_.id }
+            }
+        }
+
+        $boardList = ($availableBoards | Where-Object { $_ }) -join ", "
+        $errorMsg = "Board '$Board' not found in $sdkDisplayType configuration"
+        Exit-WithError $errorMsg "Available boards: $boardList"
+    }
+
+    return @{
+        Config     = $boardConfig
+        VendorName = $vendorName
+    }
+}
+
+function Write-BoardInfo {
+    param(
+        [object]$BoardConfig,
+        [string]$VendorName
+    )
+
+    Write-Success "Found board: $($BoardConfig.name)"
+    if ($VendorName) {
+        Write-Info "Vendor: $VendorName"
+    }
+    Write-Info "Connection methods: $($BoardConfig.connection -join ", ")"
+    Write-Info "Board target: $($BoardConfig.board)"
+    Write-Info "Manifest: $($BoardConfig.manifest)"
+    Write-Info "SDK version: $($BoardConfig.sdk_version)"
+    if ($BoardConfig.sdk_toolchain) {
+        Write-Info "Toolchain: $($BoardConfig.sdk_toolchain)"
+    }
+    if ($BoardConfig.blob) {
+        Write-Info "Blob: $($BoardConfig.blob)"
+    }
+    if ($BoardConfig.ncs_version) {
+        Write-Info "nRF Connect SDK version: $($BoardConfig.ncs_version)"
+    }
+}
+
+function Write-Callout {
+    param([string]$Callout)
+
+    if ($Callout) {
+        $calloutText = $Callout -replace '<[^>]+>', ''
+        Write-Host ""
+        Write-Warning "Note: $calloutText"
+    }
+}
+
+# Workspace folder
+
+function Get-WorkspaceFolder {
+    param(
+        [string]$ProvidedFolder,
+        [string]$SdkDisplayType,
+        [bool]$IsWindowsOS
+    )
+
+    $defaultFolder = if ($IsWindowsOS) {
+        "C:\spotflow-ws"
+    }
+    else {
+        Join-Path $HOME "spotflow-ws"
+    }
+
+    Write-Info "The workspace will contain all $SdkDisplayType files and your project."
+    if ($IsWindowsOS) {
+        Write-Warning "Tip: Avoid very long paths on Windows to prevent build issues."
+    }
+    Write-Host ""
+
+    $workspaceFolder = Read-Input "Enter workspace folder path" $defaultFolder -ProvidedValue $ProvidedFolder
+
+    if ([string]::IsNullOrWhiteSpace($workspaceFolder)) {
+        Exit-WithError "Workspace folder path cannot be empty"
+    }
+
+    # Normalize path (resolve relative paths against PowerShell's CWD)
+    $workspaceFolder = [System.IO.Path]::GetFullPath(
+        [System.IO.Path]::Combine($PWD.Path, $workspaceFolder)
+    )
+
+    if (Test-Path $workspaceFolder) {
+        $items = Get-ChildItem -Path $workspaceFolder -Force `
+            -ErrorAction SilentlyContinue
+        if ($items.Count -gt 0) {
+            Write-Warning "Folder '$workspaceFolder' already exists and is not empty."
+            $confirmMsg = "Continue anyway? This may cause issues."
+            if (-not (Confirm-Action $confirmMsg $false)) {
+                Write-Info "Setup cancelled by user."
+                exit 0
+            }
+        }
+    }
+
+    Write-Success "Workspace folder: $workspaceFolder"
+
+    return $workspaceFolder
+}
+
+function New-WorkspaceFolder {
+    param([string]$WorkspaceFolder)
+
+    try {
+        if (-not (Test-Path $WorkspaceFolder)) {
+            New-Item -ItemType Directory -Path $WorkspaceFolder -Force | Out-Null
+            Write-Success "Created folder: $WorkspaceFolder"
+        }
+        else {
+            Write-Info "Folder already exists: $WorkspaceFolder"
+        }
+    }
+    catch {
+        Exit-WithError "Failed to create workspace folder" $_.Exception.Message
+    }
+}
+
+# Workspace initialization
+
+function New-PythonVenv {
+    param(
+        [string]$WorkspaceFolder,
+        [string]$PythonCmd
+    )
+
+    $venvPath = Join-Path $WorkspaceFolder ".venv"
+
+    try {
+        if (Test-Path $venvPath) {
+            Write-Info "Virtual environment already exists, reusing it"
+        }
+        else {
+            & $PythonCmd -m venv .venv
+            if ($LASTEXITCODE -ne 0) {
+                throw "venv creation failed with exit code $LASTEXITCODE"
+            }
+            Write-Success "Virtual environment created"
+        }
+    }
+    catch {
+        Exit-WithError "Failed to create Python virtual environment" $_.Exception.Message
+    }
+
+    return $venvPath
+}
+
+function Enable-PythonVenv {
+    param([string]$VenvPath)
+
+    $activateScript = Join-Path $VenvPath "Scripts\Activate.ps1"
+    if (-not (Test-Path $activateScript)) {
+        $activateScript = Join-Path $VenvPath "bin/Activate.ps1"
+    }
+
+    try {
+        . $activateScript
+        Write-Success "Virtual environment activated"
+    }
+    catch {
+        Exit-WithError "Failed to activate virtual environment" $_.Exception.Message
+    }
+}
+
+function Install-West {
+    try {
+        & pip install west
+        if ($LASTEXITCODE -ne 0) {
+            throw "pip install west failed with exit code $LASTEXITCODE"
+        }
+        Write-Success "West installed successfully"
+    }
+    catch {
+        Exit-WithError "Failed to install West" $_.Exception.Message
+    }
+}
+
+function Initialize-WestWorkspace {
+    param(
+        [string]$Manifest,
+        [string]$ManifestBaseUrl,
+        [string]$SpotflowRevision
+    )
+
+    $manifestFile = "zephyr/manifests/$Manifest"
+
+    Write-Info "Manifest URL: $ManifestBaseUrl"
+    Write-Info "Manifest file: $manifestFile"
+
+    try {
+        $westInitArgs = @("init", "--manifest-url", $ManifestBaseUrl,
+                          "--manifest-file", $manifestFile, ".")
+        if ($SpotflowRevision) {
+            $westInitArgs += "--clone-opt=--revision=$SpotflowRevision"
+        }
+
+        $westInitOutput = & west @westInitArgs 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            if ($westInitOutput -match "already initialized") {
+                Write-Warning "Workspace already initialized, continuing..."
+            }
+            else {
+                throw "west init failed: $westInitOutput"
+            }
+        }
+        else {
+            Write-Success "West workspace initialized"
+        }
+    }
+    catch {
+        Exit-WithError "Failed to initialize West workspace" $_.Exception.Message
+    }
+}
+
+function Update-WestWorkspace {
+    try {
+        & west update --fetch-opt=--depth=1 --narrow
+        if ($LASTEXITCODE -ne 0) {
+            throw "west update failed with exit code $LASTEXITCODE"
+        }
+        Write-Success "Dependencies downloaded"
+    }
+    catch {
+        Exit-WithError "Failed to download dependencies" $_.Exception.Message
+    }
+}
+
+function Install-PythonPackages {
+    try {
+        & west packages pip --install
+        if ($LASTEXITCODE -ne 0) {
+            throw "west packages pip failed with exit code $LASTEXITCODE"
+        }
+        Write-Success "Python packages installed"
+    }
+    catch {
+        Exit-WithError "Failed to install Python packages" $_.Exception.Message
+    }
+}
+
+function Get-Blobs {
+    param([string]$Blob)
+
+    try {
+        & west blobs fetch $Blob --auto-accept
+        if ($LASTEXITCODE -ne 0) {
+            throw "west blobs fetch failed with exit code $LASTEXITCODE"
+        }
+        Write-Success "Binary blobs fetched"
+    }
+    catch {
+        Exit-WithError "Failed to fetch binary blobs" $_.Exception.Message
+    }
+}
+
+# Zephyr SDK
+
+function Test-ZephyrSdkInstallation {
+    param(
+        [string]$SdkVersion,
+        [string]$SdkToolchain,
+        [bool]$IsWindowsOS
+    )
+
+    $sdkInstalled = $false
+    $toolchainInstalled = $false
+    $installSdk = $false
+
+    $sdkLocations = if ($IsWindowsOS) {
+        @(
+            "$env:USERPROFILE\zephyr-sdk-$SdkVersion",
+            "$env:USERPROFILE\.local\zephyr-sdk-$SdkVersion",
+            "C:\zephyr-sdk-$SdkVersion",
+            "$env:LOCALAPPDATA\zephyr-sdk-$SdkVersion"
+        )
+    }
+    else {
+        @(
+            "$HOME/zephyr-sdk-$SdkVersion",
+            "$HOME/.local/zephyr-sdk-$SdkVersion",
+            "/opt/zephyr-sdk-$SdkVersion",
+            "/usr/local/zephyr-sdk-$SdkVersion"
+        )
+    }
+
+    if ($env:ZEPHYR_SDK_INSTALL_DIR) {
+        $additionalLocations = @(
+            $env:ZEPHYR_SDK_INSTALL_DIR,
+            "$env:ZEPHYR_SDK_INSTALL_DIR\zephyr-sdk-$SdkVersion"
+        )
+        $sdkLocations = $additionalLocations + $sdkLocations
+    }
+
+    foreach ($sdkPath in $sdkLocations) {
+        if (Test-Path "$sdkPath\sdk_version") {
+            Write-Success "Found Zephyr SDK at: $sdkPath"
+            $sdkInstalled = $true
+
+            if ($SdkToolchain) {
+                $toolchainPath = Join-Path $sdkPath $SdkToolchain
+                if (Test-Path $toolchainPath) {
+                    Write-Success "Toolchain '$SdkToolchain' is installed"
+                    $toolchainInstalled = $true
+                }
+                else {
+                    Write-Warning "Toolchain '$SdkToolchain' not found in SDK"
+                }
+            }
+            else {
+                $toolchainInstalled = $true
+            }
+            break
+        }
+    }
+
+    if (-not $sdkInstalled -or -not $toolchainInstalled) {
+        $warningMsg = "Zephyr SDK $SdkVersion"
+        if ($SdkToolchain) {
+            $warningMsg += " with toolchain '$SdkToolchain'"
+        }
+        $warningMsg += " is not installed."
+        Write-Warning $warningMsg
+        Write-Host ""
+        Write-Info "The Zephyr SDK will be installed to your user profile directory."
+        Write-Host ""
+
+        $confirmMsg = "Install Zephyr SDK $SdkVersion"
+        if ($SdkToolchain) {
+            $confirmMsg += " with '$SdkToolchain' toolchain"
+        }
+        $confirmMsg += "?"
+        if (Confirm-Action $confirmMsg $true) {
+            $installSdk = $true
+        }
+        else {
+            $msg = "Skipping SDK installation. " +
+                   "You can install it manually later with:"
+            Write-Warning $msg
+            $manualCmd = "west sdk install --version $SdkVersion"
+            if ($SdkToolchain) {
+                $manualCmd += " --toolchains $SdkToolchain"
+            }
+            Write-Host "    $manualCmd" -ForegroundColor DarkGray
+        }
+    }
+    else {
+        Write-Success "Zephyr SDK is properly installed"
+    }
+
+    return $installSdk
+}
+
+function Install-ZephyrSdk {
+    param(
+        [string]$SdkVersion,
+        [string]$SdkToolchain,
+        [string]$GitHubToken
+    )
+
+    $sdkArgs = @("sdk", "install", "--version", $SdkVersion)
+    if ($SdkToolchain) {
+        $sdkArgs += @("--toolchains", $SdkToolchain)
+    }
+    if ($GitHubToken) {
+        $sdkArgs += @("--personal-access-token", $GitHubToken)
+    }
+
+    Write-Info "Running: west $($sdkArgs -join ' ')"
+
+    try {
+        & west @sdkArgs
+        if ($LASTEXITCODE -ne 0) {
+            throw "west sdk install failed with exit code $LASTEXITCODE"
+        }
+        Write-Success "Zephyr SDK installed"
+    }
+    catch {
+        $errorMsg = "Failed to install Zephyr SDK: $($_.Exception.Message)"
+        Write-ErrorMessage $errorMsg
+        $manualCmd = "west sdk install --version $SdkVersion"
+        if ($SdkToolchain) {
+            $manualCmd += " --toolchains $SdkToolchain"
+        }
+        Write-Warning "You can try installing it manually later with: $manualCmd"
+    }
+}
+
+# nRF Connect SDK
+
 function Test-NrfUtilHasSdkManager {
     param([string]$NrfUtilPath)
-    <#
-    .SYNOPSIS
-        Checks if nrfutil has the sdk-manager command installed.
-    .OUTPUTS
-        $true if sdk-manager is available, $false otherwise.
-    #>
+
     try {
         $null = & $NrfUtilPath sdk-manager --version 2>&1
         return ($LASTEXITCODE -eq 0)
@@ -180,12 +690,6 @@ function Test-NrfUtilHasSdkManager {
 }
 
 function Find-NrfUtilSdkManagerInExtensions {
-    <#
-    .SYNOPSIS
-        Finds nrfutil-sdk-manager in VS Code/Cursor extensions.
-    .OUTPUTS
-        Full path to the nrfutil-sdk-manager executable, or $null if not found.
-    #>
     $isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
 
     if ($isWindowsOS) {
@@ -226,21 +730,9 @@ function Find-NrfUtilSdkManagerInExtensions {
 }
 
 function Find-NrfUtil {
-    <#
-    .SYNOPSIS
-        Finds the best available nrfutil/sdk-manager for nRF Connect SDK
-        toolchain management.
-        Priority:
-        1. nrfutil on PATH with sdk-manager already installed
-        2. nrfutil-sdk-manager from VS Code/Cursor extension
-        3. nrfutil on PATH without sdk-manager (needs installation)
-    .OUTPUTS
-        Hashtable with:
-        - 'Path': full path to executable
-        - 'Type': 'nrfutil' or 'sdk-manager'
-        - 'NeedsSdkManagerInstall': $true if sdk-manager needs installation
-        Returns $null if not found.
-    #>
+    # Returns:
+    #   Hashtable with 'Path', 'Type', 'NeedsSdkManagerInstall'
+    #   or $null if not found
 
     $nrfutilOnPath = $null
     $nrfutilHasSdkManager = $false
@@ -286,12 +778,6 @@ function Find-NrfUtil {
 
 function Install-NrfUtilSdkManager {
     param([string]$NrfUtilPath)
-    <#
-    .SYNOPSIS
-        Installs the sdk-manager command for nrfutil.
-    .OUTPUTS
-        $true if sdk-manager was installed successfully, $false otherwise.
-    #>
 
     Write-Info "Installing nrfutil sdk-manager command..."
     try {
@@ -316,13 +802,6 @@ function Test-NcsToolchainInstalled {
         [string]$NrfUtilType,
         [string]$NcsVersion
     )
-    <#
-    .SYNOPSIS
-        Checks if the nRF Connect SDK toolchain for the specified version
-        is already installed.
-    .OUTPUTS
-        $true if the toolchain is installed, $false otherwise.
-    #>
 
     try {
         $output = if ($NrfUtilType -eq "nrfutil") {
@@ -343,221 +822,27 @@ function Test-NcsToolchainInstalled {
     return $false
 }
 
-Write-Host ""
-Write-Host "+--------------------------------------------------------------+" -ForegroundColor Cyan
-Write-Host "|            Spotflow Device SDK - Workspace Setup             |" -ForegroundColor Cyan
-Write-Host "+--------------------------------------------------------------+" -ForegroundColor Cyan
-Write-Host ""
-
-# Validate arguments
-if ($zephyr -and $ncs) {
-    $errorMsg = "Cannot specify both -zephyr and -ncs"
-    $details = "Please use only one of these options."
-    Exit-WithError $errorMsg $details
-}
-
-if (-not $zephyr -and -not $ncs) {
-    $errorMsg = "Must specify either -zephyr or -ncs"
-    $details = "Use -zephyr for upstream Zephyr or -ncs for nRF Connect SDK."
-    Exit-WithError $errorMsg $details
-}
-
-$sdkType = if ($zephyr) { "zephyr" } else { "ncs" }
-$sdkDisplayType = if ($zephyr) { "Zephyr" } else { "nRF Connect SDK" }
-Write-Info "SDK type: $sdkDisplayType"
-Write-Info "Board ID: $board"
-
-# Step 1: Download and parse quickstart.json
-Write-Step "Downloading board configuration..."
-
-# Use provided URL or default
-$jsonUrl = if ($quickstartJsonUrl) { $quickstartJsonUrl } else { $DefaultQuickstartJsonUrl }
-
-try {
-    $quickstartJson = Invoke-RestMethod -Uri $jsonUrl -UseBasicParsing -ErrorAction Stop
-    Write-Success "Configuration downloaded successfully"
-}
-catch {
-    Exit-WithError "Failed to download board configuration" $_.Exception.Message
-}
-
-# Step 2: Find the board in the configuration
-Write-Step "Looking up board '$board'..."
-
-$boardConfig = $null
-$vendorName = $null
-
-if ($sdkType -eq "ncs" -and $quickstartJson.ncs -and $quickstartJson.ncs.boards) {
-    $boardConfig = $quickstartJson.ncs.boards |
-        Where-Object { $_.id -eq $board } |
-        Select-Object -First 1
-}
-elseif ($sdkType -eq "zephyr" -and $quickstartJson.zephyr -and
-        $quickstartJson.zephyr.vendors) {
-    foreach ($vendor in $quickstartJson.zephyr.vendors) {
-        $found = $vendor.boards |
-            Where-Object { $_.id -eq $board } |
-            Select-Object -First 1
-        if ($found) {
-            $boardConfig = $found
-            $vendorName = $vendor.name
-            break
-        }
-    }
-}
-
-if (-not $boardConfig) {
-    $availableBoards = @()
-    if ($sdkType -eq "ncs" -and $quickstartJson.ncs -and $quickstartJson.ncs.boards) {
-        $availableBoards = $quickstartJson.ncs.boards | ForEach-Object { $_.id }
-    }
-    elseif ($sdkType -eq "zephyr" -and $quickstartJson.zephyr -and $quickstartJson.zephyr.vendors) {
-        foreach ($vendor in $quickstartJson.zephyr.vendors) {
-            $availableBoards += $vendor.boards | ForEach-Object { $_.id }
-        }
-    }
-
-    $boardList = ($availableBoards | Where-Object { $_ }) -join ", "
-    $errorMsg = "Board '$board' not found in $sdkDisplayType configuration"
-    Exit-WithError $errorMsg "Available boards: $boardList"
-}
-
-Write-Success "Found board: $($boardConfig.name)"
-if ($vendorName) {
-    Write-Info "Vendor: $vendorName"
-}
-Write-Info "Connection methods: $($boardConfig.connection -join ", ")"
-Write-Info "Board target: $($boardConfig.board)"
-Write-Info "Manifest: $($boardConfig.manifest)"
-Write-Info "SDK version: $($boardConfig.sdk_version)"
-if ($boardConfig.sdk_toolchain) {
-    Write-Info "Toolchain: $($boardConfig.sdk_toolchain)"
-}
-if ($boardConfig.blob) {
-    Write-Info "Blob: $($boardConfig.blob)"
-}
-if ($boardConfig.ncs_version) {
-    Write-Info "nRF Connect SDK version: $($boardConfig.ncs_version)"
-}
-
-# Show callout if present (strip HTML for console display)
-if ($boardConfig.callout) {
-    $calloutText = $boardConfig.callout -replace '<[^>]+>', ''
-    Write-Host ""
-    Write-Warning "Note: $calloutText"
-}
-
-# Step 3: Determine and confirm workspace folder
-Write-Step "Configuring workspace location..."
-
-# Detect if running on Windows (works for both Windows PowerShell 5.1 and PowerShell Core)
-$isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
-
-# Set default folder based on platform
-if ($isWindowsOS) {
-    $defaultFolder = "C:\spotflow-ws"
-}
-else {
-    # Linux/macOS
-    $defaultFolder = Join-Path $HOME "spotflow-ws"
-}
-
-Write-Info "The workspace will contain all $sdkDisplayType files and your project."
-if ($isWindowsOS) {
-    Write-Warning "Tip: Avoid very long paths on Windows to prevent build issues."
-}
-Write-Host ""
-
-$workspaceFolder = `
-    Read-Input "Enter workspace folder path" $defaultFolder -ProvidedValue $workspaceFolder
-
-if ([string]::IsNullOrWhiteSpace($workspaceFolder)) {
-    Exit-WithError "Workspace folder path cannot be empty"
-}
-
-# Normalize path (resolve relative paths against PowerShell's CWD)
-$workspaceFolder = [System.IO.Path]::GetFullPath(
-    [System.IO.Path]::Combine($PWD.Path, $workspaceFolder)
-)
-
-if (Test-Path $workspaceFolder) {
-    $items = Get-ChildItem -Path $workspaceFolder -Force `
-        -ErrorAction SilentlyContinue
-    if ($items.Count -gt 0) {
-        Write-Warning "Folder '$workspaceFolder' already exists and is not empty."
-        $confirmMsg = "Continue anyway? This may cause issues."
-        if (-not (Confirm-Action $confirmMsg $false)) {
-            Write-Info "Setup cancelled by user."
-            exit 0
-        }
-    }
-}
-
-Write-Success "Workspace folder: $workspaceFolder"
-
-# Step 4: Check prerequisites
-Write-Step "Checking prerequisites..."
-
-# Check Python
-$pythonCmd = $null
-foreach ($cmd in @("python", "python3")) {
-    try {
-        $version = & $cmd --version 2>&1
-        if ($LASTEXITCODE -eq 0) {
-            $pythonCmd = $cmd
-            Write-Success "Python found: $version"
-            break
-        }
-    }
-    catch {
-        continue
-    }
-}
-
-if (-not $pythonCmd) {
-    $details = "Please install Python 3.10+ from https://www.python.org/ " +
-               "or follow Zephyr's Getting Started Guide."
-    Exit-WithError "Python not found" $details
-}
-
-# Check Git
-try {
-    $gitVersion = & git --version 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        Write-Success "Git found: $gitVersion"
-    }
-    else {
-        throw "Git not found"
-    }
-}
-catch {
-    Exit-WithError "Git not found" "Please install Git from https://git-scm.com/"
-}
-
-# Step 5: Check SDK installation
-$installSdk = $false
-$installNcsToolchain = $false
-$nrfUtilInfo = $null
-$requiredSdkVersion = $boardConfig.sdk_version
-$requiredToolchain = $boardConfig.sdk_toolchain
-$ncsVersion = $boardConfig.ncs_version
-
-if ($sdkType -eq "ncs") {
-    Write-Step "Checking nRF Connect SDK toolchain setup..."
+function Test-NcsInstallation {
+    param([string]$NcsVersion)
 
     $nrfUtilInfo = Find-NrfUtil
+    $nrfUtilType = $null
+    $nrfUtilPath = $null
 
     if ($nrfUtilInfo) {
-        if ($nrfUtilInfo.Type -eq "nrfutil") {
+        $nrfUtilType = $nrfUtilInfo.Type
+        $nrfUtilPath = $nrfUtilInfo.Path
+
+        if ($nrfUtilType -eq "nrfutil") {
             if ($nrfUtilInfo.NeedsSdkManagerInstall) {
-                Write-Info "Found nrfutil at: $($nrfUtilInfo.Path)"
+                Write-Info "Found nrfutil at: $nrfUtilPath"
                 Write-Warning "The sdk-manager command is not installed for nrfutil."
                 Write-Host ""
                 Write-Info "This command is required to install the nRF Connect SDK toolchain."
                 Write-Host ""
 
                 if (Confirm-Action "Install nrfutil sdk-manager command?" $true) {
-                    $installed = Install-NrfUtilSdkManager $nrfUtilInfo.Path
+                    $installed = Install-NrfUtilSdkManager $nrfUtilPath
                     if (-not $installed) {
                         Write-Warning "Could not install nrfutil sdk-manager command."
                         $msg = "Toolchain installation will be skipped. " +
@@ -577,11 +862,11 @@ if ($sdkType -eq "ncs") {
                 }
             }
             else {
-                Write-Success "Found nrfutil with sdk-manager at: $($nrfUtilInfo.Path)"
+                Write-Success "Found nrfutil with sdk-manager at: $nrfUtilPath"
             }
         }
         else {
-            Write-Success "Found nrfutil-sdk-manager at: $($nrfUtilInfo.Path)"
+            Write-Success "Found nrfutil-sdk-manager at: $nrfUtilPath"
         }
     }
     else {
@@ -597,299 +882,73 @@ if ($sdkType -eq "ncs") {
     }
 
     # Check if nRF Connect SDK toolchain is installed and prompt for installation
-    if ($nrfUtilInfo -and $ncsVersion) {
+    $shouldInstallNcsToolchain = $false
+    if ($nrfUtilInfo -and $NcsVersion) {
         $toolchainInstalled = Test-NcsToolchainInstalled `
-            -NrfUtilPath $nrfUtilInfo.Path `
-            -NrfUtilType $nrfUtilInfo.Type `
-            -NcsVersion $ncsVersion
+            -NrfUtilPath $nrfUtilPath `
+            -NrfUtilType $nrfUtilType `
+            -NcsVersion $NcsVersion
 
         if ($toolchainInstalled) {
-            $msg = "nRF Connect SDK toolchain for $ncsVersion is already installed"
+            $msg = "nRF Connect SDK toolchain for $NcsVersion is already installed"
             Write-Success $msg
         }
         else {
-            $msg = "nRF Connect SDK toolchain for $ncsVersion is not installed."
+            $msg = "nRF Connect SDK toolchain for $NcsVersion is not installed."
             Write-Warning $msg
             Write-Host ""
             Write-Info "The installation may take several minutes."
             Write-Host ""
 
-            $confirmMsg = "Install nRF Connect SDK toolchain for $($ncsVersion)?"
+            $confirmMsg = "Install nRF Connect SDK toolchain for $NcsVersion?"
             if (Confirm-Action $confirmMsg $true) {
-                $installNcsToolchain = $true
+                $shouldInstallNcsToolchain = $true
             }
             else {
                 $msg = "Skipping toolchain installation. " +
                        "You can install it manually later with:"
                 Write-Warning $msg
                 $cmd = "nrfutil sdk-manager toolchain install " +
-                       "--ncs-version $ncsVersion"
+                       "--ncs-version $NcsVersion"
                 Write-Host "    $cmd" -ForegroundColor DarkGray
             }
         }
     }
-    elseif (-not $ncsVersion) {
+    elseif (-not $NcsVersion) {
         Write-Warning "nRF Connect SDK version not specified in board configuration."
         Write-Info "Toolchain installation will need to be done manually."
     }
+
+    if ($shouldInstallNcsToolchain) {
+        return @{
+            Type = $nrfUtilType
+            Path = $nrfUtilPath
+        }
+    }
+
+    return $null
 }
-else {
-    Write-Step "Checking Zephyr SDK installation..."
 
-    $sdkInstalled = $false
-    $toolchainInstalled = $false
+function Install-NcsToolchain {
+    param(
+        [string]$NrfUtilType,
+        [string]$NrfUtilPath,
+        [string]$NcsVersion
+    )
 
-    $sdkLocations = if ($isWindowsOS) {
-        @(
-            "$env:USERPROFILE\zephyr-sdk-$requiredSdkVersion",
-            "$env:USERPROFILE\.local\zephyr-sdk-$requiredSdkVersion",
-            "C:\zephyr-sdk-$requiredSdkVersion",
-            "$env:LOCALAPPDATA\zephyr-sdk-$requiredSdkVersion"
-        )
+    $toolchainCmd = $NrfUtilPath
+    $toolchainArgs = if ($NrfUtilType -eq "nrfutil") {
+        @("sdk-manager", "toolchain", "install", "--ncs-version", $NcsVersion)
     }
     else {
-        @(
-            "$HOME/zephyr-sdk-$requiredSdkVersion",
-            "$HOME/.local/zephyr-sdk-$requiredSdkVersion",
-            "/opt/zephyr-sdk-$requiredSdkVersion",
-            "/usr/local/zephyr-sdk-$requiredSdkVersion"
-        )
+        @("toolchain", "install", "--ncs-version", $NcsVersion)
     }
 
-    if ($env:ZEPHYR_SDK_INSTALL_DIR) {
-        $additionalLocations = @(
-            $env:ZEPHYR_SDK_INSTALL_DIR,
-            "$env:ZEPHYR_SDK_INSTALL_DIR\zephyr-sdk-$requiredSdkVersion"
-        )
-        $sdkLocations = $additionalLocations + $sdkLocations
-    }
-
-    foreach ($sdkPath in $sdkLocations) {
-        if (Test-Path "$sdkPath\sdk_version") {
-            Write-Success "Found Zephyr SDK at: $sdkPath"
-            $sdkInstalled = $true
-
-            if ($requiredToolchain) {
-                $toolchainPath = Join-Path $sdkPath $requiredToolchain
-                if (Test-Path $toolchainPath) {
-                    Write-Success "Toolchain '$requiredToolchain' is installed"
-                    $toolchainInstalled = $true
-                }
-                else {
-                    Write-Warning "Toolchain '$requiredToolchain' not found in SDK"
-                }
-            }
-            else {
-                $toolchainInstalled = $true
-            }
-            break
-        }
-    }
-
-    if (-not $sdkInstalled -or -not $toolchainInstalled) {
-        $warningMsg = "Zephyr SDK $requiredSdkVersion"
-        if ($requiredToolchain) {
-            $warningMsg += " with toolchain '$requiredToolchain'"
-        }
-        $warningMsg += " is not installed."
-        Write-Warning $warningMsg
-        Write-Host ""
-        Write-Info "The Zephyr SDK will be installed to your user profile directory."
-        Write-Host ""
-
-        $confirmMsg = "Install Zephyr SDK $requiredSdkVersion"
-        if ($requiredToolchain) {
-            $confirmMsg += " with '$requiredToolchain' toolchain"
-        }
-        $confirmMsg += "?"
-        if (Confirm-Action $confirmMsg $true) {
-            $installSdk = $true
-        }
-        else {
-            $msg = "Skipping SDK installation. " +
-                   "You can install it manually later with:"
-            Write-Warning $msg
-            $manualCmd = "west sdk install --version $requiredSdkVersion"
-            if ($requiredToolchain) {
-                $manualCmd += " --toolchains $requiredToolchain"
-            }
-            Write-Host "    $manualCmd" -ForegroundColor DarkGray
-        }
+    $displayCmd = if ($NrfUtilType -eq "nrfutil") {
+        "nrfutil sdk-manager toolchain install --ncs-version $NcsVersion"
     }
     else {
-        Write-Success "Zephyr SDK is properly installed"
-    }
-}
-
-# Step 6: Create workspace folder and setup virtual environment
-Write-Step "Creating workspace folder..."
-
-try {
-    if (-not (Test-Path $workspaceFolder)) {
-        New-Item -ItemType Directory -Path $workspaceFolder -Force | Out-Null
-        Write-Success "Created folder: $workspaceFolder"
-    }
-    else {
-        Write-Info "Folder already exists: $workspaceFolder"
-    }
-}
-catch {
-    Exit-WithError "Failed to create workspace folder" $_.Exception.Message
-}
-
-# Change to workspace folder
-try {
-    Set-Location $workspaceFolder
-    Write-Success "Changed to workspace folder"
-}
-catch {
-    Exit-WithError "Failed to change to workspace folder" $_.Exception.Message
-}
-
-# Step 7: Create Python virtual environment
-Write-Step "Creating Python virtual environment..."
-
-$venvPath = Join-Path $workspaceFolder ".venv"
-
-try {
-    if (Test-Path $venvPath) {
-        Write-Info "Virtual environment already exists, reusing it"
-    }
-    else {
-        & $pythonCmd -m venv .venv
-        if ($LASTEXITCODE -ne 0) {
-            throw "venv creation failed with exit code $LASTEXITCODE"
-        }
-        Write-Success "Virtual environment created"
-    }
-}
-catch {
-    Exit-WithError "Failed to create Python virtual environment" $_.Exception.Message
-}
-
-# Activate virtual environment
-Write-Step "Activating virtual environment..."
-
-$activateScript = Join-Path $venvPath "Scripts\Activate.ps1"
-if (-not (Test-Path $activateScript)) {
-    $activateScript = Join-Path $venvPath "bin/Activate.ps1"
-}
-
-try {
-    . $activateScript
-    Write-Success "Virtual environment activated"
-}
-catch {
-    Exit-WithError "Failed to activate virtual environment" $_.Exception.Message
-}
-
-# Step 8: Install West
-Write-Step "Installing West..."
-
-try {
-    & pip install west
-    if ($LASTEXITCODE -ne 0) {
-        throw "pip install west failed with exit code $LASTEXITCODE"
-    }
-    Write-Success "West installed successfully"
-}
-catch {
-    Exit-WithError "Failed to install West" $_.Exception.Message
-}
-
-# Step 9: Initialize West workspace
-Write-Step "Initializing West workspace..."
-
-$manifestFile = "zephyr/manifests/$($boardConfig.manifest)"
-
-Write-Info "Manifest URL: $ManifestBaseUrl"
-Write-Info "Manifest file: $manifestFile"
-
-try {
-    $westInitArgs = @("init", "--manifest-url", $ManifestBaseUrl,
-                      "--manifest-file", $manifestFile, ".")
-    if ($spotflowRevision) {
-        $westInitArgs += "--clone-opt=--revision=$spotflowRevision"
-    }
-
-    $westInitOutput = & west @westInitArgs 2>&1
-    if ($LASTEXITCODE -ne 0) {
-        if ($westInitOutput -match "already initialized") {
-            Write-Warning "Workspace already initialized, continuing..."
-        }
-        else {
-            throw "west init failed: $westInitOutput"
-        }
-    }
-    else {
-        Write-Success "West workspace initialized"
-    }
-}
-catch {
-    Exit-WithError "Failed to initialize West workspace" $_.Exception.Message
-}
-
-# Step 10: Update West workspace (download all dependencies)
-Write-Step "Downloading dependencies (this may take several minutes)..."
-
-try {
-    & west update --fetch-opt=--depth=1 --narrow
-    if ($LASTEXITCODE -ne 0) {
-        throw "west update failed with exit code $LASTEXITCODE"
-    }
-    Write-Success "Dependencies downloaded"
-}
-catch {
-    Exit-WithError "Failed to download dependencies" $_.Exception.Message
-}
-
-# Step 11: Install Python packages
-Write-Step "Installing Python packages..."
-
-try {
-    & west packages pip --install
-    if ($LASTEXITCODE -ne 0) {
-        throw "west packages pip failed with exit code $LASTEXITCODE"
-    }
-    Write-Success "Python packages installed"
-}
-catch {
-    Exit-WithError "Failed to install Python packages" $_.Exception.Message
-}
-
-# Step 12: Fetch blobs if required
-if ($boardConfig.blob) {
-    Write-Step "Fetching binary blobs for $($boardConfig.blob)..."
-
-    try {
-        & west blobs fetch $boardConfig.blob --auto-accept
-        if ($LASTEXITCODE -ne 0) {
-            throw "west blobs fetch failed with exit code $LASTEXITCODE"
-        }
-        Write-Success "Binary blobs fetched"
-    }
-    catch {
-        Exit-WithError "Failed to fetch binary blobs" $_.Exception.Message
-    }
-}
-
-# Step 13: Install SDK/toolchain
-if ($installNcsToolchain -and $nrfUtilInfo -and $ncsVersion) {
-    Write-Step "Installing nRF Connect SDK toolchain for $ncsVersion..."
-
-    $toolchainCmd = $nrfUtilInfo.Path
-    $toolchainArgs = if ($nrfUtilInfo.Type -eq "nrfutil") {
-        @("sdk-manager", "toolchain", "install", "--ncs-version", $ncsVersion)
-    }
-    else {
-        @("toolchain", "install", "--ncs-version", $ncsVersion)
-    }
-
-    $displayCmd = if ($nrfUtilInfo.Type -eq "nrfutil") {
-        "nrfutil sdk-manager toolchain install --ncs-version $ncsVersion"
-    }
-    else {
-        "nrfutil-sdk-manager toolchain install --ncs-version $ncsVersion"
+        "nrfutil-sdk-manager toolchain install --ncs-version $NcsVersion"
     }
 
     Write-Info "Running: $displayCmd"
@@ -899,7 +958,7 @@ if ($installNcsToolchain -and $nrfUtilInfo -and $ncsVersion) {
         if ($LASTEXITCODE -ne 0) {
             throw "Toolchain install failed with exit code $LASTEXITCODE"
         }
-        $msg = "nRF Connect SDK toolchain installed for version $ncsVersion"
+        $msg = "nRF Connect SDK toolchain installed for version $NcsVersion"
         Write-Success $msg
     }
     catch {
@@ -909,108 +968,209 @@ if ($installNcsToolchain -and $nrfUtilInfo -and $ncsVersion) {
         Write-Warning "You can try installing it manually with: $displayCmd"
     }
 }
-elseif ($installSdk) {
-    Write-Step "Installing Zephyr SDK $requiredSdkVersion..."
 
-    $sdkArgs = @("sdk", "install", "--version", $requiredSdkVersion)
-    if ($requiredToolchain) {
-        $sdkArgs += @("--toolchains", $requiredToolchain)
-    }
-    if ($gitHubToken) {
-        $sdkArgs += @("--personal-access-token", $gitHubToken)
-    }
+# Configuration
 
-    Write-Info "Running: west $($sdkArgs -join ' ')"
+function Get-QuickstartUrl {
+    param([string]$SdkType)
 
-    try {
-        & west @sdkArgs
-        if ($LASTEXITCODE -ne 0) {
-            throw "west sdk install failed with exit code $LASTEXITCODE"
-        }
-        Write-Success "Zephyr SDK installed"
-    }
-    catch {
-        $errorMsg = "Failed to install Zephyr SDK: $($_.Exception.Message)"
-        Write-ErrorMessage $errorMsg
-        $manualCmd = "west sdk install --version $requiredSdkVersion"
-        if ($requiredToolchain) {
-            $manualCmd += " --toolchains $requiredToolchain"
-        }
-        Write-Warning "You can try installing it manually later with: $manualCmd"
-    }
+    $quickstartUrlSuffix = if ($SdkType -eq "zephyr") { "zephyr" } else { "nordic-nrf-connect" }
+    return "https://docs.spotflow.io/quickstart/$quickstartUrlSuffix"
 }
 
-$quickstartUrlSuffix = if ($zephyr) { "zephyr" } else { "nordic-nrf-connect" }
-$quickstartUrl = "https://docs.spotflow.io/quickstart/$quickstartUrlSuffix"
+function Add-ConfigurationPlaceholders {
+    param(
+        [string]$ConfigPath,
+        [object]$BoardConfig,
+        [string]$QuickstartUrl
+    )
 
-# Step 14: Add connection-specific configuration placeholders
-Write-Step "Adding configuration placeholders to prj.conf..."
+    $configContent = Get-Content $ConfigPath -Raw
 
-$samplePath = "$($boardConfig.spotflow_path)/zephyr/samples/logs"
-$configPath = "$samplePath/prj.conf"
-$configContent = Get-Content $configPath -Raw
+    if ($configContent -match "CONFIG_SPOTFLOW_DEVICE_ID") {
+        Write-Info "CONFIG_SPOTFLOW_DEVICE_ID already exists in prj.conf, skipping"
+        return
+    }
 
-if ($configContent -match "CONFIG_SPOTFLOW_DEVICE_ID") {
-    Write-Warning "CONFIG_SPOTFLOW_DEVICE_ID already exists in prj.conf, skipping"
-}
-else {
     $prependedConfigContent = ""
-    if ($boardConfig.connection -contains "wifi") {
+    if ($BoardConfig.connection -contains "wifi") {
         $prependedConfigContent += "CONFIG_NET_WIFI_SSID=""<Your Wi-Fi SSID>""`n"
         $prependedConfigContent += "CONFIG_NET_WIFI_PASSWORD=""<Your Wi-Fi Password>""`n`n"
     }
-    $prependedConfigContent += "CONFIG_SPOTFLOW_DEVICE_ID=""$($boardConfig.sample_device_id)""`n"
+    $prependedConfigContent += "CONFIG_SPOTFLOW_DEVICE_ID=""$($BoardConfig.sample_device_id)""`n"
     $prependedConfigContent += "CONFIG_SPOTFLOW_INGEST_KEY=""<Your Spotflow Ingest Key>""`n`n"
 
     $configContent = $prependedConfigContent + $configContent
 
     try {
-        Set-Content -Path $configPath -Value $configContent
+        Set-Content -Path $ConfigPath -Value $configContent
         Write-Success "Configuration placeholders added to prj.conf"
     }
     catch {
         $errorMsg = "Failed to add configuration placeholders to prj.conf: $($_.Exception.Message)"
         Write-ErrorMessage $errorMsg
         Write-Warning `
-            "See the quickstart guide for the list of configuration options: $quickstartUrl"
+            "See the quickstart guide for the list of configuration options: $QuickstartUrl"
     }
 }
 
-# Summary
-$buildCmd = "west build --pristine --board $($boardConfig.board)"
-if ($boardConfig.build_extra_args) {
-    $buildCmd += " $($boardConfig.build_extra_args)"
+function Main {
+    Write-Host ""
+    Write-Host "+--------------------------------------------------------------+" -ForegroundColor Cyan
+    Write-Host "|            Spotflow Device SDK - Workspace Setup             |" -ForegroundColor Cyan
+    Write-Host "+--------------------------------------------------------------+" -ForegroundColor Cyan
+    Write-Host ""
+
+    $sdkInfo = Set-SdkType -Zephyr $zephyr -Ncs $ncs
+    $sdkType = $sdkInfo.Type
+    $sdkDisplayType = $sdkInfo.DisplayType
+
+    Write-Step "Checking prerequisites..."
+    $pythonCmd = Find-Python
+    Test-Git
+
+    Write-Step "Downloading board configuration..."
+    $jsonUrl = if ($quickstartJsonUrl) { $quickstartJsonUrl } else { $DefaultQuickstartJsonUrl }
+    $quickstartJson = Get-QuickstartJson -JsonUrl $jsonUrl
+
+    Write-Step "Looking up board '$board'..."
+    $boardResult = Find-BoardConfig -QuickstartJson $quickstartJson -SdkType $sdkType -Board $board
+    $boardConfig = $boardResult.Config
+    $vendorName = $boardResult.VendorName
+
+    Write-BoardInfo -BoardConfig $boardConfig -VendorName $vendorName
+    Write-Callout -Callout $boardConfig.callout
+
+    # Detect if running on Windows
+    $isWindowsOS = ($env:OS -eq 'Windows_NT') -or ($IsWindows -eq $true)
+
+    Write-Step "Configuring workspace location..."
+    $workspaceFolder = Get-WorkspaceFolder `
+        -ProvidedFolder $workspaceFolder `
+        -SdkDisplayType $sdkDisplayType `
+        -IsWindowsOS $isWindowsOS
+
+    $requiredSdkVersion = $boardConfig.sdk_version
+    $requiredToolchain = $boardConfig.sdk_toolchain
+    $ncsVersion = $boardConfig.ncs_version
+
+    $installSdk = $false
+    $nrfUtilInfo = $null
+
+    if ($sdkType -eq "ncs") {
+        Write-Step "Checking nRF Connect SDK toolchain setup..."
+        $nrfUtilInfo = Test-NcsInstallation -NcsVersion $ncsVersion
+    }
+    else {
+        Write-Step "Checking Zephyr SDK installation..."
+        $installSdk = Test-ZephyrSdkInstallation `
+            -SdkVersion $requiredSdkVersion `
+            -SdkToolchain $requiredToolchain `
+            -IsWindowsOS $isWindowsOS
+    }
+
+    Write-Step "Creating workspace folder..."
+    New-WorkspaceFolder -WorkspaceFolder $workspaceFolder
+
+    # Change to workspace folder
+    try {
+        Set-Location $workspaceFolder
+        Write-Success "Changed to workspace folder"
+    }
+    catch {
+        Exit-WithError "Failed to change to workspace folder" $_.Exception.Message
+    }
+
+    Write-Step "Creating Python virtual environment..."
+    $venvPath = New-PythonVenv -WorkspaceFolder $workspaceFolder -PythonCmd $pythonCmd
+
+    Write-Step "Activating virtual environment..."
+    Enable-PythonVenv -VenvPath $venvPath
+
+    Write-Step "Installing West..."
+    Install-West
+
+    Write-Step "Initializing West workspace..."
+    Initialize-WestWorkspace `
+        -Manifest $boardConfig.manifest `
+        -ManifestBaseUrl $ManifestBaseUrl `
+        -SpotflowRevision $spotflowRevision
+
+    Write-Step "Downloading dependencies (this may take several minutes)..."
+    Update-WestWorkspace
+
+    Write-Step "Installing Python packages..."
+    Install-PythonPackages
+
+    if ($boardConfig.blob) {
+        Write-Step "Fetching binary blobs for $($boardConfig.blob)..."
+        Get-Blobs -Blob $boardConfig.blob
+    }
+
+    if ($nrfUtilInfo -and $ncsVersion) {
+        Write-Step "Installing nRF Connect SDK toolchain for $ncsVersion..."
+        Install-NcsToolchain `
+            -NrfUtilType $nrfUtilInfo.Type `
+            -NrfUtilPath $nrfUtilInfo.Path `
+            -NcsVersion $ncsVersion
+    }
+    elseif ($installSdk) {
+        Write-Step "Installing Zephyr SDK $requiredSdkVersion..."
+        Install-ZephyrSdk `
+            -SdkVersion $requiredSdkVersion `
+            -SdkToolchain $requiredToolchain `
+            -GitHubToken $gitHubToken
+    }
+
+    $quickstartUrl = Get-QuickstartUrl -SdkType $sdkType
+
+    $samplePath = "$($boardConfig.spotflow_path)/zephyr/samples/logs"
+    $configPath = "$samplePath/prj.conf"
+
+    Write-Step "Adding configuration placeholders to prj.conf..."
+    Add-ConfigurationPlaceholders `
+        -ConfigPath $configPath `
+        -BoardConfig $boardConfig `
+        -QuickstartUrl $quickstartUrl
+
+    # Summary
+    $buildCmd = "west build --pristine --board $($boardConfig.board)"
+    if ($boardConfig.build_extra_args) {
+        $buildCmd += " $($boardConfig.build_extra_args)"
+    }
+    Write-Host ""
+    Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
+    Write-Host "|                       Setup Complete!                        |" -ForegroundColor Green
+    Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "Workspace location: " -NoNewline
+    Write-Host $workspaceFolder -ForegroundColor Cyan
+    Write-Host "Board: " -NoNewline
+    Write-Host "$($boardConfig.name) ($($boardConfig.board))" -ForegroundColor Cyan
+    Write-Host "Spotflow module path: " -NoNewline
+    Write-Host $boardConfig.spotflow_path -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Next steps to finish the quickstart:" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "  1. Open " -NoNewline
+    Write-Host $configPath -NoNewline -ForegroundColor DarkGray
+    Write-Host " and fill in the required configuration options."
+    Write-Host ""
+    if ($zephyr) {
+        Write-Host "  2. Build and flash the Spotflow sample:"
+    }
+    else {
+        Write-Host "  2. In a terminal with the nRF Connect toolchain environment, " -NoNewline
+        Write-Host "build and flash the Spotflow sample:"
+    }
+    Write-Host ""
+    Write-Host "     cd $samplePath" -ForegroundColor DarkGray
+    Write-Host "     $buildCmd" -ForegroundColor DarkGray
+    Write-Host "     west flash" -ForegroundColor DarkGray
+    Write-Host ""
+    Write-Host "For more information, visit: " -NoNewline
+    Write-Host $quickstartUrl -ForegroundColor Cyan
+    Write-Host ""
 }
-Write-Host ""
-Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
-Write-Host "|                       Setup Complete!                        |" -ForegroundColor Green
-Write-Host "+--------------------------------------------------------------+" -ForegroundColor Green
-Write-Host ""
-Write-Host "Workspace location: " -NoNewline
-Write-Host $workspaceFolder -ForegroundColor Cyan
-Write-Host "Board: " -NoNewline
-Write-Host "$($boardConfig.name) ($($boardConfig.board))" -ForegroundColor Cyan
-Write-Host "Spotflow module path: " -NoNewline
-Write-Host $boardConfig.spotflow_path -ForegroundColor Cyan
-Write-Host ""
-Write-Host "Next steps to finish the quickstart:" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "  1. Open " -NoNewline
-Write-Host $configPath -NoNewline -ForegroundColor DarkGray
-Write-Host " and fill in the required configuration options."
-Write-Host ""
-if ($zephyr) {
-    Write-Host "  2. Build and flash the Spotflow sample:"
-}
-else {
-    Write-Host "  2. In a terminal with the nRF Connect toolchain environment, " -NoNewline
-    Write-Host "build and flash the Spotflow sample:"
-}
-Write-Host ""
-Write-Host "     cd $samplePath" -ForegroundColor DarkGray
-Write-Host "     $buildCmd" -ForegroundColor DarkGray
-Write-Host "     west flash" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "For more information, visit: " -NoNewline
-Write-Host $quickstartUrl -ForegroundColor Cyan
-Write-Host ""
+
+Main
