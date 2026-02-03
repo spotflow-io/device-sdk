@@ -61,23 +61,34 @@ write_error() {
     echo -e "  ${COLOR_RED}[x] $1${COLOR_RESET}" >&2
 }
 
+write_line() {
+    local line="${1:-}"
+    local color="${2:-}"
+
+    if [[ -n "$color" ]]; then
+        echo -e "${color}$line${COLOR_RESET}" >&2
+    else
+        echo "$line" >&2
+    fi
+}
+
 exit_with_error() {
     local message="$1"
     local details="${2:-}"
     local discord_url="https://discord.com/channels/1372202003635114125/1379411086163574864"
 
-    echo "" >&2
+    write_line
     write_error "$message"
     if [[ -n "$details" ]]; then
         echo -e "  ${COLOR_DARK_GRAY}Details: $details${COLOR_RESET}" >&2
     fi
-    echo "" >&2
+    write_line
     echo -e "${COLOR_GRAY}If you believe this is a bug, please report it at:${COLOR_RESET}" >&2
     echo -e "  ${COLOR_CYAN}https://github.com/spotflow-io/device-sdk/issues${COLOR_RESET}" >&2
-    echo "" >&2
+    write_line
     echo -e "${COLOR_GRAY}You can also contact us on Discord:${COLOR_RESET}" >&2
     echo -e "  ${COLOR_CYAN}${discord_url}${COLOR_RESET}" >&2
-    echo "" >&2
+    write_line
     exit 1
 }
 
@@ -209,7 +220,7 @@ parse_args() {
                 exit 0
                 ;;
             *)
-                echo "Unknown option: $1" >&2
+                write_line "Unknown option: $1"
                 show_usage >&2
                 exit 1
                 ;;
@@ -374,7 +385,7 @@ write_callout() {
     if [[ -n "$callout" ]]; then
         local callout_text
         callout_text=$(echo "$callout" | sed 's/<[^>]*>//g')
-        echo "" >&2
+        write_line
         write_warning "Note: $callout_text"
     fi
 }
@@ -414,7 +425,7 @@ get_workspace_folder() {
 
     write_info \
         "The workspace will contain all $sdk_display_type files and project."
-    echo "" >&2
+    write_line
 
     workspace_folder=$(read_input "Enter workspace folder path" \
         "$default_folder" "$workspace_folder")
@@ -587,9 +598,9 @@ check_zephyr_sdk_installation() {
         fi
         warning_msg+=" is not installed."
         write_warning "$warning_msg"
-        echo "" >&2
+        write_line
         write_info "Zephyr SDK will be installed to your user profile directory."
-        echo "" >&2
+        write_line
 
         local confirm_msg="Install Zephyr SDK $sdk_version"
         if [[ -n "$sdk_toolchain" ]]; then
@@ -605,7 +616,7 @@ check_zephyr_sdk_installation() {
             if [[ -n "$sdk_toolchain" ]]; then
                 manual_cmd+=" --toolchains $sdk_toolchain"
             fi
-            echo -e "    ${COLOR_DARK_GRAY}$manual_cmd${COLOR_RESET}" >&2
+            write_line "    $manual_cmd" "$COLOR_DARK_GRAY"
         fi
     else
         write_success "Zephyr SDK is properly installed"
@@ -752,10 +763,10 @@ check_ncs_installation() {
                 write_info "Found nrfutil at: $nrfutil_path"
                 write_warning \
                     "The sdk-manager command is not installed for nrfutil."
-                echo "" >&2
+                write_line
                 write_info \
                     "This command is required to install the nRF Connect SDK toolchain."
-                echo "" >&2
+                write_line
 
                 if confirm_action "Install nrfutil sdk-manager command?" true; then
                     if install_nrfutil_sdk_manager "$nrfutil_path"; then
@@ -784,12 +795,12 @@ check_ncs_installation() {
         local msg="nrfutil not found on PATH"
         msg="${msg} and nrfutil-sdk-manager not found in VS Code/Cursor extensions."
         write_warning $msg
-        echo "" >&2
+        write_line
         write_info "The nRF Connect SDK toolchain will need to be installed manually."
         local nrfutil_url="https://www.nordicsemi.com/Products/Development-tools/nRF-Util"
         write_info "You can install nrfutil from: $nrfutil_url"
         write_info "Or install the nRF Connect for VS Code extension pack."
-        echo "" >&2
+        write_line
     fi
 
     # Check if nRF Connect SDK toolchain is installed and prompt for installation
@@ -798,9 +809,9 @@ check_ncs_installation() {
             write_success "nRF Connect SDK toolchain for $ncs_version is already installed"
         else
             write_warning "nRF Connect SDK toolchain for $ncs_version is not installed."
-            echo "" >&2
+            write_line
             write_info "The installation may take several minutes."
-            echo "" >&2
+            write_line
 
             if confirm_action "Install nRF Connect SDK toolchain for $ncs_version?" true; then
                 should_install_ncs_toolchain=true
@@ -809,7 +820,7 @@ check_ncs_installation() {
                 msg="${msg} You can install it manually later with:"
                 local command="nrfutil sdk-manager toolchain install --ncs-version $ncs_version"
                 write_warning "$msg"
-                echo -e "    ${COLOR_DARK_GRAY}$command${COLOR_RESET}" >&2
+                write_line "    $command" "$COLOR_DARK_GRAY"
             fi
         fi
     elif [[ -z "$ncs_version" ]]; then
@@ -896,11 +907,11 @@ add_configuration_placeholders() {
 }
 
 main() {
-    echo ""
-    echo -e "${COLOR_CYAN}+--------------------------------------------------------+${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}|         Spotflow Device SDK - Workspace Setup          |${COLOR_RESET}"
-    echo -e "${COLOR_CYAN}+--------------------------------------------------------+${COLOR_RESET}"
-    echo ""
+    write_line
+    write_line "+--------------------------------------------------------+" "$COLOR_CYAN"
+    write_line "|         Spotflow Device SDK - Workspace Setup          |" "$COLOR_CYAN"
+    write_line "+--------------------------------------------------------+" "$COLOR_CYAN"
+    write_line
 
     parse_args "$@"
 
@@ -1029,38 +1040,34 @@ main() {
     if [[ -n "$build_extra_args" ]]; then
         build_cmd+=" $build_extra_args"
     fi
-    echo ""
-    echo -e "${COLOR_GREEN}+--------------------------------------------------------+${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}|                     Setup Complete!                    |${COLOR_RESET}"
-    echo -e "${COLOR_GREEN}+--------------------------------------------------------+${COLOR_RESET}"
-    echo ""
-    echo -n "Workspace location: "
-    echo -e "${COLOR_CYAN}$workspace_folder${COLOR_RESET}"
-    echo -n "Board: "
-    echo -e "${COLOR_CYAN}$board_name ($board_target)${COLOR_RESET}"
-    echo -n "Spotflow module path: "
-    echo -e "${COLOR_CYAN}$spotflow_path${COLOR_RESET}"
-    echo ""
-    echo -e "${COLOR_YELLOW}Next steps to finish the quickstart:${COLOR_RESET}"
-    echo ""
-    echo -n "  1. Open "
-    echo -ne "${COLOR_DARK_GRAY}$config_path${COLOR_RESET}"
-    echo " and fill in the required configuration options."
-    echo ""
+    write_line
+    write_line "+--------------------------------------------------------+" "$COLOR_GREEN"
+    write_line "|                     Setup Complete!                    |" "$COLOR_GREEN"
+    write_line "+--------------------------------------------------------+" "$COLOR_GREEN"
+    write_line
+    write_line "Workspace location: ${COLOR_CYAN}$workspace_folder${COLOR_RESET}"
+    write_line "Board: ${COLOR_CYAN}$board_name ($board_target)${COLOR_RESET}"
+    write_line "Spotflow module path: ${COLOR_CYAN}$spotflow_path${COLOR_RESET}"
+    write_line
+    write_line "Next steps to finish the quickstart:" "$COLOR_YELLOW"
+    write_line
+    echo -n "  1. Open " >&2
+    echo -ne "${COLOR_DARK_GRAY}$config_path${COLOR_RESET}" >&2
+    write_line " and fill in the required configuration options."
+    write_line
     if [[ "$sdk_type" == "zephyr" ]]; then
-        echo "  2. Build and flash the Spotflow sample:"
+        write_line "  2. Build and flash the Spotflow sample:"
     else
-        echo -n "  2. In a terminal with the nRF Connect toolchain environment, "
-        echo "build and flash the Spotflow sample:"
+        echo -n "  2. In a terminal with the nRF Connect toolchain environment, " >&2
+        write_line "build and flash the Spotflow sample:"
     fi
-    echo ""
-    echo -e "     ${COLOR_DARK_GRAY}cd $sample_path${COLOR_RESET}"
-    echo -e "     ${COLOR_DARK_GRAY}$build_cmd${COLOR_RESET}"
-    echo -e "     ${COLOR_DARK_GRAY}west flash${COLOR_RESET}"
-    echo ""
-    echo -n "For more information, visit: "
-    echo -e "${COLOR_CYAN}$quickstart_url${COLOR_RESET}"
-    echo ""
+    write_line
+    write_line "     cd $sample_path" "$COLOR_DARK_GRAY"
+    write_line "     $build_cmd" "$COLOR_DARK_GRAY"
+    write_line "     west flash" "$COLOR_DARK_GRAY"
+    write_line
+    write_line "For more information, visit: ${COLOR_CYAN}$quickstart_url${COLOR_RESET}"
+    write_line
 }
 
 main "$@"
