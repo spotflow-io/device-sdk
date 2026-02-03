@@ -107,8 +107,12 @@ int aggregator_report_value(struct spotflow_metric_base* metric,
 	/* Update aggregation state */
 	if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
 		update_aggregation_int(ts, value_int);
-	} else {
+	} else if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
 		update_aggregation_float(ts, value_float);
+	} else {
+		k_mutex_unlock(&metric->lock);
+		LOG_ERR("Invalid metric type: %d", metric->type);
+		return -EINVAL;
 	}
 
 	/* Start aggregation timer on first report (sliding window) */
@@ -164,10 +168,9 @@ static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 	uint64_t seq_num = metric->sequence_number++;
 
 	/* Encode to CBOR */
-	int rc = /* Get and increment sequence number while holding mutex */
-	    spotflow_metrics_cbor_encode_no_aggregation(metric, labels, label_count, value_int,
-							value_float, k_uptime_get(), seq_num,
-							&cbor_data, &cbor_len);
+	int rc = spotflow_metrics_cbor_encode_no_aggregation(metric, labels, label_count, value_int,
+							     value_float, k_uptime_get(), seq_num,
+							     &cbor_data, &cbor_len);
 	if (rc < 0) {
 		LOG_ERR("Failed to encode metric '%s': %d", metric->name, rc);
 		return rc;
@@ -317,8 +320,8 @@ static int copy_labels_to_timeseries(struct metric_timeseries_state* ts,
 			LOG_ERR("Label key or value is NULL at index %u", i);
 			return -1;
 		}
-		/*No need to present warning - user was already informed about truncation
-		 * in the validation phase of report metric function in metrics backed*/
+		/* No need to present warning - user was already informed about truncation
+		 * in the validation phase of report metric function in metrics backend */
 		strncpy(ts->labels[i].key, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
 		ts->labels[i].key[SPOTFLOW_MAX_LABEL_KEY_LEN - 1] = '\0';
 
@@ -388,6 +391,9 @@ find_or_create_timeseries(struct metric_aggregator_context* ctx,
 		if (ts != NULL) {
 			LOG_DBG("Evicting idle timeseries for metric '%s'", ctx->metric->name);
 		}
+		/* Note: timeseries_count is NOT incremented for evicted slots
+		 * since the slot was already counted as active. We only increment
+		 * when using a previously inactive slot. */
 	} else {
 		ctx->timeseries_count++;
 	}
@@ -507,7 +513,7 @@ static int enqueue_metric_message(uint8_t* payload, size_t len)
 		/* Queue full - free message structure only, caller frees payload */
 		k_free(msg);
 		LOG_WRN("Metrics queue full, dropping message (%zu bytes)", len);
-		return -ENOMEM;
+		return -ENOBUFS;
 	}
 
 	LOG_DBG("Enqueued metric message (%zu bytes)", len);

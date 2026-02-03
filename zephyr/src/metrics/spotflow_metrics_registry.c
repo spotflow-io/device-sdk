@@ -14,7 +14,13 @@
 
 LOG_MODULE_REGISTER(spotflow_metrics_registry, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-/* Global metric registry - union to support both int and float metrics in same array */
+/* Global metric registry - union to support both int and float metrics in same array
+ *
+ * IMPORTANT: Both int_metric and float_metric have identical memory layout
+ * (single 'base' member as first field), allowing safe access via int_metric.base
+ * regardless of actual type. This pattern is used throughout registry operations
+ * to simplify slot management.
+ */
 union metric_registry_entry {
 	struct spotflow_metric_int int_metric;
 	struct spotflow_metric_float float_metric;
@@ -48,15 +54,22 @@ int spotflow_register_metric_int(const char *name,
 				 enum spotflow_agg_interval agg_interval,
 				 struct spotflow_metric_int **metric_out)
 {
+	struct spotflow_metric_base *base;
+	int rc;
+
 	if (metric_out == NULL) {
 		LOG_ERR("metric_out cannot be NULL");
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base;
-	int rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval, 1, 0, &base);
+	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval, 1, 0, &base);
 	if (rc < 0) {
 		return rc;
+	}
+	/* Validate type matches before cast */
+	if (base->type != SPOTFLOW_METRIC_TYPE_INT) {
+		LOG_ERR("Type mismatch: expected INT, got %d", base->type);
+		return -EINVAL;
 	}
 	/* The base is the first member of spotflow_metric_int, so we can safely cast */
 	*metric_out = (struct spotflow_metric_int *)base;
@@ -67,15 +80,22 @@ int spotflow_register_metric_float(const char *name,
 				   enum spotflow_agg_interval agg_interval,
 				   struct spotflow_metric_float **metric_out)
 {
+	struct spotflow_metric_base *base;
+	int rc;
+
 	if (metric_out == NULL) {
 		LOG_ERR("metric_out cannot be NULL");
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base;
-	int rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval, 1, 0, &base);
+	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval, 1, 0, &base);
 	if (rc < 0) {
 		return rc;
+	}
+	/* Validate type matches before cast */
+	if (base->type != SPOTFLOW_METRIC_TYPE_FLOAT) {
+		LOG_ERR("Type mismatch: expected FLOAT, got %d", base->type);
+		return -EINVAL;
 	}
 	*metric_out = (struct spotflow_metric_float *)base;
 	return 0;
@@ -87,6 +107,9 @@ int spotflow_register_metric_int_with_labels(const char *name,
 					     uint8_t max_labels,
 					     struct spotflow_metric_int **metric_out)
 {
+	struct spotflow_metric_base *base;
+	int rc;
+
 	if (metric_out == NULL) {
 		LOG_ERR("metric_out cannot be NULL");
 		return -EINVAL;
@@ -97,11 +120,15 @@ int spotflow_register_metric_int_with_labels(const char *name,
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base;
-	int rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval,
-					max_timeseries, max_labels, &base);
+	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval,
+				    max_timeseries, max_labels, &base);
 	if (rc < 0) {
 		return rc;
+	}
+	/* Validate type matches before cast */
+	if (base->type != SPOTFLOW_METRIC_TYPE_INT) {
+		LOG_ERR("Type mismatch: expected INT, got %d", base->type);
+		return -EINVAL;
 	}
 	*metric_out = (struct spotflow_metric_int *)base;
 	return 0;
@@ -113,6 +140,9 @@ int spotflow_register_metric_float_with_labels(const char *name,
 					       uint8_t max_labels,
 					       struct spotflow_metric_float **metric_out)
 {
+	struct spotflow_metric_base *base;
+	int rc;
+
 	if (metric_out == NULL) {
 		LOG_ERR("metric_out cannot be NULL");
 		return -EINVAL;
@@ -123,11 +153,15 @@ int spotflow_register_metric_float_with_labels(const char *name,
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base;
-	int rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval,
-					max_timeseries, max_labels, &base);
+	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval,
+				    max_timeseries, max_labels, &base);
 	if (rc < 0) {
 		return rc;
+	}
+	/* Validate type matches before cast */
+	if (base->type != SPOTFLOW_METRIC_TYPE_FLOAT) {
+		LOG_ERR("Type mismatch: expected FLOAT, got %d", base->type);
+		return -EINVAL;
 	}
 	*metric_out = (struct spotflow_metric_float *)base;
 	return 0;
@@ -296,7 +330,7 @@ static int register_metric_common(const char *name,
 		LOG_ERR("Metric registry full (%d/%d)", CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED,
 			CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED);
 		k_mutex_unlock(&g_registry_lock);
-		return -ENOMEM;
+		return -ENOSPC;
 	}
 
 	struct spotflow_metric_base *metric = &g_metric_registry[slot].int_metric.base;
@@ -306,10 +340,10 @@ static int register_metric_common(const char *name,
 	rc = aggregator_register_metric(metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to initialize aggregator for metric '%s': %d", normalized_name, rc);
-		/* Rollback: mark registry slot as available if aggregator registration fails */
-		metric->aggregator_context = NULL;
+		/* Rollback: fully reset registry slot to avoid zombie entries */
+		memset(&g_metric_registry[slot], 0, sizeof(g_metric_registry[slot]));
 		k_mutex_unlock(&g_registry_lock);
-		return -ENOMEM;
+		return rc;
 	}
 
 	k_mutex_unlock(&g_registry_lock);
