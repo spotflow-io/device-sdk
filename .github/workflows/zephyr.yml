@@ -11,6 +11,13 @@ on:
     paths:
       - 'zephyr/**'
       - '.github/workflows/zephyr.yml'
+  workflow_dispatch:
+    inputs:
+      build_logs_all_boards:
+        description: 'Build logging sample for all boards'
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read        # Allows reading repository content (needed for checkout)
@@ -22,51 +29,31 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.generate.outputs.matrix }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+        with:
+          sparse-checkout: |
+            zephyr/ci/boards.yml
+            zephyr/ci/generate_matrix.py
+          sparse-checkout-cone-mode: false
+
+      - name: Generate matrix
+        id: generate
+        run: >-
+          python3 zephyr/ci/generate_matrix.py
+          ${{ github.event.inputs.build_logs_all_boards && '--build-logs-for-all-boards' || '' }}
+
   build:
+    needs: generate-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - board: esp32c3_devkitc
-            manifest: west-zephyr-espressif.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: riscv64-zephyr-elf
-            blob: hal_espressif
-          - board: esp32c3_devkitm
-            manifest: west-zephyr-espressif.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: riscv64-zephyr-elf
-            blob: hal_espressif
-          - board: esp32c6_devkitc/esp32c6/hpcore
-            manifest: west-zephyr-espressif.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: riscv64-zephyr-elf
-            blob: hal_espressif
-          - board: esp32s3_devkitc/esp32s3/procpu
-            manifest: west-zephyr-espressif.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: xtensa-espressif_esp32s3_zephyr-elf
-            blob: hal_espressif
-          - board: cy8cproto_062_4343w
-            manifest: west-zephyr-infineon.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: arm-zephyr-eabi
-            blob: hal_infineon
-          - board: frdm_rw612
-            manifest: west-zephyr-nxp.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: arm-zephyr-eabi
-            blob: hal_nxp
-          - board: nrf7002dk/nrf5340/cpuapp/ns
-            manifest: west-ncs.yml
-            sdk_version: 0.17.0
-            sdk_toolchain: arm-zephyr-eabi
-          - board: rpi_pico/rp2040/w
-            manifest: west-zephyr-raspberrypi.yml
-            sdk_version: 0.17.4
-            sdk_toolchain: arm-zephyr-eabi
-            blob: hal_infineon
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
 
     steps:
       # Needed to use the hash of the manifest as a part of the cache key
@@ -77,14 +64,29 @@ jobs:
           sparse-checkout: zephyr/manifests/${{ matrix.manifest }}
           sparse-checkout-cone-mode: false
 
+      - name: Extract module path from manifest
+        id: module-path
+        run: |
+          python3 << 'EOF'
+          import yaml
+          import os
+
+          with open('temp-manifest/zephyr/manifests/${{ matrix.manifest }}') as f:
+              manifest = yaml.safe_load(f)
+
+          module_path = manifest['manifest']['self']['path']
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as f:
+              f.write(f'path={module_path}\n')
+          EOF
+
       - name: Restore workspace dependencies
         id: cache-restore-workspace
         uses: actions/cache/restore@v4
         with:
           path: .
           key: >-
-            zephyr-workspace-${{ matrix.manifest }}-
-            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-
+            zephyr-workspace-${{ matrix.manifest }}
+            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}
             ${{ matrix.blob }}-${{ runner.os }}
 
       - name: Create Python virtual environment
@@ -114,14 +116,14 @@ jobs:
         if: steps.cache-restore-workspace.outputs.cache-hit == 'true'
         uses: actions/checkout@v6
         with:
-          path: modules/lib/spotflow
+          path: ${{ steps.module-path.outputs.path }}
 
       - name: Install Python packages
         if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
         run: west packages pip --install --ignore-venv-check
 
       - name: Download blobs
-        if: steps.cache-restore-workspace.outputs.cache-hit != 'true' && ${{ matrix.blob != '' }}
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true' && matrix.blob != ''
         run: west blobs fetch ${{ matrix.blob }} --auto-accept
 
       - name: Cache workspace dependencies
@@ -130,8 +132,8 @@ jobs:
         with:
           path: .
           key: >-
-            zephyr-workspace-${{ matrix.manifest }}-
-            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}-
+            zephyr-workspace-${{ matrix.manifest }}
+            ${{ hashFiles(format('temp-manifest/zephyr/manifests/{0}', matrix.manifest)) }}
             ${{ matrix.blob }}-${{ runner.os }}
 
       - name: Cache Zephyr SDK
@@ -149,7 +151,7 @@ jobs:
             --toolchains ${{ matrix.sdk_toolchain }}
 
       - name: Configure application
-        working-directory: modules/lib/spotflow/zephyr/samples/logs
+        working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/${{ matrix.sample }}
         run: |
           cat <<EOF > credentials.conf
           CONFIG_NET_WIFI_SSID="TODOTODO"
@@ -159,6 +161,6 @@ jobs:
           EOF
 
       - name: Build application
-        working-directory: modules/lib/spotflow/zephyr/samples/logs
+        working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/${{ matrix.sample }}
         run: |
-          west build --board ${{ matrix.board }}
+          west build --board ${{ matrix.board }} ${{ matrix.build_extra_args }}
