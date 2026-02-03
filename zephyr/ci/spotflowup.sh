@@ -375,7 +375,7 @@ write_callout() {
     if [[ -n "$callout" ]]; then
         local callout_text
         callout_text=$(echo "$callout" | sed 's/<[^>]*>//g')
-        echo ""
+        echo "" >&2
         write_warning "Note: $callout_text"
     fi
 }
@@ -430,7 +430,7 @@ get_workspace_folder() {
         write_warning "Folder '$workspace_folder' already exists and is not empty."
         if ! confirm_action "Continue anyway? This may cause issues." false; then
             write_info "Setup cancelled by user."
-            exit 0
+            exit 1
         fi
     fi
 
@@ -453,12 +453,14 @@ create_workspace_folder() {
 # Workspace initialization
 
 create_python_venv() {
+    local python_cmd="$1"
+
     local venv_path="$workspace_folder/.venv"
 
     if [[ -d "$venv_path" ]]; then
         write_info "Virtual environment already exists, reusing it"
     else
-        if ! "$python_cmd" -m venv .venv; then
+        if ! "$python_cmd" -m venv "$venv_path" >&2; then
             exit_with_error "Failed to create Python virtual environment"
         fi
         write_success "Virtual environment created"
@@ -609,7 +611,7 @@ check_zephyr_sdk_installation() {
         write_success "Zephyr SDK is properly installed"
     fi
 
-    echo $install_sdk
+    echo "$install_sdk"
 }
 
 install_zephyr_sdk() {
@@ -768,7 +770,7 @@ check_ncs_installation() {
                 else
                     local msg="Skipping sdk-manager installation."
                     msg="${msg} Toolchain will need to be installed manually."
-                    write_warning $msg
+                    write_warning "$msg"
                     nrfutil_info=""
                 fi
             else
@@ -805,8 +807,8 @@ check_ncs_installation() {
             else
                 local msg="Skipping toolchain installation."
                 msg="${msg} You can install it manually later with:"
-                $command="nrfutil sdk-manager toolchain install --ncs-version $ncs_version"
-                write_warning $msg
+                local command="nrfutil sdk-manager toolchain install --ncs-version $ncs_version"
+                write_warning "$msg"
                 echo -e "    ${COLOR_DARK_GRAY}$command${COLOR_RESET}" >&2
             fi
         fi
@@ -983,7 +985,7 @@ main() {
 
     write_step "Creating Python virtual environment..."
     local venv_path
-    venv_path=$(create_python_venv)
+    venv_path=$(create_python_venv "$python_cmd")
 
     write_step "Activating virtual environment..."
     activate_python_venv "$venv_path"
