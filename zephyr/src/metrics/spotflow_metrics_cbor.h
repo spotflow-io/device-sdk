@@ -16,12 +16,8 @@ extern "C" {
 /**
  * @brief Encode metric message to CBOR format
  *
- * Memory Ownership Contract:
- * 1. Encoder allocates and returns pointer to caller
- * 2. Caller enqueues pointer to message queue
- * 3. If enqueue fails: caller MUST free immediately
- * 4. If enqueue succeeds: ownership transfers to processor thread
- * 5. Processor thread ALWAYS frees (success or failure)
+ * Allocates and returns a CBOR-encoded buffer. Caller owns the buffer
+ * and is responsible for freeing it with k_free().
  *
  * @param metric Metric base handle
  * @param ts Time series state to encode
