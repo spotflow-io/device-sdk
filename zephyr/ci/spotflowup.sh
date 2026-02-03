@@ -913,6 +913,7 @@ main() {
     board_config=$(lookup_board_config "$python_cmd" "$quickstart_json")
 
     # Extract board configuration values
+    local vendor_name=$(extract_board_parameter "$board_config" "vendor_name")
     local board_name=$(extract_board_parameter "$board_config" "name")
     local board_target=$(extract_board_parameter "$board_config" "board")
     local manifest=$(extract_board_parameter "$board_config" "manifest")
@@ -925,12 +926,9 @@ main() {
     local spotflow_path=$(extract_board_parameter "$board_config" "spotflow_path")
     local build_extra_args=$(extract_board_parameter "$board_config" "build_extra_args")
 
-    if [[ "$sdk_type" == "zephyr" ]]; then
-        vendor_name=$(extract_board_parameter "$board_config" "vendor_name")
-    fi
-
     write_success "Found board: $board_name"
     if [[ -n "$vendor_name" ]]; then
+        # Not shown for nRF Connect SDK
         write_info "Vendor: $vendor_name"
     fi
     write_info "Connection methods: $connection_methods"
