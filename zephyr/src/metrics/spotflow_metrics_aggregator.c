@@ -19,17 +19,19 @@ LOG_MODULE_REGISTER(spotflow_metrics_agg, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG
 /* External message queue (defined in spotflow_metrics_net.c) */
 extern struct k_msgq g_spotflow_metrics_msgq;
 
-static bool labels_equal(const struct metric_timeseries_state* ts, const struct spotflow_label* labels,
-			 uint8_t label_count);
+static bool labels_equal(const struct metric_timeseries_state* ts,
+			 const struct spotflow_label* labels, uint8_t label_count);
 static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value);
 static void update_aggregation_float(struct metric_timeseries_state* ts, float value);
 static int64_t get_interval_ms(enum spotflow_agg_interval interval);
 static int enqueue_metric_message(uint8_t* payload, size_t len);
 static struct metric_timeseries_state*
-find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct spotflow_label* labels,
-			  uint8_t label_count);
+find_or_create_timeseries(struct metric_aggregator_context* ctx,
+			  const struct spotflow_label* labels, uint8_t label_count);
 static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_timeseries_state* ts,
 			    int64_t timestamp_ms);
+static void reset_timeseries_state(struct spotflow_metric_base* metric,
+				   struct metric_timeseries_state* ts);
 static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 				       const struct spotflow_label* labels, uint8_t label_count,
 				       int64_t value_int, float value_float);
@@ -73,8 +75,9 @@ int aggregator_register_metric(struct spotflow_metric_base* metric)
 	return 0;
 }
 
-int aggregator_report_value(struct spotflow_metric_base* metric, const struct spotflow_label* labels,
-			    uint8_t label_count, int64_t value_int, float value_float)
+int aggregator_report_value(struct spotflow_metric_base* metric,
+			    const struct spotflow_label* labels, uint8_t label_count,
+			    int64_t value_int, float value_float)
 {
 	if (metric == NULL || metric->aggregator_context == NULL) {
 		return -EINVAL;
@@ -85,7 +88,8 @@ int aggregator_report_value(struct spotflow_metric_base* metric, const struct sp
 	k_mutex_lock(&metric->lock, K_FOREVER);
 
 	if (metric->agg_interval == SPOTFLOW_AGG_INTERVAL_NONE) {
-		int rc = flush_no_aggregation_metric(metric, labels, label_count, value_int, value_float);
+		int rc = flush_no_aggregation_metric(metric, labels, label_count, value_int,
+						     value_float);
 		k_mutex_unlock(&metric->lock);
 		return rc;
 	}
@@ -100,6 +104,13 @@ int aggregator_report_value(struct spotflow_metric_base* metric, const struct sp
 		return -ENOSPC;
 	}
 
+	/* Update aggregation state */
+	if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
+		update_aggregation_int(ts, value_int);
+	} else {
+		update_aggregation_float(ts, value_float);
+	}
+
 	/* Start aggregation timer on first report (sliding window) */
 	/* Use per-metric flag to prevent race condition with labeled metrics */
 	if (!ctx->timer_started) {
@@ -109,16 +120,10 @@ int aggregator_report_value(struct spotflow_metric_base* metric, const struct sp
 			int32_t jitter_ms = sys_rand32_get() % (interval_ms / 10);
 			k_work_schedule(&ctx->aggregation_work, K_MSEC(interval_ms - jitter_ms));
 			ctx->timer_started = true;
-			LOG_DBG("Started aggregation timer for metric '%s' (interval=%lld ms, jitter=-%d ms)",
+			LOG_DBG("Started aggregation timer for metric '%s' (interval=%lld ms, "
+				"jitter=-%d ms)",
 				metric->name, interval_ms, jitter_ms);
 		}
-	}
-
-	/* Update aggregation state */
-	if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
-		update_aggregation_int(ts, value_int);
-	} else {
-		update_aggregation_float(ts, value_float);
 	}
 
 	k_mutex_unlock(&metric->lock);
@@ -131,8 +136,8 @@ int aggregator_report_value(struct spotflow_metric_base* metric, const struct sp
  * Direct string comparison is used instead of hashing since labels are
  * sufficiently small (max 8 labels, key max 16 chars, value max 32 chars).
  */
-static bool labels_equal(const struct metric_timeseries_state* ts, const struct spotflow_label* labels,
-			 uint8_t label_count)
+static bool labels_equal(const struct metric_timeseries_state* ts,
+			 const struct spotflow_label* labels, uint8_t label_count)
 {
 	if (ts->label_count != label_count) {
 		return false;
@@ -179,16 +184,39 @@ static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 	}
 
 	/* Ownership transferred to queue - processor will free */
-
-	/* Increment message counter */
-	metric->transmitted_messages++;
 	return 0;
+}
+
+/**
+ * @brief Reset time series state for next aggregation window
+ *
+ * @param metric Metric base handle (for type information)
+ * @param ts Time series state to reset
+ */
+static void reset_timeseries_state(struct spotflow_metric_base* metric,
+				   struct metric_timeseries_state* ts)
+{
+	ts->count = 0;
+	ts->sum_truncated = false;
+
+	if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
+		ts->sum_int = 0;
+		ts->min_int = INT64_MAX;
+		ts->max_int = INT64_MIN;
+	} else {
+		ts->sum_float = 0.0f;
+		ts->min_float = FLT_MAX;
+		ts->max_float = -FLT_MAX;
+	}
 }
 
 /**
  * @brief Flush time series (encode and enqueue message)
  *
  * MUST be called with metric->lock held.
+ *
+ * Always resets timeseries state regardless of success/failure to maintain
+ * correct aggregation window semantics.
  *
  * @param metric Metric base handle
  * @param ts Time series state to flush
@@ -208,6 +236,7 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 	    spotflow_metrics_cbor_encode(metric, ts, timestamp_ms, seq_num, &cbor_data, &cbor_len);
 	if (rc < 0) {
 		LOG_ERR("Failed to encode metric '%s': %d", metric->name, rc);
+		reset_timeseries_state(metric, ts);
 		return rc;
 	}
 
@@ -218,28 +247,13 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 		/* We must free it here */
 		k_free(cbor_data);
 		LOG_WRN("Failed to enqueue metric '%s': %d", metric->name, rc);
+		reset_timeseries_state(metric, ts);
 		return rc;
 	}
 
 	/* Ownership transferred to queue - processor will free */
 
-	/* Increment message counter */
-	metric->transmitted_messages++;
-
-	/* Reset time series state for next aggregation window */
-	ts->count = 0;
-	ts->sum_truncated = false;
-
-	if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
-		ts->sum_int = 0;
-		ts->min_int = INT64_MAX;
-		ts->max_int = INT64_MIN;
-	} else {
-		ts->sum_float = 0.0f;
-		ts->min_float = FLT_MAX;
-		ts->max_float = -FLT_MAX;
-	}
-
+	reset_timeseries_state(metric, ts);
 	return 0;
 }
 
@@ -303,7 +317,8 @@ static int copy_labels_to_timeseries(struct metric_timeseries_state* ts,
 			LOG_ERR("Label key or value is NULL at index %u", i);
 			return -1;
 		}
-
+		/*No need to present warning - user was already informed about truncation
+		 * in the validation phase of report metric function in metrics backed*/
 		strncpy(ts->labels[i].key, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
 		ts->labels[i].key[SPOTFLOW_MAX_LABEL_KEY_LEN - 1] = '\0';
 
@@ -344,8 +359,8 @@ static void init_timeseries_aggregation_state(struct metric_timeseries_state* ts
  * (no values reported in current aggregation window).
  */
 static struct metric_timeseries_state*
-find_or_create_timeseries(struct metric_aggregator_context* ctx, const struct spotflow_label* labels,
-			  uint8_t label_count)
+find_or_create_timeseries(struct metric_aggregator_context* ctx,
+			  const struct spotflow_label* labels, uint8_t label_count)
 {
 	struct metric_timeseries_state* inactive_slot = NULL;
 	struct metric_timeseries_state* evictable_slot = NULL;

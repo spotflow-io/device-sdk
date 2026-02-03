@@ -256,7 +256,6 @@ static void init_metric_struct(struct spotflow_metric_base *metric,
 	metric->max_timeseries = max_timeseries;
 	metric->max_labels = max_labels;
 	metric->sequence_number = 0;
-	metric->transmitted_messages = 0;
 
 	k_mutex_init(&metric->lock);
 }

@@ -107,7 +107,6 @@ struct spotflow_metric_base {
 
 	/* Message sequencing */
 	uint64_t sequence_number;          /* Incremented per message transmitted */
-	uint64_t transmitted_messages;     /* Total messages sent */
 
 	/* Synchronization */
 	struct k_mutex lock;               /* Protects metric state */
