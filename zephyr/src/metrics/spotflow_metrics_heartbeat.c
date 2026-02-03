@@ -99,7 +99,7 @@ int spotflow_poll_and_process_heartbeat(void)
 	}
 
 	/* Publish heartbeat with exponential backoff on transient errors */
-	static const int retry_delays_ms[] = {10, 100, 1000, 5000};
+	static const int retry_delays_ms[] = {10, 100, 1000};
 	int rc;
 	int retry = 0;
 
