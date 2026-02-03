@@ -965,12 +965,7 @@ main() {
 
     if [[ "$sdk_type" == "ncs" ]]; then
         write_step "Checking nRF Connect SDK toolchain setup..."
-
-        local tmp
-        tmp=$(check_ncs_installation)
-        echo "tmp=$tmp" >&2
-
-        IFS='|' read -r nrfutil_type nrfutil_path <<< "$tmp"
+        IFS='|' read -r nrfutil_type nrfutil_path <<< $(check_ncs_installation)
         if [[ -n "$nrfutil_type" ]]; then
             should_install_ncs_toolchain=true
         fi
