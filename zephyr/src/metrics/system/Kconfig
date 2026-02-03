@@ -104,14 +104,28 @@ config SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS
 
 endif # SPOTFLOW_METRICS_SYSTEM_STACK
 
-config SPOTFLOW_METRICS_SYSTEM_INTERVAL
+config SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL
 	int "System metrics collection interval (seconds)"
+	default 10
+	range 1 360
+	help
+	  How often to sample system metrics (memory, CPU, network, etc.).
+	  Valid range: 1-360 seconds.
+	  Lower values increase CPU overhead but provide finer granularity.
+
+config SPOTFLOW_METRICS_SYSTEM_AGGREGATION_INTERVAL
+	int "System metrics aggregation interval (seconds)"
 	default 60
 	help
-	  How often to collect and report system metrics.
-	  Allowed values: 60 (1 minute), 600 (10 minutes), 3600 (1 hour).
-	  This also sets the metric aggregation interval (PT1M, PT10M, PT1H).
-	  Lower values increase network/CPU overhead.
+	  Aggregation window for system metrics before sending to cloud.
+	  Allowed values: 0, 60, 3600, 86400 (validated at build time).
+	  0 = PT0S (no aggregation - send each sample immediately)
+	  60 = PT1M (1 minute aggregation window)
+	  3600 = PT1H (1 hour aggregation window)
+	  86400 = P1D (1 day aggregation window)
+
+	  With PT0S, each collection produces a separate message.
+	  With aggregation, samples within the window are combined (min/max/sum/count).
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
 	int "Additional heap memory pool size for system metrics (bytes)"

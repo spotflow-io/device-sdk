@@ -23,8 +23,8 @@ extern "C" {
 enum spotflow_agg_interval {
 	SPOTFLOW_AGG_INTERVAL_NONE = 0,   /* PT0S - No aggregation */
 	SPOTFLOW_AGG_INTERVAL_1MIN = 1,   /* PT1M - 1 minute */
-	SPOTFLOW_AGG_INTERVAL_10MIN = 2,  /* PT10M - 10 minutes */
-	SPOTFLOW_AGG_INTERVAL_1HOUR = 3   /* PT1H - 1 hour */
+	SPOTFLOW_AGG_INTERVAL_1HOUR = 3,  /* PT1H - 1 hour */
+	SPOTFLOW_AGG_INTERVAL_1DAY = 4    /* P1D - 1 day */
 };
 
 /**

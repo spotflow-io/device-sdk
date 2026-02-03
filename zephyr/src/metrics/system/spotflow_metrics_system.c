@@ -111,12 +111,13 @@ int spotflow_metrics_system_init(void)
 #endif
 
 	k_work_init_delayable(&g_collection_work, collection_timer_handler);
-	k_work_schedule(&g_collection_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL));
+	k_work_schedule(&g_collection_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL));
 
 	atomic_set(&g_system_metrics_init_state, 2);
 
-	LOG_INF("System metrics initialized: %d metrics registered, collection interval=%d seconds",
-		registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL);
+	LOG_INF("System metrics initialized: %d metrics registered, collection=%ds, aggregation=%ds",
+		registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL,
+		CONFIG_SPOTFLOW_METRICS_SYSTEM_AGGREGATION_INTERVAL);
 
 	return 0;
 }
@@ -151,7 +152,7 @@ static void collection_timer_handler(struct k_work *work)
 	spotflow_metrics_system_stack_collect();
 #endif
 
-	k_work_schedule(&g_collection_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_INTERVAL));
+	k_work_schedule(&g_collection_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL));
 }
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK

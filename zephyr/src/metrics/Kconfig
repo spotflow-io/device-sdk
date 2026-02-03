@@ -40,11 +40,11 @@ config SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL
 	default 60
 	help
 	  Default aggregation period for metrics registered without explicit interval.
-	  Allowed values: 0, 60, 600, 3600 (validated at build time).
+	  Allowed values: 0, 60, 3600, 86400 (validated at build time).
 	  0 = PT0S (no aggregation, immediate - not recommended for production)
 	  60 = PT1M (1 minute, recommended default)
-	  600 = PT10M (10 minutes)
 	  3600 = PT1H (1 hour)
+	  86400 = P1D (1 day)
 
 config SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC
 	int "Maximum labels per metric"

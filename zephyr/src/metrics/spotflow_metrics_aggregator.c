@@ -473,11 +473,11 @@ static int64_t get_interval_ms(enum spotflow_agg_interval interval)
 	case SPOTFLOW_AGG_INTERVAL_NONE:
 		return 0;
 	case SPOTFLOW_AGG_INTERVAL_1MIN:
-		return 60 * 1000;
-	case SPOTFLOW_AGG_INTERVAL_10MIN:
-		return 10 * 60 * 1000;
+		return 60 * 1000;              /* 60,000 ms */
 	case SPOTFLOW_AGG_INTERVAL_1HOUR:
-		return 60 * 60 * 1000;
+		return 60 * 60 * 1000;         /* 3,600,000 ms */
+	case SPOTFLOW_AGG_INTERVAL_1DAY:
+		return 24 * 60 * 60 * 1000;    /* 86,400,000 ms */
 	default:
 		return 60 * 1000; /* Default to 1 minute */
 	}
