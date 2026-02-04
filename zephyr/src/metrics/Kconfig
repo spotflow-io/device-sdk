@@ -78,7 +78,7 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 
 config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
 	int "Metrics subsystem log level"
-  	default SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
+	default SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	range 0 4
 	help
 	  Log level for metrics subsystem:

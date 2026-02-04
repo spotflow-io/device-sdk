@@ -1,3 +1,4 @@
 {
-  "SpacesAfterTabs": true
+  "SpacesAfterTabs": true,
+  "Exclude": [".*\\.rst$"]
 }
