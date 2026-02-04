@@ -167,8 +167,12 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 	succ = succ && zcbor_uint32_put(state, KEY_SUM);
 	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
 		succ = succ && zcbor_float64_put(state, value_float);
-	} else {
+	} else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
 		succ = succ && zcbor_int64_put(state, value_int);
+	} else {
+		LOG_ERR("Invalid metric type: %d", metric->type);
+		k_free(buffer);
+		return -EINVAL;
 	}
 
 	/* End CBOR map */
@@ -299,8 +303,11 @@ static bool encode_aggregation_stats(zcbor_state_t *state,
 	succ = succ && zcbor_uint32_put(state, KEY_SUM);
 	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
 		succ = succ && zcbor_float64_put(state, ts->sum_float);
-	} else {
+	} else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
 		succ = succ && zcbor_int64_put(state, ts->sum_int);
+	} else {
+		LOG_ERR("Invalid metric type: %d", metric->type);
+		return false;
 	}
 
 	/* sumTruncated (only if true) */
@@ -317,16 +324,22 @@ static bool encode_aggregation_stats(zcbor_state_t *state,
 	succ = succ && zcbor_uint32_put(state, KEY_MIN);
 	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
 		succ = succ && zcbor_float64_put(state, ts->min_float);
-	} else {
+	} else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
 		succ = succ && zcbor_int64_put(state, ts->min_int);
+	} else {
+		LOG_ERR("Invalid metric type: %d", metric->type);
+		return false;
 	}
 
 	/* max */
 	succ = succ && zcbor_uint32_put(state, KEY_MAX);
 	if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
 		succ = succ && zcbor_float64_put(state, ts->max_float);
-	} else {
+	} else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
 		succ = succ && zcbor_int64_put(state, ts->max_int);
+	} else {
+		LOG_ERR("Invalid metric type: %d", metric->type);
+		return false;
 	}
 
 	return succ;

@@ -206,10 +206,12 @@ static void reset_timeseries_state(struct spotflow_metric_base* metric,
 		ts->sum_int = 0;
 		ts->min_int = INT64_MAX;
 		ts->max_int = INT64_MIN;
-	} else {
+	} else if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
 		ts->sum_float = 0.0f;
 		ts->min_float = FLT_MAX;
 		ts->max_float = -FLT_MAX;
+	} else {
+		LOG_ERR("Invalid metric type: %d", metric->type);
 	}
 }
 
@@ -346,9 +348,11 @@ static void init_timeseries_aggregation_state(struct metric_timeseries_state* ts
 	if (type == SPOTFLOW_METRIC_TYPE_INT) {
 		ts->min_int = INT64_MAX;
 		ts->max_int = INT64_MIN;
-	} else {
+	} else if (type == SPOTFLOW_METRIC_TYPE_FLOAT) {
 		ts->min_float = FLT_MAX;
 		ts->max_float = -FLT_MAX;
+	} else {
+		LOG_ERR("Invalid metric type: %d", type);
 	}
 }
 
