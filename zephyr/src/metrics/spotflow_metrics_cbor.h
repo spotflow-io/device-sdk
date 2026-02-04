@@ -30,19 +30,16 @@ extern "C" {
  *         -EINVAL: CBOR encoding failed
  *         -ENOMEM: Memory allocation failed
  */
-int spotflow_metrics_cbor_encode(
-	struct spotflow_metric_base *metric,
-	struct metric_timeseries_state *ts,
-	int64_t timestamp_ms,
-	uint64_t sequence_number,
-	uint8_t **cbor_data,
-	size_t *cbor_len);
+int spotflow_metrics_cbor_encode(struct spotflow_metric_base* metric,
+				 struct metric_timeseries_state* ts, int64_t timestamp_ms,
+				 uint64_t sequence_number, uint8_t** cbor_data, size_t* cbor_len);
 
 int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* metric,
-						const struct spotflow_label* labels, uint8_t label_count,
-						int64_t value_int, float value_float,
-						int64_t timestamp_ms, uint64_t sequence_number,
-					uint8_t** cbor_data, size_t* cbor_len);
+						const struct spotflow_label* labels,
+						uint8_t label_count, int64_t value_int,
+						float value_float, int64_t timestamp_ms,
+						uint64_t sequence_number, uint8_t** cbor_data,
+						size_t* cbor_len);
 
 /**
  * @brief Encode a minimal heartbeat CBOR message
@@ -62,7 +59,7 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
  *         -EINVAL: CBOR encoding failed
  *         -ENOMEM: Memory allocation failed
  */
-int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t **data, size_t *len);
+int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, size_t* len);
 
 #ifdef __cplusplus
 }

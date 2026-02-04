@@ -14,39 +14,33 @@
 LOG_MODULE_REGISTER(spotflow_metrics_cbor, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 /* CBOR Protocol Keys (aligned with cloud backend) */
-#define KEY_MESSAGE_TYPE           0x00  /* 0 */
-#define KEY_LABELS                 0x05  /* 5 */
-#define KEY_DEVICE_UPTIME_MS       0x06  /* 6 */
-#define KEY_SEQUENCE_NUMBER        0x0D  /* 13 */
-#define KEY_METRIC_NAME            0x15  /* 21 */
-#define KEY_AGGREGATION_INTERVAL   0x16  /* 22 */
-#define KEY_SUM                    0x18  /* 24 */
-#define KEY_SUM_TRUNCATED          0x19  /* 25 */
-#define KEY_COUNT                  0x1A  /* 26 */
-#define KEY_MIN                    0x1B  /* 27 */
-#define KEY_MAX                    0x1C  /* 28 */
-#define KEY_SAMPLES                0x1D  /* 29 - reserved for future */
+#define KEY_MESSAGE_TYPE 0x00 /* 0 */
+#define KEY_LABELS 0x05 /* 5 */
+#define KEY_DEVICE_UPTIME_MS 0x06 /* 6 */
+#define KEY_SEQUENCE_NUMBER 0x0D /* 13 */
+#define KEY_METRIC_NAME 0x15 /* 21 */
+#define KEY_AGGREGATION_INTERVAL 0x16 /* 22 */
+#define KEY_SUM 0x18 /* 24 */
+#define KEY_SUM_TRUNCATED 0x19 /* 25 */
+#define KEY_COUNT 0x1A /* 26 */
+#define KEY_MIN 0x1B /* 27 */
+#define KEY_MAX 0x1C /* 28 */
+#define KEY_SAMPLES 0x1D /* 29 - reserved for future */
 
 /* Message Type */
-#define METRIC_MESSAGE_TYPE        0x05
-static bool encode_labels(zcbor_state_t *state,
-			  const struct metric_label_storage *labels,
+#define METRIC_MESSAGE_TYPE 0x05
+static bool encode_labels(zcbor_state_t* state, const struct metric_label_storage* labels,
 			  uint8_t label_count);
 static void encode_metric_header(struct spotflow_metric_base* metric, int64_t timestamp_ms,
-			  uint64_t sequence_number, zcbor_state_t state[3], bool* succ);
-static bool encode_aggregation_stats(zcbor_state_t *state,
-				     struct spotflow_metric_base *metric,
-				     struct metric_timeseries_state *ts);
-static int finalize_cbor_output(uint8_t *buffer, zcbor_state_t *state,
-				uint8_t **cbor_data, size_t *cbor_len);
+				 uint64_t sequence_number, zcbor_state_t state[3], bool* succ);
+static bool encode_aggregation_stats(zcbor_state_t* state, struct spotflow_metric_base* metric,
+				     struct metric_timeseries_state* ts);
+static int finalize_cbor_output(uint8_t* buffer, zcbor_state_t* state, uint8_t** cbor_data,
+				size_t* cbor_len);
 
-int spotflow_metrics_cbor_encode(
-	struct spotflow_metric_base *metric,
-	struct metric_timeseries_state *ts,
-	int64_t timestamp_ms,
-	uint64_t sequence_number,
-	uint8_t **cbor_data,
-	size_t *cbor_len)
+int spotflow_metrics_cbor_encode(struct spotflow_metric_base* metric,
+				 struct metric_timeseries_state* ts, int64_t timestamp_ms,
+				 uint64_t sequence_number, uint8_t** cbor_data, size_t* cbor_len)
 {
 	if (metric == NULL || ts == NULL || cbor_data == NULL || cbor_len == NULL) {
 		return -EINVAL;
@@ -57,7 +51,7 @@ int spotflow_metrics_cbor_encode(
 		return -EINVAL; /* This function is for non-aggregated metrics only */
 	}
 
-	uint8_t *buffer = k_malloc(CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE);
+	uint8_t* buffer = k_malloc(CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE);
 	if (!buffer) {
 		LOG_ERR("Failed to allocate CBOR encoding buffer");
 		return -ENOMEM;
@@ -71,10 +65,10 @@ int spotflow_metrics_cbor_encode(
 	 *               sequenceNumber, sum, count, min, max = 9 */
 	uint32_t map_entries = 9;
 	if (ts->label_count > 0) {
-		map_entries++;  /* labels */
+		map_entries++; /* labels */
 	}
 	if (ts->sum_truncated) {
-		map_entries++;  /* sumTruncated */
+		map_entries++; /* sumTruncated */
 	}
 
 	/* Start CBOR map with exact entry count */
@@ -104,17 +98,18 @@ int spotflow_metrics_cbor_encode(
 		return ret;
 	}
 
-	LOG_DBG("Encoded metric '%s' message (%zu bytes, seq=%llu)",
-		metric->name, *cbor_len, (unsigned long long)sequence_number);
+	LOG_DBG("Encoded metric '%s' message (%zu bytes, seq=%llu)", metric->name, *cbor_len,
+		(unsigned long long)sequence_number);
 
 	return 0;
 }
 
 int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* metric,
-						const struct spotflow_label* labels, uint8_t label_count,
-						int64_t value_int, float value_float,
-						int64_t timestamp_ms, uint64_t sequence_number,
-						uint8_t** cbor_data, size_t* cbor_len)
+						const struct spotflow_label* labels,
+						uint8_t label_count, int64_t value_int,
+						float value_float, int64_t timestamp_ms,
+						uint64_t sequence_number, uint8_t** cbor_data,
+						size_t* cbor_len)
 {
 	if (metric == NULL || cbor_data == NULL || cbor_len == NULL) {
 		return -EINVAL;
@@ -125,7 +120,7 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 		return -EINVAL; /* This function is for non-aggregated metrics only */
 	}
 
-	uint8_t *buffer = k_malloc(CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE);
+	uint8_t* buffer = k_malloc(CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE);
 	if (!buffer) {
 		LOG_ERR("Failed to allocate CBOR encoding buffer");
 		return -ENOMEM;
@@ -195,10 +190,9 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 	return 0;
 }
 
-
-int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t **data, size_t *len)
+int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, size_t* len)
 {
-	uint8_t buffer[64];  /* Small static buffer for ~40 bytes output */
+	uint8_t buffer[64]; /* Small static buffer for ~40 bytes output */
 	ZCBOR_STATE_E(state, 1, buffer, sizeof(buffer), 1);
 
 	bool succ = true;
@@ -243,12 +237,10 @@ int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t **data, si
 	return 0;
 }
 
-
 /**
  * @brief Encode labels as CBOR map
  */
-static bool encode_labels(zcbor_state_t *state,
-			  const struct metric_label_storage *labels,
+static bool encode_labels(zcbor_state_t* state, const struct metric_label_storage* labels,
 			  uint8_t label_count)
 {
 	bool succ = true;
@@ -257,10 +249,10 @@ static bool encode_labels(zcbor_state_t *state,
 	succ = succ && zcbor_map_start_encode(state, label_count);
 
 	for (uint8_t i = 0; i < label_count && succ; i++) {
-		succ = succ && zcbor_tstr_put_term(state, labels[i].key,
-						   SPOTFLOW_MAX_LABEL_KEY_LEN);
-		succ = succ && zcbor_tstr_put_term(state, labels[i].value,
-						   SPOTFLOW_MAX_LABEL_VALUE_LEN);
+		succ =
+		    succ && zcbor_tstr_put_term(state, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN);
+		succ = succ &&
+		    zcbor_tstr_put_term(state, labels[i].value, SPOTFLOW_MAX_LABEL_VALUE_LEN);
 	}
 
 	succ = succ && zcbor_map_end_encode(state, label_count);
@@ -269,7 +261,7 @@ static bool encode_labels(zcbor_state_t *state,
 }
 
 static void encode_metric_header(struct spotflow_metric_base* metric, int64_t timestamp_ms,
-			  uint64_t sequence_number, zcbor_state_t state[3], bool* succ)
+				 uint64_t sequence_number, zcbor_state_t state[3], bool* succ)
 {
 	/* messageType */
 	*succ = *succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
@@ -293,9 +285,8 @@ static void encode_metric_header(struct spotflow_metric_base* metric, int64_t ti
 	*succ = *succ && zcbor_uint64_put(state, sequence_number);
 }
 
-static bool encode_aggregation_stats(zcbor_state_t *state,
-				     struct spotflow_metric_base *metric,
-				     struct metric_timeseries_state *ts)
+static bool encode_aggregation_stats(zcbor_state_t* state, struct spotflow_metric_base* metric,
+				     struct metric_timeseries_state* ts)
 {
 	bool succ = true;
 
@@ -345,11 +336,11 @@ static bool encode_aggregation_stats(zcbor_state_t *state,
 	return succ;
 }
 
-static int finalize_cbor_output(uint8_t *buffer, zcbor_state_t *state,
-				uint8_t **cbor_data, size_t *cbor_len)
+static int finalize_cbor_output(uint8_t* buffer, zcbor_state_t* state, uint8_t** cbor_data,
+				size_t* cbor_len)
 {
 	size_t encoded_len = state->payload - buffer;
-	uint8_t *data = k_malloc(encoded_len);
+	uint8_t* data = k_malloc(encoded_len);
 	if (!data) {
 		k_free(buffer);
 		return -ENOMEM;
@@ -362,4 +353,3 @@ static int finalize_cbor_output(uint8_t *buffer, zcbor_state_t *state,
 
 	return 0;
 }
-

@@ -46,7 +46,7 @@ static struct k_work_delayable g_collection_work;
  */
 static atomic_t g_system_metrics_init_state = ATOMIC_INIT(0);
 
-static void collection_timer_handler(struct k_work *work);
+static void collection_timer_handler(struct k_work* work);
 
 int spotflow_metrics_system_init(void)
 {
@@ -111,13 +111,15 @@ int spotflow_metrics_system_init(void)
 #endif
 
 	k_work_init_delayable(&g_collection_work, collection_timer_handler);
-	k_work_schedule(&g_collection_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL));
+	k_work_schedule(&g_collection_work,
+			K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL));
 
 	atomic_set(&g_system_metrics_init_state, 2);
 
-	LOG_INF("System metrics initialized: %d metrics registered, collection=%ds, aggregation=%ds",
-		registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL,
-		CONFIG_SPOTFLOW_METRICS_SYSTEM_AGGREGATION_INTERVAL);
+	LOG_INF(
+	    "System metrics initialized: %d metrics registered, collection=%ds, aggregation=%ds",
+	    registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL,
+	    CONFIG_SPOTFLOW_METRICS_SYSTEM_AGGREGATION_INTERVAL);
 
 	return 0;
 }
@@ -132,7 +134,7 @@ void spotflow_metrics_system_report_connection_state(bool connected)
 #endif
 }
 
-static void collection_timer_handler(struct k_work *work)
+static void collection_timer_handler(struct k_work* work)
 {
 	LOG_DBG("Collecting system metrics...");
 
@@ -152,11 +154,12 @@ static void collection_timer_handler(struct k_work *work)
 	spotflow_metrics_system_stack_collect();
 #endif
 
-	k_work_schedule(&g_collection_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL));
+	k_work_schedule(&g_collection_work,
+			K_SECONDS(CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL));
 }
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
-int spotflow_metrics_system_enable_thread_stack(struct k_thread *thread)
+int spotflow_metrics_system_enable_thread_stack(struct k_thread* thread)
 {
 	return spotflow_metrics_system_stack_enable_thread(thread);
 }

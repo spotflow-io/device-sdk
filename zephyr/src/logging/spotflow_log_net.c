@@ -5,16 +5,14 @@
 
 LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
-
 int poll_and_process_enqueued_logs(void)
 {
-	struct spotflow_mqtt_logs_msg *msg_ptr;
+	struct spotflow_mqtt_logs_msg* msg_ptr;
 
 	/* Peek without removing - returns non-zero if queue empty */
 	if (k_msgq_peek(&g_spotflow_logs_msgq, &msg_ptr) != 0) {
-		return 0;  /* Queue empty */
+		return 0; /* Queue empty */
 	}
-
 
 	int rc = spotflow_mqtt_publish_ingest_cbor_msg(msg_ptr->payload, msg_ptr->len);
 	if (rc == -EAGAIN) {

@@ -15,16 +15,16 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static struct spotflow_metric_int *g_stack_metric;
-static struct spotflow_metric_float *g_stack_used_metric;
+static struct spotflow_metric_int* g_stack_metric;
+static struct spotflow_metric_float* g_stack_used_metric;
 
 #ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
-static struct k_thread *g_tracked_threads[CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS];
+static struct k_thread* g_tracked_threads[CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS];
 static struct k_mutex g_tracked_threads_mutex;
 static bool g_tracked_threads_initialized;
 #endif
 
-static void report_thread_stack(const struct k_thread *thread, void *user_data);
+static void report_thread_stack(const struct k_thread* thread, void* user_data);
 
 int spotflow_metrics_system_stack_init(void)
 {
@@ -83,7 +83,7 @@ void spotflow_metrics_system_stack_collect(void)
 #endif
 }
 
-int spotflow_metrics_system_stack_enable_thread(struct k_thread *thread)
+int spotflow_metrics_system_stack_enable_thread(struct k_thread* thread)
 {
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 	ARG_UNUSED(thread);
@@ -116,7 +116,7 @@ int spotflow_metrics_system_stack_enable_thread(struct k_thread *thread)
 		if (g_tracked_threads[i] == NULL) {
 			g_tracked_threads[i] = thread;
 			k_mutex_unlock(&g_tracked_threads_mutex);
-			LOG_INF("Added thread %p to stack tracking", (void *)thread);
+			LOG_INF("Added thread %p to stack tracking", (void*)thread);
 			return 0;
 		}
 	}
@@ -127,7 +127,7 @@ int spotflow_metrics_system_stack_enable_thread(struct k_thread *thread)
 #endif
 }
 
-static void report_thread_stack(const struct k_thread *thread, void *user_data)
+static void report_thread_stack(const struct k_thread* thread, void* user_data)
 {
 	ARG_UNUSED(user_data);
 
@@ -146,20 +146,21 @@ static void report_thread_stack(const struct k_thread *thread, void *user_data)
 
 	char thread_label[32];
 #ifdef CONFIG_THREAD_NAME
-	const char *name = k_thread_name_get((k_tid_t)thread);
+	const char* name = k_thread_name_get((k_tid_t)thread);
 	if (name != NULL && name[0] != '\0') {
 		strncpy(thread_label, name, sizeof(thread_label) - 1);
 		thread_label[sizeof(thread_label) - 1] = '\0';
 	} else {
-		snprintf(thread_label, sizeof(thread_label), "%p", (void *)thread);
+		snprintf(thread_label, sizeof(thread_label), "%p", (void*)thread);
 	}
 #else
-	snprintf(thread_label, sizeof(thread_label), "%p", (void *)thread);
+	snprintf(thread_label, sizeof(thread_label), "%p", (void*)thread);
 #endif
 
-	struct spotflow_label labels[] = {{.key = "thread", .value = thread_label}};
+	struct spotflow_label labels[] = { { .key = "thread", .value = thread_label } };
 
-	rc = spotflow_report_metric_int_with_labels(g_stack_metric, (int64_t)unused_bytes, labels, 1);
+	rc = spotflow_report_metric_int_with_labels(g_stack_metric, (int64_t)unused_bytes, labels,
+						    1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report stack free metric for %s: %d", thread_label, rc);
 	}
@@ -173,5 +174,6 @@ static void report_thread_stack(const struct k_thread *thread, void *user_data)
 	/* Log using integer format to avoid float-to-double promotion (Zephyr convention) */
 	int pct_int = (int)used_percent;
 	int pct_frac = (int)((used_percent - pct_int) * 10);
-	LOG_DBG("Stack: thread=%s, used=%d.%01d%%, free=%zu bytes", thread_label, pct_int, pct_frac, unused_bytes);
+	LOG_DBG("Stack: thread=%s, used=%d.%01d%%, free=%zu bytes", thread_label, pct_int, pct_frac,
+		unused_bytes);
 }

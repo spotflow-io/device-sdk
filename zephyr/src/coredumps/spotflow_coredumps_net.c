@@ -14,11 +14,11 @@ LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_L
  */
 int spotflow_poll_and_process_enqueued_coredump_chunks(void)
 {
-	struct spotflow_mqtt_coredumps_msg *msg_ptr;
+	struct spotflow_mqtt_coredumps_msg* msg_ptr;
 
 	/* Peek without removing - returns non-zero if queue empty */
 	if (k_msgq_peek(&g_spotflow_core_dumps_msgq, &msg_ptr) != 0) {
-		return 0;  /* Queue empty */
+		return 0; /* Queue empty */
 	}
 
 	/* Publish while message is still safely in queue */

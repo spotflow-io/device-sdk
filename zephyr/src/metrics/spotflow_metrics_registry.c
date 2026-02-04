@@ -30,31 +30,26 @@ static union metric_registry_entry g_metric_registry[CONFIG_SPOTFLOW_METRICS_MAX
 static K_MUTEX_DEFINE(g_registry_lock);
 
 /* Forward declarations of static functions */
-static void normalize_metric_name(const char *input, char *output, size_t output_size);
+static void normalize_metric_name(const char* input, char* output, size_t output_size);
 static int find_available_slot(void);
-static struct spotflow_metric_base *find_metric_by_name(const char *normalized_name);
-static int validate_metric_params(const char *name, uint16_t max_timeseries, uint8_t max_labels);
-static int normalize_and_validate_metric_name(const char *name, char *out_normalized, size_t out_size);
-static void init_metric_struct(struct spotflow_metric_base *metric,
-			       const char *normalized_name,
+static struct spotflow_metric_base* find_metric_by_name(const char* normalized_name);
+static int validate_metric_params(const char* name, uint16_t max_timeseries, uint8_t max_labels);
+static int normalize_and_validate_metric_name(const char* name, char* out_normalized,
+					      size_t out_size);
+static void init_metric_struct(struct spotflow_metric_base* metric, const char* normalized_name,
 			       enum spotflow_metric_type type,
-			       enum spotflow_agg_interval agg_interval,
-			       uint16_t max_timeseries,
+			       enum spotflow_agg_interval agg_interval, uint16_t max_timeseries,
 			       uint8_t max_labels);
-static int register_metric_common(const char *name,
-				  enum spotflow_metric_type type,
-				  enum spotflow_agg_interval agg_interval,
-				  uint16_t max_timeseries,
-				  uint8_t max_labels,
-				  struct spotflow_metric_base **metric_out);
+static int register_metric_common(const char* name, enum spotflow_metric_type type,
+				  enum spotflow_agg_interval agg_interval, uint16_t max_timeseries,
+				  uint8_t max_labels, struct spotflow_metric_base** metric_out);
 
 /* Public API Implementation */
 
-int spotflow_register_metric_int(const char *name,
-				 enum spotflow_agg_interval agg_interval,
-				 struct spotflow_metric_int **metric_out)
+int spotflow_register_metric_int(const char* name, enum spotflow_agg_interval agg_interval,
+				 struct spotflow_metric_int** metric_out)
 {
-	struct spotflow_metric_base *base;
+	struct spotflow_metric_base* base;
 	int rc;
 
 	if (metric_out == NULL) {
@@ -72,15 +67,14 @@ int spotflow_register_metric_int(const char *name,
 		return -EINVAL;
 	}
 	/* The base is the first member of spotflow_metric_int, so we can safely cast */
-	*metric_out = (struct spotflow_metric_int *)base;
+	*metric_out = (struct spotflow_metric_int*)base;
 	return 0;
 }
 
-int spotflow_register_metric_float(const char *name,
-				   enum spotflow_agg_interval agg_interval,
-				   struct spotflow_metric_float **metric_out)
+int spotflow_register_metric_float(const char* name, enum spotflow_agg_interval agg_interval,
+				   struct spotflow_metric_float** metric_out)
 {
-	struct spotflow_metric_base *base;
+	struct spotflow_metric_base* base;
 	int rc;
 
 	if (metric_out == NULL) {
@@ -97,17 +91,16 @@ int spotflow_register_metric_float(const char *name,
 		LOG_ERR("Type mismatch: expected FLOAT, got %d", base->type);
 		return -EINVAL;
 	}
-	*metric_out = (struct spotflow_metric_float *)base;
+	*metric_out = (struct spotflow_metric_float*)base;
 	return 0;
 }
 
-int spotflow_register_metric_int_with_labels(const char *name,
+int spotflow_register_metric_int_with_labels(const char* name,
 					     enum spotflow_agg_interval agg_interval,
-					     uint16_t max_timeseries,
-					     uint8_t max_labels,
-					     struct spotflow_metric_int **metric_out)
+					     uint16_t max_timeseries, uint8_t max_labels,
+					     struct spotflow_metric_int** metric_out)
 {
-	struct spotflow_metric_base *base;
+	struct spotflow_metric_base* base;
 	int rc;
 
 	if (metric_out == NULL) {
@@ -120,8 +113,8 @@ int spotflow_register_metric_int_with_labels(const char *name,
 		return -EINVAL;
 	}
 
-	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval,
-				    max_timeseries, max_labels, &base);
+	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval, max_timeseries,
+				    max_labels, &base);
 	if (rc < 0) {
 		return rc;
 	}
@@ -130,17 +123,16 @@ int spotflow_register_metric_int_with_labels(const char *name,
 		LOG_ERR("Type mismatch: expected INT, got %d", base->type);
 		return -EINVAL;
 	}
-	*metric_out = (struct spotflow_metric_int *)base;
+	*metric_out = (struct spotflow_metric_int*)base;
 	return 0;
 }
 
-int spotflow_register_metric_float_with_labels(const char *name,
+int spotflow_register_metric_float_with_labels(const char* name,
 					       enum spotflow_agg_interval agg_interval,
-					       uint16_t max_timeseries,
-					       uint8_t max_labels,
-					       struct spotflow_metric_float **metric_out)
+					       uint16_t max_timeseries, uint8_t max_labels,
+					       struct spotflow_metric_float** metric_out)
 {
-	struct spotflow_metric_base *base;
+	struct spotflow_metric_base* base;
 	int rc;
 
 	if (metric_out == NULL) {
@@ -153,8 +145,8 @@ int spotflow_register_metric_float_with_labels(const char *name,
 		return -EINVAL;
 	}
 
-	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval,
-				    max_timeseries, max_labels, &base);
+	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval, max_timeseries,
+				    max_labels, &base);
 	if (rc < 0) {
 		return rc;
 	}
@@ -163,7 +155,7 @@ int spotflow_register_metric_float_with_labels(const char *name,
 		LOG_ERR("Type mismatch: expected FLOAT, got %d", base->type);
 		return -EINVAL;
 	}
-	*metric_out = (struct spotflow_metric_float *)base;
+	*metric_out = (struct spotflow_metric_float*)base;
 	return 0;
 }
 
@@ -172,7 +164,7 @@ int spotflow_register_metric_float_with_labels(const char *name,
 /**
  * @brief Normalize metric name to lowercase alphanumeric with underscores
  */
-static void normalize_metric_name(const char *input, char *output, size_t output_size)
+static void normalize_metric_name(const char* input, char* output, size_t output_size)
 {
 	size_t i = 0;
 	size_t j = 0;
@@ -213,12 +205,11 @@ static int find_available_slot(void)
  *
  * @return Pointer to existing metric base if found, NULL otherwise
  */
-static struct spotflow_metric_base *find_metric_by_name(const char *normalized_name)
+static struct spotflow_metric_base* find_metric_by_name(const char* normalized_name)
 {
 	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED; i++) {
-		struct spotflow_metric_base *base = &g_metric_registry[i].int_metric.base;
-		if (base->aggregator_context != NULL &&
-		    strcmp(base->name, normalized_name) == 0) {
+		struct spotflow_metric_base* base = &g_metric_registry[i].int_metric.base;
+		if (base->aggregator_context != NULL && strcmp(base->name, normalized_name) == 0) {
 			return base;
 		}
 	}
@@ -230,7 +221,7 @@ static struct spotflow_metric_base *find_metric_by_name(const char *normalized_n
  *
  * @return 0 on success, -EINVAL on validation failure
  */
-static int validate_metric_params(const char *name, uint16_t max_timeseries, uint8_t max_labels)
+static int validate_metric_params(const char* name, uint16_t max_timeseries, uint8_t max_labels)
 {
 	if (name == NULL) {
 		LOG_ERR("Metric name cannot be NULL");
@@ -256,7 +247,8 @@ static int validate_metric_params(const char *name, uint16_t max_timeseries, uin
  *
  * @return 0 on success, -EINVAL if normalized name is empty
  */
-static int normalize_and_validate_metric_name(const char *name, char *out_normalized, size_t out_size)
+static int normalize_and_validate_metric_name(const char* name, char* out_normalized,
+					      size_t out_size)
 {
 	normalize_metric_name(name, out_normalized, out_size);
 
@@ -275,11 +267,9 @@ static int normalize_and_validate_metric_name(const char *name, char *out_normal
 /**
  * @brief Initialize metric structure fields
  */
-static void init_metric_struct(struct spotflow_metric_base *metric,
-			       const char *normalized_name,
+static void init_metric_struct(struct spotflow_metric_base* metric, const char* normalized_name,
 			       enum spotflow_metric_type type,
-			       enum spotflow_agg_interval agg_interval,
-			       uint16_t max_timeseries,
+			       enum spotflow_agg_interval agg_interval, uint16_t max_timeseries,
 			       uint8_t max_labels)
 {
 	strncpy(metric->name, normalized_name, sizeof(metric->name) - 1);
@@ -297,12 +287,9 @@ static void init_metric_struct(struct spotflow_metric_base *metric,
 /**
  * @brief Common registration logic
  */
-static int register_metric_common(const char *name,
-				  enum spotflow_metric_type type,
-				  enum spotflow_agg_interval agg_interval,
-				  uint16_t max_timeseries,
-				  uint8_t max_labels,
-				  struct spotflow_metric_base **metric_out)
+static int register_metric_common(const char* name, enum spotflow_metric_type type,
+				  enum spotflow_agg_interval agg_interval, uint16_t max_timeseries,
+				  uint8_t max_labels, struct spotflow_metric_base** metric_out)
 {
 	int rc = validate_metric_params(name, max_timeseries, max_labels);
 	if (rc < 0) {
@@ -333,7 +320,7 @@ static int register_metric_common(const char *name,
 		return -ENOSPC;
 	}
 
-	struct spotflow_metric_base *metric = &g_metric_registry[slot].int_metric.base;
+	struct spotflow_metric_base* metric = &g_metric_registry[slot].int_metric.base;
 	init_metric_struct(metric, normalized_name, type, agg_interval, max_timeseries, max_labels);
 
 	/* Initialize aggregator context */
@@ -350,8 +337,9 @@ static int register_metric_common(const char *name,
 
 	LOG_INF("Registered metric '%s' (type=%s, agg=%d, max_ts=%u, max_labels=%u)",
 		normalized_name,
-		(type == SPOTFLOW_METRIC_TYPE_INT) ? "int" :
-		(type == SPOTFLOW_METRIC_TYPE_FLOAT) ? "float" : "unknown",
+		(type == SPOTFLOW_METRIC_TYPE_INT)	   ? "int"
+		    : (type == SPOTFLOW_METRIC_TYPE_FLOAT) ? "float"
+							   : "unknown",
 		metric->agg_interval, max_timeseries, max_labels);
 
 	*metric_out = metric;

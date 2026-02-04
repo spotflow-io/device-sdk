@@ -16,26 +16,26 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static struct spotflow_metric_int *g_network_tx_metric;
-static struct spotflow_metric_int *g_network_rx_metric;
+static struct spotflow_metric_int* g_network_tx_metric;
+static struct spotflow_metric_int* g_network_rx_metric;
 
-static void report_network_interface_metrics(struct net_if *iface, void *user_data);
+static void report_network_interface_metrics(struct net_if* iface, void* user_data);
 
 int spotflow_metrics_system_network_init(void)
 {
 	int rc;
 
 	rc = spotflow_register_metric_int_with_labels(
-		SPOTFLOW_METRIC_NAME_NETWORK_TX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
-		CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_tx_metric);
+	    SPOTFLOW_METRIC_NAME_NETWORK_TX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+	    CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_tx_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register network TX metric: %d", rc);
 		return rc;
 	}
 
 	rc = spotflow_register_metric_int_with_labels(
-		SPOTFLOW_METRIC_NAME_NETWORK_RX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
-		CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_rx_metric);
+	    SPOTFLOW_METRIC_NAME_NETWORK_RX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+	    CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_rx_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register network RX metric: %d", rc);
 		return rc;
@@ -60,27 +60,27 @@ void spotflow_metrics_system_network_collect(void)
 	}
 }
 
-static void report_network_interface_metrics(struct net_if *iface, void *user_data)
+static void report_network_interface_metrics(struct net_if* iface, void* user_data)
 {
-	int *if_count = (int *)user_data;
+	int* if_count = (int*)user_data;
 
 	if (!net_if_is_up(iface)) {
 		return;
 	}
 
-	const struct device *dev = net_if_get_device(iface);
+	const struct device* dev = net_if_get_device(iface);
 	if (!dev || !dev->name) {
 		LOG_WRN("Interface has no valid device/name");
 		return;
 	}
 
-	const char *if_name = dev->name;
+	const char* if_name = dev->name;
 
-	struct net_stats *stats = &iface->stats;
+	struct net_stats* stats = &iface->stats;
 	uint64_t tx_bytes = stats->bytes.sent;
 	uint64_t rx_bytes = stats->bytes.received;
 
-	struct spotflow_label labels[] = {{.key = "interface", .value = if_name}};
+	struct spotflow_label labels[] = { { .key = "interface", .value = if_name } };
 
 	int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, (int64_t)tx_bytes,
 							labels, 1);

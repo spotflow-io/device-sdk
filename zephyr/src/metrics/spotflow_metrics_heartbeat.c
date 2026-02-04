@@ -14,7 +14,7 @@
 LOG_MODULE_REGISTER(spotflow_metrics_heartbeat, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 /* Single-slot buffer for pending heartbeat (size 1, silent overwrite) */
-static struct spotflow_mqtt_metrics_msg *g_pending_heartbeat;
+static struct spotflow_mqtt_metrics_msg* g_pending_heartbeat;
 static struct k_mutex g_heartbeat_mutex;
 
 /* Periodic heartbeat work */
@@ -23,14 +23,14 @@ static struct k_work_delayable g_heartbeat_work;
 /**
  * @brief Timer handler - generates heartbeat and overwrites pending buffer
  */
-static void heartbeat_work_handler(struct k_work *work)
+static void heartbeat_work_handler(struct k_work* work)
 {
 	ARG_UNUSED(work);
 
 	int64_t uptime_ms = k_uptime_get();
 
 	/* Encode heartbeat message */
-	uint8_t *payload = NULL;
+	uint8_t* payload = NULL;
 	size_t len = 0;
 	int rc = spotflow_metrics_cbor_encode_heartbeat(uptime_ms, &payload, &len);
 	if (rc != 0) {
@@ -39,7 +39,7 @@ static void heartbeat_work_handler(struct k_work *work)
 	}
 
 	/* Allocate message structure */
-	struct spotflow_mqtt_metrics_msg *new_msg = k_malloc(sizeof(*new_msg));
+	struct spotflow_mqtt_metrics_msg* new_msg = k_malloc(sizeof(*new_msg));
 	if (!new_msg) {
 		LOG_ERR("Failed to allocate heartbeat message");
 		k_free(payload);
@@ -63,13 +63,11 @@ static void heartbeat_work_handler(struct k_work *work)
 
 	k_mutex_unlock(&g_heartbeat_mutex);
 
-	LOG_DBG("Heartbeat queued (uptime=%lld ms, %zu bytes)",
-		(long long)uptime_ms, len);
+	LOG_DBG("Heartbeat queued (uptime=%lld ms, %zu bytes)", (long long)uptime_ms, len);
 
 reschedule:
 	/* Reschedule for next interval */
-	k_work_schedule(&g_heartbeat_work,
-			K_SECONDS(CONFIG_SPOTFLOW_METRICS_HEARTBEAT_INTERVAL));
+	k_work_schedule(&g_heartbeat_work, K_SECONDS(CONFIG_SPOTFLOW_METRICS_HEARTBEAT_INTERVAL));
 }
 
 void spotflow_metrics_heartbeat_init(void)
@@ -86,7 +84,7 @@ void spotflow_metrics_heartbeat_init(void)
 
 int spotflow_poll_and_process_heartbeat(void)
 {
-	struct spotflow_mqtt_metrics_msg *msg = NULL;
+	struct spotflow_mqtt_metrics_msg* msg = NULL;
 
 	/* Atomically dequeue pending heartbeat */
 	k_mutex_lock(&g_heartbeat_mutex, K_FOREVER);
@@ -95,11 +93,11 @@ int spotflow_poll_and_process_heartbeat(void)
 	k_mutex_unlock(&g_heartbeat_mutex);
 
 	if (!msg) {
-		return 0;  /* No heartbeat pending */
+		return 0; /* No heartbeat pending */
 	}
 
 	/* Publish heartbeat with exponential backoff on transient errors */
-	static const int retry_delays_ms[] = {10, 100, 1000};
+	static const int retry_delays_ms[] = { 10, 100, 1000 };
 	int rc;
 	int retry = 0;
 
@@ -107,10 +105,12 @@ int spotflow_poll_and_process_heartbeat(void)
 		rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
 		if (rc == -EAGAIN) {
 			if (retry >= ARRAY_SIZE(retry_delays_ms)) {
-				LOG_WRN("Heartbeat publish failed after %d retries, skipping", retry);
+				LOG_WRN("Heartbeat publish failed after %d retries, skipping",
+					retry);
 				break;
 			}
-			LOG_DBG("MQTT busy, retrying heartbeat in %d ms...", retry_delays_ms[retry]);
+			LOG_DBG("MQTT busy, retrying heartbeat in %d ms...",
+				retry_delays_ms[retry]);
 			k_sleep(K_MSEC(retry_delays_ms[retry]));
 			retry++;
 		}
@@ -126,5 +126,5 @@ int spotflow_poll_and_process_heartbeat(void)
 	}
 
 	LOG_DBG("Heartbeat published");
-	return 1;  /* Processed one heartbeat */
+	return 1; /* Processed one heartbeat */
 }

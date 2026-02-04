@@ -24,9 +24,7 @@ extern "C" {
  *         -EINVAL: Invalid metric handle
  *         -EAGAIN: Aggregator busy (rare, retry)
  */
-int spotflow_report_metric_int(
-	struct spotflow_metric_int *metric,
-	int64_t value);
+int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value);
 
 /**
  * @brief Report a label-less float metric value
@@ -36,9 +34,7 @@ int spotflow_report_metric_int(
  *
  * @return 0 on success, negative errno on failure
  */
-int spotflow_report_metric_float(
-	struct spotflow_metric_float *metric,
-	float value);
+int spotflow_report_metric_float(struct spotflow_metric_float* metric, float value);
 
 /**
  * @brief Report a labeled integer metric value
@@ -53,11 +49,9 @@ int spotflow_report_metric_float(
  *         -ENOSPC: Time series pool full (max_timeseries limit reached)
  *         -EAGAIN: Aggregator busy (rare, retry)
  */
-int spotflow_report_metric_int_with_labels(
-	struct spotflow_metric_int *metric,
-	int64_t value,
-	const struct spotflow_label *labels,
-	uint8_t label_count);
+int spotflow_report_metric_int_with_labels(struct spotflow_metric_int* metric, int64_t value,
+					   const struct spotflow_label* labels,
+					   uint8_t label_count);
 
 /**
  * @brief Report a labeled float metric value
@@ -69,11 +63,9 @@ int spotflow_report_metric_int_with_labels(
  *
  * @return 0 on success, negative errno on failure
  */
-int spotflow_report_metric_float_with_labels(
-	struct spotflow_metric_float *metric,
-	float value,
-	const struct spotflow_label *labels,
-	uint8_t label_count);
+int spotflow_report_metric_float_with_labels(struct spotflow_metric_float* metric, float value,
+					     const struct spotflow_label* labels,
+					     uint8_t label_count);
 
 /**
  * @brief Report an event for a label-less metric
@@ -88,7 +80,7 @@ int spotflow_report_metric_float_with_labels(
  *         -EINVAL: Invalid metric handle or metric is labeled
  *         -ENOMEM: Metric queue is full
  */
-int spotflow_report_event(struct spotflow_metric_int *metric);
+int spotflow_report_event(struct spotflow_metric_int* metric);
 
 /**
  * @brief Report an event with labels for a labeled metric
@@ -106,10 +98,8 @@ int spotflow_report_event(struct spotflow_metric_int *metric);
  *         -ENOMEM: Metric queue is full
  *         -ENOSPC: Time series pool is full
  */
-int spotflow_report_event_with_labels(
-	struct spotflow_metric_int *metric,
-	const struct spotflow_label *labels,
-	uint8_t label_count);
+int spotflow_report_event_with_labels(struct spotflow_metric_int* metric,
+				      const struct spotflow_label* labels, uint8_t label_count);
 
 #ifdef __cplusplus
 }

@@ -35,9 +35,9 @@ LOG_MODULE_REGISTER(metrics_sample, LOG_LEVEL_INF);
 }*/
 
 /* Metric handles - using type-specific handles */
-static struct spotflow_metric_int *g_app_counter_metric;
-static struct spotflow_metric_float *g_temperature_metric;
-static struct spotflow_metric_float *g_request_duration_metric;
+static struct spotflow_metric_int* g_app_counter_metric;
+static struct spotflow_metric_float* g_temperature_metric;
+static struct spotflow_metric_float* g_request_duration_metric;
 
 #ifdef CONFIG_SPOTFLOW_USE_ETH
 static void turn_on_dhcp_when_device_is_up();
@@ -52,9 +52,8 @@ static void temperature_thread_entry();
 #define TEMPERATURE_THREAD_STACK_SIZE 2048
 #define TEMPERATURE_THREAD_PRIORITY 5
 
-K_THREAD_DEFINE(temperature_thread, TEMPERATURE_THREAD_STACK_SIZE,
-		temperature_thread_entry, NULL, NULL, NULL,
-		TEMPERATURE_THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(temperature_thread, TEMPERATURE_THREAD_STACK_SIZE, temperature_thread_entry, NULL,
+		NULL, NULL, TEMPERATURE_THREAD_PRIORITY, 0, 0);
 
 int main(void)
 {
@@ -135,15 +134,13 @@ static int init_application_metrics(void)
 	}
 	LOG_INF("Registered metric: app_counter (int, 1MIN)");
 
-
 	/* Register labeled float metric - aggregated over 1 minute */
 	/* Supports up to 18 unique label combinations (3 endpoints × 2 methods × 3 statuses) */
 	rc = spotflow_register_metric_float_with_labels(
-		"http_request_duration_ms",
-		SPOTFLOW_AGG_INTERVAL_1MIN,
-		18,  /* max_timeseries: 3 endpoints × 2 methods × 3 statuses = 18 */
-		3,   /* max_labels */
-		&g_request_duration_metric);
+	    "http_request_duration_ms", SPOTFLOW_AGG_INTERVAL_1MIN,
+	    18, /* max_timeseries: 3 endpoints × 2 methods × 3 statuses = 18 */
+	    3, /* max_labels */
+	    &g_request_duration_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register request_duration metric: %d", rc);
 		return rc;
@@ -169,7 +166,6 @@ static void report_counter_metric(void)
 		LOG_DBG("Reported counter: %d", counter);
 	}
 }
-
 
 /**
  * @brief Simulate temperature sensor reading (immediate metric)
@@ -215,43 +211,35 @@ static void temperature_thread_entry()
 static void report_request_duration_metric(void)
 {
 	/* Simulate different endpoints and methods */
-	const char *endpoints[] = {"/api/users", "/api/products", "/health"};
-	const char *methods[] = {"GET", "POST"};
-	const char *status_codes[] = {"200", "404", "500"};
+	const char* endpoints[] = { "/api/users", "/api/products", "/health" };
+	const char* methods[] = { "GET", "POST" };
+	const char* status_codes[] = { "200", "404", "500" };
 
-	const char *endpoint = endpoints[sys_rand32_get() % 3];
-	const char *method = methods[sys_rand32_get() % 2];
-	const char *status = status_codes[sys_rand32_get() % 3];
+	const char* endpoint = endpoints[sys_rand32_get() % 3];
+	const char* method = methods[sys_rand32_get() % 2];
+	const char* status = status_codes[sys_rand32_get() % 3];
 
 	/* Simulate duration between 10ms and 500ms */
 	double duration_ms = 10.0 + ((double)(sys_rand32_get() % 4900) / 10.0);
 
 	/* Define labels */
-	struct spotflow_label labels[] = {
-		{.key = "endpoint", .value = endpoint},
-		{.key = "method", .value = method},
-		{.key = "status", .value = status}
-	};
+	struct spotflow_label labels[] = { { .key = "endpoint", .value = endpoint },
+					   { .key = "method", .value = method },
+					   { .key = "status", .value = status } };
 
-	int rc = spotflow_report_metric_float_with_labels(
-		g_request_duration_metric,
-		duration_ms,
-		labels,
-		3
-	);
+	int rc = spotflow_report_metric_float_with_labels(g_request_duration_metric, duration_ms,
+							  labels, 3);
 
 	if (rc < 0) {
 		LOG_ERR("Failed to report request duration: %d", rc);
 	} else {
-		LOG_DBG("Reported request: %s %s -> %s (%.2f ms)",
-			method, endpoint, status, duration_ms);
+		LOG_DBG("Reported request: %s %s -> %s (%.2f ms)", method, endpoint, status,
+			duration_ms);
 	}
 }
 
-
 #ifdef CONFIG_SPOTFLOW_USE_ETH
-static void handler(struct net_mgmt_event_callback *cb, uint64_t mgmt_event,
-		    struct net_if *iface)
+static void handler(struct net_mgmt_event_callback* cb, uint64_t mgmt_event, struct net_if* iface)
 {
 	if (mgmt_event == NET_EVENT_IF_UP) {
 		LOG_INF("Interface is up -> starting DHCPv4");

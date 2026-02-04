@@ -24,7 +24,7 @@ extern "C" {
  *
  * @return 0 on success, -ENOMEM on failure
  */
-int aggregator_register_metric(struct spotflow_metric_base *metric);
+int aggregator_register_metric(struct spotflow_metric_base* metric);
 
 /**
  * @brief Report value to aggregator
@@ -42,12 +42,9 @@ int aggregator_register_metric(struct spotflow_metric_base *metric);
  *         -ENOSPC: Time series pool full
  *         -ENOMEM: Allocation failure
  */
-int aggregator_report_value(
-	struct spotflow_metric_base *metric,
-	const struct spotflow_label *labels,
-	uint8_t label_count,
-	int64_t value_int,
-	float value_float);
+int aggregator_report_value(struct spotflow_metric_base* metric,
+			    const struct spotflow_label* labels, uint8_t label_count,
+			    int64_t value_int, float value_float);
 
 #ifdef __cplusplus
 }

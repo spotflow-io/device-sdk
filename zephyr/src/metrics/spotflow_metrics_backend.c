@@ -15,13 +15,13 @@ LOG_MODULE_REGISTER(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEV
 
 /* Public API Implementation */
 
-int spotflow_report_metric_int(struct spotflow_metric_int *metric, int64_t value)
+int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value)
 {
 	if (metric == NULL) {
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base = &metric->base;
+	struct spotflow_metric_base* base = &metric->base;
 
 	/* Label-less metrics have max_labels == 0 */
 	if (base->max_labels > 0) {
@@ -33,13 +33,13 @@ int spotflow_report_metric_int(struct spotflow_metric_int *metric, int64_t value
 	return aggregator_report_value(base, NULL, 0, value, 0.0);
 }
 
-int spotflow_report_metric_float(struct spotflow_metric_float *metric, float value)
+int spotflow_report_metric_float(struct spotflow_metric_float* metric, float value)
 {
 	if (metric == NULL) {
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base = &metric->base;
+	struct spotflow_metric_base* base = &metric->base;
 
 	/* Label-less metrics have max_labels == 0 */
 	if (base->max_labels > 0) {
@@ -51,14 +51,14 @@ int spotflow_report_metric_float(struct spotflow_metric_float *metric, float val
 	return aggregator_report_value(base, NULL, 0, 0, value);
 }
 
-int spotflow_report_metric_int_with_labels(struct spotflow_metric_int *metric, int64_t value,
-					   const struct spotflow_label *labels, uint8_t label_count)
+int spotflow_report_metric_int_with_labels(struct spotflow_metric_int* metric, int64_t value,
+					   const struct spotflow_label* labels, uint8_t label_count)
 {
 	if (metric == NULL || labels == NULL) {
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base = &metric->base;
+	struct spotflow_metric_base* base = &metric->base;
 
 	/* Labeled metrics have max_labels > 0 */
 	if (base->max_labels == 0) {
@@ -89,15 +89,15 @@ int spotflow_report_metric_int_with_labels(struct spotflow_metric_int *metric, i
 	return aggregator_report_value(base, labels, label_count, value, 0.0);
 }
 
-int spotflow_report_metric_float_with_labels(struct spotflow_metric_float *metric, float value,
-					     const struct spotflow_label *labels,
+int spotflow_report_metric_float_with_labels(struct spotflow_metric_float* metric, float value,
+					     const struct spotflow_label* labels,
 					     uint8_t label_count)
 {
 	if (metric == NULL || labels == NULL) {
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base = &metric->base;
+	struct spotflow_metric_base* base = &metric->base;
 
 	/* Labeled metrics have max_labels > 0 */
 	if (base->max_labels == 0) {
@@ -128,13 +128,13 @@ int spotflow_report_metric_float_with_labels(struct spotflow_metric_float *metri
 	return aggregator_report_value(base, labels, label_count, 0, value);
 }
 
-int spotflow_report_event(struct spotflow_metric_int *metric)
+int spotflow_report_event(struct spotflow_metric_int* metric)
 {
 	if (metric == NULL) {
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base = &metric->base;
+	struct spotflow_metric_base* base = &metric->base;
 
 	/* Label-less metrics have max_labels == 0 */
 	if (base->max_labels > 0) {
@@ -146,14 +146,14 @@ int spotflow_report_event(struct spotflow_metric_int *metric)
 	return aggregator_report_value(base, NULL, 0, 1, 0.0);
 }
 
-int spotflow_report_event_with_labels(struct spotflow_metric_int *metric,
-				      const struct spotflow_label *labels, uint8_t label_count)
+int spotflow_report_event_with_labels(struct spotflow_metric_int* metric,
+				      const struct spotflow_label* labels, uint8_t label_count)
 {
 	if (metric == NULL || labels == NULL) {
 		return -EINVAL;
 	}
 
-	struct spotflow_metric_base *base = &metric->base;
+	struct spotflow_metric_base* base = &metric->base;
 
 	/* Labeled metrics have max_labels > 0 */
 	if (base->max_labels == 0) {

@@ -14,13 +14,13 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static struct spotflow_metric_int *g_connection_state_metric;
+static struct spotflow_metric_int* g_connection_state_metric;
 
 int spotflow_metrics_system_connection_init(void)
 {
-	int rc = spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_CONNECTION,
-					      SPOTFLOW_AGG_INTERVAL_NONE,
-					      &g_connection_state_metric);
+	int rc =
+	    spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_CONNECTION,
+					 SPOTFLOW_AGG_INTERVAL_NONE, &g_connection_state_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register connection state metric: %d", rc);
 		return rc;

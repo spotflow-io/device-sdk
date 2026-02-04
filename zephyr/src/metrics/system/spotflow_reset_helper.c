@@ -47,10 +47,9 @@ void report_reboot_reason(void)
 	}
 
 	/* Report as immediate event metric */
-	static struct spotflow_metric_int *reset_cause_metric;
-	rc = spotflow_register_metric_int_with_labels(SPOTFLOW_METRIC_NAME_BOOT_RESET,
-						      SPOTFLOW_AGG_INTERVAL_NONE, 1, 1,
-						      &reset_cause_metric);
+	static struct spotflow_metric_int* reset_cause_metric;
+	rc = spotflow_register_metric_int_with_labels(
+	    SPOTFLOW_METRIC_NAME_BOOT_RESET, SPOTFLOW_AGG_INTERVAL_NONE, 1, 1, &reset_cause_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register reset cause metric: %d", rc);
 		return;

@@ -30,9 +30,8 @@ extern "C" {
  *         -EEXIST: Metric with same name already registered
  *         -ENOMEM: Registry full or aggregator allocation failed
  */
-int spotflow_register_metric_int(const char *name,
-				 enum spotflow_agg_interval agg_interval,
-				 struct spotflow_metric_int **metric_out);
+int spotflow_register_metric_int(const char* name, enum spotflow_agg_interval agg_interval,
+				 struct spotflow_metric_int** metric_out);
 
 /**
  * @brief Register a label-less float metric
@@ -51,9 +50,8 @@ int spotflow_register_metric_int(const char *name,
  *         -EEXIST: Metric with same name already registered
  *         -ENOMEM: Registry full or aggregator allocation failed
  */
-int spotflow_register_metric_float(const char *name,
-				   enum spotflow_agg_interval agg_interval,
-				   struct spotflow_metric_float **metric_out);
+int spotflow_register_metric_float(const char* name, enum spotflow_agg_interval agg_interval,
+				   struct spotflow_metric_float** metric_out);
 
 /**
  * @brief Register a labeled integer metric
@@ -75,11 +73,10 @@ int spotflow_register_metric_float(const char *name,
  *         -EEXIST: Metric with same name already registered
  *         -ENOMEM: Registry full or aggregator allocation failed
  */
-int spotflow_register_metric_int_with_labels(const char *name,
+int spotflow_register_metric_int_with_labels(const char* name,
 					     enum spotflow_agg_interval agg_interval,
-					     uint16_t max_timeseries,
-					     uint8_t max_labels,
-					     struct spotflow_metric_int **metric_out);
+					     uint16_t max_timeseries, uint8_t max_labels,
+					     struct spotflow_metric_int** metric_out);
 
 /**
  * @brief Register a labeled float metric
@@ -101,11 +98,10 @@ int spotflow_register_metric_int_with_labels(const char *name,
  *         -EEXIST: Metric with same name already registered
  *         -ENOMEM: Registry full or aggregator allocation failed
  */
-int spotflow_register_metric_float_with_labels(const char *name,
+int spotflow_register_metric_float_with_labels(const char* name,
 					       enum spotflow_agg_interval agg_interval,
-					       uint16_t max_timeseries,
-					       uint8_t max_labels,
-					       struct spotflow_metric_float **metric_out);
+					       uint16_t max_timeseries, uint8_t max_labels,
+					       struct spotflow_metric_float** metric_out);
 
 #ifdef __cplusplus
 }
