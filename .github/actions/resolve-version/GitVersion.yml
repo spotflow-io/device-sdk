@@ -1,0 +1,5 @@
+branches:
+  main:
+    label: beta
+  pull-request:
+    label: alpha{Number}

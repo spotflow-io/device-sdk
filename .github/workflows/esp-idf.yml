@@ -26,7 +26,7 @@ jobs:
         run: |
           echo "🔍 Searching for top-level example folders..."
 
-          examples=$(find esp_idf/spotflow/examples -mindepth 1 -maxdepth 1 -type d \
+          examples=$(find esp_idf/spotflow/device_sdk/examples -mindepth 1 -maxdepth 1 -type d \
             -exec test -f "{}/CMakeLists.txt" \; -print \
             | jq -R -c . | jq -s -c .)
 
@@ -68,16 +68,16 @@ jobs:
           idf.py set-target ${{ matrix.target }}
           idf.py build -DCMAKE_C_FLAGS="-Werror" -DCMAKE_CXX_FLAGS="-Werror"
 
-      - name: Set safe artifact name
-        id: artifact_name
-        run: |
-          EXAMPLE_NAME=$(basename "${{ matrix.example }}")
-          SAFE_NAME="firmware-${{ matrix.target }}-${EXAMPLE_NAME}"
-          echo "name=$SAFE_NAME" >> "$GITHUB_OUTPUT"
+      # - name: Set safe artifact name
+      #   id: artifact_name
+      #   run: |
+      #     EXAMPLE_NAME=$(basename "${{ matrix.example }}")
+      #     SAFE_NAME="firmware-${{ matrix.target }}-${EXAMPLE_NAME}"
+      #     echo "name=$SAFE_NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Upload build artifacts
-        if: always() && (test -d "${{ matrix.example }}/build/")
-        uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.artifact_name.outputs.name }}
-          path: ${{ matrix.example }}/build/
+      # - name: Upload build artifacts
+      #   if: always() && (test -d "${{ matrix.example }}/build/")
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: ${{ steps.artifact_name.outputs.name }}
+      #     path: ${{ matrix.example }}/build/
