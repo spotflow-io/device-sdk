@@ -86,14 +86,14 @@ static void report_network_interface_metrics(struct net_if* iface, void* user_da
 
 	struct spotflow_label labels[] = { { .key = "interface", .value = if_name } };
 
-	int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, tx_bytes_capped,
-							labels, 1);
+	int rc =
+	    spotflow_report_metric_int_with_labels(g_network_tx_metric, tx_bytes_capped, labels, 1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report network TX for %s: %d", if_name, rc);
 	}
 
-	rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, rx_bytes_capped, labels,
-						    1);
+	rc =
+	    spotflow_report_metric_int_with_labels(g_network_rx_metric, rx_bytes_capped, labels, 1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report network RX for %s: %d", if_name, rc);
 	}
