@@ -15,8 +15,8 @@
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static struct spotflow_metric_int* g_stack_metric;
-static struct spotflow_metric_float* g_stack_used_metric;
+static struct spotflow_metric_int* g_stack_free_metric;
+static struct spotflow_metric_float* g_stack_used_percent_metric;
 
 #ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 static struct k_thread* g_tracked_threads[CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS];
@@ -33,15 +33,15 @@ int spotflow_metrics_system_stack_init(void)
 
 	rc = spotflow_register_metric_int_with_labels(SPOTFLOW_METRIC_NAME_STACK_FREE,
 						      SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
-						      max_threads, 1, &g_stack_metric);
+						      max_threads, 1, &g_stack_free_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register stack free metric: %d", rc);
 		return rc;
 	}
 
-	rc = spotflow_register_metric_float_with_labels(SPOTFLOW_METRIC_NAME_STACK_USED,
+	rc = spotflow_register_metric_float_with_labels(SPOTFLOW_METRIC_NAME_STACK_USED_PERCENT,
 							SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
-							max_threads, 1, &g_stack_used_metric);
+							max_threads, 1, &g_stack_used_percent_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register stack used percent metric: %d", rc);
 		return rc;
@@ -61,7 +61,7 @@ int spotflow_metrics_system_stack_init(void)
 
 void spotflow_metrics_system_stack_collect(void)
 {
-	if (!g_stack_metric) {
+	if (!g_stack_free_metric) {
 		LOG_ERR("Stack metric not registered");
 		return;
 	}
@@ -159,14 +159,14 @@ static void report_thread_stack(const struct k_thread* thread, void* user_data)
 
 	struct spotflow_label labels[] = { { .key = "thread", .value = thread_label } };
 
-	rc = spotflow_report_metric_int_with_labels(g_stack_metric, (int64_t)unused_bytes, labels,
+	rc = spotflow_report_metric_int_with_labels(g_stack_free_metric, (int64_t)unused_bytes, labels,
 						    1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report stack free metric for %s: %d", thread_label, rc);
 	}
 
 	float used_percent = (float)used_bytes / (float)stack_size * 100.0f;
-	rc = spotflow_report_metric_float_with_labels(g_stack_used_metric, used_percent, labels, 1);
+	rc = spotflow_report_metric_float_with_labels(g_stack_used_percent_metric, used_percent, labels, 1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report stack used percent metric for %s: %d", thread_label, rc);
 	}
