@@ -3,7 +3,6 @@
 #include "zephyr/logging/log.h"
 
 #include <zephyr/drivers/hwinfo.h>
-#include <string.h>
 #include <stdio.h>
 
 LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);

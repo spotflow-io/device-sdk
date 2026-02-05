@@ -27,6 +27,7 @@ int spotflow_metrics_system_stack_init(void);
  */
 void spotflow_metrics_system_stack_collect(void);
 
+#ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 /**
  * @brief Enable stack tracking for a specific thread
  *
@@ -36,6 +37,7 @@ void spotflow_metrics_system_stack_collect(void);
  * @return 0 on success, negative errno on failure
  */
 int spotflow_metrics_system_stack_enable_thread(struct k_thread* thread);
+#endif
 
 #ifdef __cplusplus
 }
