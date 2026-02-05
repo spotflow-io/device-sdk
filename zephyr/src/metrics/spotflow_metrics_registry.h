@@ -22,7 +22,7 @@ extern "C" {
  *             - Other characters are removed
  *             Example: "My-Metric.Name" becomes "my_metric_name"
  * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
- *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
+ *                     SPOTFLOW_AGG_INTERVAL_1HOUR, SPOTFLOW_AGG_INTERVAL_1DAY)
  * @param metric_out Output parameter for the registered metric handle
  *
  * @return 0 on success, negative errno on failure
@@ -42,7 +42,7 @@ int spotflow_register_metric_int(const char* name, enum spotflow_agg_interval ag
  *             - Other characters are removed
  *             Example: "My-Metric.Name" becomes "my_metric_name"
  * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
- *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
+ *                     SPOTFLOW_AGG_INTERVAL_1HOUR, SPOTFLOW_AGG_INTERVAL_1DAY)
  * @param metric_out Output parameter for the registered metric handle
  *
  * @return 0 on success, negative errno on failure
@@ -62,7 +62,7 @@ int spotflow_register_metric_float(const char* name, enum spotflow_agg_interval 
  *             - Other characters are removed
  *             Example: "My-Metric.Name" becomes "my_metric_name"
  * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
- *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
+ *                     SPOTFLOW_AGG_INTERVAL_1HOUR, SPOTFLOW_AGG_INTERVAL_1DAY)
  * @param max_timeseries Maximum number of unique label combinations (1-256)
  * @param max_labels Maximum labels per report (1-CONFIG_SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC)
  * @param metric_out Output parameter for the registered metric handle
@@ -87,7 +87,7 @@ int spotflow_register_metric_int_with_labels(const char* name,
  *             - Other characters are removed
  *             Example: "My-Metric.Name" becomes "my_metric_name"
  * @param agg_interval Aggregation interval (SPOTFLOW_AGG_INTERVAL_NONE, SPOTFLOW_AGG_INTERVAL_1MIN,
- *                     SPOTFLOW_AGG_INTERVAL_10MIN, SPOTFLOW_AGG_INTERVAL_1HOUR)
+ *                     SPOTFLOW_AGG_INTERVAL_1HOUR, SPOTFLOW_AGG_INTERVAL_1DAY)
  * @param max_timeseries Maximum number of unique label combinations (1-256)
  * @param max_labels Maximum labels per report (1-CONFIG_SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC)
  * @param metric_out Output parameter for the registered metric handle

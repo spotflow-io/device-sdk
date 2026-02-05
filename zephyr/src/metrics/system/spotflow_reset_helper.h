@@ -1,4 +1,9 @@
-﻿
+/*
+ * Copyright (c) 2024 Spotflow
+ *
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 #ifndef METRICS_SPOTFLOW_RESET_HELPER_H
 #define METRICS_SPOTFLOW_RESET_HELPER_H
 #include <stddef.h>
