@@ -33,6 +33,9 @@ int spotflow_metrics_system_connection_init(void)
 void spotflow_metrics_system_connection_report(bool connected)
 {
 	if (!g_connection_state_metric) {
+		/*This should never happen because spotflow_metrics_system_report_connection_state
+		 *checks if system metrics were already initialized*/
+		LOG_ERR("Connection state metric not registered");
 		return;
 	}
 
@@ -42,5 +45,5 @@ void spotflow_metrics_system_connection_report(bool connected)
 		return;
 	}
 
-	LOG_INF("MQTT connection state: %s", connected ? "connected" : "disconnected");
+	LOG_DBG("MQTT connection state: %s", connected ? "connected" : "disconnected");
 }

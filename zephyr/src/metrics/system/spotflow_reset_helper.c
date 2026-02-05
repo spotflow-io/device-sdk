@@ -64,7 +64,7 @@ void report_reboot_reason(void)
 		return;
 	}
 
-	LOG_INF("Reset cause reported: 0x%08x, %s", cause, reset_str);
+	LOG_DBG("Reset cause reported: 0x%08x, %s", cause, reset_str);
 
 	/* Clear reset cause after reporting */
 	hwinfo_clear_reset_cause();
