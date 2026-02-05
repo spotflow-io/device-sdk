@@ -12,6 +12,10 @@
 #include "net/spotflow_device_id.h"
 #include "net/spotflow_tls.h"
 
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+#include "../metrics/system/spotflow_metrics_system.h"
+#endif
+
 /* 80 bytes is just password itself */
 /* should at least match MBEDTLS_SSL_MAX_CONTENT_LEN - default is 4096 */
 #define APP_MQTT_BUFFER_SIZE 4096
@@ -318,10 +322,21 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		}
 		mqtt_client_toolset.mqtt_connected = true;
 		LOG_DBG("MQTT client connected!");
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+		/* Report connection state to system metrics */
+		spotflow_metrics_system_report_connection_state(true);
+#endif
 		break;
 	case MQTT_EVT_DISCONNECT:
 		LOG_DBG("MQTT client disconnected %d", evt->result);
 		mqtt_client_toolset.mqtt_connected = false;
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+		/* Report connection state to system metrics */
+		spotflow_metrics_system_report_connection_state(false);
+#endif
+
 		clear_fds();
 		break;
 	case MQTT_EVT_PUBACK:

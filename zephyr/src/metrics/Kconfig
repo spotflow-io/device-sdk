@@ -1,0 +1,107 @@
+menuconfig SPOTFLOW_METRICS
+	bool "Enable Spotflow metrics collection and reporting"
+	depends on SPOTFLOW
+	default n
+	help
+	  Enable metrics collection and reporting feature for the Spotflow SDK.
+	  Allows devices to collect, aggregate, and transmit metrics to the cloud.
+
+if SPOTFLOW_METRICS
+
+config SPOTFLOW_METRICS_QUEUE_SIZE
+	int "Metrics message queue size"
+	range 4 128
+	default 64 if SPOTFLOW_METRICS_SYSTEM
+	default 16
+	help
+	  Maximum number of encoded metric messages buffered before transmission.
+	  Messages are dropped if queue is full. Default 64 when system metrics
+	  are enabled (to handle burst from multiple time series), otherwise 16.
+
+config SPOTFLOW_METRICS_CBOR_BUFFER_SIZE
+	int "CBOR encoding buffer size (bytes)"
+	range 256 2048
+	default 512
+	help
+	  Size of buffer for CBOR encoding.
+	  Must be large enough for the largest metric message.
+	  Default 512 bytes is sufficient for most use cases.
+
+config SPOTFLOW_METRICS_MAX_REGISTERED
+	int "Maximum number of registered metrics"
+	range 1 128
+	default 32
+	help
+	  Maximum number of metrics that can be registered simultaneously.
+	  Each metric consumes heap memory for aggregation context and time series storage.
+
+config SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL
+	int "Default aggregation interval (seconds)"
+	default 60
+	help
+	  Default aggregation period for metrics registered without explicit interval.
+	  Allowed values: 0, 60, 3600, 86400 (validated at build time).
+	  0 = PT0S (no aggregation, immediate - not recommended for production)
+	  60 = PT1M (1 minute, recommended default)
+	  3600 = PT1H (1 hour)
+	  86400 = P1D (1 day)
+
+config SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC
+	int "Maximum labels per metric"
+	range 1 8
+	default 4
+	help
+	  Maximum number of label key-value pairs per metric report.
+	  Affects memory consumption per time series (~48 bytes per label).
+	  System metrics use only 1 label, so default of 4 is sufficient
+	  for most use cases.
+
+config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
+	int "Additional heap memory pool size for metrics (bytes)"
+	default 8192
+	range 4096 65536
+	help
+	  Heap memory for application metrics depends on two factors:
+	  1. Timeseries size = ~36 + (48 × MAX_LABELS_PER_METRIC) bytes
+	     With MAX_LABELS=4: ~230 bytes per timeseries
+	  2. Number of concurrent timeseries (max_timeseries parameter at registration)
+
+	  Per-metric heap = 80 + (timeseries_size × max_timeseries)
+
+	  Examples (with MAX_LABELS=4, ~230 bytes/ts):
+	  - Dimensionless metric (max_ts=1): 80 + 230 = 310 bytes
+	  - Labeled metric (max_ts=4): 80 + 230×4 = 1KB
+	  - Labeled metric (max_ts=16): 80 + 230×16 = 3.8KB
+
+	  Default 8KB supports ~25 dimensionless metrics or ~8 labeled metrics
+	  with 4 timeseries each. Adjust based on your application needs.
+
+config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
+	int "Metrics subsystem log level"
+	default SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
+	range 0 4
+	help
+	  Log level for metrics subsystem:
+	  Defaults to SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL.
+	  0 = OFF
+	  1 = ERROR
+	  2 = WARNING (default)
+	  3 = INFO
+	  4 = DEBUG
+
+config SPOTFLOW_METRICS_HEARTBEAT
+	bool "Enable device heartbeat"
+	default y
+	help
+	  Send periodic heartbeat messages with device uptime.
+	  Heartbeats have higher priority than regular metrics.
+
+config SPOTFLOW_METRICS_HEARTBEAT_INTERVAL
+	int "Heartbeat interval (seconds)"
+	depends on SPOTFLOW_METRICS_HEARTBEAT
+	default 60
+	range 10 3600
+	help
+	  How often to send heartbeat messages.
+
+endif # SPOTFLOW_METRICS
