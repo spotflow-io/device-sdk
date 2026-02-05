@@ -80,15 +80,19 @@ static void report_network_interface_metrics(struct net_if* iface, void* user_da
 	uint64_t tx_bytes = stats->bytes.sent;
 	uint64_t rx_bytes = stats->bytes.received;
 
+	// TODO: Replace with spotflow_report_metric_uint64 when available
+	int64_t tx_bytes_capped = (tx_bytes > INT64_MAX) ? INT64_MAX : (int64_t)tx_bytes;
+	int64_t rx_bytes_capped = (rx_bytes > INT64_MAX) ? INT64_MAX : (int64_t)rx_bytes;
+
 	struct spotflow_label labels[] = { { .key = "interface", .value = if_name } };
 
-	int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, (int64_t)tx_bytes,
+	int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, tx_bytes_capped,
 							labels, 1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report network TX for %s: %d", if_name, rc);
 	}
 
-	rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, (int64_t)rx_bytes, labels,
+	rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, rx_bytes_capped, labels,
 						    1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report network RX for %s: %d", if_name, rc);
