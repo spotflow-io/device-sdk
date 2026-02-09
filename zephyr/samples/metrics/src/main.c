@@ -119,10 +119,10 @@ static int init_application_metrics(void)
 	LOG_INF("Registered metric: app_counter (int, 1MIN)");
 
 	/* Register labeled float metric - aggregated over 1 minute */
-	/* Supports up to 18 unique label combinations (3 endpoints × 2 methods × 3 statuses) */
+	/* Supports up to 18 unique label combinations (3 endpoints x 2 methods x 3 statuses) */
 	rc = spotflow_register_metric_float_with_labels(
 	    "http_request_duration_ms", SPOTFLOW_AGG_INTERVAL_1MIN,
-	    18, /* max_timeseries: 3 endpoints × 2 methods × 3 statuses = 18 */
+	    18, /* max_timeseries: 3 endpoints x 2 methods x 3 statuses = 18 */
 	    3, /* max_labels */
 	    &g_request_duration_metric);
 	if (rc < 0) {
