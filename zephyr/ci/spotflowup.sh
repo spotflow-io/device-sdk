@@ -923,9 +923,8 @@ add_configuration_placeholders() {
     prepended_config_content+="CONFIG_SPOTFLOW_DEVICE_ID=\"$sample_device_id\"\n"
     prepended_config_content+="CONFIG_SPOTFLOW_INGEST_KEY=\"<Your Spotflow Ingest Key>\"\n\n"
 
-    config_content="${prepended_config_content}${config_content}"
-
-    if printf '%s' "$config_content" > "$config_path"; then
+    { printf '%b' "$prepended_config_content"; printf '%s' "$config_content"; } > "$config_path"
+    if [[ $? -eq 0 ]]; then
         write_success "Configuration placeholders added to prj.conf"
     else
         write_error "Failed to add configuration placeholders to prj.conf"
