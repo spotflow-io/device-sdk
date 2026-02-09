@@ -23,7 +23,7 @@ static bool labels_equal(const struct metric_timeseries_state* ts,
 			 const struct spotflow_label* labels, uint8_t label_count);
 static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value);
 static void update_aggregation_float(struct metric_timeseries_state* ts, float value);
-static int64_t get_interval_ms(enum spotflow_agg_interval interval);
+static uint32_t get_interval_ms(enum spotflow_agg_interval interval);
 static int enqueue_metric_message(uint8_t* payload, size_t len);
 static struct metric_timeseries_state*
 find_or_create_timeseries(struct metric_aggregator_context* ctx,
@@ -118,13 +118,13 @@ int aggregator_report_value(struct spotflow_metric_base* metric,
 	/* Start aggregation timer on first report (sliding window) */
 	/* Use per-metric flag to prevent race condition with labeled metrics */
 	if (!ctx->timer_started) {
-		int64_t interval_ms = get_interval_ms(metric->agg_interval);
+		uint32_t interval_ms = get_interval_ms(metric->agg_interval);
 		if (interval_ms > 0) {
 			/* Add 0-10% jitter to first flush to spread out across metrics */
 			int32_t jitter_ms = sys_rand32_get() % (interval_ms / 10);
 			k_work_schedule(&ctx->aggregation_work, K_MSEC(interval_ms - jitter_ms));
 			ctx->timer_started = true;
-			LOG_DBG("Started aggregation timer for metric '%s' (interval=%lld ms, "
+			LOG_DBG("Started aggregation timer for metric '%s' (interval=%u ms, "
 				"jitter=-%d ms)",
 				metric->name, interval_ms, jitter_ms);
 		}
@@ -298,7 +298,7 @@ static void aggregation_timer_handler(struct k_work* work)
 	}
 
 	/* Reschedule timer for next aggregation window */
-	int64_t interval_ms = get_interval_ms(metric->agg_interval);
+	uint32_t interval_ms = get_interval_ms(metric->agg_interval);
 	if (interval_ms > 0) {
 		k_work_schedule(dwork, K_MSEC(interval_ms));
 	}
@@ -471,7 +471,7 @@ static void update_aggregation_float(struct metric_timeseries_state* ts, float v
 /**
  * @brief Get aggregation interval in milliseconds
  */
-static int64_t get_interval_ms(enum spotflow_agg_interval interval)
+static uint32_t get_interval_ms(enum spotflow_agg_interval interval)
 {
 	switch (interval) {
 	case SPOTFLOW_AGG_INTERVAL_NONE:
