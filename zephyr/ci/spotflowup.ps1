@@ -215,7 +215,7 @@ function Find-Python {
     }
 
     if (-not $pythonCmd) {
-        Exit-WithError "Python not found" $details `
+        Exit-WithError "Python not found" `
             "Please install Python 3.10+ or follow Zephyr's Getting Started Guide."
     }
 
