@@ -26,11 +26,6 @@ Source files should follow this order:
 ### Example
 
 ```c
-/*
- * Copyright (c) 2024 Spotflow
- *
- * SPDX-License-Identifier: Apache-2.0
- */
 
 #include "my_module.h"
 #include "other/project_header.h"
