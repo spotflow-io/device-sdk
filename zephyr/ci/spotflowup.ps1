@@ -56,6 +56,8 @@ param(
     [switch]$autoConfirm
 )
 
+$ErrorActionPreference = 'Stop'
+
 # Configuration
 $DefaultQuickstartJsonUrl = "https://downloads.spotflow.io/quickstart.json"
 $ManifestBaseUrl = "https://github.com/spotflow-io/device-sdk"
@@ -217,6 +219,17 @@ function Find-Python {
     if (-not $pythonCmd) {
         Exit-WithError "Python not found" `
             "Please install Python 3.10+ or follow Zephyr's Getting Started Guide."
+    }
+
+    try {
+        & $pythonCmd -c "import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)"
+        if ($LASTEXITCODE -ne 0) {
+            Exit-WithError "Python 3.10+ is required" `
+                "Please install Python 3.10+ or follow Zephyr's Getting Started Guide."
+        }
+    }
+    catch {
+        Exit-WithError "Failed to verify Python version" $_.Exception.Message
     }
 
     return $pythonCmd
@@ -449,8 +462,9 @@ function Enable-PythonVenv {
 }
 
 function Install-West {
+    param([string]$PythonCmd)
     try {
-        & pip install west
+        & $PythonCmd -m pip install west
         if ($LASTEXITCODE -ne 0) {
             throw "pip install west failed with exit code $LASTEXITCODE"
         }
@@ -993,7 +1007,7 @@ function Add-ConfigurationPlaceholders {
     $configContent = $prependedConfigContent + $configContent
 
     try {
-        Set-Content -Path $ConfigPath -Value $configContent
+        Set-Content -Path $ConfigPath -Value $configContent -Encoding UTF8
         Write-Success "Configuration placeholders added to prj.conf"
     }
     catch {
@@ -1075,7 +1089,7 @@ function Main {
     Enable-PythonVenv -VenvPath $venvPath
 
     Write-Step "Installing West..."
-    Install-West
+    Install-West -PythonCmd $pythonCmd
 
     Write-Step "Initializing West workspace..."
     Initialize-WestWorkspace `

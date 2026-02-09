@@ -192,22 +192,42 @@ parse_args() {
                 shift
                 ;;
             --board)
+                if [[ -z "${2:-}" ]]; then
+                    exit_with_error "Missing value for --board" \
+                        "Use --board to specify the board ID (e.g., frdm_rw612)."
+                fi
                 board="$2"
                 shift 2
                 ;;
             --workspace-folder)
+                if [[ -z "${2:-}" ]]; then
+                    exit_with_error "Missing value for --workspace-folder" \
+                        "Provide a path to the workspace directory."
+                fi
                 workspace_folder="$2"
                 shift 2
                 ;;
             --spotflow-revision)
+                if [[ -z "${2:-}" ]]; then
+                    exit_with_error "Missing value for --spotflow-revision" \
+                        "Provide a revision or tag for the Spotflow module."
+                fi
                 spotflow_revision="$2"
                 shift 2
                 ;;
             --quickstart-json-url)
+                if [[ -z "${2:-}" ]]; then
+                    exit_with_error "Missing value for --quickstart-json-url" \
+                        "Provide a URL to a quickstart.json file."
+                fi
                 quickstart_json_url="$2"
                 shift 2
                 ;;
             --github-token)
+                if [[ -z "${2:-}" ]]; then
+                    exit_with_error "Missing value for --github-token" \
+                        "Provide a GitHub token or omit this option."
+                fi
                 github_token="$2"
                 shift 2
                 ;;
@@ -261,6 +281,11 @@ find_python() {
 
     if [[ -z "$python_cmd" ]]; then
         exit_with_error "Python not found" \
+            "Please install Python 3.10+ or follow Zephyr's Getting Started Guide."
+    fi
+
+    if ! "$python_cmd" -c 'import sys; sys.exit(0 if sys.version_info >= (3,10) else 1)'; then
+        exit_with_error "Python 3.10+ is required" \
             "Please install Python 3.10+ or follow Zephyr's Getting Started Guide."
     fi
 
@@ -494,7 +519,9 @@ activate_python_venv() {
 }
 
 install_west() {
-    if ! pip install west; then
+    local python_cmd="$1"
+
+    if ! "$python_cmd" -m pip install west; then
         exit_with_error "Failed to install West"
     fi
     write_success "West installed successfully"
@@ -754,6 +781,7 @@ check_ncs_installation() {
     local nrfutil_path=""
     local nrfutil_type=""
     local needs_sdk_manager_install=false
+    local should_install_ncs_toolchain=false
 
     if nrfutil_info=$(find_nrfutil); then
         IFS='|' read -r nrfutil_type nrfutil_path needs_sdk_manager_install <<< "$nrfutil_info"
@@ -897,7 +925,7 @@ add_configuration_placeholders() {
 
     config_content="${prepended_config_content}${config_content}"
 
-    if echo -e "$config_content" > "$config_path"; then
+    if printf '%s' "$config_content" > "$config_path"; then
         write_success "Configuration placeholders added to prj.conf"
     else
         write_error "Failed to add configuration placeholders to prj.conf"
@@ -1004,7 +1032,7 @@ main() {
     activate_python_venv "$venv_path"
 
     write_step "Installing West..."
-    install_west
+    install_west "$python_cmd"
 
     write_step "Initializing West workspace..."
     initialize_west_workspace "$manifest"
