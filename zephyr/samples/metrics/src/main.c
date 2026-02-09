@@ -83,7 +83,8 @@ int main(void)
 #endif
 
 	/* Initialize application metrics */
-	if (init_application_metrics() < 0) {
+	int rc = init_application_metrics();
+	if (rc < 0) {
 		LOG_ERR("Failed to initialize application metrics");
 		return -1;
 	}
