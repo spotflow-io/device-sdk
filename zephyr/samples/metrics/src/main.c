@@ -28,12 +28,6 @@
 
 LOG_MODULE_REGISTER(metrics_sample, LOG_LEVEL_INF);
 
-/* Uncomment this function to provide your own device ID in runtime */
-/*const char* spotflow_override_device_id()
-{
-	return "my_custom_device_id";
-}*/
-
 /* Metric handles - using type-specific handles */
 static struct spotflow_metric_int* g_app_counter_metric;
 static struct spotflow_metric_float* g_temperature_metric;
@@ -57,16 +51,7 @@ K_THREAD_DEFINE(temperature_thread, TEMPERATURE_THREAD_STACK_SIZE, temperature_t
 
 int main(void)
 {
-	LOG_INF("========================================");
-	LOG_INF("Spotflow Metrics Sample Application");
-	LOG_INF("========================================");
-	LOG_INF("");
-	LOG_INF("This sample demonstrates:");
-	LOG_INF("  - System metrics auto-collection");
-	LOG_INF("  - Custom label-less metrics");
-	LOG_INF("  - Custom labeled metrics");
-	LOG_INF("  - Integration with logs");
-	LOG_INF("");
+	LOG_INF("Starting Spotflow metrics example");
 
 	/* Wait for the initialization of Wi-Fi/Ethernet device */
 	k_sleep(K_SECONDS(1));
