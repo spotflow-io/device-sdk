@@ -28,7 +28,6 @@ This sample showcases:
 
   - Label-less metrics: Simple counter and temperature sensor
   - Labeled metrics: HTTP request duration with endpoint, method, and status labels
-  - Note: Metric names are normalized (lowercase, alphanumeric, underscores only)
 
 - **Integration with Logs**
 
