@@ -74,9 +74,7 @@ int main(void)
 		return -1;
 	}
 
-	LOG_INF("");
 	LOG_INF("Starting metric reporting...");
-	LOG_INF("");
 
 	/* Main loop - report metrics periodically */
 	for (int iteration = 0; iteration < 100; iteration++) {
