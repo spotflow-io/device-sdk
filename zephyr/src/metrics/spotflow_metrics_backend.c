@@ -13,6 +13,9 @@
 
 LOG_MODULE_REGISTER(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
+static int validate_labels(const struct spotflow_metric_base *base,
+			   const struct spotflow_label *labels, uint8_t label_count);
+
 /* Public API Implementation */
 
 int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value)
@@ -66,23 +69,9 @@ int spotflow_report_metric_int_with_labels(struct spotflow_metric_int* metric, i
 		return -EINVAL;
 	}
 
-	if (label_count == 0 || label_count > base->max_labels) {
-		LOG_ERR("Invalid label_count: %u (max %u)", label_count, base->max_labels);
-		return -EINVAL;
-	}
-
-	/* Validate individual label elements */
-	for (uint8_t i = 0; i < label_count; i++) {
-		if (labels[i].key == NULL || labels[i].value == NULL) {
-			LOG_ERR("Label key or value is NULL at index %u", i);
-			return -EINVAL;
-		}
-		if (strlen(labels[i].key) >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
-			LOG_WRN("Label key at index %u will be truncated", i);
-		}
-		if (strlen(labels[i].value) >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
-			LOG_WRN("Label value at index %u will be truncated", i);
-		}
+	int err = validate_labels(base, labels, label_count);
+	if (err) {
+		return err;
 	}
 
 	/* Type-safe: int metrics always store int values */
@@ -105,23 +94,9 @@ int spotflow_report_metric_float_with_labels(struct spotflow_metric_float* metri
 		return -EINVAL;
 	}
 
-	if (label_count == 0 || label_count > base->max_labels) {
-		LOG_ERR("Invalid label_count: %u (max %u)", label_count, base->max_labels);
-		return -EINVAL;
-	}
-
-	/* Validate individual label elements */
-	for (uint8_t i = 0; i < label_count; i++) {
-		if (labels[i].key == NULL || labels[i].value == NULL) {
-			LOG_ERR("Label key or value is NULL at index %u", i);
-			return -EINVAL;
-		}
-		if (strlen(labels[i].key) >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
-			LOG_WRN("Label key at index %u will be truncated", i);
-		}
-		if (strlen(labels[i].value) >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
-			LOG_WRN("Label value at index %u will be truncated", i);
-		}
+	int err = validate_labels(base, labels, label_count);
+	if (err) {
+		return err;
 	}
 
 	/* Type-safe: float metrics always store float values */
@@ -161,12 +136,25 @@ int spotflow_report_event_with_labels(struct spotflow_metric_int* metric,
 		return -EINVAL;
 	}
 
+	int err = validate_labels(base, labels, label_count);
+	if (err) {
+		return err;
+	}
+
+	/* Events report value of 1 (event occurred) */
+	return aggregator_report_value(base, labels, label_count, 1, 0.0);
+}
+
+/* Static function implementations */
+
+static int validate_labels(const struct spotflow_metric_base *base,
+			   const struct spotflow_label *labels, uint8_t label_count)
+{
 	if (label_count == 0 || label_count > base->max_labels) {
 		LOG_ERR("Invalid label_count: %u (max %u)", label_count, base->max_labels);
 		return -EINVAL;
 	}
 
-	/* Validate individual label elements */
 	for (uint8_t i = 0; i < label_count; i++) {
 		if (labels[i].key == NULL || labels[i].value == NULL) {
 			LOG_ERR("Label key or value is NULL at index %u", i);
@@ -180,6 +168,5 @@ int spotflow_report_event_with_labels(struct spotflow_metric_int* metric,
 		}
 	}
 
-	/* Events report value of 1 (event occurred) */
-	return aggregator_report_value(base, labels, label_count, 1, 0.0);
+	return 0;
 }
