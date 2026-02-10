@@ -8,6 +8,7 @@ Overview
 ********
 
 This sample demonstrates the Spotflow metrics collection and reporting feature for Zephyr-based IoT devices.
+You can also follow `Metrics with Zephyr (Spotflow) <https://docs.spotflow.io/guides/zephyr/metrics-zephyr>`_
 
 Features
 ========
@@ -41,7 +42,7 @@ Hardware
 ========
 
 - Zephyr-supported board with network connectivity (Wi-Fi or Ethernet)
-- Tested on: NXP FRDM-RW612 (Wi-Fi)
+- Tested on: NXP FRDM-RW612 (Wi-Fi), more coming soon
 
 Software
 ========
@@ -55,7 +56,7 @@ Building and Running
 Configure Credentials
 =====================
 
-Copy the sample credentials file and add your Spotflow credentials:
+Copy the sample credentials file and add your WIFI details and Spotflow credentials:
 
 .. code-block:: bash
 
@@ -67,102 +68,14 @@ Edit ``credentials.conf``:
 
    CONFIG_SPOTFLOW_DEVICE_ID="your-device-id"
    CONFIG_SPOTFLOW_INGEST_KEY="your-ingest-key"
+   CONFIG_NET_WIFI_SSID=""
+   CONFIG_NET_WIFI_PASSWORD=""
 
 Alternatively add your credentials directly in ``prj.conf``.
 
-Build the Sample
-================
-
-For Wi-Fi boards (e.g., NXP FRDM-RW612):
-
-.. zephyr-app-commands::
-   :zephyr-app: samples/metrics
-   :board: frdm_rw612
-   :goals: build flash
-   :compact:
-
-
-Monitor Output
-==============
-
-.. code-block:: bash
-
-   west espressif monitor  # For ESP32 boards
-   # OR
-   screen /dev/ttyUSB0 115200  # For other boards
-
-Expected Behavior
-*****************
-
-The application will:
-
-1. Initialize Wi-Fi/Ethernet and connect to network
-2. Register 3 custom metrics (metrics subsystem auto-initializes on first registration):
-
-   - ``app_counter`` (int, aggregated over 1 minute)
-   - ``temperature_celsius`` (float, immediate/no aggregation)
-   - ``http_request_duration_ms`` (float, labeled, aggregated over 1 minute)
-
-3. Start reporting metrics every 2 seconds
-4. System metrics automatically collected every 60 seconds (configurable)
-
-Sample Output
-=============
-
-.. code-block:: console
-
-   [00:00:01.234] <inf> metrics_sample: ========================================
-   [00:00:01.235] <inf> metrics_sample: Spotflow Metrics Sample Application
-   [00:00:01.236] <inf> metrics_sample: ========================================
-   [00:00:01.237] <inf> metrics_sample:
-   [00:00:01.238] <inf> metrics_sample: This sample demonstrates:
-   [00:00:01.239] <inf> metrics_sample:   - System metrics auto-collection
-   [00:00:01.240] <inf> metrics_sample:   - Custom dimensionless metrics
-   [00:00:01.241] <inf> metrics_sample:   - Custom dimensional metrics
-   [00:00:01.242] <inf> metrics_sample:   - Integration with logs
-   [00:00:01.244] <inf> spotflow_metrics: Registered metric 'network_tx_bytes' (type=int, agg=1, max_ts=4, max_labels=1)
-   [00:00:01.250] <inf> spotflow_metrics: Registered metric 'network_rx_bytes' (type=int, agg=1, max_ts=4, max_labels=1)
-   ....
-   [00:00:03.456] <inf> metrics_sample: === Iteration 0 ===
-   [00:00:03.457] <inf> metrics_sample: Reported temperature: 22.34 °C
 
 Understanding the Metrics
 *************************
-
-Label-less Metrics
-==================
-
-**app_counter** (integer, aggregated):
-
-- Increments by 10 every iteration
-- Aggregated over 1 minute (PT1M)
-- Cloud receives: sum, count, min, max
-
-**temperature_celsius** (float, immediate):
-
-- Simulates temperature sensor reading
-- No aggregation (PT0S) - each value sent immediately
-- Cloud receives: individual readings as they occur
-
-Labeled Metrics
-===============
-
-**http_request_duration_ms** (float, labeled):
-
-- Simulates HTTP request latency
-- Labels: ``endpoint``, ``method``, ``status``
-- Up to 18 unique label combinations tracked (3 endpoints × 2 methods × 3 statuses)
-- Aggregated over 1 minute per label combination
-
-Example label combinations:
-
-.. code-block:: none
-
-   {endpoint="/api/users", method="GET", status="200"}
-   {endpoint="/api/products", method="POST", status="201"}
-   {endpoint="/health", method="GET", status="200"}
-
-Each unique combination maintains separate aggregation state.
 
 System Metrics
 **************
@@ -218,6 +131,57 @@ The following system metrics are automatically collected every 60 seconds (confi
      - \-
      - Device uptime (heartbeat, configurable interval)
 
+Custom User Metrics
+*******************
+
+.. note::
+
+     Custom application metrics are fully supported and persisted by the Spotflow cloud.
+     Visualization for custom metrics in the cloud dashboard is coming soon.
+
+Label-less Metrics
+==================
+
+**app_counter** (integer, aggregated):
+
+- Increments by 10 every iteration
+- Aggregated over 1 minute (PT1M)
+- Cloud receives: sum, count, min, max
+
+**temperature_celsius** (float, immediate):
+
+- Simulates temperature sensor reading
+- No aggregation (PT0S) - each value sent immediately
+- Cloud receives: individual readings as they occur
+
+Labeled Metrics
+===============
+
+**http_request_duration_ms** (float, labeled):
+
+- Simulates HTTP request latency
+- Labels: ``endpoint``, ``method``, ``status``
+- Up to 18 unique label combinations tracked (3 endpoints × 2 methods × 3 statuses)
+- Aggregated over 1 minute per label combination
+
+Example label combinations:
+
+.. code-block:: none
+
+   {endpoint="/api/users", method="GET", status="200"}
+   {endpoint="/api/products", method="POST", status="201"}
+   {endpoint="/health", method="GET", status="200"}
+
+Each unique combination maintains separate aggregation state.
+
+Viewing Metrics in Spotflow Cloud
+*********************************
+
+1. Log in to your Spotflow account at `Spotflow <https://spotflow.io>`_
+2. Navigate to your device dashboard
+3. View real-time and historical metrics
+4. Create custom dashboards and alerts
+
 Configuration Options
 *********************
 
@@ -248,14 +212,6 @@ Key configuration options in ``prj.conf``:
    # Heap sizing (auto-calculated, adjust if needed)
    CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS=8192       # 8KB for app metrics
    CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM=20480  # 20KB for system metrics
-
-Viewing Metrics in Spotflow Cloud
-*********************************
-
-1. Log in to your Spotflow account at `Spotflow <https://spotflow.io>`_
-2. Navigate to your device dashboard
-3. View real-time and historical metrics
-4. Create custom dashboards and alerts
 
 Troubleshooting
 ***************
