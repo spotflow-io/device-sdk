@@ -8,14 +8,6 @@ menuconfig SPOTFLOW_METRICS_SYSTEM
 	  requiring any application code.
 
 if SPOTFLOW_METRICS_SYSTEM
-
-config SPOTFLOW_METRICS_SYSTEM_MEMORY
-	bool "Enable memory metrics"
-	default y
-	help
-	  Collect system memory statistics (free/total bytes).
-	  Uses Zephyr sys_mem_stats_get() API.
-
 config SPOTFLOW_METRICS_SYSTEM_HEAP
 	bool "Enable heap metrics"
 	select SYS_HEAP_RUNTIME_STATS
