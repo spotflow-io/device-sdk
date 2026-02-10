@@ -22,8 +22,8 @@ extern "C" {
  * @param metric Metric base handle
  * @param ts Time series state to encode
  * @param timestamp_ms Device uptime in milliseconds when aggregation window closed
- * @param sequence_number Sequence number for this message (caller must increment atomically)
- * @param cbor_data Output: allocated CBOR buffer (caller must free if enqueue fails)
+ * @param sequence_number Sequence number for this message
+ * @param cbor_data Output: allocated CBOR buffer
  * @param cbor_len Output: CBOR buffer length
  *
  * @return 0 on success, negative errno on failure
