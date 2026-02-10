@@ -134,10 +134,10 @@ The following system metrics are automatically collected every 60 seconds (confi
 Custom User Metrics
 *******************
 
-.. note::
+.. important::
 
-     Custom application metrics are fully supported and persisted by the Spotflow cloud.
-     Visualization for custom metrics in the cloud dashboard is coming soon.
+   Custom application metrics are fully supported and persisted by the Spotflow cloud.
+   Visualization for custom metrics in the cloud dashboard is coming soon.
 
 Label-less Metrics
 ==================
