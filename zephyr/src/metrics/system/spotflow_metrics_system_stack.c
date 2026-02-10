@@ -49,9 +49,6 @@ int spotflow_metrics_system_stack_init(void)
 
 #ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 	k_mutex_init(&g_tracked_threads_mutex);
-	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS; i++) {
-		g_tracked_threads[i] = NULL;
-	}
 	g_tracked_threads_initialized = true;
 #endif
 

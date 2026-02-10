@@ -18,7 +18,6 @@ extern "C" {
 /**
  * @brief Aggregation interval enumeration
  *
- * Maps to ISO 8601 duration strings as specified in the ingestion protocol.
  */
 enum spotflow_agg_interval {
 	SPOTFLOW_AGG_INTERVAL_NONE = 0, /* PT0S - No aggregation */
@@ -45,10 +44,6 @@ struct spotflow_label {
 
 /**
  * @brief Internal label storage (copied strings)
- *
- * Sizes per design specification:
- * - Key: max 16 characters (SPOTFLOW_MAX_LABEL_KEY_LEN)
- * - Value: max 32 characters (SPOTFLOW_MAX_LABEL_VALUE_LEN)
  */
 #define SPOTFLOW_MAX_LABEL_KEY_LEN 16
 #define SPOTFLOW_MAX_LABEL_VALUE_LEN 32
