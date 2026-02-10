@@ -18,7 +18,7 @@ config SPOTFLOW_METRICS_SYSTEM_MEMORY
 
 config SPOTFLOW_METRICS_SYSTEM_HEAP
 	bool "Enable heap metrics"
-	imply SYS_HEAP_RUNTIME_STATS
+	select SYS_HEAP_RUNTIME_STATS
 	default y
 	help
 	  Collect heap memory statistics (free/allocated bytes).
