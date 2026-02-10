@@ -94,7 +94,6 @@ int aggregator_report_value(struct spotflow_metric_base* metric,
 		return rc;
 	}
 
-	/* Find or create time series */
 	struct metric_timeseries_state* ts = find_or_create_timeseries(ctx, labels, label_count);
 
 	if (ts == NULL) {
