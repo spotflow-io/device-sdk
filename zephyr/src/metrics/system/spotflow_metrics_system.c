@@ -107,7 +107,7 @@ int spotflow_metrics_system_init(void)
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
-	report_reboot_reason();
+	spotflow_report_reboot_reason();
 #endif
 
 	k_work_init_delayable(&g_collection_work, collection_timer_handler);

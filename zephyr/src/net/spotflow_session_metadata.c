@@ -37,7 +37,7 @@ int spotflow_session_metadata_send(void)
 		uint32_t rand_high = sys_rand32_get();
 		uint32_t rand_low = sys_rand32_get();
 		device_run_id = ((uint64_t)rand_high << 32) | rand_low;
-		LOG_INF("Generated device run ID: %llu", device_run_id);
+		LOG_INF("Generated device run ID: %"PRIu64, device_run_id);
 	}
 
 	int rc;
