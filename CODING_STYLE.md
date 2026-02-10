@@ -64,3 +64,30 @@ static void helper_function(int arg)
 - **Functions**: `spotflow_<module>_<action>` (e.g., `spotflow_metrics_system_init`)
 - **Static functions**: descriptive names without prefix (e.g., `report_thread_stack`)
 - **Constants/Macros**: `UPPER_SNAKE_CASE`
+
+## Documentation Comments
+
+Use Doxygen comments to document all public API functions and types in header files.
+
+- Use `/** ... */` style for Doxygen comments
+- Use `@brief` for a one-line summary
+- Use `@param` for each parameter
+- Use `@return` for return values (include error codes where applicable)
+- Use `@note` for important usage notes
+- Static/internal functions do not require Doxygen comments (regular `/* */` comments suffice)
+
+### Example
+
+```c
+/**
+ * @brief Report a label-less integer metric value
+ *
+ * @param metric Metric handle from registration
+ * @param value Integer value to report
+ *
+ * @return 0 on success, negative errno on failure
+ *         -EINVAL: Invalid metric handle
+ *         -EAGAIN: Aggregator busy (rare, retry)
+ */
+int spotflow_report_metric_int(struct spotflow_metric_int *metric, int64_t value);
+```
