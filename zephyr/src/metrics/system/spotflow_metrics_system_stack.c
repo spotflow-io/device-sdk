@@ -13,7 +13,7 @@
 #include <zephyr/logging/log.h>
 #include <string.h>
 
-LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 static struct spotflow_metric_int* g_stack_free_metric;
 static struct spotflow_metric_float* g_stack_used_percent_metric;

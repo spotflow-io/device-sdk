@@ -34,7 +34,7 @@
 #include "spotflow_reset_helper.h"
 #endif
 
-LOG_MODULE_REGISTER(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 static struct k_work_delayable g_collection_work;
 

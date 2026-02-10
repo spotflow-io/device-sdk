@@ -11,7 +11,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(spotflow_metrics_cbor, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 /* CBOR Protocol Keys (aligned with cloud backend) */
 #define KEY_MESSAGE_TYPE 0x00 /* 0 */

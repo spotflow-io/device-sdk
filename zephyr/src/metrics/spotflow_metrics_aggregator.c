@@ -14,7 +14,7 @@
 #include <limits.h>
 #include <float.h>
 
-LOG_MODULE_REGISTER(spotflow_metrics_agg, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 static bool labels_equal(const struct metric_timeseries_state* ts,
 			 const struct spotflow_label* labels, uint8_t label_count);

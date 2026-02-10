@@ -12,7 +12,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 static struct spotflow_metric_int* g_connection_state_metric;
 

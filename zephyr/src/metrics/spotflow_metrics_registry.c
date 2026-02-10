@@ -12,7 +12,7 @@
 #include <string.h>
 #include <ctype.h>
 
-LOG_MODULE_REGISTER(spotflow_metrics_registry, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 static struct spotflow_metric_base g_metric_registry[CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED];
 static K_MUTEX_DEFINE(g_registry_lock);

@@ -14,7 +14,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_REGISTER(spotflow_metrics_net, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 /* Message queue for metrics transmission */
 K_MSGQ_DEFINE(g_spotflow_metrics_msgq, sizeof(struct spotflow_mqtt_metrics_msg*),

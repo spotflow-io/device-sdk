@@ -14,7 +14,7 @@
 #include <zephyr/net/net_if.h>
 #include <zephyr/net/net_stats.h>
 
-LOG_MODULE_DECLARE(spotflow_metrics_system, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 static struct spotflow_metric_int* g_network_tx_metric;
 static struct spotflow_metric_int* g_network_rx_metric;
