@@ -1,20 +1,31 @@
 config NET_WIFI_SSID
 	string "SSID device should connect to"
 	help
-		SSID of the wifi network that the device should connect to.
+		SSID of the Wi-Fi network that the device should connect to.
 
 config NET_WIFI_PASSWORD
-	string "Wifi Password device should connect to"
+	string "Wi-Fi Password device should connect to"
 	help
-		Wifi password for the network that the device should connect to.
+		Wi-Fi password for the network that the device should connect to.
+
+config SPOTFLOW_IS_WIFI_AVAILABLE
+	bool
+	help
+		Indicates if Wi-Fi is available on the board (inferred from devicetree of supported boards).
+	default y if \
+		DT_HAS_ESPRESSIF_ESP32_WIFI_ENABLED || \
+		DT_HAS_INFINEON_AIROC_WIFI_ENABLED || \
+		DT_HAS_NORDIC_WLAN_ENABLED || \
+		DT_HAS_NXP_WIFI_ENABLED || \
+		DT_HAS_SILABS_SIWX91X_WIFI_ENABLED
 
 choice SPOTFLOW_NETWORK_IFACE
 	prompt "Spotflow network interface"
-	default SPOTFLOW_USE_WIFI
+	default SPOTFLOW_USE_WIFI if SPOTFLOW_IS_WIFI_AVAILABLE
+	default SPOTFLOW_USE_ETH
 
-# By default, use WIFI for Spotflow samples (more common among example boards)
 config SPOTFLOW_USE_WIFI
-	bool "Enable Wifi for Spotflow samples"
+	bool "Enable Wi-Fi for Spotflow samples"
 	imply WIFI
 	imply WIFI_NM
 	imply NET_L2_WIFI_MGMT
@@ -26,6 +37,7 @@ config SPOTFLOW_USE_WIFI
 config SPOTFLOW_USE_ETH
 	bool "Enable Ethernet for Spotflow samples"
 	imply ETH_DRIVER
+	imply NET_L2_ETHERNET
 	imply NET_L2_ETHERNET_MGMT
 
 endchoice
