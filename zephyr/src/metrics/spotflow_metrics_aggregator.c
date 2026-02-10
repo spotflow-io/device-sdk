@@ -238,7 +238,7 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 
 	/* Encode to CBOR */
 	int rc =
-	    spotflow_metrics_cbor_encode(metric, ts, timestamp_ms, seq_num, &cbor_data, &cbor_len);
+	    spotflow_metrics_cbor_encode_aggregated(metric, ts, timestamp_ms, seq_num, &cbor_data, &cbor_len);
 	if (rc < 0) {
 		LOG_ERR("Failed to encode metric '%s': %d", metric->name, rc);
 		reset_timeseries_state(metric, ts);

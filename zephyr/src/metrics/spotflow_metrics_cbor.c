@@ -38,7 +38,7 @@ static bool encode_aggregation_stats(zcbor_state_t* state, struct spotflow_metri
 static int finalize_cbor_output(uint8_t* buffer, zcbor_state_t* state, uint8_t** cbor_data,
 				size_t* cbor_len);
 
-int spotflow_metrics_cbor_encode(struct spotflow_metric_base* metric,
+int spotflow_metrics_cbor_encode_aggregated(struct spotflow_metric_base* metric,
 				 struct metric_timeseries_state* ts, int64_t timestamp_ms,
 				 uint64_t sequence_number, uint8_t** cbor_data, size_t* cbor_len)
 {
@@ -48,7 +48,7 @@ int spotflow_metrics_cbor_encode(struct spotflow_metric_base* metric,
 
 	if (metric->agg_interval == SPOTFLOW_AGG_INTERVAL_NONE) {
 		LOG_ERR("This function should not be used for non-aggregated metrics");
-		return -EINVAL; /* This function is for non-aggregated metrics only */
+		return -EINVAL;
 	}
 
 	uint8_t* buffer = k_malloc(CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE);

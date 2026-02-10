@@ -30,7 +30,7 @@ extern "C" {
  *         -EINVAL: CBOR encoding failed
  *         -ENOMEM: Memory allocation failed
  */
-int spotflow_metrics_cbor_encode(struct spotflow_metric_base* metric,
+int spotflow_metrics_cbor_encode_aggregated(struct spotflow_metric_base* metric,
 				 struct metric_timeseries_state* ts, int64_t timestamp_ms,
 				 uint64_t sequence_number, uint8_t** cbor_data, size_t* cbor_len);
 

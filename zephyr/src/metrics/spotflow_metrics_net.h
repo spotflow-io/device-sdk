@@ -30,9 +30,6 @@ void spotflow_metrics_net_init(void);
  * Memory Ownership: Processor thread ALWAYS frees message memory
  * (success or failure) after dequeue completes.
  *
- * MQTT Retry: Retries infinitely on -EAGAIN to preserve message ordering.
- * Does NOT requeue (would break ordering).
- *
  * @return 1 if message processed, 0 if queue empty, negative errno on permanent failure
  */
 int spotflow_poll_and_process_enqueued_metrics(void);
