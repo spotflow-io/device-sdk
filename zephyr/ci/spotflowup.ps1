@@ -56,8 +56,6 @@ param(
     [switch]$autoConfirm
 )
 
-$ErrorActionPreference = 'Stop'
-
 # Configuration
 $DefaultQuickstartJsonUrl = "https://downloads.spotflow.io/quickstart.json"
 $ManifestBaseUrl = "https://github.com/spotflow-io/device-sdk"
@@ -493,6 +491,11 @@ function Initialize-WestWorkspace {
         if ($SpotflowRevision) {
             $westInitArgs += "--clone-opt=--revision=$SpotflowRevision"
         }
+        # if (Test-IsWindowsOS) {
+        #     # Prevents access denied errors on Windows
+        #     $westInitArgs += "--rename-delay"
+        #     $westInitArgs += "5"
+        # }
 
         $westInitOutput = & west @westInitArgs 2>&1
         if ($LASTEXITCODE -ne 0) {
