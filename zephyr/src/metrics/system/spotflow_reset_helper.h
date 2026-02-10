@@ -12,6 +12,7 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
 void report_reboot_reason(void);
 
 #ifdef __cplusplus
