@@ -28,7 +28,8 @@ extern "C" {
  * @return 0 on success, negative errno on failure
  *         -EINVAL: Invalid parameters (NULL name or metric_out, empty normalized name)
  *         -EEXIST: Metric with same name already registered
- *         -ENOMEM: Registry full or aggregator allocation failed
+ *         -ENOSPC: Metric registry full
+ *         -ENOMEM: Aggregator allocation failed
  */
 int spotflow_register_metric_int(const char* name, enum spotflow_agg_interval agg_interval,
 				 struct spotflow_metric_int** metric_out);
@@ -48,7 +49,8 @@ int spotflow_register_metric_int(const char* name, enum spotflow_agg_interval ag
  * @return 0 on success, negative errno on failure
  *         -EINVAL: Invalid parameters (NULL name or metric_out, empty normalized name)
  *         -EEXIST: Metric with same name already registered
- *         -ENOMEM: Registry full or aggregator allocation failed
+ *         -ENOSPC: Metric registry full
+ *         -ENOMEM: Aggregator allocation failed
  */
 int spotflow_register_metric_float(const char* name, enum spotflow_agg_interval agg_interval,
 				   struct spotflow_metric_float** metric_out);
@@ -71,7 +73,8 @@ int spotflow_register_metric_float(const char* name, enum spotflow_agg_interval 
  *         -EINVAL: Invalid parameters (NULL name/metric_out, empty normalized name,
  *                  invalid max_timeseries/max_labels, max_labels=0)
  *         -EEXIST: Metric with same name already registered
- *         -ENOMEM: Registry full or aggregator allocation failed
+ *         -ENOSPC: Metric registry full
+ *         -ENOMEM: Aggregator allocation failed
  */
 int spotflow_register_metric_int_with_labels(const char* name,
 					     enum spotflow_agg_interval agg_interval,
@@ -96,7 +99,8 @@ int spotflow_register_metric_int_with_labels(const char* name,
  *         -EINVAL: Invalid parameters (NULL name/metric_out, empty normalized name,
  *                  invalid max_timeseries/max_labels, max_labels=0)
  *         -EEXIST: Metric with same name already registered
- *         -ENOMEM: Registry full or aggregator allocation failed
+ *         -ENOSPC: Metric registry full
+ *         -ENOMEM: Aggregator allocation failed
  */
 int spotflow_register_metric_float_with_labels(const char* name,
 					       enum spotflow_agg_interval agg_interval,

@@ -72,7 +72,8 @@ void spotflow_metrics_system_report_connection_state(bool connected);
  * @param thread Thread to monitor (or NULL for current thread)
  * @return 0 on success, negative errno on failure
  *         -ENOMEM: Maximum tracked threads limit reached
- *         -EINVAL: Invalid thread pointer or already tracked
+ *         -EINVAL: Stack metrics not initialized
+ *         -EEXIST: Thread already tracked
  */
 int spotflow_metrics_system_enable_thread_stack(struct k_thread* thread);
 #endif

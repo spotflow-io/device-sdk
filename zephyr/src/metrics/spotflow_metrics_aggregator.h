@@ -40,7 +40,9 @@ int aggregator_register_metric(struct spotflow_metric_base* metric);
  *
  * @return 0 on success, negative errno on failure
  *         -ENOSPC: Time series pool full
- *         -ENOMEM: Allocation failure
+ *         -EINVAL: Invalid metric type
+ *         -ENOBUFS: Metric queue full (non-aggregated metrics)
+ *         -ENOMEM: Memory allocation failed (non-aggregated metrics)
  */
 int aggregator_report_value(struct spotflow_metric_base* metric,
 			    const struct spotflow_label* labels, uint8_t label_count,

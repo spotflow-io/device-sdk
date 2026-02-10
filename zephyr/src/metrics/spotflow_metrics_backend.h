@@ -22,7 +22,8 @@ extern "C" {
  *
  * @return 0 on success, negative errno on failure
  *         -EINVAL: Invalid metric handle
- *         -EAGAIN: Aggregator busy (rare, retry)
+ *         -ENOSPC: Time series pool full
+ *         -ENOBUFS: Metric queue full (non-aggregated metrics)
  */
 int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value);
 
@@ -33,6 +34,9 @@ int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value
  * @param value Float value to report
  *
  * @return 0 on success, negative errno on failure
+ *         -EINVAL: Invalid metric handle
+ *         -ENOSPC: Time series pool full
+ *         -ENOBUFS: Metric queue full (non-aggregated metrics)
  */
 int spotflow_report_metric_float(struct spotflow_metric_float* metric, float value);
 
@@ -47,7 +51,7 @@ int spotflow_report_metric_float(struct spotflow_metric_float* metric, float val
  * @return 0 on success, negative errno on failure
  *         -EINVAL: Invalid parameters (too many labels, NULL pointers)
  *         -ENOSPC: Time series pool full (max_timeseries limit reached)
- *         -EAGAIN: Aggregator busy (rare, retry)
+ *         -ENOBUFS: Metric queue full (non-aggregated metrics)
  */
 int spotflow_report_metric_int_with_labels(struct spotflow_metric_int* metric, int64_t value,
 					   const struct spotflow_label* labels,
@@ -62,6 +66,9 @@ int spotflow_report_metric_int_with_labels(struct spotflow_metric_int* metric, i
  * @param label_count Number of labels
  *
  * @return 0 on success, negative errno on failure
+ *         -EINVAL: Invalid parameters (too many labels, NULL pointers)
+ *         -ENOSPC: Time series pool full (max_timeseries limit reached)
+ *         -ENOBUFS: Metric queue full (non-aggregated metrics)
  */
 int spotflow_report_metric_float_with_labels(struct spotflow_metric_float* metric, float value,
 					     const struct spotflow_label* labels,
@@ -78,7 +85,7 @@ int spotflow_report_metric_float_with_labels(struct spotflow_metric_float* metri
  *
  * @return 0 on success, negative errno on failure
  *         -EINVAL: Invalid metric handle or metric is labeled
- *         -ENOMEM: Metric queue is full
+ *         -ENOBUFS: Metric queue full
  */
 int spotflow_report_event(struct spotflow_metric_int* metric);
 
@@ -95,7 +102,7 @@ int spotflow_report_event(struct spotflow_metric_int* metric);
  *
  * @return 0 on success, negative errno on failure
  *         -EINVAL: Invalid parameters
- *         -ENOMEM: Metric queue is full
+ *         -ENOBUFS: Metric queue full
  *         -ENOSPC: Time series pool is full
  */
 int spotflow_report_event_with_labels(struct spotflow_metric_int* metric,
