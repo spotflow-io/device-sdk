@@ -5,7 +5,7 @@
 
 LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
-int poll_and_process_enqueued_logs(void)
+int spotflow_poll_and_process_enqueued_logs(void)
 {
 	struct spotflow_mqtt_logs_msg* msg_ptr;
 

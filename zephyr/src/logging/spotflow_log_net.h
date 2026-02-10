@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-int poll_and_process_enqueued_logs(void);
+int spotflow_poll_and_process_enqueued_logs(void);
 
 #ifdef __cplusplus
 }

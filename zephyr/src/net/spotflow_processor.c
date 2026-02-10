@@ -113,7 +113,7 @@ static int process_config_coredumps_or_logs()
 	 */
 	if (rc == 0) {
 		/*No coredumps or metrics to send -> sending logs*/
-		rc = poll_and_process_enqueued_logs();
+		rc = spotflow_poll_and_process_enqueued_logs();
 		if (rc < 0) {
 			LOG_DBG("Failed to process logs: %d", rc);
 			return rc;
