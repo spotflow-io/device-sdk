@@ -147,6 +147,10 @@ static void process_mqtt()
 		}
 
 		rc = process_config_coredumps_or_logs();
+		if (rc == -EAGAIN) {
+			/* Transient: MQTT busy, retry on next iteration */
+			continue;
+		}
 		if (rc < 0) {
 			/* Problem in sending/mqtt_publish, reestablishing MQTT Connection*/
 			break;
