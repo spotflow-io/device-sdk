@@ -13,6 +13,9 @@
 extern "C" {
 #endif
 
+/* External message queue (defined in spotflow_metrics_net.c) */
+extern struct k_msgq g_spotflow_metrics_msgq;
+
 /**
  * @brief Register metric with aggregator
  *

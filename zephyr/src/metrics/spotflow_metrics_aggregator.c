@@ -16,9 +16,6 @@
 
 LOG_MODULE_REGISTER(spotflow_metrics_agg, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-/* External message queue (defined in spotflow_metrics_net.c) */
-extern struct k_msgq g_spotflow_metrics_msgq;
-
 static bool labels_equal(const struct metric_timeseries_state* ts,
 			 const struct spotflow_label* labels, uint8_t label_count);
 static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value);
