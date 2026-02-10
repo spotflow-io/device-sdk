@@ -40,7 +40,7 @@ static const struct {
 
 void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len);
 
-void report_reboot_reason(void)
+void spotflow_report_reboot_reason(void)
 {
 	uint32_t cause;
 	char reset_str[64];

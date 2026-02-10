@@ -13,7 +13,7 @@
 extern "C" {
 #endif
 
-void report_reboot_reason(void);
+void spotflow_report_reboot_reason(void);
 
 #ifdef __cplusplus
 }

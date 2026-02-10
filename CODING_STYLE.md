@@ -63,5 +63,4 @@ static void helper_function(int arg)
 
 - **Functions**: `spotflow_<module>_<action>` (e.g., `spotflow_metrics_system_init`)
 - **Static functions**: descriptive names without prefix (e.g., `report_thread_stack`)
-- **Global static variables**: `g_` prefix (e.g., `g_context`)
 - **Constants/Macros**: `UPPER_SNAKE_CASE`
