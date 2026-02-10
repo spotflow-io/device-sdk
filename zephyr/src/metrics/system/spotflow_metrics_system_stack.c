@@ -176,7 +176,7 @@ static void report_thread_stack(const struct k_thread* thread, void* user_data)
 		LOG_ERR("Failed to report stack used percent metric for %s: %d", thread_label, rc);
 	}
 
-	/* Log using integer format to avoid float-to-double promotion (Zephyr convention) */
+	/* Use integer format to avoid enabling CONFIG_CBPRINTF_FP_SUPPORT */
 	int pct_int = (int)used_percent;
 	int pct_frac = (int)((used_percent - pct_int) * 10);
 	LOG_DBG("Stack: thread=%s, used=%d.%01d%%, free=%zu bytes", thread_label, pct_int, pct_frac,
