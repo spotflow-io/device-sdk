@@ -62,16 +62,16 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 	range 4096 65536
 	help
 	  Heap memory for application metrics depends on two factors:
-	  1. Timeseries size = ~36 + (48 × MAX_LABELS_PER_METRIC) bytes
+	  1. Timeseries size = ~36 + (48 x MAX_LABELS_PER_METRIC) bytes
 	     With MAX_LABELS=4: ~230 bytes per timeseries
 	  2. Number of concurrent timeseries (max_timeseries parameter at registration)
 
-	  Per-metric heap = 80 + (timeseries_size × max_timeseries)
+	  Per-metric heap = 80 + (timeseries_size x max_timeseries)
 
 	  Examples (with MAX_LABELS=4, ~230 bytes/ts):
 	  - Dimensionless metric (max_ts=1): 80 + 230 = 310 bytes
-	  - Labeled metric (max_ts=4): 80 + 230×4 = 1KB
-	  - Labeled metric (max_ts=16): 80 + 230×16 = 3.8KB
+	  - Labeled metric (max_ts=4): 80 + 230x4 = 1KB
+	  - Labeled metric (max_ts=16): 80 + 230x16 = 3.8KB
 
 	  Default 8KB supports ~25 dimensionless metrics or ~8 labeled metrics
 	  with 4 timeseries each. Adjust based on your application needs.

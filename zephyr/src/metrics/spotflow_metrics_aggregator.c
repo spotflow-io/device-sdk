@@ -360,7 +360,7 @@ static void init_timeseries_aggregation_state(struct metric_timeseries_state* ts
  * @brief Find or create time series slot
  *
  * Uses direct string comparison for label matching. O(n) linear search
- * is acceptable since max_timeseries ≤ 256 and labels are small.
+ * is acceptable since max_timeseries <= 256 and labels are small.
  *
  * When pool is full, attempts to evict a timeseries with count == 0
  * (no values reported in current aggregation window).
