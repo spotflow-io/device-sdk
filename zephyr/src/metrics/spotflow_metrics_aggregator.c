@@ -237,8 +237,8 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 	uint64_t seq_num = metric->sequence_number++;
 
 	/* Encode to CBOR */
-	int rc =
-	    spotflow_metrics_cbor_encode_aggregated(metric, ts, timestamp_ms, seq_num, &cbor_data, &cbor_len);
+	int rc = spotflow_metrics_cbor_encode_aggregated(metric, ts, timestamp_ms, seq_num,
+							 &cbor_data, &cbor_len);
 	if (rc < 0) {
 		LOG_ERR("Failed to encode metric '%s': %d", metric->name, rc);
 		reset_timeseries_state(metric, ts);
@@ -277,12 +277,11 @@ static void aggregation_timer_handler(struct k_work* work)
 
 	/* Capture timestamp when aggregation window closes */
 	int64_t timestamp_ms = k_uptime_get();
-	LOG_DBG("Aggregation window closed for metric '%s' at %lld ms", metric->name, timestamp_ms);
 
 	k_mutex_lock(&metric->lock, K_FOREVER);
 
-	LOG_DBG("Aggregation timer expired for metric '%s' (%u active time series)", metric->name,
-		ctx->timeseries_count);
+	LOG_DBG("Aggregation window closed for metric '%s' at %lld ms (%u active time series)",
+		metric->name, timestamp_ms, ctx->timeseries_count);
 
 	/* Flush all active time series with the same timestamp */
 	for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {

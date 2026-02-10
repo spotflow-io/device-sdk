@@ -14,19 +14,7 @@
 
 LOG_MODULE_REGISTER(spotflow_metrics_registry, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-/* Global metric registry - union to support both int and float metrics in same array
- *
- * IMPORTANT: Both int_metric and float_metric have identical memory layout
- * (single 'base' member as first field), allowing safe access via int_metric.base
- * regardless of actual type. This pattern is used throughout registry operations
- * to simplify slot management.
- */
-union metric_registry_entry {
-	struct spotflow_metric_int int_metric;
-	struct spotflow_metric_float float_metric;
-};
-
-static union metric_registry_entry g_metric_registry[CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED];
+static struct spotflow_metric_base g_metric_registry[CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED];
 static K_MUTEX_DEFINE(g_registry_lock);
 
 /* Forward declarations of static functions */
@@ -191,7 +179,7 @@ static void normalize_metric_name(const char* input, char* output, size_t output
 static int find_available_slot(void)
 {
 	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED; i++) {
-		if (g_metric_registry[i].int_metric.base.aggregator_context == NULL) {
+		if (g_metric_registry[i].aggregator_context == NULL) {
 			return i;
 		}
 	}
@@ -208,7 +196,7 @@ static int find_available_slot(void)
 static struct spotflow_metric_base* find_metric_by_name(const char* normalized_name)
 {
 	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED; i++) {
-		struct spotflow_metric_base* base = &g_metric_registry[i].int_metric.base;
+		struct spotflow_metric_base* base = &g_metric_registry[i];
 		if (base->aggregator_context != NULL && strcmp(base->name, normalized_name) == 0) {
 			return base;
 		}
@@ -320,7 +308,7 @@ static int register_metric_common(const char* name, enum spotflow_metric_type ty
 		return -ENOSPC;
 	}
 
-	struct spotflow_metric_base* metric = &g_metric_registry[slot].int_metric.base;
+	struct spotflow_metric_base* metric = &g_metric_registry[slot];
 	init_metric_struct(metric, normalized_name, type, agg_interval, max_timeseries, max_labels);
 
 	/* Initialize aggregator context */
