@@ -127,14 +127,14 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
 	  System metrics heap depends on timeseries size (~230 bytes with
 	  MAX_LABELS=4) and number of concurrent timeseries per metric.
 
-	  Per-metric heap = 80 + (230 × max_timeseries)
+	  Per-metric heap = 80 + (230 x max_timeseries)
 
 	  Default estimates (all system metrics enabled):
-	  - Heap metrics (2 metrics × 1 ts): ~0.6 KB
-	  - Network metrics (2 × NETWORK_MAX_INTERFACES=4): ~2 KB
+	  - Heap metrics (2 metrics x 1 ts): ~0.6 KB
+	  - Network metrics (2 x NETWORK_MAX_INTERFACES=4): ~2 KB
 	  - CPU metric (1 ts): ~0.3 KB
 	  - Connection metric (1 ts): ~0.3 KB
-	  - Stack metrics (2 × STACK_MAX_THREADS=32): ~15 KB (dominates!)
+	  - Stack metrics (2 x STACK_MAX_THREADS=32): ~15 KB (dominates!)
 
 	  Total with defaults: ~18 KB
 
