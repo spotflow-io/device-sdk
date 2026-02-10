@@ -108,7 +108,7 @@ int spotflow_metrics_system_stack_enable_thread(struct k_thread* thread)
 	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS; i++) {
 		if (g_tracked_threads[i] == thread) {
 			k_mutex_unlock(&g_tracked_threads_mutex);
-			return -EINVAL;
+			return -EEXIST;
 		}
 	}
 
