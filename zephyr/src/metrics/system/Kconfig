@@ -150,7 +150,4 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
 
 	  This is added to CONFIG_HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 	  which is for application metrics.
-
-
-
 endif # SPOTFLOW_METRICS_SYSTEM
