@@ -1,0 +1,17 @@
+manifest:
+  projects:
+    - name: zephyr
+      url: https://github.com/zephyrproject-rtos/zephyr
+      revision: v4.2.1
+      clone-depth: 1
+      import:
+        name-allowlist:
+          - cmsis_6
+          - hal_infineon
+          - hal_rpi_pico
+          - mbedtls
+          - mcuboot
+          - zcbor
+
+  self:
+    path: modules/lib/spotflow
