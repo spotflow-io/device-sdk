@@ -1,8 +1,4 @@
 /*
- * Copyright (c) 2024 Spotflow
- *
- * SPDX-License-Identifier: Apache-2.0
- *
  * Spotflow Metrics Sample Application
  *
  * This example demonstrates:

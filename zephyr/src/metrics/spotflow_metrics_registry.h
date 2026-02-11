@@ -1,9 +1,3 @@
-/*
- * Copyright (c) 2024 Spotflow
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #ifndef SPOTFLOW_METRICS_REGISTRY_H_
 #define SPOTFLOW_METRICS_REGISTRY_H_
 

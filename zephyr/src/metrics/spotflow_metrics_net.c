@@ -1,9 +1,3 @@
-/*
- * Copyright (c) 2024 Spotflow
- *
- * SPDX-License-Identifier: Apache-2.0
- */
-
 #include "spotflow_metrics_net.h"
 #include "../net/spotflow_mqtt.h"
 
