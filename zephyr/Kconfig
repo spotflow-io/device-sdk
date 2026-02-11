@@ -32,6 +32,9 @@ if SPOTFLOW
 
 rsource "src/logging/KConfig"
 rsource "src/coredumps/KConfig"
+rsource "src/metrics/Kconfig"
+rsource "src/metrics/system/Kconfig"
+
 
 config SPOTFLOW_GENERATE_BUILD_ID
 	bool "Generate build ID"
@@ -102,6 +105,7 @@ config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	range 0 4
 	help
 		Sets default log level for all Spotflow components.
+		Not the overall log levels.
 		Defaults to 2 (WARNING).
 		Levels are:
 		- 0 OFF, do not write
