@@ -277,7 +277,8 @@ static void aggregation_timer_handler(struct k_work* work)
 
 	k_mutex_lock(&metric->lock, K_FOREVER);
 
-	LOG_DBG("Aggregation window closed for metric '%s' at %" PRId64 " ms (%u active time series)",
+	LOG_DBG("Aggregation window closed for metric '%s' at %" PRId64
+		" ms (%u active time series)",
 		metric->name, timestamp_ms, ctx->timeseries_count);
 
 	/* Flush all active time series with the same timestamp */

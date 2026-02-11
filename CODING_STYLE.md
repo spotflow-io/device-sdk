@@ -41,7 +41,7 @@ struct my_context {
 	int value;
 };
 
-static struct my_context g_context;
+static struct my_context context;
 
 static void helper_function(int arg);
 

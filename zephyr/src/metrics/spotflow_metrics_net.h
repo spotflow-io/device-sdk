@@ -27,10 +27,7 @@ void spotflow_metrics_net_init(void);
  * Dequeues one message from the metrics queue and publishes via MQTT.
  * Called repeatedly by processor thread to drain the queue.
  *
- * Memory Ownership: Processor thread ALWAYS frees message memory
- * (success or failure) after dequeue completes.
- *
- * @return 1 if message processed, 0 if queue empty, negative errno on permanent failure
+ * @return 1 if message processed, 0 if queue empty, negative errno on failure
  */
 int spotflow_poll_and_process_enqueued_metrics(void);
 
