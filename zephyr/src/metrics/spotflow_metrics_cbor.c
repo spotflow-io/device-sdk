@@ -6,6 +6,7 @@
 
 #include "spotflow_metrics_cbor.h"
 
+#include <inttypes.h>
 #include <zcbor_common.h>
 #include <zcbor_encode.h>
 #include <zephyr/kernel.h>
@@ -39,8 +40,9 @@ static int finalize_cbor_output(uint8_t* buffer, zcbor_state_t* state, uint8_t**
 				size_t* cbor_len);
 
 int spotflow_metrics_cbor_encode_aggregated(struct spotflow_metric_base* metric,
-				 struct metric_timeseries_state* ts, int64_t timestamp_ms,
-				 uint64_t sequence_number, uint8_t** cbor_data, size_t* cbor_len)
+					    struct metric_timeseries_state* ts,
+					    int64_t timestamp_ms, uint64_t sequence_number,
+					    uint8_t** cbor_data, size_t* cbor_len)
 {
 	if (metric == NULL || ts == NULL || cbor_data == NULL || cbor_len == NULL) {
 		return -EINVAL;
@@ -98,8 +100,8 @@ int spotflow_metrics_cbor_encode_aggregated(struct spotflow_metric_base* metric,
 		return ret;
 	}
 
-	LOG_DBG("Encoded metric '%s' message (%zu bytes, seq=%llu)", metric->name, *cbor_len,
-		(unsigned long long)sequence_number);
+	LOG_DBG("Encoded metric '%s' message (%zu bytes, seq=%" PRIu64 ")", metric->name, *cbor_len,
+		sequence_number);
 
 	return 0;
 }
@@ -184,8 +186,8 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 		return ret;
 	}
 
-	LOG_DBG("Encoded raw metric '%s' message (%zu bytes, seq=%llu)", metric->name, *cbor_len,
-		(unsigned long long)sequence_number);
+	LOG_DBG("Encoded raw metric '%s' message (%zu bytes, seq=%" PRIu64 ")", metric->name,
+		*cbor_len, sequence_number);
 
 	return 0;
 }

@@ -9,6 +9,7 @@
 #include "metrics/spotflow_metrics_backend.h"
 #include "metrics/spotflow_metrics_types.h"
 
+#include <inttypes.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/net_if.h>
@@ -98,8 +99,8 @@ static void report_network_interface_metrics(struct net_if* iface, void* user_da
 		LOG_ERR("Failed to report network RX for %s: %d", if_name, rc);
 	}
 
-	LOG_DBG("Network %s: TX=%llu bytes, RX=%llu bytes", if_name, (unsigned long long)tx_bytes,
-		(unsigned long long)rx_bytes);
+	LOG_DBG("Network %s: TX=%" PRIu64 " bytes, RX=%" PRIu64 " bytes", if_name, tx_bytes,
+		rx_bytes);
 
 	(*if_count)++;
 }

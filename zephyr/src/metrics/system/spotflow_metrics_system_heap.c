@@ -58,7 +58,7 @@ void spotflow_metrics_system_heap_collect(void)
 		return;
 	}
 
-	// TODO: Replace with spotflow_report_metric_uint64 when available
+	/* TODO: Replace with spotflow_report_metric_uint64 when available */
 	int64_t free_bytes_capped =
 	    (heap_stats.free_bytes > INT64_MAX) ? INT64_MAX : (int64_t)heap_stats.free_bytes;
 	int64_t allocated_bytes_capped = (heap_stats.allocated_bytes > INT64_MAX)

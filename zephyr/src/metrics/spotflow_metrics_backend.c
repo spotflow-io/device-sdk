@@ -13,8 +13,8 @@
 
 LOG_MODULE_REGISTER(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
-static int validate_labels(const struct spotflow_metric_base *base,
-			   const struct spotflow_label *labels, uint8_t label_count);
+static int validate_labels(const struct spotflow_metric_base* base,
+			   const struct spotflow_label* labels, uint8_t label_count);
 
 /* Public API Implementation */
 
@@ -147,8 +147,8 @@ int spotflow_report_event_with_labels(struct spotflow_metric_int* metric,
 
 /* Static function implementations */
 
-static int validate_labels(const struct spotflow_metric_base *base,
-			   const struct spotflow_label *labels, uint8_t label_count)
+static int validate_labels(const struct spotflow_metric_base* base,
+			   const struct spotflow_label* labels, uint8_t label_count)
 {
 	if (label_count == 0 || label_count > base->max_labels) {
 		LOG_ERR("Invalid label_count: %u (max %u)", label_count, base->max_labels);

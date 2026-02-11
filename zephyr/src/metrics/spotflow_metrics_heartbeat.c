@@ -8,6 +8,7 @@
 #include "spotflow_metrics_cbor.h"
 #include "../net/spotflow_mqtt.h"
 
+#include <inttypes.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
@@ -63,7 +64,7 @@ static void heartbeat_work_handler(struct k_work* work)
 
 	k_mutex_unlock(&g_heartbeat_mutex);
 
-	LOG_DBG("Heartbeat queued (uptime=%lld ms, %zu bytes)", (long long)uptime_ms, len);
+	LOG_DBG("Heartbeat queued (uptime=%" PRId64 " ms, %zu bytes)", uptime_ms, len);
 
 reschedule:
 	/* Reschedule for next interval */
