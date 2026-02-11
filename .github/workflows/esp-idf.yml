@@ -2,6 +2,15 @@ name: Build ESP-IDF Project
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - 'esp_idf/**'
+      - '.github/workflows/esp-idf.yml'
+  pull_request:
+    paths:
+      - 'esp_idf/**'
+      - '.github/workflows/esp-idf.yml'
 
 permissions:
   contents: read        # Allows reading repository content (needed for checkout)
