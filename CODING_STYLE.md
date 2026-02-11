@@ -26,7 +26,6 @@ Source files should follow this order:
 ### Example
 
 ```c
-
 #include "my_module.h"
 #include "other/project_header.h"
 
@@ -55,15 +54,56 @@ int my_module_init(void)
 static void helper_function(int arg)
 {
 	/* Static function implementation */
-	g_context.value = arg;
+	context.value = arg;
 }
+```
+
+## Header File Structure
+
+Use include guards, not `#pragma once`. Wrap declarations in `extern "C"` for
+C++ compatibility.
+
+```c
+#ifndef SPOTFLOW_EXAMPLE_H
+#define SPOTFLOW_EXAMPLE_H
+
+#include <stdint.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* declarations */
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* SPOTFLOW_EXAMPLE_H */
 ```
 
 ## Naming Conventions
 
-- **Functions**: `spotflow_<module>_<action>` (e.g., `spotflow_metrics_system_init`)
+- **Public functions**: `spotflow_<module>_<action>` (e.g., `spotflow_metrics_system_init`)
 - **Static functions**: descriptive names without prefix (e.g., `report_thread_stack`)
-- **Constants/Macros**: `UPPER_SNAKE_CASE`
+- **Public macros/constants**: `SPOTFLOW_` prefix, `UPPER_SNAKE_CASE`
+- **Kconfig options**: `CONFIG_SPOTFLOW_*`
+- **Structs**: `struct spotflow_<name>` (no typedef)
+- **File names**: `spotflow_<subsystem>[_<component>].c/.h`
+
+## Logging
+
+- Register per-file: `LOG_MODULE_REGISTER(spotflow_<name>, CONFIG_SPOTFLOW_*_LOG_LEVEL);`
+- Or declare: `LOG_MODULE_DECLARE(spotflow_<name>);`
+- Use `LOG_ERR`, `LOG_WRN`, `LOG_INF`, `LOG_DBG` -- never `printk` in library code
+
+## Error Handling
+
+- Return negative errno values: `-EINVAL`, `-ENOMEM`, `-ENOSPC`, `-ENOBUFS`
+- Validate all pointer arguments against `NULL` at function entry
+- Log errors with `LOG_ERR` before returning an error code
+- Log warnings with `LOG_WRN` for non-fatal issues (e.g., truncation)
+- Document return codes in Doxygen `@return` blocks on public API headers
 
 ## Documentation Comments
 
@@ -89,5 +129,18 @@ Use Doxygen comments to document all public API functions and types in header fi
  *         -EINVAL: Invalid metric handle
  *         -EAGAIN: Aggregator busy (rare, retry)
  */
-int spotflow_report_metric_int(struct spotflow_metric_int *metric, int64_t value);
+int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value);
 ```
+
+## Conditional Compilation
+
+- Guard subsystem includes and code with `#ifdef CONFIG_SPOTFLOW_*`
+- End guards with a comment: `#endif /* CONFIG_SPOTFLOW_* */`
+- Use `zephyr_library_sources_ifdef()` in CMake, not raw `if()`
+
+## Kconfig Conventions
+
+- New options go under the `if SPOTFLOW` block in the relevant `Kconfig` file
+- Use `depends on` for hard dependencies, `select` for auto-enabled deps
+- Provide `help` text for all user-facing options
+- Use `configdefault` (not `config ... default`) when overriding Zephyr defaults
