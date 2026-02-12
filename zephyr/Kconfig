@@ -55,9 +55,6 @@ configdefault MBEDTLS_MPI_MAX_SIZE
 	default 512 if SPOTFLOW
 endif #NRF_SECURITY
 
-configdefault MAIN_STACK_SIZE
-	default 4096 if SPOTFLOW
-
 configdefault ZVFS_OPEN_MAX
 	default 32 if SPOTFLOW
 
