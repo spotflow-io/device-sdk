@@ -6,9 +6,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
-### Added
-* Added interfaces for reporting metrics to Spotflow
-* Removed configdefautl for MAIN_STACK_SIZE
 
 ### Added
 * Added sample for Ethernet on FRDM_RW612
@@ -22,6 +19,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added CI/CD pipeline for Zephyr.
 * Added list of supported boards and generation of quickstart.json file.
 * Added spotflowup.sh and spotflowup.ps1 scripts for workspace setup.
+* Added interfaces for reporting metrics to Spotflow
+
+### Removed
+* Removed configdefault for MAIN_STACK_SIZE
 
 ### Fixed
 * Added check of `CONFIG_MBEDTLS_MPI_MAX_SIZE` in CMake and explicitly set it for Nordic boards in samples
