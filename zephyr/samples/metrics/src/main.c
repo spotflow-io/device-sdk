@@ -13,14 +13,7 @@
 
 #include "metrics/spotflow_metrics_backend.h"
 
-#ifdef CONFIG_SPOTFLOW_USE_ETH
-#include <zephyr/net/net_if.h>
-#include <zephyr/net/dhcpv4.h>
-#endif
-
-#ifdef CONFIG_SPOTFLOW_USE_WIFI
-#include "../../wifi-common/wifi.h"
-#endif
+#include "net.h"
 
 LOG_MODULE_REGISTER(metrics_sample, LOG_LEVEL_INF);
 
@@ -28,10 +21,6 @@ LOG_MODULE_REGISTER(metrics_sample, LOG_LEVEL_INF);
 static struct spotflow_metric_int* g_app_counter_metric;
 static struct spotflow_metric_float* g_temperature_metric;
 static struct spotflow_metric_float* g_request_duration_metric;
-
-#ifdef CONFIG_SPOTFLOW_USE_ETH
-static void turn_on_dhcp_when_device_is_up();
-#endif
 
 static int init_application_metrics(void);
 static void report_counter_metric(void);
@@ -49,19 +38,10 @@ int main(void)
 {
 	LOG_INF("Starting Spotflow metrics example");
 
-	/* Wait for the initialization of Wi-Fi/Ethernet device */
+	/* Wait for the initialization of network device */
 	k_sleep(K_SECONDS(1));
 
-#ifdef CONFIG_SPOTFLOW_USE_WIFI
-	LOG_INF("Initializing Wi-Fi...");
-	init_wifi();
-	connect_to_wifi();
-#endif
-
-#ifdef CONFIG_SPOTFLOW_USE_ETH
-	LOG_INF("Initializing Ethernet...");
-	turn_on_dhcp_when_device_is_up();
-#endif
+	spotflow_sample_net_init();
 
 	/* Initialize application metrics */
 	int rc = init_application_metrics();
@@ -218,19 +198,3 @@ static void report_request_duration_metric(void)
 	}
 }
 
-#ifdef CONFIG_SPOTFLOW_USE_ETH
-static void handler(struct net_mgmt_event_callback* cb, uint64_t mgmt_event, struct net_if* iface)
-{
-	if (mgmt_event == NET_EVENT_IF_UP) {
-		LOG_INF("Interface is up -> starting DHCPv4");
-		net_dhcpv4_start(iface);
-	}
-}
-
-static void turn_on_dhcp_when_device_is_up()
-{
-	static struct net_mgmt_event_callback iface_cb;
-	net_mgmt_init_event_callback(&iface_cb, handler, NET_EVENT_IF_UP);
-	net_mgmt_add_event_callback(&iface_cb);
-}
-#endif
