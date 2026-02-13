@@ -172,9 +172,10 @@ TEST_CASE("CBOR encodes a simple log correctly", "[spotflow][cbor]")
 	char body[] = "Hello CBOR";
 	struct message_metadata meta = { .sequence_number = 1U,
 					 .uptime_ms = 1000U,
+					 .severity = LOG_SEVERITY_INFO,
 					 .source = "unit_test" };
 
-	cbor_buf = spotflow_log_cbor(template_str, body, LOG_SEVERITY_INFO, &cbor_len, &meta);
+	cbor_buf = spotflow_log_cbor(template_str, body, &cbor_len, &meta);
 
 	TEST_SPOTFLOW_ASSERT_TRUE(cbor_buf != NULL);
 	TEST_SPOTFLOW_ASSERT_LESS_OR_EQUAL(MAX_CBOR_LEN, cbor_len);
@@ -210,9 +211,12 @@ TEST_CASE("CBOR handles empty source string", "[spotflow][cbor]")
 {
 	const char* template_str = "Template";
 	char body[] = "Msg";
-	struct message_metadata meta = { .sequence_number = 1U, .uptime_ms = 100U, .source = "" };
+	struct message_metadata meta = { .sequence_number = 1U,
+					 .uptime_ms = 100U,
+					 .source = "",
+					 .severity = LOG_SEVERITY_WARN };
 
-	cbor_buf = spotflow_log_cbor(template_str, body, LOG_SEVERITY_WARN, &cbor_len, &meta);
+	cbor_buf = spotflow_log_cbor(template_str, body, &cbor_len, &meta);
 
 	TEST_SPOTFLOW_ASSERT_TRUE(cbor_buf != NULL);
 	TEST_SPOTFLOW_ASSERT_TRUE(cbor_len > 0U);
@@ -251,9 +255,10 @@ TEST_CASE("CBOR encodes large log body", "[spotflow][cbor]")
 
 	struct message_metadata meta = { .sequence_number = 99,
 					 .uptime_ms = 12345,
+					 .severity = LOG_SEVERITY_INFO,
 					 .source = "large_test" };
 
-	cbor_buf = spotflow_log_cbor(template, body, LOG_SEVERITY_INFO, &cbor_len, &meta);
+	cbor_buf = spotflow_log_cbor(template, body, &cbor_len, &meta);
 
 	TEST_SPOTFLOW_ASSERT_TRUE(cbor_buf != NULL);
 
@@ -270,12 +275,12 @@ TEST_CASE("CBOR handles NULL body safely", "[spotflow][cbor]")
 
 	struct message_metadata meta = { .sequence_number = 5,
 					 .uptime_ms = 0,
+					 .severity = LOG_SEVERITY_INFO,
 					 .source = "null_test" };
 
 	// Allocate a dummy empty string if NULL
 	char dummy_body[] = "";
-	cbor_buf = spotflow_log_cbor(template, body ? body : dummy_body, LOG_SEVERITY_INFO,
-				     &cbor_len, &meta);
+	cbor_buf = spotflow_log_cbor(template, body ? body : dummy_body, &cbor_len, &meta);
 
 	TEST_SPOTFLOW_ASSERT_TRUE(cbor_buf != NULL);
 
