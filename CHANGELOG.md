@@ -21,10 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added spotflowup.sh and spotflowup.ps1 scripts for workspace setup.
 
 ### Fixed
-* Hiding CPU system metrics on unsupported platforms
-
-### Fixed
 * Added check of `CONFIG_MBEDTLS_MPI_MAX_SIZE` in CMake and explicitly set it for Nordic boards in samples
+* Hiding CPU system metrics on unsupported platforms
 
 ## [0.7.0] - 2025-11-18
 ### Added
