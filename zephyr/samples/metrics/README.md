@@ -32,7 +32,14 @@ This sample showcases:
 ## Hardware
 
 - Zephyr-supported board with network connectivity (Wi-Fi or Ethernet)
-- Tested on: NXP FRDM-RW612 (Wi-Fi), more coming soon
+- Tested on:
+  - ESP32-C3-DevKitM
+  - ESP32-C6-DevKitC
+  - ESP32-S3-DevKitC
+  - Infineon CY8CPROTO-062-4343W
+  - Nordic nRF7002 DK
+  - NXP FRDM-RW612 (Wi-Fi)
+  - Raspberry Pi Pico W
 
 ## Software
 

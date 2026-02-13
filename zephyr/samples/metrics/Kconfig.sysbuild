@@ -1,0 +1,4 @@
+config WIFI_NRF70
+	default y if BOARD_NRF7002DK
+
+source "${ZEPHYR_BASE}/share/sysbuild/Kconfig"
