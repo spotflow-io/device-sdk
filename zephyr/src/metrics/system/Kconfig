@@ -39,10 +39,14 @@ endif # SPOTFLOW_METRICS_SYSTEM_NETWORK
 
 config SPOTFLOW_METRICS_SYSTEM_CPU
 	bool "Enable CPU utilization metrics"
+# 	the dependencies from CPU_LOAD definition
+	depends on (CPU_CORTEX_M || RISCV || CPU_CORTEX_A) && !SMP
 	select CPU_LOAD
 	default y
 	help
 	  Collect CPU utilization percentage using Zephyr's cpu_load module.
+	  Requires an architecture supported by Zephyr's CPU_LOAD subsystem
+	  (Cortex-M, RISC-V, or Cortex-A) and a non-SMP configuration.
 
 config SPOTFLOW_METRICS_SYSTEM_CONNECTION
 	bool "Enable connection state metrics"
