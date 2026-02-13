@@ -13,4 +13,5 @@ idf_component_register(
         unity
         cmock
         mqtt
+        cbor
 )
