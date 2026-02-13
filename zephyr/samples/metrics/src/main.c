@@ -197,4 +197,3 @@ static void report_request_duration_metric(void)
 			duration_ms);
 	}
 }
-

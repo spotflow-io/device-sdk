@@ -77,4 +77,3 @@ static int prepare_button()
 	LOG_DBG("Set up button at %s pin %d", button.port->name, button.pin);
 	return 0;
 }
-
