@@ -100,7 +100,7 @@ west sdk install --version 0.17.4 --toolchains arm-zephyr-eabi
 **OR** when working with the nRF Connect SDK, install the toolchain using the following command:
 
 ```bash
-nrfutil sdk-manager toolchain install --ncs-version 3.2.1
+nrfutil sdk-manager toolchain install --ncs-version 3.2.2
 ```
 
 **4. Add placeholders for the configuration options:**
