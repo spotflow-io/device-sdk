@@ -3,6 +3,7 @@
 #include "esp_partition.h"
 #include "esp_core_dump.h"
 #include "esp_random.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 

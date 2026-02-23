@@ -204,7 +204,7 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 		goto fail;
 	}
 
-	err = cbor_encode_int64(&map_encoder, device_uptime_ms);
+	err = cbor_encode_int(&map_encoder, device_uptime_ms);
 	if (err != CborNoError) {
 		goto fail;
 	}
