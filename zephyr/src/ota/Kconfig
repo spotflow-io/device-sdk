@@ -1,0 +1,10 @@
+menuconfig SPOTFLOW_OTA
+	bool "Enable Spotflow over-the-air (OTA) updates"
+	depends on SPOTFLOW && BOOTLOADER_MCUBOOT
+    select FLASH
+    select FLASH_MAP
+    select STREAM_FLASH
+    select IMG_MANAGER
+    select IMG_ENABLE_IMAGE_CHECK
+    select REBOOT
+	default n
