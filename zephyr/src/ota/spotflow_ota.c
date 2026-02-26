@@ -6,7 +6,7 @@
 #include "ota/spotflow_ota_cbor.h"
 #include "net/spotflow_mqtt.h"
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static void handle_update_firmware_msg(uint8_t* payload, size_t len);
 
