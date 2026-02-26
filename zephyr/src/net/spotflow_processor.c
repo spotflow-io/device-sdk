@@ -138,6 +138,13 @@ static void process_mqtt()
 		LOG_WRN("Failed to initialize configuration updating: %d", rc);
 	}
 
+#ifdef CONFIG_SPOTFLOW_OTA
+	rc = spotflow_ota_init_session();
+	if (rc < 0) {
+		LOG_WRN("Failed to initialize OTA updates: %d", rc);
+	}
+#endif
+
 	/*  INNER LOOP: perform normal MQTT I/O until an error occurs. */
 	while (spotflow_mqtt_is_connected()) {
 		rc = spotflow_mqtt_poll();

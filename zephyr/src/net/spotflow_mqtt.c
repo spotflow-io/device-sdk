@@ -1,4 +1,4 @@
-﻿#include <zephyr/kernel.h>
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/mqtt.h>
@@ -20,13 +20,17 @@
 /* should at least match MBEDTLS_SSL_MAX_CONTENT_LEN - default is 4096 */
 #define APP_MQTT_BUFFER_SIZE 4096
 
-/* Maximum size of the payload of C2D messages */
+/* Maximum size of the payload of config C2D messages */
 #define C2D_PAYLOAD_BUFFER_SIZE 32
+
+/* Maximum size of the payload of OTA C2D messages (image URL up to 64 bytes + CBOR overhead) */
+#define OTA_C2D_PAYLOAD_BUFFER_SIZE 128
 
 #define DEFAULT_GENERAL_TIMEOUT_MSEC 500
 #define SPOTFLOW_MQTT_INGEST_CBOR_TOPIC "ingest-cbor"
 #define SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC "config-cbor-d2c"
 #define SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC "config-cbor-c2d"
+#define SPOTFLOW_MQTT_OTA_CBOR_C2D_TOPIC "ota-cbor"
 
 #define RC_STR(rc) ((rc) == 0 ? "OK" : "ERROR")
 
@@ -43,6 +47,7 @@ struct mqtt_config {
 	struct mqtt_utf8 ingest_topic;
 	struct mqtt_utf8 config_d2c_topic;
 	struct mqtt_utf8 config_c2d_topic;
+	struct mqtt_utf8 ota_c2d_topic;
 };
 
 struct mqtt_client_toolset {
@@ -53,6 +58,8 @@ struct mqtt_client_toolset {
 	bool mqtt_connected;
 	spotflow_mqtt_message_cb c2d_message_callback;
 	uint16_t c2d_sub_message_id;
+	spotflow_mqtt_message_cb ota_message_callback;
+	uint16_t ota_sub_message_id;
 };
 
 static int client_init(struct mqtt_client* client);
@@ -72,6 +79,7 @@ static struct mqtt_config spotflow_mqtt_config = {
 	.ingest_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_INGEST_CBOR_TOPIC),
 	.config_d2c_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC),
 	.config_c2d_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC),
+	.ota_c2d_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_OTA_CBOR_C2D_TOPIC),
 };
 
 static struct mqtt_client_toolset mqtt_client_toolset = { .mqtt_connected = false };
@@ -80,8 +88,11 @@ static struct mqtt_client_toolset mqtt_client_toolset = { .mqtt_connected = fals
 static uint8_t rx_buffer[APP_MQTT_BUFFER_SIZE];
 static uint8_t tx_buffer[APP_MQTT_BUFFER_SIZE];
 
-/* Buffer for C2D messages */
+/* Buffer for config C2D messages */
 static uint8_t c2d_payload_buffer[C2D_PAYLOAD_BUFFER_SIZE];
+
+/* Buffer for OTA C2D messages */
+static uint8_t ota_c2d_payload_buffer[OTA_C2D_PAYLOAD_BUFFER_SIZE];
 
 int spotflow_mqtt_poll()
 {
@@ -129,6 +140,8 @@ void spotflow_mqtt_establish_mqtt()
 {
 	mqtt_client_toolset.c2d_message_callback = NULL;
 	mqtt_client_toolset.c2d_sub_message_id = 0;
+	mqtt_client_toolset.ota_message_callback = NULL;
+	mqtt_client_toolset.ota_sub_message_id = 0;
 
 	/* infinitely try to connect to mqtt broker */
 	while (!mqtt_client_toolset.mqtt_connected) {
@@ -277,6 +290,28 @@ int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback)
 	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
 }
 
+int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
+{
+	mqtt_client_toolset.ota_message_callback = callback;
+
+	struct mqtt_topic topics[] = {
+		{
+		    .topic = spotflow_mqtt_config.ota_c2d_topic,
+		    .qos = MQTT_QOS_0_AT_MOST_ONCE,
+		},
+	};
+
+	struct mqtt_subscription_list param = {
+		.list = topics,
+		.list_count = ARRAY_SIZE(topics),
+		.message_id = sys_rand16_get(),
+	};
+
+	mqtt_client_toolset.ota_sub_message_id = param.message_id;
+
+	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
+}
+
 int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len)
 {
 	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.ingest_topic);
@@ -310,6 +345,8 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		LOG_DBG("SUBACK packet id: %u", evt->param.suback.message_id);
 		if (evt->param.suback.message_id == mqtt_client_toolset.c2d_sub_message_id) {
 			LOG_DBG("Subscription to desired configuration topic acknowledged");
+		} else if (evt->param.suback.message_id == mqtt_client_toolset.ota_sub_message_id) {
+			LOG_DBG("Subscription to OTA topic acknowledged");
 		}
 		break;
 	case MQTT_EVT_UNSUBACK:
@@ -384,6 +421,17 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 			}
 
 			mqtt_client_toolset.c2d_message_callback(c2d_payload_buffer, ret);
+		} else if (mqtt_client_toolset.ota_message_callback &&
+			   utf8_starts_with(&evt->param.publish.message.topic.topic,
+					    &spotflow_mqtt_config.ota_c2d_topic)) {
+			ret = mqtt_read_publish_payload(client, ota_c2d_payload_buffer,
+							sizeof(ota_c2d_payload_buffer));
+			if (ret < 0) {
+				LOG_ERR("Failed to read PUBLISH payload: %d", ret);
+				break;
+			}
+
+			mqtt_client_toolset.ota_message_callback(ota_c2d_payload_buffer, ret);
 		}
 		break;
 	default:
