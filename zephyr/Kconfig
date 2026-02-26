@@ -30,6 +30,7 @@ menuconfig SPOTFLOW
 
 if SPOTFLOW
 
+rsource "src/config/Kconfig"
 rsource "src/logging/KConfig"
 rsource "src/coredumps/KConfig"
 rsource "src/metrics/Kconfig"
