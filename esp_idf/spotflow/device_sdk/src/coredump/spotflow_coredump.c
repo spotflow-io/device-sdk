@@ -3,6 +3,7 @@
 #include "esp_partition.h"
 #include "esp_core_dump.h"
 #include "esp_random.h"
+#include "esp_timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
@@ -161,10 +162,13 @@ esp_err_t spotflow_coredump_backend(void)
 		// Encode coredump chunk to CBOR
 		uint8_t* cbor_data = NULL;
 		size_t cbor_data_len = 0;
+
+		int64_t device_uptime_ms = esp_timer_get_time() / 1000;
+
 		int rc = spotflow_cbor_encode_coredump(
 		    chunk_buffer, current_chunk_size, coredump_info.chunk_ordinal,
-		    coredump_info.coredump_id, is_last_chunk, build_id, build_id_len, &cbor_data,
-		    &cbor_data_len);
+		    coredump_info.coredump_id, is_last_chunk, build_id, build_id_len,
+		    device_uptime_ms, &cbor_data, &cbor_data_len);
 
 		if (rc < 0) {
 			free(chunk_buffer);
