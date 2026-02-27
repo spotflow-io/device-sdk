@@ -6,4 +6,16 @@ menuconfig SPOTFLOW_OTA
 	select STREAM_FLASH
 	select IMG_MANAGER
 	select REBOOT
+	select HTTP_CLIENT
 	default n
+
+if SPOTFLOW_OTA
+
+config SPOTFLOW_OTA_DOWNLOAD_THREAD_STACK_SIZE
+	int "Stack size for the OTA download thread"
+	default 4096
+	help
+	  Stack size in bytes for the dedicated OTA firmware download thread.
+	  Increase if you observe stack overflows during TLS or HTTP operations.
+
+endif # SPOTFLOW_OTA
