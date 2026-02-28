@@ -31,14 +31,6 @@ typedef struct {
 static coredump_info_t coredump_info = { 0 };
 
 /**
- * @brief Check if coredump is valid by checking it's checksum
- *
- * @return true it is valud
- * @return false it is not valid sending error message to cloud
- */
-esp_err_t spotflow_is_coredump_valid(void);
-
-/**
  * @brief If coredump Partion is available return true otherwise false
  *
  * @return true
@@ -105,11 +97,13 @@ esp_err_t spotflow_coredump_backend(void)
 		return ESP_ERR_NOT_FOUND;
 	}
 
-	err = spotflow_is_coredump_valid();
+	err = esp_core_dump_image_check();
 	if (err != ESP_OK) {
 		SPOTFLOW_LOG("Coredump is invalid, will attempt to send error report to cloud.");
-		return err;
+		ESP_LOGE(TAG, "Coredump is invalid: checksum mismatch.");
+		coredump_size = 1; // Set size to 1 to indicate invalid coredump, actual content will be empty
 	}
+
 	// Adjust address to partition offset
 	coredump_addr = coredump_addr - part->address;
 	SPOTFLOW_LOG("Adjusted coredump address: 0x%08X, partition address: 0x%08X",
@@ -224,61 +218,4 @@ esp_err_t spotflow_coredump_backend(void)
 void spotflow_coredump_cleanup()
 {
 	esp_core_dump_image_erase(); //Erase the image after upload
-}
-
-/**
- * @brief Check if coredump is valid by checking it's checksum
- *
- * @return true it is valud
- * @return false it is not valid sending error message to cloud
- */
-esp_err_t spotflow_is_coredump_valid(void)
-{
-	esp_err_t err = esp_core_dump_image_check();
-	int rc = 0;
-	if (err != ESP_OK) {
-		SPOTFLOW_LOG("Coredump is invalid: checksum mismatch.");
-		const uint8_t* build_id = NULL;
-		uint16_t build_id_len = 0;
-
-#ifdef CONFIG_SPOTFLOW_USE_BUILD_ID
-		rc = spotflow_build_id_get(&build_id, &build_id_len);
-		if (rc != 0) {
-			SPOTFLOW_LOG("Failed to get build ID for coredump: %d", rc);
-		} else {
-			SPOTFLOW_LOG("Build ID retrieved, length: %zu", build_id_len);
-		}
-#endif
-		// Encode coredump chunk to CBOR
-		uint8_t* cbor_data = NULL;
-		size_t cbor_data_len = 0;
-
-		int64_t device_uptime_ms = esp_timer_get_time() / 1000;
-
-		// Dummy byte (pointer must not be NULL)
-		uint8_t empty_payload = 0;
-		coredump_info.coredump_id = esp_random(); // Generate random coredump ID
-		rc = spotflow_cbor_encode_coredump(&empty_payload, 0, 0, coredump_info.coredump_id,
-						   true, build_id, build_id_len, device_uptime_ms,
-						   &cbor_data, &cbor_data_len);
-
-		if (rc < 0) {
-			SPOTFLOW_LOG("Failed to encode coredump chunk: %d", rc);
-			return ESP_FAIL;
-		}
-
-		// keep retrying to push data until the mqtt function is able to read and clear it
-		do {
-			rc = spotflow_queue_coredump_push(cbor_data, cbor_data_len);
-		} while (rc < 0);
-
-		spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_COREDUMP);
-		ESP_LOGE(TAG, "Coredump is invalid: checksum mismatch.");
-		spotflow_coredump_cleanup();
-		// Free the CBOR data after sending
-		free(cbor_data);
-		return err;
-	}
-
-	return ESP_OK;
 }
