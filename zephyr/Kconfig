@@ -70,8 +70,15 @@ if MBEDTLS_ENABLE_HEAP
 # recommended size for mbedtls heap is 32kB
 # to be able to verify whole Lets Encrypt certificate chain
 configdefault MBEDTLS_HEAP_SIZE
+	# TODO: Check if necessary and find adequate value (this is probably too much)
+	default 65536 if SPOTFLOW_OTA
 	default 32768
 endif # MBEDTLS_ENABLE_HEAP
+
+if SPOTFLOW_OTA
+configdefault NET_SOCKETS_TLS_MAX_CONTEXTS
+	default 2
+endif # SPOTFLOW_OTA
 
 config SPOTFLOW_SERVER_HOSTNAME
 	string "Hostname of Spotflow observability platform"
