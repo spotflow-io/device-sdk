@@ -97,13 +97,6 @@ esp_err_t spotflow_coredump_backend(void)
 		return ESP_ERR_NOT_FOUND;
 	}
 
-	err = esp_core_dump_image_check();
-	if (err != ESP_OK) {
-		SPOTFLOW_LOG("Coredump is invalid, will attempt to send error report to cloud.");
-		ESP_LOGE(TAG, "Coredump is invalid: checksum mismatch.");
-		coredump_size = 1; // Set size to 1 to indicate invalid coredump, actual content will be empty
-	}
-
 	// Adjust address to partition offset
 	coredump_addr = coredump_addr - part->address;
 	SPOTFLOW_LOG("Adjusted coredump address: 0x%08X, partition address: 0x%08X",
@@ -127,8 +120,18 @@ esp_err_t spotflow_coredump_backend(void)
 		return ESP_ERR_NO_MEM;
 	}
 
+	err = esp_core_dump_image_check();
+	if (err != ESP_OK) {
+		SPOTFLOW_LOG("Coredump is invalid, will attempt to send error report to cloud.");
+		ESP_LOGE(TAG, "Coredump is invalid: checksum mismatch.");
+		coredump_info.size = 1; // Set size to 1 to indicate invalid coredump, actual content will be empty
+		chunk_size = 0; // No need to read chunks if coredump is invalid. Because chunk size is 0.
+	}
 	// Process coredump in chunks
 	while (coredump_info.offset < coredump_info.size) {
+		if(chunk_size == 0) {
+			coredump_info.size = 0;
+		}
 		// Calculate remaining size and current chunk size
 		size_t remaining_size = coredump_info.size - coredump_info.offset;
 		size_t current_chunk_size =
@@ -195,11 +198,12 @@ esp_err_t spotflow_coredump_backend(void)
 		// Update progress
 		coredump_info.chunk_ordinal++;
 		coredump_info.offset += current_chunk_size;
-
+		if (coredump_info.size > 0) {
 		SPOTFLOW_LOG("Sent chunk %d: %zu/%zu bytes (%.1f%%)\n",
 			     coredump_info.chunk_ordinal - 1, coredump_info.offset,
 			     coredump_info.size,
 			     (float)coredump_info.offset * 100.0f / coredump_info.size);
+		}
 	}
 
 	free(chunk_buffer);

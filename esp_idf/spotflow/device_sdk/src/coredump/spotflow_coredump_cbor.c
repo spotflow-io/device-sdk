@@ -155,16 +155,17 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 		goto fail;
 	}
 
-	err = cbor_encode_uint(&map_encoder, KEY_CONTENT);
-	if (err != CborNoError) {
-		goto fail;
-	}
+	if(coredump_data_len != 0) {
+		err = cbor_encode_uint(&map_encoder, KEY_CONTENT);
+		if (err != CborNoError) {
+			goto fail;
+		}
 
-	err = cbor_encode_byte_string(&map_encoder, coredump_data, coredump_data_len);
-	if (err != CborNoError) {
-		goto fail;
+		err = cbor_encode_byte_string(&map_encoder, coredump_data, coredump_data_len);
+		if (err != CborNoError) {
+			goto fail;
+		}
 	}
-
 	err = cbor_encode_uint(&map_encoder, KEY_IS_LAST_CHUNK);
 	if (err != CborNoError) {
 		goto fail;
