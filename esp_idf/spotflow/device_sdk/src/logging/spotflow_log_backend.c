@@ -114,7 +114,9 @@ int spotflow_log_backend(const char* fmt, va_list args)
 	}
 
 	len = vsnprintf(buffer, len + 1, fmt_copy, args_copy);
-	spotflow_log_cbor_send(fmt_copy, buffer, log_severity, &metadata);
+
+	metadata.severity = spotflow_log_cbor_convert_char_log_lvl(log_severity);
+	spotflow_log_cbor_send(fmt_copy, buffer, &metadata);
 
 	free(buffer);
 	va_end(args_copy);
@@ -131,10 +133,11 @@ int spotflow_log_backend(const char* fmt, va_list args)
  * 
  * @param level
  */
-void spotflow_log_backend_try_set_runtime_filter(uint8_t level) {
+void spotflow_log_backend_try_set_runtime_filter(uint8_t level)
+{
 #if CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING
 
-	esp_log_level_set("*", level);  // Set log level for the provided tag
+	esp_log_level_set("*", level); // Set log level for the provided tag
 
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND_SET_RUNTIME_FILTERING */
 }
