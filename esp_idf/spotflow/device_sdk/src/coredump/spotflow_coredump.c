@@ -198,11 +198,16 @@ esp_err_t spotflow_coredump_backend(void)
 		// Update progress
 		coredump_info.chunk_ordinal++;
 		coredump_info.offset += current_chunk_size;
+
 		if (coredump_info.size > 0) {
-		SPOTFLOW_LOG("Sent chunk %d: %zu/%zu bytes (%.1f%%)\n",
-			     coredump_info.chunk_ordinal - 1, coredump_info.offset,
-			     coredump_info.size,
-			     (float)coredump_info.offset * 100.0f / coredump_info.size);
+			SPOTFLOW_LOG("Sent chunk %d: %zu/%zu bytes (%.1f%%)\n",
+				coredump_info.chunk_ordinal - 1, coredump_info.offset,
+				coredump_info.size,
+				(float)coredump_info.offset * 100.0f / coredump_info.size);
+		}
+		else {
+			SPOTFLOW_LOG("Sent chunk %d: 0/0 bytes (100%%) - Invalid coredump report sent\n",
+				coredump_info.chunk_ordinal - 1);
 		}
 	}
 
