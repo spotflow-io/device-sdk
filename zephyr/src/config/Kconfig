@@ -1,0 +1,7 @@
+config SPOTFLOW_CONFIG
+	bool
+    default y if SPOTFLOW_LOG_BACKEND
+    default n
+    help
+        Spotflow configuration is enabled automatically when needed by any other part of the SDK
+        (currently only by the logging backend).
