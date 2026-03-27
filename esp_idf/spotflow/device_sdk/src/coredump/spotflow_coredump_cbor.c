@@ -100,7 +100,7 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 				  size_t build_id_data_len, const int64_t device_uptime_ms,
 				  uint8_t** cbor_data, size_t* cbor_data_len)
 {
-	if (!coredump_data || coredump_data_len == 0) {
+	if (!coredump_data) {
 		SPOTFLOW_LOG("Invalid coredump input");
 		return -1;
 	}
@@ -155,16 +155,17 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 		goto fail;
 	}
 
-	err = cbor_encode_uint(&map_encoder, KEY_CONTENT);
-	if (err != CborNoError) {
-		goto fail;
-	}
+	if(coredump_data_len != 0) {
+		err = cbor_encode_uint(&map_encoder, KEY_CONTENT);
+		if (err != CborNoError) {
+			goto fail;
+		}
 
-	err = cbor_encode_byte_string(&map_encoder, coredump_data, coredump_data_len);
-	if (err != CborNoError) {
-		goto fail;
+		err = cbor_encode_byte_string(&map_encoder, coredump_data, coredump_data_len);
+		if (err != CborNoError) {
+			goto fail;
+		}
 	}
-
 	err = cbor_encode_uint(&map_encoder, KEY_IS_LAST_CHUNK);
 	if (err != CborNoError) {
 		goto fail;
