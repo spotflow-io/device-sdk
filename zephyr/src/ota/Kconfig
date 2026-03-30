@@ -5,6 +5,7 @@ menuconfig SPOTFLOW_OTA
 	select FLASH_MAP
 	select STREAM_FLASH
 	select IMG_MANAGER
+	select IMG_ERASE_PROGRESSIVELY
 	select REBOOT
 	select HTTP_CLIENT
 	default n
