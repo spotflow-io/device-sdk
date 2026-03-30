@@ -48,7 +48,9 @@ config SPOTFLOW_GENERATE_BUILD_ID
 		Build ID allows to match core dumps with the original .elf file.
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
-	default 4096 if SPOTFLOW
+	# TODO: Remove if we manage to support max_fragment_length in the CDN
+	default 16384 if SPOTFLOW_OTA
+	default 4096
 
 if NRF_SECURITY
 configdefault MBEDTLS_MPI_MAX_SIZE
