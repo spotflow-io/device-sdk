@@ -12,6 +12,6 @@ test_sysbuild()
 
 add_subdirectory(../net-common ${CMAKE_CURRENT_BINARY_DIR}/net-common)
 
-target_sources(app PRIVATE 
+target_sources(app PRIVATE
     src/main.c
 )

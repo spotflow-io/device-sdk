@@ -39,7 +39,7 @@ struct ota_flash_ctx {
 static char s_image_url[SPOTFLOW_OTA_IMAGE_URL_MAX_LENGTH + 1];
 static K_SEM_DEFINE(s_download_sem, 0, 1);
 
-static void ota_download_thread_entry(void *p1, void *p2, void *p3);
+static void ota_download_thread_entry(void* p1, void* p2, void* p3);
 
 K_THREAD_DEFINE(spotflow_ota_thread, CONFIG_SPOTFLOW_OTA_DOWNLOAD_THREAD_STACK_SIZE,
 		ota_download_thread_entry, NULL, NULL, NULL, K_LOWEST_APPLICATION_THREAD_PRIO, 0,
@@ -58,7 +58,7 @@ K_THREAD_DEFINE(spotflow_ota_thread, CONFIG_SPOTFLOW_OTA_DOWNLOAD_THREAD_STACK_S
  *
  * @return 0 on success, -EINVAL on malformed or unsupported input
  */
-static int parse_url(const char *url, struct ota_url *out)
+static int parse_url(const char* url, struct ota_url* out)
 {
 	struct http_parser_url parsed;
 
@@ -118,9 +118,9 @@ static int parse_url(const char *url, struct ota_url *out)
 
 		if (parsed.field_set & BIT(UF_QUERY)) {
 			/* Extend to include the '?' separator and the query string */
-			copy_len = (parsed.field_data[UF_QUERY].off +
-				    parsed.field_data[UF_QUERY].len) -
-				   path_off;
+			copy_len =
+			    (parsed.field_data[UF_QUERY].off + parsed.field_data[UF_QUERY].len) -
+			    path_off;
 		}
 
 		if (copy_len >= sizeof(out->path)) {
@@ -142,10 +142,10 @@ static int parse_url(const char *url, struct ota_url *out)
  * HTTP response callback -- streams body into flash
  * -------------------------------------------------------------------------- */
 
-static int http_response_cb(struct http_response *rsp, enum http_final_call final_data,
-			     void *user_data)
+static int http_response_cb(struct http_response* rsp, enum http_final_call final_data,
+			    void* user_data)
 {
-	struct ota_flash_ctx *ctx = user_data;
+	struct ota_flash_ctx* ctx = user_data;
 
 	if (ctx->write_err != 0) {
 		return -ECANCELED;
@@ -186,13 +186,13 @@ static int http_response_cb(struct http_response *rsp, enum http_final_call fina
  * Download and flash a firmware image
  * -------------------------------------------------------------------------- */
 
-static int connect_socket(const struct ota_url *url)
+static int connect_socket(const struct ota_url* url)
 {
 	struct zsock_addrinfo hints = {
 		.ai_socktype = SOCK_STREAM,
 		.ai_family = AF_INET,
 	};
-	struct zsock_addrinfo *res = NULL;
+	struct zsock_addrinfo* res = NULL;
 	char port_str[6];
 
 	snprintk(port_str, sizeof(port_str), "%u", url->port);
@@ -221,8 +221,7 @@ static int connect_socket(const struct ota_url *url)
 	if (url->tls) {
 		sec_tag_t sec_tags[] = { OTA_TLS_SEC_TAG };
 
-		rc = zsock_setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tags,
-				      sizeof(sec_tags));
+		rc = zsock_setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tags, sizeof(sec_tags));
 		if (rc < 0) {
 			LOG_ERR("Failed to set TLS sec tag: %d", errno);
 			zsock_close(sock);
@@ -230,8 +229,8 @@ static int connect_socket(const struct ota_url *url)
 			return -errno;
 		}
 
-		rc = zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, url->host,
-				      strlen(url->host) + 1);
+		rc =
+		    zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, url->host, strlen(url->host) + 1);
 		if (rc < 0) {
 			LOG_ERR("Failed to set TLS hostname: %d", errno);
 			zsock_close(sock);
@@ -252,7 +251,7 @@ static int connect_socket(const struct ota_url *url)
 	return sock;
 }
 
-static int download_and_flash(const char *image_url)
+static int download_and_flash(const char* image_url)
 {
 	struct ota_url url;
 	int rc = parse_url(image_url, &url);
@@ -315,7 +314,7 @@ static int download_and_flash(const char *image_url)
  * OTA download thread
  * -------------------------------------------------------------------------- */
 
-static void ota_download_thread_entry(void *p1, void *p2, void *p3)
+static void ota_download_thread_entry(void* p1, void* p2, void* p3)
 {
 	ARG_UNUSED(p1);
 	ARG_UNUSED(p2);
@@ -350,7 +349,7 @@ static void ota_download_thread_entry(void *p1, void *p2, void *p3)
  * Public API
  * -------------------------------------------------------------------------- */
 
-static void handle_update_firmware_msg(uint8_t *payload, size_t len);
+static void handle_update_firmware_msg(uint8_t* payload, size_t len);
 
 int spotflow_ota_init_session(void)
 {
@@ -363,7 +362,7 @@ int spotflow_ota_init_session(void)
 	return 0;
 }
 
-static void handle_update_firmware_msg(uint8_t *payload, size_t len)
+static void handle_update_firmware_msg(uint8_t* payload, size_t len)
 {
 	struct spotflow_ota_update_firmware_msg msg;
 	int rc = spotflow_ota_cbor_decode_update_firmware(payload, len, &msg);
