@@ -14,6 +14,7 @@
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static char image_url[SPOTFLOW_OTA_IMAGE_URL_MAX_LENGTH + 1];
+static K_MUTEX_DEFINE(image_url_mutex);
 static K_SEM_DEFINE(download_sem, 0, 1);
 
 static void handle_update_firmware_msg(uint8_t* payload, size_t len);
@@ -47,8 +48,10 @@ static void handle_update_firmware_msg(uint8_t* payload, size_t len)
 	/* TODO: Replace just by the version after the message includes it (the URL is a secret) */
 	LOG_INF("OTA firmware update requested: %s", msg.image_url);
 
+	k_mutex_lock(&image_url_mutex, K_FOREVER);
 	strncpy(image_url, msg.image_url, sizeof(image_url) - 1);
 	image_url[sizeof(image_url) - 1] = '\0';
+	k_mutex_unlock(&image_url_mutex);
 
 	k_sem_give(&download_sem);
 }
@@ -60,11 +63,18 @@ static void ota_download_thread_entry(void* p1, void* p2, void* p3)
 	ARG_UNUSED(p3);
 
 	while (true) {
+		char image_url_copy[sizeof(image_url)];
+
 		k_sem_take(&download_sem, K_FOREVER);
 
-		LOG_INF("OTA download triggered for: %s", image_url);
+		k_mutex_lock(&image_url_mutex, K_FOREVER);
+		strncpy(image_url_copy, image_url, sizeof(image_url_copy));
+		image_url_copy[sizeof(image_url_copy) - 1] = '\0';
+		k_mutex_unlock(&image_url_mutex);
 
-		int rc = spotflow_ota_download_and_flash(image_url);
+		LOG_INF("OTA download triggered for: %s", image_url_copy);
+
+		int rc = spotflow_ota_download_and_flash(image_url_copy);
 
 		if (rc < 0) {
 			LOG_ERR("OTA firmware download failed: %d -- will retry on next update "
