@@ -49,6 +49,7 @@ config SPOTFLOW_GENERATE_BUILD_ID
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
 	# TODO: Remove if we manage to support max_fragment_length in the CDN
+	#       (and reflect that in MBEDTLS_HEAP_SIZE as well)
 	default 16384 if SPOTFLOW_OTA
 	default 4096
 
@@ -72,8 +73,7 @@ if MBEDTLS_ENABLE_HEAP
 # recommended size for mbedtls heap is 32kB
 # to be able to verify whole Lets Encrypt certificate chain
 configdefault MBEDTLS_HEAP_SIZE
-	# TODO: Check if necessary and find adequate value (this is probably too much)
-	default 65536 if SPOTFLOW_OTA
+	default 98304 if SPOTFLOW_OTA
 	default 32768
 endif # MBEDTLS_ENABLE_HEAP
 
