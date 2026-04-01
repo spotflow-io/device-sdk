@@ -3,8 +3,8 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/net/wifi_mgmt.h>
 #include <zephyr/net/dhcpv4_server.h>
+#include <zephyr/net/dhcpv4.h>
 #include "version_helper.h"
-#include <zephyr/kernel_version.h>
 #include <version.h>
 
 LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_INF);
@@ -40,6 +40,9 @@ static void wifi_event_handler(struct net_mgmt_event_callback* cb,
 
 		if (result->status == 0) {
 			LOG_INF("Connected to %s", WIFI_SSID);
+#if defined(CONFIG_NET_DHCPV4)
+			net_dhcpv4_start(sta_iface);
+#endif
 		} else {
 			LOG_ERR("Failed to connect to %s (status %d)", WIFI_SSID, result->status);
 		}
