@@ -110,7 +110,7 @@ static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len)
 
 static bool is_test_firmware_upgrade(void)
 {
-#if defined(CONFIG_MCUBOOT_IMG_MANAGER)
+#ifdef CONFIG_MCUBOOT_IMG_MANAGER
 	return !boot_is_img_confirmed();
 #else
 	return false;
