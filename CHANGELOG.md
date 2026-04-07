@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added cloud config log control for the ESP IDF component.
 * Added CI/CD pipeline for ESP IDF.
 * Added CI/CD pipeline for Zephyr.
+* Added ESP IDF component tests.
 
 ### Fixed
 * Added check of `CONFIG_MBEDTLS_MPI_MAX_SIZE` in CMake and explicitly set it for Nordic boards in samples
