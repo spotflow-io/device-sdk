@@ -21,7 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added spotflowup.sh and spotflowup.ps1 scripts for workspace setup.
 * Added interfaces for reporting metrics to Spotflow
 * Added device uptime to coredump chunks
-* added support for Silicon Labs board DK2605A (siwx917_dk2605a)
+* Added support for Silicon Labs board DK2605A (siwx917_dk2605a)
+* Added recognition of ENOSYS status when getting reset cause
 
 ### Removed
 * Removed configdefault for MAIN_STACK_SIZE
