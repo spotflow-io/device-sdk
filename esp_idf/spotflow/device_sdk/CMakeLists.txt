@@ -28,6 +28,14 @@ if(CONFIG_ESP_COREDUMP_ENABLE)
 	file(GLOB CORE_DUMP_SRCS "src/coredump/*.c")
 	list(APPEND SRCS ${CORE_DUMP_SRCS})
 endif()
+# ---- Optional metrics sources ----
+if(CONFIG_SPOTFLOW_METRICS)
+	file(GLOB_RECURSE METRICS_SRCS CONFIGURE_DEPENDS
+	"src/metrics/*.c"
+	"src/metrics/system/**/*.c"
+	)
+	list(APPEND SRCS ${METRICS_SRCS})
+endif()
 
 idf_component_register( SRCS ${SRCS}
 						PRIV_REQUIRES ${PRIV_REQUIRES}
