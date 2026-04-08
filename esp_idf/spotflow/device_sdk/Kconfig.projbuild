@@ -52,5 +52,6 @@ menu "Spotflow"
     rsource "./Kconfig.logging"
     rsource "./Kconfig.configs"
     rsource "./Kconfig.coredump"
+    rsource "./Kconfig.metrics"
 
 endmenu
