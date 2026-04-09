@@ -6,6 +6,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/timers.h"
+#include "esp_timer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -133,7 +134,7 @@ struct metric_aggregator_context {
 	/* Timer scope: ONE timer per metric (not per time series) */
 	/* All time series of this metric share the same aggregation window */
 	/* When timer expires, all active time series generate messages with their counts */
-	TimerHandle_t aggregation_timer;
+	esp_timer_handle_t aggregation_timer;
 	bool timer_started; /* Flag to prevent timer restart race */
 };
 

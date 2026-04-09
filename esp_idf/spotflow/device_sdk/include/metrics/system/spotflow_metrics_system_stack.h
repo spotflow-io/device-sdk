@@ -1,6 +1,9 @@
 #ifndef SPOTFLOW_METRICS_SYSTEM_STACK_H_
 #define SPOTFLOW_METRICS_SYSTEM_STACK_H_
 
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif

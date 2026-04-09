@@ -310,21 +310,3 @@ static bool encode_aggregation_stats(CborEncoder* map, struct spotflow_metric_ba
 
     return true;
 }
-
-static int finalize_cbor_output(uint8_t* buffer, zcbor_state_t* state, uint8_t** cbor_data,
-				size_t* cbor_len)
-{
-	size_t encoded_len = state->payload - buffer;
-	uint8_t* data = k_malloc(encoded_len);
-	if (!data) {
-		k_free(buffer);
-		return -ENOMEM;
-	}
-
-	memcpy(data, buffer, encoded_len);
-	k_free(buffer);
-	*cbor_data = data;
-	*cbor_len = encoded_len;
-
-	return 0;
-}

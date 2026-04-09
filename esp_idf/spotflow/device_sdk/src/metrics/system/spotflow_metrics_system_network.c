@@ -58,7 +58,7 @@ void spotflow_metrics_system_network_collect(void)
 
     // Iterate over all interfaces
     for (int i = 0; i < esp_netif_get_nr_of_ifs(); i++) {
-        netif = esp_netif_next(netif);
+        netif = esp_netif_next_unsafe(netif);
         if (netif) {
             report_network_interface_metrics(netif, &if_count);
         }
@@ -83,38 +83,38 @@ static void report_network_interface_metrics(esp_netif_t* iface, void* user_data
         return;
     }
 
-    esp_netif_stats_t stats;
-    memset(&stats, 0, sizeof(stats));
+    // esp_netif_stats_t stats;
+    // memset(&stats, 0, sizeof(stats));
 
-    if (esp_netif_get_stats(iface, &stats) != ESP_OK) {
-        SPOTFLOW_LOG("Failed to get stats for interface");
-        return;
-    }
+    // if (esp_netif_get_stats(iface, &stats) != ESP_OK) {
+    //     SPOTFLOW_LOG("Failed to get stats for interface");
+    //     return;
+    // }
 
-    uint64_t tx_bytes = stats.tx_bytes;
-    uint64_t rx_bytes = stats.rx_bytes;
+    // uint64_t tx_bytes = stats.tx_bytes;
+    // uint64_t rx_bytes = stats.rx_bytes;
 
-    int64_t tx_bytes_capped = (tx_bytes > INT64_MAX) ? INT64_MAX : (int64_t)tx_bytes;
-    int64_t rx_bytes_capped = (rx_bytes > INT64_MAX) ? INT64_MAX : (int64_t)rx_bytes;
+    // int64_t tx_bytes_capped = (tx_bytes > INT64_MAX) ? INT64_MAX : (int64_t)tx_bytes;
+    // int64_t rx_bytes_capped = (rx_bytes > INT64_MAX) ? INT64_MAX : (int64_t)rx_bytes;
 
-    struct spotflow_label labels[] = {
-        { .key = "interface", .value = if_name }
-    };
+    // struct spotflow_label labels[] = {
+    //     { .key = "interface", .value = if_name }
+    // };
 
-    int rc = spotflow_report_metric_int_with_labels(
-        g_network_tx_metric, tx_bytes_capped, labels, 1);
-    if (rc < 0) {
-        SPOTFLOW_LOG("Failed to report network TX for interface");
-    }
+    // int rc = spotflow_report_metric_int_with_labels(
+    //     g_network_tx_metric, tx_bytes_capped, labels, 1);
+    // if (rc < 0) {
+    //     SPOTFLOW_LOG("Failed to report network TX for interface");
+    // }
 
-    rc = spotflow_report_metric_int_with_labels(
-        g_network_rx_metric, rx_bytes_capped, labels, 1);
-    if (rc < 0) {
-        SPOTFLOW_LOG("Failed to report network RX for interface");
-    }
+    // rc = spotflow_report_metric_int_with_labels(
+    //     g_network_rx_metric, rx_bytes_capped, labels, 1);
+    // if (rc < 0) {
+    //     SPOTFLOW_LOG("Failed to report network RX for interface");
+    // }
 
-    SPOTFLOW_DEBUG("Network %s: TX=%" PRIu64 " bytes, RX=%" PRIu64 " bytes",
-                   if_name, tx_bytes, rx_bytes);
+    // SPOTFLOW_DEBUG("Network %s: TX=%" PRIu64 " bytes, RX=%" PRIu64 " bytes",
+    //                if_name, tx_bytes, rx_bytes);
 
-    (*if_count)++;
+    // (*if_count)++;
 }

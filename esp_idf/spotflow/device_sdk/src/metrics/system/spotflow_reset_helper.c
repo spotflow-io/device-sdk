@@ -89,5 +89,5 @@ void spotflow_report_reboot_reason(void)
         return;
     }
 
-    SPOTFLOW_DEBUG("Reset cause reported: 0x%08x, %s", cause, reset_str);
+    SPOTFLOW_DEBUG("Reset cause reported: 0x%08x, %s", (unsigned int)cause, reset_str);
 }

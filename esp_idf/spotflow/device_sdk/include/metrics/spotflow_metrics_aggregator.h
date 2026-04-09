@@ -2,7 +2,7 @@
 #define SPOTFLOW_METRICS_AGGREGATOR_H_
 
 #include "spotflow_metrics_types.h"
-
+#include "esp_timer.h"
 #ifdef __cplusplus
 extern "C" {
 #endif

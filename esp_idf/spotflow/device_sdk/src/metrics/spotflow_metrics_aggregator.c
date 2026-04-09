@@ -1,308 +1,339 @@
-#include "metrics/spotflow_metrics_registry.h"
 #include "metrics/spotflow_metrics_aggregator.h"
-#include "logging/spotflow_log_backend.h"
-
-#include <errno.h>
-#include <string.h>
-#include <ctype.h>
+#include "metrics/spotflow_metrics_cbor.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
+#include "esp_timer.h"
+#include "esp_log.h"
+#include "esp_random.h"
+#include <string.h>
+#include <limits.h>
+#include <float.h>
+#include <errno.h>
 
-#define SPOTFLOW_LOG(...)   do { printf(__VA_ARGS__); printf("\n"); } while(0)
+static const char *TAG = "spotflow_aggregator";
 
-static struct spotflow_metric_base g_metric_registry[CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED];
-static SemaphoreHandle_t g_registry_lock = NULL;
-
-/* Forward declarations of static functions */
-static void normalize_metric_name(const char* input, char* output, size_t output_size);
-static int find_available_slot(void);
-static struct spotflow_metric_base* find_metric_by_name(const char* normalized_name);
-static int validate_metric_params(const char* name, uint16_t max_timeseries, uint8_t max_labels);
-static int normalize_and_validate_metric_name(const char* name, char* out_normalized,
-					      size_t out_size);
-static void init_metric_struct(struct spotflow_metric_base* metric, const char* normalized_name,
-			       enum spotflow_metric_type type,
-			       enum spotflow_agg_interval agg_interval, uint16_t max_timeseries,
-			       uint8_t max_labels);
-static int register_metric_common(const char* name, enum spotflow_metric_type type,
-				  enum spotflow_agg_interval agg_interval, uint16_t max_timeseries,
-				  uint8_t max_labels, struct spotflow_metric_base** metric_out);
-
-/* Initialize the registry mutex */
-void spotflow_metrics_init(void)
-{
-	if (g_registry_lock == NULL) {
-		g_registry_lock = xSemaphoreCreateMutex();
-		if (!g_registry_lock) {
-			SPOTFLOW_LOG("Failed to create registry mutex");
-		}
-	}
-}
+/* Forward declarations */
+static bool labels_equal(const struct metric_timeseries_state* ts,
+                         const struct spotflow_label* labels, uint8_t label_count);
+static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value);
+static void update_aggregation_float(struct metric_timeseries_state* ts, float value);
+static void reset_timeseries_state(struct spotflow_metric_base* metric,
+                                   struct metric_timeseries_state* ts);
+static void init_timeseries_aggregation_state(struct metric_timeseries_state* ts,
+                                              enum spotflow_metric_type type);
+static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
+                                       const struct spotflow_label* labels, uint8_t label_count,
+                                       int64_t value_int, float value_float);
+static int flush_timeseries(struct spotflow_metric_base* metric,
+                            struct metric_timeseries_state* ts,
+                            int64_t timestamp_ms);
+static int enqueue_metric_message(uint8_t* payload, size_t len);
+static int copy_labels_to_timeseries(struct metric_timeseries_state* ts,
+                                     const struct spotflow_label* labels, uint8_t label_count);
+static void aggregation_timer_callback(void* arg);
+static uint32_t get_interval_ms(enum spotflow_agg_interval interval);
+static struct metric_timeseries_state* find_or_create_timeseries(
+    struct metric_aggregator_context* ctx, const struct spotflow_label* labels, uint8_t label_count);
 
 /* Public API Implementation */
 
-int spotflow_register_metric_int(const char* name, enum spotflow_agg_interval agg_interval,
-				 struct spotflow_metric_int** metric_out)
+int aggregator_register_metric(struct spotflow_metric_base* metric)
 {
-	struct spotflow_metric_base* base;
-	int rc;
+    struct metric_aggregator_context* ctx = malloc(sizeof(*ctx));
+    if (!ctx) {
+        return -ENOMEM;
+    }
 
-	if (metric_out == NULL) {
-		SPOTFLOW_LOG("metric_out cannot be NULL");
-		return -EINVAL;
-	}
+    ctx->timeseries = calloc(metric->max_timeseries,
+                             sizeof(struct metric_timeseries_state));
+    if (!ctx->timeseries) {
+        free(ctx);
+        return -ENOMEM;
+    }
 
-	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval, 1, 0, &base);
-	if (rc < 0) {
-		return rc;
-	}
-	if (base->type != SPOTFLOW_METRIC_TYPE_INT) {
-		SPOTFLOW_LOG("Type mismatch: expected INT, got %d", base->type);
-		return -EINVAL;
-	}
-	*metric_out = (struct spotflow_metric_int*)base;
-	return 0;
-}
+    ctx->metric = metric;
+    ctx->timeseries_count = 0;
+    ctx->timeseries_capacity = metric->max_timeseries;
+    ctx->timer_started = false;
 
-int spotflow_register_metric_float(const char* name, enum spotflow_agg_interval agg_interval,
-				   struct spotflow_metric_float** metric_out)
-{
-	struct spotflow_metric_base* base;
-	int rc;
-
-	if (metric_out == NULL) {
-		SPOTFLOW_LOG("metric_out cannot be NULL");
-		return -EINVAL;
-	}
-
-	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval, 1, 0, &base);
-	if (rc < 0) {
-		return rc;
-	}
-	if (base->type != SPOTFLOW_METRIC_TYPE_FLOAT) {
-		SPOTFLOW_LOG("Type mismatch: expected FLOAT, got %d", base->type);
-		return -EINVAL;
-	}
-	*metric_out = (struct spotflow_metric_float*)base;
-	return 0;
-}
-
-int spotflow_register_metric_int_with_labels(const char* name,
-					     enum spotflow_agg_interval agg_interval,
-					     uint16_t max_timeseries, uint8_t max_labels,
-					     struct spotflow_metric_int** metric_out)
-{
-	struct spotflow_metric_base* base;
-	int rc;
-
-	if (metric_out == NULL) {
-		SPOTFLOW_LOG("metric_out cannot be NULL");
-		return -EINVAL;
-	}
-
-	if (max_labels == 0) {
-		SPOTFLOW_LOG("Labeled metric requires max_labels > 0");
-		return -EINVAL;
-	}
-
-	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval, max_timeseries,
-				    max_labels, &base);
-	if (rc < 0) {
-		return rc;
-	}
-	if (base->type != SPOTFLOW_METRIC_TYPE_INT) {
-		SPOTFLOW_LOG("Type mismatch: expected INT, got %d", base->type);
-		return -EINVAL;
-	}
-	*metric_out = (struct spotflow_metric_int*)base;
-	return 0;
-}
-
-int spotflow_register_metric_float_with_labels(const char* name,
-					       enum spotflow_agg_interval agg_interval,
-					       uint16_t max_timeseries, uint8_t max_labels,
-					       struct spotflow_metric_float** metric_out)
-{
-	struct spotflow_metric_base* base;
-	int rc;
-
-	if (metric_out == NULL) {
-		SPOTFLOW_LOG("metric_out cannot be NULL");
-		return -EINVAL;
-	}
-
-	if (max_labels == 0) {
-		SPOTFLOW_LOG("Labeled metric requires max_labels > 0");
-		return -EINVAL;
-	}
-
-	rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_FLOAT, agg_interval, max_timeseries,
-				    max_labels, &base);
-	if (rc < 0) {
-		return rc;
-	}
-	if (base->type != SPOTFLOW_METRIC_TYPE_FLOAT) {
-		SPOTFLOW_LOG("Type mismatch: expected FLOAT, got %d", base->type);
-		return -EINVAL;
-	}
-	*metric_out = (struct spotflow_metric_float*)base;
-	return 0;
-}
-
-/* Static function implementations */
-
-static void normalize_metric_name(const char* input, char* output, size_t output_size)
-{
-	size_t i = 0;
-	size_t j = 0;
-
-	while (input[i] != '\0' && j < (output_size - 1)) {
-		char c = input[i];
-
-		if (isalnum((unsigned char)c)) {
-			output[j++] = tolower((unsigned char)c);
-		} else if (c == '_' || c == '-' || c == '.' || c == ' ') {
-			output[j++] = '_';
+    if (metric->agg_interval != SPOTFLOW_AGG_INTERVAL_NONE) {
+        esp_timer_create_args_t timer_args = {
+            .callback = aggregation_timer_callback,
+            .arg = ctx,
+            .name = "aggregation_timer"
+        };
+         esp_err_t err = esp_timer_create(&timer_args, &ctx->aggregation_timer);
+		if (err != ESP_OK) {
+			ESP_LOGE(TAG, "Failed to create aggregation timer: %d", err);
+			free(ctx->timeseries);
+			free(ctx);
+			return -ENOMEM;
 		}
-		i++;
-	}
+    }
 
-	output[j] = '\0';
+    metric->aggregator_context = ctx;
+    ESP_LOGD(TAG, "Registered aggregator for metric '%s' (max_ts=%u)",
+             metric->name, metric->max_timeseries);
+
+    return 0;
 }
 
-static int find_available_slot(void)
+int aggregator_report_value(struct spotflow_metric_base* metric,
+                            const struct spotflow_label* labels, uint8_t label_count,
+                            int64_t value_int, float value_float)
 {
-	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED; i++) {
-		if (g_metric_registry[i].aggregator_context == NULL) {
-			return i;
-		}
-	}
-	return -1;
+    if (!metric || !metric->aggregator_context) {
+        return -EINVAL;
+    }
+
+    struct metric_aggregator_context* ctx = metric->aggregator_context;
+
+    if (xSemaphoreTake(metric->lock, portMAX_DELAY) != pdTRUE) {
+        return -EINVAL;
+    }
+
+    if (metric->agg_interval == SPOTFLOW_AGG_INTERVAL_NONE) {
+        int rc = flush_no_aggregation_metric(metric, labels, label_count,
+                                             value_int, value_float);
+        xSemaphoreGive(metric->lock);
+        return rc;
+    }
+
+    struct metric_timeseries_state* ts =
+        find_or_create_timeseries(ctx, labels, label_count);
+
+    if (!ts) {
+        ESP_LOGW(TAG, "Time series pool full for metric '%s' (%u/%u)",
+                 metric->name, ctx->timeseries_count, ctx->timeseries_capacity);
+        xSemaphoreGive(metric->lock);
+        return -ENOSPC;
+    }
+
+    if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
+        update_aggregation_int(ts, value_int);
+    } else if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+        update_aggregation_float(ts, value_float);
+    } else {
+        xSemaphoreGive(metric->lock);
+        ESP_LOGE(TAG, "Invalid metric type: %d", metric->type);
+        return -EINVAL;
+    }
+
+    if (!ctx->timer_started) {
+        uint32_t interval_ms = get_interval_ms(metric->agg_interval);
+        if (interval_ms > 0) {
+            uint32_t jitter = esp_random() % (interval_ms / 10);
+            esp_timer_start_once(ctx->aggregation_timer, (interval_ms - jitter) * 1000ULL);
+            ctx->timer_started = true;
+            ESP_LOGD(TAG, "Started aggregation timer for metric '%s' (interval=%u ms, jitter=%u ms)",
+                     metric->name, interval_ms, jitter);
+        }
+    }
+
+    xSemaphoreGive(metric->lock);
+    return 0;
 }
 
-static struct spotflow_metric_base* find_metric_by_name(const char* normalized_name)
+/* --- Internal functions --- */
+
+static bool labels_equal(const struct metric_timeseries_state* ts,
+                         const struct spotflow_label* labels, uint8_t label_count)
 {
-	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED; i++) {
-		struct spotflow_metric_base* base = &g_metric_registry[i];
-		if (base->aggregator_context != NULL && strcmp(base->name, normalized_name) == 0) {
-			return base;
-		}
-	}
-	return NULL;
+    if (ts->label_count != label_count) return false;
+
+    for (uint8_t i = 0; i < label_count; i++) {
+        if (strcmp(ts->labels[i].key, labels[i].key) != 0 ||
+            strcmp(ts->labels[i].value, labels[i].value) != 0) {
+            return false;
+        }
+    }
+    return true;
 }
 
-static int validate_metric_params(const char* name, uint16_t max_timeseries, uint8_t max_labels)
+static int copy_labels_to_timeseries(struct metric_timeseries_state* ts,
+                                     const struct spotflow_label* labels, uint8_t label_count)
 {
-	if (name == NULL) {
-		SPOTFLOW_LOG("Metric name cannot be NULL");
-		return -EINVAL;
-	}
-
-	if (max_timeseries == 0 || max_timeseries > 256) {
-		SPOTFLOW_LOG("Invalid max_timeseries: %u (must be 1-256)", max_timeseries);
-		return -EINVAL;
-	}
-
-	if (max_labels > CONFIG_SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC) {
-		SPOTFLOW_LOG("Invalid max_labels: %u (max %d)", max_labels,
-			CONFIG_SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC);
-		return -EINVAL;
-	}
-
-	return 0;
+    for (uint8_t i = 0; i < label_count; i++) {
+        if (!labels[i].key || !labels[i].value) {
+            ESP_LOGE(TAG, "Label key or value NULL at index %u", i);
+            return -1;
+        }
+        strncpy(ts->labels[i].key, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN - 1);
+        ts->labels[i].key[SPOTFLOW_MAX_LABEL_KEY_LEN - 1] = '\0';
+        strncpy(ts->labels[i].value, labels[i].value, SPOTFLOW_MAX_LABEL_VALUE_LEN - 1);
+        ts->labels[i].value[SPOTFLOW_MAX_LABEL_VALUE_LEN - 1] = '\0';
+    }
+    return 0;
 }
 
-static int normalize_and_validate_metric_name(const char* name, char* out_normalized,
-					      size_t out_size)
+static void update_aggregation_int(struct metric_timeseries_state* ts, int64_t value)
 {
-	normalize_metric_name(name, out_normalized, out_size);
-
-	if (strcmp(name, out_normalized) != 0) {
-		SPOTFLOW_LOG("Metric name '%s' normalized to '%s'", name, out_normalized);
-	}
-
-	if (strlen(out_normalized) == 0) {
-		SPOTFLOW_LOG("Metric name '%s' normalizes to empty string", name);
-		return -EINVAL;
-	}
-
-	return 0;
+    ts->count++;
+    int64_t old_sum = ts->sum_int;
+    ts->sum_int += value;
+    if ((value > 0 && ts->sum_int < old_sum) || (value < 0 && ts->sum_int > old_sum)) {
+        ts->sum_truncated = true;
+    }
+    if (value < ts->min_int) ts->min_int = value;
+    if (value > ts->max_int) ts->max_int = value;
 }
 
-static void init_metric_struct(struct spotflow_metric_base* metric, const char* normalized_name,
-			       enum spotflow_metric_type type,
-			       enum spotflow_agg_interval agg_interval, uint16_t max_timeseries,
-			       uint8_t max_labels)
+static void update_aggregation_float(struct metric_timeseries_state* ts, float value)
 {
-	strncpy(metric->name, normalized_name, sizeof(metric->name) - 1);
-	metric->name[sizeof(metric->name) - 1] = '\0';
-
-	metric->type = type;
-	metric->agg_interval = agg_interval;
-	metric->max_timeseries = max_timeseries;
-	metric->max_labels = max_labels;
-	metric->sequence_number = 0;
-
-	metric->lock = xSemaphoreCreateMutex();
-	if (!metric->lock) {
-		SPOTFLOW_LOG("Failed to create metric mutex for '%s'", normalized_name);
-	}
+    ts->count++;
+    ts->sum_float += value;
+    if (value < ts->min_float) ts->min_float = value;
+    if (value > ts->max_float) ts->max_float = value;
 }
 
-static int register_metric_common(const char* name, enum spotflow_metric_type type,
-				  enum spotflow_agg_interval agg_interval, uint16_t max_timeseries,
-				  uint8_t max_labels, struct spotflow_metric_base** metric_out)
+static void reset_timeseries_state(struct spotflow_metric_base* metric,
+                                   struct metric_timeseries_state* ts)
 {
-	int rc = validate_metric_params(name, max_timeseries, max_labels);
-	if (rc < 0) {
-		return rc;
-	}
+    ts->count = 0;
+    ts->sum_truncated = false;
 
-	char normalized_name[256];
-	rc = normalize_and_validate_metric_name(name, normalized_name, sizeof(normalized_name));
-	if (rc < 0) {
-		return rc;
-	}
+    if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
+        ts->sum_int = 0;
+        ts->min_int = INT64_MAX;
+        ts->max_int = INT64_MIN;
+    } else if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+        ts->sum_float = 0.0f;
+        ts->min_float = FLT_MAX;
+        ts->max_float = -FLT_MAX;
+    } else {
+        ESP_LOGE(TAG, "Invalid metric type: %d", metric->type);
+    }
+}
 
-	if (xSemaphoreTake(g_registry_lock, portMAX_DELAY) != pdTRUE) {
-		SPOTFLOW_LOG("Failed to acquire registry mutex");
-		return -EINVAL;
-	}
+static void init_timeseries_aggregation_state(struct metric_timeseries_state* ts,
+                                              enum spotflow_metric_type type)
+{
+    if (type == SPOTFLOW_METRIC_TYPE_INT) {
+        ts->min_int = INT64_MAX;
+        ts->max_int = INT64_MIN;
+    } else if (type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+        ts->min_float = FLT_MAX;
+        ts->max_float = -FLT_MAX;
+    }
+}
 
-	if (find_metric_by_name(normalized_name) != NULL) {
-		SPOTFLOW_LOG("Metric '%s' already registered", normalized_name);
-		xSemaphoreGive(g_registry_lock);
-		return -EEXIST;
-	}
+static uint32_t get_interval_ms(enum spotflow_agg_interval interval)
+{
+    switch (interval) {
+    case SPOTFLOW_AGG_INTERVAL_NONE: return 0;
+    case SPOTFLOW_AGG_INTERVAL_1MIN: return 60 * 1000;
+    case SPOTFLOW_AGG_INTERVAL_1HOUR: return 60 * 60 * 1000;
+    case SPOTFLOW_AGG_INTERVAL_1DAY: return 24 * 60 * 60 * 1000;
+    default: return 60 * 1000;
+    }
+}
 
-	int slot = find_available_slot();
-	if (slot < 0) {
-		SPOTFLOW_LOG("Metric registry full (%d/%d)", CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED,
-			CONFIG_SPOTFLOW_METRICS_MAX_REGISTERED);
-		xSemaphoreGive(g_registry_lock);
-		return -ENOSPC;
-	}
+static struct metric_timeseries_state* find_or_create_timeseries(
+    struct metric_aggregator_context* ctx, const struct spotflow_label* labels, uint8_t label_count)
+{
+    struct metric_timeseries_state* inactive_slot = NULL;
+    struct metric_timeseries_state* evictable_slot = NULL;
 
-	struct spotflow_metric_base* metric = &g_metric_registry[slot];
-	init_metric_struct(metric, normalized_name, type, agg_interval, max_timeseries, max_labels);
+    for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
+        struct metric_timeseries_state* ts = &ctx->timeseries[i];
 
-	rc = aggregator_register_metric(metric);
-	if (rc < 0) {
-		SPOTFLOW_LOG("Failed to initialize aggregator for metric '%s': %d", normalized_name, rc);
-		memset(&g_metric_registry[slot], 0, sizeof(g_metric_registry[slot]));
-		xSemaphoreGive(g_registry_lock);
-		return rc;
-	}
+        if (ts->active) {
+            if (labels_equal(ts, labels, label_count)) return ts;
+            if (ts->count == 0 && evictable_slot == NULL) evictable_slot = ts;
+        } else if (!inactive_slot) {
+            inactive_slot = ts;
+        }
+    }
 
-	xSemaphoreGive(g_registry_lock);
+    struct metric_timeseries_state* ts = inactive_slot ? inactive_slot : evictable_slot;
+    if (!ts) return NULL;
 
-	SPOTFLOW_LOG("Registered metric '%s' (type=%s, agg=%d, max_ts=%u, max_labels=%u)",
-		normalized_name,
-		(type == SPOTFLOW_METRIC_TYPE_INT)	   ? "int"
-		    : (type == SPOTFLOW_METRIC_TYPE_FLOAT) ? "float"
-							   : "unknown",
-		metric->agg_interval, max_timeseries, max_labels);
+    if (!inactive_slot) {
+        ESP_LOGD(TAG, "Evicting idle timeseries for metric '%s'", ctx->metric->name);
+    } else {
+        ctx->timeseries_count++;
+    }
 
-	*metric_out = metric;
-	return 0;
+    memset(ts, 0, sizeof(*ts));
+    ts->active = true;
+    ts->label_count = label_count;
+    if (copy_labels_to_timeseries(ts, labels, label_count) < 0) {
+        ts->active = false;
+        return NULL;
+    }
+
+    init_timeseries_aggregation_state(ts, ctx->metric->type);
+    ESP_LOGD(TAG, "Initialized timeseries for metric '%s'", ctx->metric->name);
+    return ts;
+}
+
+/* Placeholder for enqueue function – replace with your queue mechanism */
+static int enqueue_metric_message(uint8_t* payload, size_t len)
+{
+    /* TODO: implement your queue or MQTT enqueue here */
+    ESP_LOGD(TAG, "Enqueued metric message (%zu bytes)", len);
+    return 0;
+}
+
+static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
+                                       const struct spotflow_label* labels, uint8_t label_count,
+                                       int64_t value_int, float value_float)
+{
+    uint8_t* cbor_data = NULL;
+    size_t cbor_len = 0;
+    uint64_t seq_num = metric->sequence_number++;
+
+    int rc = spotflow_metrics_cbor_encode_no_aggregation(metric, labels, label_count,
+                                                        value_int, value_float,
+                                                        esp_timer_get_time() / 1000ULL,
+                                                        seq_num, &cbor_data, &cbor_len);
+    if (rc < 0) return rc;
+
+    rc = enqueue_metric_message(cbor_data, cbor_len);
+    if (rc < 0) free(cbor_data);
+    return rc;
+}
+
+static int flush_timeseries(struct spotflow_metric_base* metric,
+                            struct metric_timeseries_state* ts,
+                            int64_t timestamp_ms)
+{
+    uint8_t* cbor_data = NULL;
+    size_t cbor_len = 0;
+    uint64_t seq_num = metric->sequence_number++;
+
+    int rc = spotflow_metrics_cbor_encode_aggregated(metric, ts, timestamp_ms,
+                                                     seq_num, &cbor_data, &cbor_len);
+    if (rc < 0) {
+        reset_timeseries_state(metric, ts);
+        return rc;
+    }
+
+    rc = enqueue_metric_message(cbor_data, cbor_len);
+    if (rc < 0) free(cbor_data);
+    reset_timeseries_state(metric, ts);
+    return rc;
+}
+
+static void aggregation_timer_callback(void* arg)
+{
+    struct metric_aggregator_context* ctx = (struct metric_aggregator_context*)arg;
+    struct spotflow_metric_base* metric = ctx->metric;
+    int64_t timestamp_ms = esp_timer_get_time() / 1000ULL;
+
+    if (xSemaphoreTake(metric->lock, portMAX_DELAY) != pdTRUE) return;
+
+    for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
+        struct metric_timeseries_state* ts = &ctx->timeseries[i];
+        if (ts->active && ts->count > 0) {
+            int rc = flush_timeseries(metric, ts, timestamp_ms);
+            if (rc < 0) ESP_LOGE(TAG, "Failed to flush timeseries for metric '%s': %d",
+                                 metric->name, rc);
+        }
+    }
+
+    uint32_t interval_ms = get_interval_ms(metric->agg_interval);
+    if (interval_ms > 0) esp_timer_start_once(ctx->aggregation_timer, interval_ms * 1000ULL);
+
+    xSemaphoreGive(metric->lock);
 }
