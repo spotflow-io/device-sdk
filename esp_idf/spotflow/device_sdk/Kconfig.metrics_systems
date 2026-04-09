@@ -1,7 +1,6 @@
 menuconfig SPOTFLOW_METRICS_SYSTEM
 	bool "Enable Spotflow system metrics auto-collection"
-	depends on SPOTFLOW_METRICS
-	default n
+	default y
 	help
 	  Enable automatic collection of system-level metrics (memory, network, CPU, etc.).
 	  These metrics are collected periodically and reported to the cloud without
@@ -10,7 +9,6 @@ menuconfig SPOTFLOW_METRICS_SYSTEM
 if SPOTFLOW_METRICS_SYSTEM
 config SPOTFLOW_METRICS_SYSTEM_HEAP
 	bool "Enable heap metrics"
-	select SYS_HEAP_RUNTIME_STATS
 	default y
 	help
 	  Collect heap memory statistics (free/allocated bytes).
@@ -18,8 +16,6 @@ config SPOTFLOW_METRICS_SYSTEM_HEAP
 
 config SPOTFLOW_METRICS_SYSTEM_NETWORK
 	bool "Enable network metrics"
-	depends on NETWORKING
-	select NET_STATISTICS
 	default y
 	help
 	  Collect network traffic statistics (TX/RX bytes).
