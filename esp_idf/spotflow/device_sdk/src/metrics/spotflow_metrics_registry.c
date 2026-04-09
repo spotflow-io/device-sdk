@@ -50,6 +50,7 @@ int spotflow_register_metric_int(const char* name, enum spotflow_agg_interval ag
         return -EINVAL;
     }
 
+    spotflow_metrics_init();
     rc = register_metric_common(name, SPOTFLOW_METRIC_TYPE_INT, agg_interval, 1, 0, &base);
     if (rc < 0) {
         return rc;
