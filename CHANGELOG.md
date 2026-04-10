@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added spotflowup.sh and spotflowup.ps1 scripts for workspace setup.
 * Added interfaces for reporting metrics to Spotflow.
 * Added device uptime to coredump chunks.
+* Added support for Silicon Labs board DK2605A (siwx917_dk2605a).
+* Added recognition of ENOSYS status when getting reset cause.
 * Added a hash check on coredump partition to make sure coredump is valid.
 
 ### Removed
@@ -29,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 * Added check of `CONFIG_MBEDTLS_MPI_MAX_SIZE` in CMake and explicitly set it for Nordic boards in samples
 * Hiding CPU system metrics on unsupported platforms
+* Added const modifier to the variable holding the certificate
 
 ## [0.7.0] - 2025-11-18
 ### Added
