@@ -1,6 +1,6 @@
 defaults:
   manifest: west-zephyr.yml
-  sdk_version: 0.17.4
+  sdk_version: 1.0.1
 
 vendors:
 
@@ -244,6 +244,7 @@ vendors:
         name: Raspberry Pi Pico W
         board: rpi_pico/rp2040/w
         manifest: west-zephyr-raspberrypi-pico-w.yml
+        sdk_version: 0.17.4
         callout: >-
           Zephyr 4.2.1 should be used because of the
           <a href='https://github.com/zephyrproject-rtos/zephyr/issues/96224'>regression</a>

@@ -1,4 +1,5 @@
 ﻿#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/socket.h>
 
