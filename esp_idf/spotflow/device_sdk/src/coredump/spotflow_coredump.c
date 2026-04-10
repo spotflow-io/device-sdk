@@ -124,14 +124,13 @@ esp_err_t spotflow_coredump_backend(void)
 	if (err != ESP_OK) {
 		SPOTFLOW_LOG("Coredump is invalid, will attempt to send error report to cloud.");
 		ESP_LOGE(TAG, "Coredump is invalid: checksum mismatch.");
-		coredump_info.size = 1; // Set size to 1 to indicate invalid coredump, actual content will be empty
-		chunk_size = 0; // No need to read chunks if coredump is invalid. Because chunk size is 0.
+
+		// Send an empty coredump to at least indicate that the error occurred
+		coredump_info.size = 0;
 	}
+
 	// Process coredump in chunks
-	while (coredump_info.offset < coredump_info.size) {
-		if(chunk_size == 0) {
-			coredump_info.size = 0;
-		}
+	do {
 		// Calculate remaining size and current chunk size
 		size_t remaining_size = coredump_info.size - coredump_info.offset;
 		size_t current_chunk_size =
@@ -209,7 +208,7 @@ esp_err_t spotflow_coredump_backend(void)
 			SPOTFLOW_LOG("Sent chunk %d: 0/0 bytes (100%%) - Invalid coredump report sent\n",
 				coredump_info.chunk_ordinal - 1);
 		}
-	}
+	} while (coredump_info.offset < coredump_info.size);
 
 	free(chunk_buffer);
 	SPOTFLOW_LOG(
