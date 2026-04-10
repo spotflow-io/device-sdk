@@ -2,6 +2,9 @@
 #include "metrics/spotflow_metrics_backend.h"
 #include "zephyr/logging/log.h"
 
+#if defined(CONFIG_MCUBOOT_IMG_MANAGER)
+#include <zephyr/dfu/mcuboot.h>
+#endif
 #include <zephyr/drivers/hwinfo.h>
 #include <errno.h>
 #include <stdio.h>
@@ -33,7 +36,12 @@ static const struct {
 
 #define RESET_CAUSE_COUNT ARRAY_SIZE(reset_cause_map)
 
-void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len);
+static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len);
+
+static bool is_test_firmware_upgrade(void);
+
+static bool append_cause_name(char* buf, size_t buf_len, size_t* used, bool* first,
+			      const char* name);
 
 void spotflow_report_reboot_reason(void)
 {
@@ -76,10 +84,11 @@ void spotflow_report_reboot_reason(void)
 	}
 }
 
-void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len)
+static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len)
 {
 	size_t used = 0;
 	bool first = true;
+	bool test_firmware_upgrade = is_test_firmware_upgrade();
 
 	if (buf_len == 0) {
 		return;
@@ -87,22 +96,44 @@ void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len)
 
 	buf[0] = '\0';
 
-	if (cause == 0U) {
+	if (cause == 0U && !test_firmware_upgrade) {
 		snprintk(buf, buf_len, "UNKNOWN");
 		return;
 	}
 
 	for (size_t i = 0; i < RESET_CAUSE_COUNT; i++) {
 		if (cause & reset_cause_map[i].flag) {
-			int n = snprintk(buf + used, buf_len - used, "%s%s", first ? "" : " | ",
-					 reset_cause_map[i].name);
-
-			if (n < 0 || (size_t)n >= buf_len - used) {
+			if (!append_cause_name(buf, buf_len, &used, &first,
+					       reset_cause_map[i].name)) {
 				return; /* truncated safely */
 			}
-
-			used += n;
-			first = false;
 		}
 	}
+
+	if (test_firmware_upgrade) {
+		(void)append_cause_name(buf, buf_len, &used, &first, "TEST_FIRMWARE_UPGRADE");
+	}
+}
+
+static bool is_test_firmware_upgrade(void)
+{
+#ifdef CONFIG_MCUBOOT_IMG_MANAGER
+	return !boot_is_img_confirmed();
+#else
+	return false;
+#endif
+}
+
+static bool append_cause_name(char* buf, size_t buf_len, size_t* used, bool* first,
+			      const char* name)
+{
+	int n = snprintk(buf + *used, buf_len - *used, "%s%s", *first ? "" : " | ", name);
+
+	if (n < 0 || (size_t)n >= buf_len - *used) {
+		return false;
+	}
+
+	*used += n;
+	*first = false;
+	return true;
 }
