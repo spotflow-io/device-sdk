@@ -18,7 +18,7 @@ Our solution was tested on the following Zephyr boards (more are coming soon):
 * [Raspberry Pi Pico 2 W](https://www.raspberrypi.com/documentation/microcontrollers/pico-series.html#pico2w-technical-specification)
 
 We currently support:
-* Zephyr 3.7.x, 4.1.x, 4.2.x, and 4.3.x
+* Zephyr 3.7.x, 4.1.x, 4.2.x, 4.3.x, 4.4.x
 * nRF Connect SDK 3.0.x and 3.1.x
 
 For more information, check [Spotflow](https://app.spotflow.io/) or [Spotflow documentation](https://docs.spotflow.io/).
