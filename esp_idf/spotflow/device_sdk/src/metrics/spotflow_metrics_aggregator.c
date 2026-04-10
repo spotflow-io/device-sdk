@@ -1,6 +1,7 @@
 #include "metrics/spotflow_metrics_aggregator.h"
 #include "metrics/spotflow_metrics_cbor.h"
 #include "metrics/spotflow_metrics_net.h"
+#include "net/spotflow_mqtt.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "esp_timer.h"

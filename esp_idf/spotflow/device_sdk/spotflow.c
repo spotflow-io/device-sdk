@@ -24,6 +24,7 @@
 
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 #include "metrics/spotflow_metrics_heartbeat.h"
+#include "metrics/system/spotflow_metrics_system.h"
 #endif
 
 vprintf_like_t original_vprintf = NULL;
@@ -35,6 +36,7 @@ void spotflow_metrics(void)
     spotflow_metrics_net_init();
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 	spotflow_metrics_heartbeat_init();
+	spotflow_metrics_system_init();
 #endif
 }
 #endif

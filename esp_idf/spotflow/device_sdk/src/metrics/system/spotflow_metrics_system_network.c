@@ -12,7 +12,7 @@ static struct spotflow_metric_int* g_network_tx_metric;
 static struct spotflow_metric_int* g_network_rx_metric;
 
 static void report_network_interface_metrics(esp_netif_t* iface, void* user_data);
-
+#define CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES 4
 int spotflow_metrics_system_network_init(void)
 {
     int rc;

@@ -14,6 +14,7 @@ static struct spotflow_metric_int* g_stack_free_metric;
 static struct spotflow_metric_float* g_stack_used_percent_metric;
 
 #ifndef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
+#define CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS 4 
 static TaskHandle_t g_tracked_threads[CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS];
 static SemaphoreHandle_t g_tracked_threads_mutex;
 static bool g_tracked_threads_initialized;

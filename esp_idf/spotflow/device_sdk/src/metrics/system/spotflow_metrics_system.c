@@ -1,5 +1,6 @@
 #include "metrics/system/spotflow_metrics_system.h"
 #include "logging/spotflow_log_backend.h"
+#include "net/spotflow_mqtt.h"
 
 #include <errno.h>
 #include <stdatomic.h>
@@ -131,7 +132,7 @@ void spotflow_metrics_system_report_connection_state(bool connected)
 
 static void collection_timer_handler(void* arg)
 {
-    SPOTFLOW_DEBUG("Collecting system metrics...");
+    SPOTFLOW_LOG("Collecting system metrics...");
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP
     spotflow_metrics_system_heap_collect();
@@ -149,6 +150,7 @@ static void collection_timer_handler(void* arg)
     spotflow_metrics_system_stack_collect();
 #endif
 
+    spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_METRICS);
     /* Restart the timer */
     esp_timer_start_once(g_collection_timer,
                          CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL * 1000000ULL);
