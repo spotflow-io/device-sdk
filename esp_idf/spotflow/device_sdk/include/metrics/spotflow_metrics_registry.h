@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+void spotflow_metrics_init(void);
 /**
  * @brief Register a label-less integer metric
  *

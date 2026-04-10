@@ -28,6 +28,28 @@ static bool encode_metric_header(CborEncoder* map, struct spotflow_metric_base* 
 static bool encode_aggregation_stats(CborEncoder* map, struct spotflow_metric_base* metric,
                                      struct metric_timeseries_state* ts);
 
+#define CBOR_CHECK(expr)        \
+    do {                        \
+        if ((err = (expr)) != CborNoError) \
+            goto fail;          \
+    } while (0)
+
+/**
+ * @brief Debugging Function not to be used in Production
+ *
+ * @param buf
+ * @param len
+ */
+static void print_cbor_hex(const uint8_t* buf, size_t len)
+{
+	SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
+	for (size_t i = 0; i < len; i++) {
+		printf("%02X ", buf[i]); // print each byte as 2-digit hex
+		if ((i + 1) % 16 == 0){} // 16 bytes per line
+			// SPOTFLOW_LOG("\n");
+	}
+	SPOTFLOW_LOG("\n");
+}
 int spotflow_metrics_cbor_encode_aggregated(struct spotflow_metric_base* metric,
 					    struct metric_timeseries_state* ts,
 					    int64_t timestamp_ms, uint64_t sequence_number,
@@ -91,8 +113,8 @@ int spotflow_metrics_cbor_encode_aggregated(struct spotflow_metric_base* metric,
     memcpy(*cbor_data, buffer, len);
     *cbor_len = len;
     free(buffer);
-
-    SPOTFLOW_DEBUG("Encoded aggregated metric '%s' (%zu bytes, seq=%" PRIu64 ")",
+    print_cbor_hex(*cbor_data,*cbor_len);
+    SPOTFLOW_DEBUG("\nEncoded aggregated metric '%s' (%zu bytes, seq=%" PRIu64 ")",
              metric->name, len, sequence_number);
     return 0;
 }
@@ -192,7 +214,8 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
     *cbor_len = len;
     free(buffer);
 
-	SPOTFLOW_DEBUG("Encoded raw metric '%s' message (%zu bytes, seq=%" PRIu64 ")", metric->name,
+    print_cbor_hex(*cbor_data,*cbor_len);
+	SPOTFLOW_DEBUG("\nEncoded raw metric '%s' message (%zu bytes, seq=%" PRIu64 ")", metric->name,
 		*cbor_len, sequence_number);
 
 	return 0;
@@ -202,22 +225,20 @@ int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, si
 {
     uint8_t buffer[64];
     CborEncoder encoder, map;
+    CborError err;
     cbor_encoder_init(&encoder, buffer, sizeof(buffer), 0);
 
-    if (cbor_encoder_create_map(&encoder, &map, 4) != CborNoError) return -22;
+    CBOR_CHECK(cbor_encoder_create_map(&encoder, &map, 4)); 
 
-    if (cbor_encode_uint(&map, KEY_MESSAGE_TYPE) != CborNoError ||
-        cbor_encode_uint(&map, METRIC_MESSAGE_TYPE) != CborNoError ||
-        cbor_encode_uint(&map, KEY_METRIC_NAME) != CborNoError ||
-        cbor_encode_text_stringz(&map, "uptime_ms") != CborNoError ||
-        cbor_encode_uint(&map, KEY_DEVICE_UPTIME_MS) != CborNoError ||
-        cbor_encode_int(&map, uptime_ms) != CborNoError ||
-        cbor_encode_uint(&map, KEY_SUM) != CborNoError ||
-        cbor_encode_int(&map, uptime_ms) != CborNoError ||
-        cbor_encoder_close_container(&encoder, &map) != CborNoError)
-    {
-        return -22;
-    }
+    CBOR_CHECK(cbor_encode_uint(&map, KEY_MESSAGE_TYPE));
+    CBOR_CHECK(cbor_encode_uint(&map, METRIC_MESSAGE_TYPE));
+    CBOR_CHECK(cbor_encode_uint(&map, KEY_METRIC_NAME));
+    CBOR_CHECK(cbor_encode_text_stringz(&map, "uptime_ms"));
+    CBOR_CHECK(cbor_encode_uint(&map, KEY_DEVICE_UPTIME_MS));
+    CBOR_CHECK(cbor_encode_int(&map, uptime_ms));
+    CBOR_CHECK(cbor_encode_uint(&map, KEY_SUM));
+    CBOR_CHECK(cbor_encode_int(&map, uptime_ms));
+    CBOR_CHECK(cbor_encoder_close_container(&encoder, &map));
 
     size_t encoded_len = cbor_encoder_get_buffer_size(&encoder, buffer);
     *data = malloc(encoded_len);
@@ -226,7 +247,10 @@ int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, si
     memcpy(*data, buffer, encoded_len);
     *len = encoded_len;
 
+    print_cbor_hex(*data,*len);
     return 0;
+fail:
+    return err;
 }
 
 /**
@@ -236,77 +260,80 @@ static bool encode_labels(CborEncoder* map, const struct metric_label_storage* l
                           uint8_t label_count)
 {
     CborEncoder labels_map;
-    if (cbor_encode_uint(map, KEY_LABELS) != CborNoError ||
-        cbor_encoder_create_map(map, &labels_map, label_count) != CborNoError)
-    {
-        return false;
-    }
+    CborError err;
+
+    CBOR_CHECK(cbor_encode_uint(map, KEY_LABELS));
+    CBOR_CHECK(cbor_encoder_create_map(map, &labels_map, label_count));
 
     for (uint8_t i = 0; i < label_count; i++) {
-        if (cbor_encode_text_stringz(&labels_map, labels[i].key) != CborNoError ||
-            cbor_encode_text_stringz(&labels_map, labels[i].value) != CborNoError)
-        {
-            return false;
-        }
+        CBOR_CHECK(cbor_encode_text_stringz(&labels_map, labels[i].key));
+        CBOR_CHECK(cbor_encode_text_stringz(&labels_map, labels[i].value));
     }
-
-    if (cbor_encoder_close_container(map, &labels_map) != CborNoError) return false;
+    CBOR_CHECK(cbor_encoder_close_container(map, &labels_map));
+    
     return true;
+
+fail:
+    return false;
 }
 
 static bool encode_metric_header(CborEncoder* map, struct spotflow_metric_base* metric,
                                  int64_t timestamp_ms, uint64_t sequence_number)
 {
-    if (cbor_encode_uint(map, KEY_MESSAGE_TYPE) != CborNoError ||
-        cbor_encode_uint(map, METRIC_MESSAGE_TYPE) != CborNoError ||
-        cbor_encode_uint(map, KEY_METRIC_NAME) != CborNoError ||
-        cbor_encode_text_stringz(map, metric->name) != CborNoError ||
-        cbor_encode_uint(map, KEY_AGGREGATION_INTERVAL) != CborNoError ||
-        cbor_encode_uint(map, metric->agg_interval) != CborNoError ||
-        cbor_encode_uint(map, KEY_DEVICE_UPTIME_MS) != CborNoError ||
-        cbor_encode_int(map, timestamp_ms) != CborNoError ||
-        cbor_encode_uint(map, KEY_SEQUENCE_NUMBER) != CborNoError ||
-        cbor_encode_uint(map, sequence_number) != CborNoError)
-    {
-        return false;
-    }
+    CborError err;
+    CBOR_CHECK(cbor_encode_uint(map, KEY_MESSAGE_TYPE));
+    CBOR_CHECK(cbor_encode_uint(map, METRIC_MESSAGE_TYPE));
+    CBOR_CHECK(cbor_encode_uint(map, KEY_METRIC_NAME));
+    CBOR_CHECK(cbor_encode_text_stringz(map, metric->name));
+    CBOR_CHECK(cbor_encode_uint(map, KEY_AGGREGATION_INTERVAL));
+    CBOR_CHECK(cbor_encode_uint(map, metric->agg_interval));
+    CBOR_CHECK(cbor_encode_uint(map, KEY_DEVICE_UPTIME_MS));
+    CBOR_CHECK(cbor_encode_int(map, timestamp_ms));
+    CBOR_CHECK(cbor_encode_uint(map, KEY_SEQUENCE_NUMBER));
+    CBOR_CHECK(cbor_encode_uint(map, sequence_number));
+
     return true;
+fail:
+    return false;
 }
 
 static bool encode_aggregation_stats(CborEncoder* map, struct spotflow_metric_base* metric,
                                      struct metric_timeseries_state* ts)
 {
-    if (cbor_encode_uint(map, KEY_SUM) != CborNoError) return false;
-    if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
-        if (cbor_encode_double(map, ts->sum_float) != CborNoError) return false;
-    } else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
-        if (cbor_encode_int(map, ts->sum_int) != CborNoError) return false;
-    } else return false;
+    CborError err;
 
-    if (ts->sum_truncated) {
-        if (cbor_encode_uint(map, KEY_SUM_TRUNCATED) != CborNoError ||
-            cbor_encode_boolean(map, true) != CborNoError)
-        {
-            return false;
-        }
+    CBOR_CHECK(cbor_encode_uint(map, KEY_SUM));
+    if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+        CBOR_CHECK(cbor_encode_double(map, ts->sum_float));
+    } else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
+        CBOR_CHECK(cbor_encode_int(map, ts->sum_int));
     }
 
-    if (cbor_encode_uint(map, KEY_COUNT) != CborNoError ||
-        cbor_encode_uint(map, ts->count) != CborNoError) return false;
+    if (ts->sum_truncated) {
+        CBOR_CHECK(cbor_encode_uint(map, KEY_SUM_TRUNCATED));
+        CBOR_CHECK(cbor_encode_boolean(map, true));
+    }
 
-    if (cbor_encode_uint(map, KEY_MIN) != CborNoError) return false;
-    if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
-        if (cbor_encode_double(map, ts->min_float) != CborNoError) return false;
-    } else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
-        if (cbor_encode_int(map, ts->min_int) != CborNoError) return false;
-    } else return false;
+    CBOR_CHECK(cbor_encode_uint(map, KEY_COUNT));
+    CBOR_CHECK(cbor_encode_uint(map, ts->count));
 
-    if (cbor_encode_uint(map, KEY_MAX) != CborNoError) return false;
+    CBOR_CHECK(cbor_encode_uint(map, KEY_MIN));
+
     if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
-        if (cbor_encode_double(map, ts->max_float) != CborNoError) return false;
+        CBOR_CHECK(cbor_encode_double(map, ts->min_float));
     } else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
-        if (cbor_encode_int(map, ts->max_int) != CborNoError) return false;
-    } else return false;
+        CBOR_CHECK(cbor_encode_int(map, ts->min_int));
+    }
+
+    CBOR_CHECK(cbor_encode_uint(map, KEY_MAX));
+    if (metric->type == SPOTFLOW_METRIC_TYPE_FLOAT) {
+        CBOR_CHECK(cbor_encode_double(map, ts->max_float));
+    } else if (metric->type == SPOTFLOW_METRIC_TYPE_INT) {
+        CBOR_CHECK(cbor_encode_int(map, ts->max_int));
+    }
 
     return true;
+
+fail:
+    return false;
 }

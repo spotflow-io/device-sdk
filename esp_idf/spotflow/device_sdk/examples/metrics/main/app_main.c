@@ -105,7 +105,6 @@ void app_main(void)
 static int init_application_metrics(void)
 {
     int rc;
-
     rc = spotflow_register_metric_int("app_counter",
                                      SPOTFLOW_AGG_INTERVAL_1MIN,
                                      &g_app_counter_metric);

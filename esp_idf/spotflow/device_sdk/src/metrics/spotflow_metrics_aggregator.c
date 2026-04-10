@@ -1,5 +1,6 @@
 #include "metrics/spotflow_metrics_aggregator.h"
 #include "metrics/spotflow_metrics_cbor.h"
+#include "metrics/spotflow_metrics_net.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "esp_timer.h"
@@ -27,7 +28,6 @@ static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 static int flush_timeseries(struct spotflow_metric_base* metric,
                             struct metric_timeseries_state* ts,
                             int64_t timestamp_ms);
-static int enqueue_metric_message(uint8_t* payload, size_t len);
 static int copy_labels_to_timeseries(struct metric_timeseries_state* ts,
                                      const struct spotflow_label* labels, uint8_t label_count);
 static void aggregation_timer_callback(void* arg);
@@ -267,13 +267,6 @@ static struct metric_timeseries_state* find_or_create_timeseries(
     return ts;
 }
 
-/* Placeholder for enqueue function – replace with your queue mechanism */
-static int enqueue_metric_message(uint8_t* payload, size_t len)
-{
-    /* TODO: implement your queue or MQTT enqueue here */
-    ESP_LOGD(TAG, "Enqueued metric message (%zu bytes)", len);
-    return 0;
-}
 
 static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
                                        const struct spotflow_label* labels, uint8_t label_count,
@@ -289,7 +282,7 @@ static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
                                                         seq_num, &cbor_data, &cbor_len);
     if (rc < 0) return rc;
 
-    rc = enqueue_metric_message(cbor_data, cbor_len);
+    rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
     if (rc < 0) free(cbor_data);
     return rc;
 }
@@ -309,7 +302,7 @@ static int flush_timeseries(struct spotflow_metric_base* metric,
         return rc;
     }
 
-    rc = enqueue_metric_message(cbor_data, cbor_len);
+    rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
     if (rc < 0) free(cbor_data);
     reset_timeseries_state(metric, ts);
     return rc;

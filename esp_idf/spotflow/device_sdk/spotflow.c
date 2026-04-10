@@ -17,7 +17,27 @@
 
 #include "configs/spotflow_config.h"
 
+#ifdef CONFIG_SPOTFLOW_METRICS
+#include "metrics/spotflow_metrics_registry.h"
+#include "metrics/spotflow_metrics_net.h"
+#endif
+
+#ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+#include "metrics/spotflow_metrics_heartbeat.h"
+#endif
+
 vprintf_like_t original_vprintf = NULL;
+
+#ifdef CONFIG_SPOTFLOW_METRICS
+void spotflow_metrics(void)
+{
+	spotflow_metrics_init();
+    spotflow_metrics_net_init();
+#ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+	spotflow_metrics_heartbeat_init();
+#endif
+}
+#endif
 
 /**
  * @brief 
@@ -36,4 +56,7 @@ void spotflow_init(void)
 	}
 #endif
 	spotflow_config_init();
+#ifdef CONFIG_SPOTFLOW_METRICS
+	spotflow_metrics();
+#endif
 }

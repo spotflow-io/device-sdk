@@ -2,6 +2,7 @@
 #include "net/spotflow_mqtt.h"
 #include "logging/spotflow_log_backend.h"
 #include "logging/spotflow_log_net.h"
+#include "net/spotflow_mqtt.h"
 
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 #include "metrics/spotflow_metrics_heartbeat.h"
@@ -65,4 +66,33 @@ int spotflow_poll_and_process_enqueued_metrics(void)
     free(msg);
 
     return 1;
+}
+
+int spotflow_metrics_enqueue(uint8_t *payload, size_t len)
+{
+    if (!g_spotflow_metrics_msgq || !payload || len == 0) {
+        return -EINVAL;
+    }
+
+    struct spotflow_mqtt_metrics_msg* msg = malloc(sizeof(*msg));
+    if (!msg) {
+        return -ENOMEM;
+    }
+
+    msg->payload = malloc(len);
+    if (!msg->payload) {
+        free(msg);
+        return -ENOMEM;
+    }
+
+    memcpy(msg->payload, payload, len);
+    msg->len = len;
+
+    if (xQueueSend(g_spotflow_metrics_msgq, &msg, 0) != pdTRUE) {
+        free(msg->payload);
+        free(msg);
+        return -EAGAIN;
+    }
+    spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_METRICS);
+    return 0;
 }
