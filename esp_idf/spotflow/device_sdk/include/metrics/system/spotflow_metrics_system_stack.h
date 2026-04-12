@@ -1,7 +1,8 @@
 #ifndef SPOTFLOW_METRICS_SYSTEM_STACK_H_
 #define SPOTFLOW_METRICS_SYSTEM_STACK_H_
 
-#include <zephyr/kernel.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -30,7 +31,7 @@ void spotflow_metrics_system_stack_collect(void);
  * @param thread Thread to track (or NULL for current thread)
  * @return 0 on success, negative errno on failure
  */
-int spotflow_metrics_system_stack_enable_thread(struct k_thread* thread);
+int spotflow_metrics_system_stack_enable_thread(TaskHandle_t thread);
 
 #ifdef __cplusplus
 }

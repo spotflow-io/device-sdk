@@ -2,7 +2,6 @@
 #define SPOTFLOW_METRICS_SYSTEM_H_
 
 #include <stdbool.h>
-#include <zephyr/kernel.h>
 #include "../spotflow_metrics_types.h"
 
 /* Map aggregation interval (seconds) to enum */
@@ -69,7 +68,7 @@ void spotflow_metrics_system_report_connection_state(bool connected);
  *         -EINVAL: Stack metrics not initialized
  *         -EEXIST: Thread already tracked
  */
-int spotflow_metrics_system_enable_thread_stack(struct k_thread* thread);
+int spotflow_metrics_system_enable_thread_stack(TaskHandle_t thread);
 #endif
 
 #ifdef __cplusplus

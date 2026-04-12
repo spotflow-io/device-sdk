@@ -3,7 +3,10 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#include <zephyr/kernel.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/timers.h"
+#include "esp_timer.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -95,7 +98,7 @@ struct spotflow_metric_base {
 	uint64_t sequence_number; /* Incremented per message transmitted */
 
 	/* Synchronization */
-	struct k_mutex lock; /* Protects metric state */
+	SemaphoreHandle_t lock; /* Protects metric state */
 
 	/* Aggregator context (allocated dynamically) */
 	void* aggregator_context; /* Points to metric_aggregator_context */
@@ -131,7 +134,7 @@ struct metric_aggregator_context {
 	/* Timer scope: ONE timer per metric (not per time series) */
 	/* All time series of this metric share the same aggregation window */
 	/* When timer expires, all active time series generate messages with their counts */
-	struct k_work_delayable aggregation_work;
+	esp_timer_handle_t aggregation_timer;
 	bool timer_started; /* Flag to prevent timer restart race */
 };
 

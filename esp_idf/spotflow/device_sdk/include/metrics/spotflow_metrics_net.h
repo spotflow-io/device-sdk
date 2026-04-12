@@ -25,6 +25,12 @@ void spotflow_metrics_net_init(void);
  */
 int spotflow_poll_and_process_enqueued_metrics(void);
 
+/**
+ * @brief Create the enqueu metric messages
+ *
+ */
+int spotflow_metrics_enqueue(uint8_t* payload, size_t len);
+
 #ifdef __cplusplus
 }
 #endif
