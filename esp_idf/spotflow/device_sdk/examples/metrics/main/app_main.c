@@ -72,7 +72,7 @@ void app_main(void)
         vTaskDelay(pdMS_TO_TICKS(2000));
     }
 
-	int test_num = 1;
+	// int test_num = 1;
 	while (1) {
 		// {
 		// 	ESP_LOGI(TAG, "Info log message works");
