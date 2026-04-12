@@ -2,6 +2,8 @@
 #define SPOTFLOW_METRICS_CBOR_H_
 
 #include "spotflow_metrics_types.h"
+#include <stdlib.h>
+#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {

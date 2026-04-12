@@ -54,19 +54,6 @@ menuconfig SPOTFLOW_METRICS
                 System metrics use only 1 label, so default of 4 is sufficient
                 for most use cases.
 
-        config SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL
-            int "Metrics subsystem log level"
-            default SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
-            range 0 4
-            help
-                Log level for metrics subsystem:
-                Defaults to SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL.
-                0 = OFF
-                1 = ERROR
-                2 = WARNING (default)
-                3 = INFO
-                4 = DEBUG
-
         config SPOTFLOW_METRICS_HEARTBEAT
             bool "Enable device heartbeat"
             default y

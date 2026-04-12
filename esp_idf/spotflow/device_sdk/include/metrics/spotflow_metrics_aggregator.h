@@ -2,13 +2,13 @@
 #define SPOTFLOW_METRICS_AGGREGATOR_H_
 
 #include "spotflow_metrics_types.h"
-
+#include "esp_timer.h"
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 /* External message queue (defined in spotflow_metrics_net.c) */
-extern struct k_msgq g_spotflow_metrics_msgq;
+extern struct QueueHandle_t g_spotflow_metrics_msgq;
 
 /**
  * @brief Register metric with aggregator

@@ -3,6 +3,7 @@
 
 #include "spotflow_metrics_types.h"
 #include "spotflow_metrics_registry.h"
+#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {

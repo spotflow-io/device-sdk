@@ -1,7 +1,6 @@
 menuconfig SPOTFLOW_METRICS_SYSTEM
 	bool "Enable Spotflow system metrics auto-collection"
-	depends on SPOTFLOW_METRICS
-	default n
+	default y
 	help
 	  Enable automatic collection of system-level metrics (memory, network, CPU, etc.).
 	  These metrics are collected periodically and reported to the cloud without
@@ -10,20 +9,16 @@ menuconfig SPOTFLOW_METRICS_SYSTEM
 if SPOTFLOW_METRICS_SYSTEM
 config SPOTFLOW_METRICS_SYSTEM_HEAP
 	bool "Enable heap metrics"
-	select SYS_HEAP_RUNTIME_STATS
 	default y
 	help
 	  Collect heap memory statistics (free/allocated bytes).
-	  Requires a system heap (via HEAP_MEM_POOL_SIZE or HEAP_MEM_POOL_ADD_*).
 
 config SPOTFLOW_METRICS_SYSTEM_NETWORK
 	bool "Enable network metrics"
-	depends on NETWORKING
-	select NET_STATISTICS
+	select LWIP_STATS
 	default y
 	help
 	  Collect network traffic statistics (TX/RX bytes).
-	  Requires networking and network statistics to be enabled.
 
 if SPOTFLOW_METRICS_SYSTEM_NETWORK
 
@@ -39,14 +34,11 @@ endif # SPOTFLOW_METRICS_SYSTEM_NETWORK
 
 config SPOTFLOW_METRICS_SYSTEM_CPU
 	bool "Enable CPU utilization metrics"
-# 	the dependencies from CPU_LOAD definition
-	depends on (CPU_CORTEX_M || RISCV || CPU_CORTEX_A) && !SMP
-	select CPU_LOAD
+	select FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
+	select FREERTOS_GENERATE_RUN_TIME_STATS
 	default y
 	help
-	  Collect CPU utilization percentage using Zephyr's cpu_load module.
-	  Requires an architecture supported by Zephyr's CPU_LOAD subsystem
-	  (Cortex-M, RISC-V, or Cortex-A) and a non-SMP configuration.
+	  Collect CPU utilization percentage.
 
 config SPOTFLOW_METRICS_SYSTEM_CONNECTION
 	bool "Enable connection state metrics"
@@ -57,36 +49,27 @@ config SPOTFLOW_METRICS_SYSTEM_CONNECTION
 
 config SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
 	bool "Enable reset cause metric"
-	select HWINFO
 	default y
 	help
 	  Report device reset cause on boot (power-on, watchdog, etc.).
 	  Event-driven metric (reported once on boot, not periodic).
-	  Requires HWINFO support in the platform.
 
 config SPOTFLOW_METRICS_SYSTEM_STACK
 	bool "Enable thread stack metrics"
-	select THREAD_STACK_INFO
-	select INIT_STACKS
-	imply THREAD_NAME
+	select FREERTOS_USE_TRACE_FACILITY
+	select FREERTOS_SUPPORT_STATIC_ALLOCATION
 	default y
 	help
 	  Collect thread stack usage statistics (free bytes per thread).
-	  Requires CONFIG_THREAD_STACK_INFO to be enabled.
-	  Uses k_thread_stack_space_get() API to measure unused stack space.
-	  Reports metric: thread_stack_free_bytes (labeled by thread name or ID).
-	  Recommended to keep CONFIG_THREAD_NAME enabled for easier identification.
+	  Requires FREERTOS_USE_TRACE_FACILITY and FREERTOS_SUPPORT_STATIC_ALLOCATION to be enabled.
 
 if SPOTFLOW_METRICS_SYSTEM_STACK
 
 config SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 	bool "Automatically track all threads"
 	default y
-	select THREAD_MONITOR
 	help
 	  Automatically collect stack metrics for all threads in the system.
-	  If disabled, use spotflow_metrics_system_enable_thread_stack() to
-	  track specific threads at runtime.
 
 config SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS
 	int "Maximum number of tracked threads"

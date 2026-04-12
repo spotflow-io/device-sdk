@@ -1,0 +1,212 @@
+#include "logging/spotflow_log_backend.h"
+#include "metrics/spotflow_metrics_backend.h"
+#include "metrics/spotflow_metrics_aggregator.h"
+#include <string.h>
+
+static int validate_labels(const struct spotflow_metric_base* base,
+			   const struct spotflow_label* labels, uint8_t label_count);
+
+/**
+ * @brief Report an integer metric value
+ *
+ * @param metric
+ * @param value
+ * @return int
+ */
+int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value)
+{
+	if (metric == NULL) {
+		return -EINVAL;
+	}
+
+	struct spotflow_metric_base* base = &metric->base;
+
+	/* Label-less metrics have max_labels == 0 */
+	if (base->max_labels > 0) {
+		SPOTFLOW_LOG("Use spotflow_report_metric_int_with_labels for labeled metrics");
+		return -EINVAL;
+	}
+
+	/* Type-safe: int metrics always store int values */
+	return aggregator_report_value(base, NULL, 0, value, 0.0);
+}
+
+/**
+ * @brief Report a float metric value
+ *
+ * @param metric
+ * @param value
+ * @return int
+ */
+int spotflow_report_metric_float(struct spotflow_metric_float* metric, float value)
+{
+	if (metric == NULL) {
+		return -EINVAL;
+	}
+
+	struct spotflow_metric_base* base = &metric->base;
+
+	/* Label-less metrics have max_labels == 0 */
+	if (base->max_labels > 0) {
+		SPOTFLOW_LOG("Use spotflow_report_metric_float_with_labels for labeled metrics");
+		return -EINVAL;
+	}
+
+	/* Type-safe: float metrics always store float values */
+	return aggregator_report_value(base, NULL, 0, 0, value);
+}
+
+/**
+ * @brief Report an integer metric value with labels
+ *
+ * @param metric
+ * @param value
+ * @param labels
+ * @param label_count
+ * @return int
+ */
+int spotflow_report_metric_int_with_labels(struct spotflow_metric_int* metric, int64_t value,
+					   const struct spotflow_label* labels, uint8_t label_count)
+{
+	if (metric == NULL || labels == NULL) {
+		return -EINVAL;
+	}
+
+	struct spotflow_metric_base* base = &metric->base;
+
+	/* Labeled metrics have max_labels > 0 */
+	if (base->max_labels == 0) {
+		SPOTFLOW_LOG("Use spotflow_report_metric_int for label-less metrics");
+		return -EINVAL;
+	}
+
+	int err = validate_labels(base, labels, label_count);
+	if (err) {
+		return err;
+	}
+
+	/* Type-safe: int metrics always store int values */
+	return aggregator_report_value(base, labels, label_count, value, 0.0);
+}
+
+/**
+ * @brief Report a float metric value with labels
+ *
+ * @param metric
+ * @param value
+ * @param labels
+ * @param label_count
+ * @return int
+ */
+int spotflow_report_metric_float_with_labels(struct spotflow_metric_float* metric, float value,
+					     const struct spotflow_label* labels,
+					     uint8_t label_count)
+{
+	if (metric == NULL || labels == NULL) {
+		return -EINVAL;
+	}
+
+	struct spotflow_metric_base* base = &metric->base;
+
+	/* Labeled metrics have max_labels > 0 */
+	if (base->max_labels == 0) {
+		SPOTFLOW_LOG("Use spotflow_report_metric_float for label-less metrics");
+		return -EINVAL;
+	}
+
+	int err = validate_labels(base, labels, label_count);
+	if (err) {
+		return err;
+	}
+
+	/* Type-safe: float metrics always store float values */
+	return aggregator_report_value(base, labels, label_count, 0, value);
+}
+
+/**
+ * @brief Report an event
+ *
+ * @param metric
+ * @return int
+ */
+int spotflow_report_event(struct spotflow_metric_int* metric)
+{
+	if (metric == NULL) {
+		return -EINVAL;
+	}
+
+	struct spotflow_metric_base* base = &metric->base;
+
+	/* Label-less metrics have max_labels == 0 */
+	if (base->max_labels > 0) {
+		SPOTFLOW_LOG("Use spotflow_report_event_with_labels for labeled metrics");
+		return -EINVAL;
+	}
+
+	/* Events report value of 1 (event occurred) */
+	return aggregator_report_value(base, NULL, 0, 1, 0.0);
+}
+
+/**
+ * @brief Report an event with labels
+ *
+ * @param metric
+ * @param labels
+ * @param label_count
+ * @return int
+ */
+int spotflow_report_event_with_labels(struct spotflow_metric_int* metric,
+				      const struct spotflow_label* labels, uint8_t label_count)
+{
+	if (metric == NULL || labels == NULL) {
+		return -EINVAL;
+	}
+
+	struct spotflow_metric_base* base = &metric->base;
+
+	/* Labeled metrics have max_labels > 0 */
+	if (base->max_labels == 0) {
+		SPOTFLOW_LOG("Use spotflow_report_event for label-less metrics");
+		return -EINVAL;
+	}
+
+	int err = validate_labels(base, labels, label_count);
+	if (err) {
+		return err;
+	}
+
+	/* Events report value of 1 (event occurred) */
+	return aggregator_report_value(base, labels, label_count, 1, 0.0);
+}
+
+/**
+ * @brief Validate the labels for a metric
+ *
+ * @param base
+ * @param labels
+ * @param label_count
+ * @return int
+ */
+static int validate_labels(const struct spotflow_metric_base* base,
+			   const struct spotflow_label* labels, uint8_t label_count)
+{
+	if (label_count == 0 || label_count > base->max_labels) {
+		SPOTFLOW_LOG("Invalid label_count: %u (max %u)", label_count, base->max_labels);
+		return -EINVAL;
+	}
+
+	for (uint8_t i = 0; i < label_count; i++) {
+		if (labels[i].key == NULL || labels[i].value == NULL) {
+			SPOTFLOW_LOG("Label key or value is NULL at index %u", i);
+			return -EINVAL;
+		}
+		if (strlen(labels[i].key) >= SPOTFLOW_MAX_LABEL_KEY_LEN) {
+			SPOTFLOW_LOG("Label key at index %u will be truncated", i);
+		}
+		if (strlen(labels[i].value) >= SPOTFLOW_MAX_LABEL_VALUE_LEN) {
+			SPOTFLOW_LOG("Label value at index %u will be truncated", i);
+		}
+	}
+
+	return 0;
+}

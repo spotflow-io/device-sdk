@@ -14,6 +14,8 @@
 #include "coredump/spotflow_coredump_net.h"
 #endif
 
+#include "metrics/spotflow_metrics_net.h"
+
 esp_mqtt_client_handle_t spotflow_client = NULL;
 static TaskHandle_t mqtt_publish_task_handle = NULL;
 EventGroupHandle_t spotflow_mqtt_event_group;
@@ -180,6 +182,7 @@ void spotflow_mqtt_publish(void* pvParameters)
 				clear_mask |= SPOTFLOW_MQTT_NOTIFY_LOGS;
 				}
 			}
+			spotflow_poll_and_process_enqueued_metrics();
 			xEventGroupClearBits(spotflow_mqtt_event_group, clear_mask);
 		} else {
 			SPOTFLOW_LOG("MQTT outbox not empty; waiting for messages to be sent.\n");
