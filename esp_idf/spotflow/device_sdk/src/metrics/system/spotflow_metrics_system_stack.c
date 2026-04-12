@@ -277,11 +277,8 @@ static void report_thread_stack(TaskHandle_t thread, void* user_data)
 
 	struct spotflow_label labels[] = { { .key = "thread", .value = thread_label } };
 
-	int64_t unused_bytes_capped =
-	    (unused_bytes > INT64_MAX) ? INT64_MAX : (int64_t)unused_bytes;
-
-	int rc = spotflow_report_metric_int_with_labels(g_stack_free_metric, unused_bytes_capped,
-							labels, 1);
+	int rc =
+	    spotflow_report_metric_int_with_labels(g_stack_free_metric, unused_bytes, labels, 1);
 	if (rc < 0) {
 		SPOTFLOW_LOG("Failed to report stack free metric for %s: %d", thread_label, rc);
 	}

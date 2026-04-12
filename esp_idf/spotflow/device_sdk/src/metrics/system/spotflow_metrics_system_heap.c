@@ -56,17 +56,12 @@ void spotflow_metrics_system_heap_collect(void)
 	size_t total_bytes = heap_caps_get_total_size(MALLOC_CAP_DEFAULT);
 	size_t allocated_bytes = total_bytes - free_bytes;
 
-	/* Cap to INT64_MAX */
-	int64_t free_bytes_capped = (free_bytes > INT64_MAX) ? INT64_MAX : (int64_t)free_bytes;
-	int64_t allocated_bytes_capped =
-	    (allocated_bytes > INT64_MAX) ? INT64_MAX : (int64_t)allocated_bytes;
-
-	int rc = spotflow_report_metric_int(g_heap_free_metric, free_bytes_capped);
+	int rc = spotflow_report_metric_int(g_heap_free_metric, free_bytes);
 	if (rc < 0) {
 		SPOTFLOW_LOG("Failed to report heap free");
 	}
 
-	rc = spotflow_report_metric_int(g_heap_allocated_metric, allocated_bytes_capped);
+	rc = spotflow_report_metric_int(g_heap_allocated_metric, allocated_bytes);
 	if (rc < 0) {
 		SPOTFLOW_LOG("Failed to report heap allocated");
 	}

@@ -159,20 +159,15 @@ void spotflow_metrics_system_network_collect(void)
 		uint64_t tx = g_hooks[i].tx_bytes;
 		uint64_t rx = g_hooks[i].rx_bytes;
 
-		int64_t tx_capped = (tx > INT64_MAX) ? INT64_MAX : (int64_t)tx;
-		int64_t rx_capped = (rx > INT64_MAX) ? INT64_MAX : (int64_t)rx;
-
 		struct spotflow_label labels[] = { { .key = "interface",
 						     .value = g_hooks[i].name } };
 
-		int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, tx_capped,
-								labels, 1);
+		int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, tx, labels, 1);
 		if (rc < 0) {
 			SPOTFLOW_LOG("Failed to report TX for %s", g_hooks[i].name);
 		}
 
-		rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, rx_capped, labels,
-							    1);
+		rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, rx, labels, 1);
 		if (rc < 0) {
 			SPOTFLOW_LOG("Failed to report RX for %s", g_hooks[i].name);
 		}
