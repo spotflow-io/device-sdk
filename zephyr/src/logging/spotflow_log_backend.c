@@ -112,6 +112,7 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 
 	if (rc < 0) {
 		LOG_DBG("Failed to encode message: %d", rc);
+		process_single_message_stats_update(ctx, true /* dropped */);
 		return;
 	}
 
@@ -120,6 +121,7 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 	if (!mqtt_msg) {
 		LOG_DBG("Failed to allocate memory for message");
 		k_free(cbor_data);
+		process_single_message_stats_update(ctx, true /* dropped */);
 		return;
 	}
 

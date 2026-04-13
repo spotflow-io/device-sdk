@@ -55,15 +55,19 @@ int spotflow_cbor_encode_log(struct log_msg* log_msg, size_t sequence_number,
 	https://docs.zephyrproject.org/latest/services/formatted_output.html#cbprintf-package-format */
 	size_t plen;
 	uint8_t* package = log_msg_get_package(log_msg, &plen);
-	get_formatted_message(output_context, package);
+	int rc = get_formatted_message(output_context, package);
+	if (rc < 0) {
+		LOG_DBG("Failed to get formatted message: %d", rc);
+		return rc;
+	}
 
 	/* get message template */
 	struct cbprintf_package_hdr_ext* hdr = (struct cbprintf_package_hdr_ext*)package;
 	const char* message_template = hdr->fmt;
 
 	size_t cbor_len;
-	int rc = encode_cbor_spotflow(&metadata, output_context->log_msg, message_template,
-				      output_context->cbor_buf, &cbor_len);
+	rc = encode_cbor_spotflow(&metadata, output_context->log_msg, message_template,
+				  output_context->cbor_buf, &cbor_len);
 	if (rc < 0) {
 		LOG_DBG("Failed to encode spotflow log message %d", rc);
 		return rc;
@@ -102,6 +106,8 @@ static int get_formatted_message(struct spotflow_cbor_output_context* output_con
 	output_context->log_msg_ctr = 0;
 	int rc = cbpprintf(cb_out, output_context, package);
 	if (output_context->log_msg_ctr >= CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
+		LOG_DBG("Log message buffer overflow, total length: %zu bytes",
+			output_context->log_msg_ctr);
 		return -ENOMEM;
 	}
 	output_context->log_msg[output_context->log_msg_ctr++] = '\0';
