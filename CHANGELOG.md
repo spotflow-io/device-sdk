@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added check of `CONFIG_MBEDTLS_MPI_MAX_SIZE` in CMake and explicitly set it for Nordic boards in samples
 * Hiding CPU system metrics on unsupported platforms
 * Added const modifier to the variable holding the certificate
+* Fixed checking of errors during log message encoding
+* Added unencoded and unallocated log messages to drop statistics
 
 ## [0.7.0] - 2025-11-18
 ### Added
