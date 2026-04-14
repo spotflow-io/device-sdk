@@ -212,8 +212,11 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 				const char* formatted_message, const char* message_template,
 				uint8_t buf[], size_t* encoded_len)
 {
-	const size_t map_key_value_pairs =
-		CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE ? 6 : 5;
+#if CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
+	const size_t map_key_value_pairs = 6;
+#else
+	const size_t map_key_value_pairs = 5;
+#endif
 
 	/* zcbor supports state arrays; we need 2 states for nested array */
 	zcbor_state_t state[ZCBOR_STATE_DEPTH];
