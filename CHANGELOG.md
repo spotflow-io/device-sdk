@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added support for Silicon Labs board DK2605A (siwx917_dk2605a).
 * Added recognition of ENOSYS status when getting reset cause.
 * Added a hash check on coredump partition to make sure coredump is valid.
+* Added Zephyr Kconfig option `CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE` to control whether log body template is sent with log body, reducing CBOR payload size when disabled.
 
 ### Removed
 * Removed configdefault for MAIN_STACK_SIZE
@@ -34,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added const modifier to the variable holding the certificate
 * Fixed checking of errors during log message encoding
 * Added unencoded and unallocated log messages to drop statistics
+* Deferred Wi-Fi reconnect from `wifi_event_handler` to workqueue context in Zephyr samples to avoid callback stack overflow; retry delay set to 2 seconds
 
 ## [0.7.0] - 2025-11-18
 ### Added

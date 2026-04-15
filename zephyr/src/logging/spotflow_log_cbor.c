@@ -212,6 +212,12 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 				const char* formatted_message, const char* message_template,
 				uint8_t buf[], size_t* encoded_len)
 {
+#if CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
+	const size_t map_key_value_pairs = 6;
+#else
+	const size_t map_key_value_pairs = 5;
+#endif
+
 	/* zcbor supports state arrays; we need 2 states for nested array */
 	zcbor_state_t state[ZCBOR_STATE_DEPTH];
 
@@ -221,8 +227,8 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 	/* using instead of ZCBOR_STATE_E because we need multiple state because of nested array */
 	zcbor_new_encode_state(state, ZCBOR_STATE_DEPTH, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1);
 
-	/* start outer map with 6 key/value pairs */
-	succ = zcbor_map_start_encode(state, 6);
+	/* start outer map */
+	succ = zcbor_map_start_encode(state, map_key_value_pairs);
 
 	/* messageType: "LOG" */
 	succ = succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
@@ -239,12 +245,14 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 	succ = succ && zcbor_uint32_put(state, KEY_BODY);
 	succ = succ && zcbor_tstr_put_term(state, formatted_message, SIZE_MAX);
 
+#if CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
 	/* bodyTemplate */
 	succ = succ && zcbor_uint32_put(state, KEY_BODY_TEMPLATE);
 	succ = succ && zcbor_tstr_put_term(state, message_template, SIZE_MAX);
+#endif
 
 	/* finish cbor */
-	succ = succ && zcbor_map_end_encode(state, 6);
+	succ = succ && zcbor_map_end_encode(state, map_key_value_pairs);
 
 	if (succ != true) {
 		LOG_DBG("Failed to encode cbor: %d", zcbor_peek_error(state));
