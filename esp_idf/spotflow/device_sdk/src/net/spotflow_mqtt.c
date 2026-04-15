@@ -13,7 +13,9 @@
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 #include "coredump/spotflow_coredump_net.h"
 #endif
-
+#ifdef CONFIG_SPOTFLOW_METRICS
+#include "metrics/spotflow_metrics_net.h"
+#endif
 esp_mqtt_client_handle_t spotflow_client = NULL;
 static TaskHandle_t mqtt_publish_task_handle = NULL;
 EventGroupHandle_t spotflow_mqtt_event_group;
@@ -139,7 +141,7 @@ void spotflow_mqtt_publish(void* pvParameters)
 {
 	const EventBits_t ALL_BITS = SPOTFLOW_MQTT_NOTIFY_COREDUMP |
 		SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG |
-		SPOTFLOW_MQTT_NOTIFY_LOGS;
+		SPOTFLOW_MQTT_NOTIFY_LOGS | SPOTFLOW_MQTT_NOTIFY_METRICS;
 
 	while (1) {
 		EventBits_t notify_value = xEventGroupWaitBits(
@@ -180,6 +182,12 @@ void spotflow_mqtt_publish(void* pvParameters)
 				clear_mask |= SPOTFLOW_MQTT_NOTIFY_LOGS;
 				}
 			}
+#ifdef CONFIG_SPOTFLOW_METRICS
+			if (notify_value & SPOTFLOW_MQTT_NOTIFY_METRICS) {
+				spotflow_poll_and_process_enqueued_metrics();
+				clear_mask |= SPOTFLOW_MQTT_NOTIFY_METRICS;
+			}
+#endif
 			xEventGroupClearBits(spotflow_mqtt_event_group, clear_mask);
 		} else {
 			SPOTFLOW_LOG("MQTT outbox not empty; waiting for messages to be sent.\n");

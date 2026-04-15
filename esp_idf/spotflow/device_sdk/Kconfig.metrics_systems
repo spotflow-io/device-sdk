@@ -1,0 +1,109 @@
+menuconfig SPOTFLOW_METRICS_SYSTEM
+	bool "Enable Spotflow system metrics auto-collection"
+	default y
+	help
+	  Enable automatic collection of system-level metrics (memory, network, CPU, etc.).
+	  These metrics are collected periodically and reported to the cloud without
+	  requiring any application code.
+
+if SPOTFLOW_METRICS_SYSTEM
+config SPOTFLOW_METRICS_SYSTEM_HEAP
+	bool "Enable heap metrics"
+	default y
+	help
+	  Collect heap memory statistics (free/allocated bytes).
+
+config SPOTFLOW_METRICS_SYSTEM_NETWORK
+	bool "Enable network metrics"
+	select LWIP_STATS
+	default y
+	help
+	  Collect network traffic statistics (TX/RX bytes).
+
+if SPOTFLOW_METRICS_SYSTEM_NETWORK
+
+config SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES
+	int "Maximum number of network interfaces to track"
+	range 1 16
+	default 4
+	help
+	  Maximum number of network interfaces for metrics collection.
+	  Each interface is tracked with separate TX/RX metrics.
+
+endif # SPOTFLOW_METRICS_SYSTEM_NETWORK
+
+config SPOTFLOW_METRICS_SYSTEM_CPU
+	bool "Enable CPU utilization metrics"
+	select FREERTOS_USE_STATS_FORMATTING_FUNCTIONS
+	select FREERTOS_GENERATE_RUN_TIME_STATS
+	default y
+	help
+	  Collect CPU utilization percentage.
+
+config SPOTFLOW_METRICS_SYSTEM_CONNECTION
+	bool "Enable connection state metrics"
+	default y
+	help
+	  Report MQTT connection state changes (connected=1, disconnected=0).
+	  Event-driven metric (not periodic).
+
+config SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE
+	bool "Enable reset cause metric"
+	default y
+	help
+	  Report device reset cause on boot (power-on, watchdog, etc.).
+	  Event-driven metric (reported once on boot, not periodic).
+
+config SPOTFLOW_METRICS_SYSTEM_STACK
+	bool "Enable thread stack metrics"
+	select FREERTOS_USE_TRACE_FACILITY
+	select FREERTOS_SUPPORT_STATIC_ALLOCATION
+	default y
+	help
+	  Collect thread stack usage statistics (free bytes per thread).
+	  Requires FREERTOS_USE_TRACE_FACILITY and FREERTOS_SUPPORT_STATIC_ALLOCATION to be enabled.
+
+if SPOTFLOW_METRICS_SYSTEM_STACK
+
+config SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
+	bool "Automatically track all threads"
+	default y
+	help
+	  Automatically collect stack metrics for all threads in the system.
+
+config SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS
+	int "Maximum number of tracked threads"
+	range 1 128
+	default 32
+	help
+	  Maximum number of threads for stack metrics.
+	  This sets the max time series allocated for the metric.
+	  When automatic tracking is disabled, also limits the
+	  number of threads that can be manually registered.
+
+endif # SPOTFLOW_METRICS_SYSTEM_STACK
+
+config SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL
+	int "System metrics collection interval (seconds)"
+	default 10
+	range 1 360
+	help
+	  How often to sample system metrics (memory, CPU, network, etc.).
+	  Valid range: 1-360 seconds.
+	  Lower values increase CPU overhead but provide finer granularity.
+
+config SPOTFLOW_METRICS_SYSTEM_AGGREGATION_INTERVAL
+	int "System metrics aggregation interval (seconds)"
+	default 60
+	help
+	  Aggregation window for system metrics before sending to cloud.
+	  Allowed values: 0, 60, 3600, 86400 (validated at build time).
+	  0 = PT0S (no aggregation - send each sample immediately)
+	  60 = PT1M (1 minute aggregation window)
+	  3600 = PT1H (1 hour aggregation window)
+	  86400 = P1D (1 day aggregation window)
+
+	  With PT0S, each collection produces a separate message.
+	  With aggregation, samples within the window are combined (min/max/sum/count).
+
+endif # SPOTFLOW_METRICS_SYSTEM
