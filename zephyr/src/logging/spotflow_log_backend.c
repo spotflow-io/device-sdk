@@ -21,7 +21,7 @@ K_MSGQ_DEFINE(g_spotflow_logs_msgq, sizeof(struct spotflow_mqtt_logs_msg*),
 	      CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE, 1);
 
 struct spotflow_log_context {
-	struct spotflow_cbor_output_context* cbor_output_context;
+	struct spotflow_cbor_output_context cbor_output_context;
 	size_t dropped_backend_count;
 	size_t message_index;
 };
@@ -77,11 +77,8 @@ static void init(const struct log_backend* const backend)
 
 	__ASSERT(backend->cb->ctx != NULL, "Spotflow log backend context is NULL");
 	struct spotflow_log_context* ctx = backend->cb->ctx;
-	int rc = spotflow_cbor_output_context_init(&ctx->cbor_output_context);
-	if (rc < 0) {
-		LOG_ERR("Failed to initialize spotflow output context: %d", rc);
-		return;
-	}
+	ctx->cbor_output_context.cbor_len = 0;
+	ctx->cbor_output_context.log_msg_ctr = 0;
 	ctx->dropped_backend_count = 0;
 	ctx->message_index = 0;
 
@@ -107,7 +104,7 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 
 	uint8_t* cbor_data = NULL;
 	size_t cbor_data_len = 0;
-	int rc = spotflow_cbor_encode_log(log_msg, ctx->message_index, ctx->cbor_output_context,
+	int rc = spotflow_cbor_encode_log(log_msg, ctx->message_index, &ctx->cbor_output_context,
 					  &cbor_data, &cbor_data_len);
 
 	if (rc < 0) {
