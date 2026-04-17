@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+/* Current heartbeat payload encodes to ~35 bytes; keep margin for future fields. */
+#define SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN 64
+
 /**
  * @brief Encode metric message to CBOR format
  *
@@ -48,13 +51,14 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
  * }
  *
  * @param uptime_ms Device uptime in milliseconds
- * @param data Output pointer for allocated CBOR data (caller must free if not enqueued)
+ * @param buffer Output buffer for encoded CBOR data
+ * @param buffer_size Size of output buffer in bytes
  * @param len Output pointer for CBOR data length
  * @return 0 on success, negative errno on failure
  *         -EINVAL: CBOR encoding failed
- *         -ENOMEM: Memory allocation failed
  */
-int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, size_t* len);
+int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t* buffer,
+					   size_t buffer_size, size_t* len);
 
 #ifdef __cplusplus
 }
