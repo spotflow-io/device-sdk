@@ -30,7 +30,7 @@ static void heartbeat_work_handler(struct k_work* work)
 	/* Encode heartbeat message */
 	size_t len = 0;
 	int rc = spotflow_metrics_cbor_encode_heartbeat(uptime_ms, g_pending_heartbeat_payload,
-						      sizeof(g_pending_heartbeat_payload), &len);
+							sizeof(g_pending_heartbeat_payload), &len);
 	if (rc != 0) {
 		LOG_ERR("Failed to encode heartbeat: %d", rc);
 		goto reschedule;

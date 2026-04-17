@@ -57,8 +57,8 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
  * @return 0 on success, negative errno on failure
  *         -EINVAL: CBOR encoding failed
  */
-int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t* buffer,
-					   size_t buffer_size, size_t* len);
+int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t* buffer, size_t buffer_size,
+					   size_t* len);
 
 #ifdef __cplusplus
 }
