@@ -1,0 +1,30 @@
+menuconfig SPOTFLOW_OTA
+	bool "Enable Spotflow over-the-air (OTA) updates"
+	depends on SPOTFLOW && BOOTLOADER_MCUBOOT
+	select FLASH
+	select FLASH_MAP
+	select STREAM_FLASH
+	select IMG_MANAGER
+	select IMG_ERASE_PROGRESSIVELY
+	select REBOOT
+	select HTTP_CLIENT
+	default n
+
+if SPOTFLOW_OTA
+
+config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_OTA
+	int "Additional heap size required by Spotflow OTA"
+	# TODO: Find adequate value (this is probably too much)
+	default 32768
+	help
+		Additional heap size required by Spotflow OTA.
+		Increase this value if you experience issues with OTA updates.
+
+config SPOTFLOW_OTA_DOWNLOAD_THREAD_STACK_SIZE
+	int "Stack size for the OTA download thread"
+	default 4096
+	help
+	  Stack size in bytes for the dedicated OTA firmware download thread.
+	  Increase if you observe stack overflows during TLS or HTTP operations.
+
+endif # SPOTFLOW_OTA
