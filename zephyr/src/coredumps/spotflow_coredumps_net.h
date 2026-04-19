@@ -5,8 +5,7 @@
 extern "C" {
 #endif
 
-void spotflow_init_core_dumps_polling();
-int spotflow_poll_and_process_enqueued_coredump_chunks();
+int spotflow_poll_and_process_enqueued_coredump_chunks(void);
 
 #ifdef __cplusplus
 }

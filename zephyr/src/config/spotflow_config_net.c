@@ -50,10 +50,13 @@ int spotflow_config_send_pending_message()
 	}
 
 	rc = spotflow_mqtt_publish_config_cbor_msg(pending_message_buffer, pending_message_length);
+	if (rc == -EAGAIN) {
+		/* Temporary, retry later without aborting connection */
+		k_mutex_unlock(&pending_message_mutex);
+		return rc;
+	}
 	if (rc < 0) {
-		LOG_ERR("Failed to publish reported configuration message: %d -> "
-			"aborting mqtt connection",
-			rc);
+		LOG_ERR("Failed to publish config message: %d, aborting connection", rc);
 		spotflow_mqtt_abort_mqtt();
 	}
 

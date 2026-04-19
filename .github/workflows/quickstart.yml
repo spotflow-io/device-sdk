@@ -1,0 +1,303 @@
+name: Test and publish Quickstart-related files
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'zephyr/ci/**'
+      - 'zephyr/manifests/**'
+      - '.github/workflows/quickstart.yml'
+  pull_request:
+    paths:
+      - 'zephyr/ci/**'
+      - 'zephyr/manifests/**'
+      - '.github/workflows/quickstart.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+
+  generate-quickstart-json:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Generate quickstart.json
+        run: python zephyr/ci/generate_quickstart_json.py
+
+      - name: Upload quickstart.json artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: quickstart-json
+          path: zephyr/ci/quickstart.json
+
+  test-spotflowup:
+    needs: generate-quickstart-json
+    runs-on: ${{ matrix.environment.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        script: [powershell, bash]
+        environment:
+          - os: ubuntu-latest
+            workspace_dir: test-workspace
+            nrfutil_link: x86_64-unknown-linux-gnu/nrfutil
+          - os: macos-latest
+            workspace_dir: test-workspace
+            nrfutil_link: universal-apple-darwin/nrfutil
+          - os: windows-latest
+            workspace_dir: D:\test-workspace
+            nrfutil_link: x86_64-pc-windows-msvc/nrfutil.exe
+        example:
+          - sdk_flag: ncs
+            board: nrf7002dk
+            board_target: nrf7002dk/nrf5340/cpuapp/ns
+            module_path: spotflow
+          - sdk_flag: zephyr
+            board: frdm_rw612
+            board_target: frdm_rw612
+            module_path: modules/lib/spotflow
+        exclude:
+          - script: bash
+            environment:
+              os: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download quickstart.json artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quickstart-json
+          path: ./quickstart-artifact
+
+      - name: Serve quickstart.json using nginx on default port 80 (Ubuntu)
+        if: matrix.environment.os == 'ubuntu-latest'
+        run: |
+          sudo cp ./quickstart-artifact/quickstart.json /var/www/html/
+          sudo systemctl restart nginx
+          sleep 2
+
+      - name: Serve quickstart.json using nginx on default port 8080 (macOS)
+        if: matrix.environment.os == 'macos-latest'
+        run: |
+          brew install nginx
+
+          cp ./quickstart-artifact/quickstart.json /opt/homebrew/var/www/
+          brew services start nginx
+          sleep 2
+
+      - name: Serve quickstart.json using nginx on default port 80 (Windows)
+        if: matrix.environment.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $nginxPath = "C:\tools\nginx-*"
+          $nginxDir = (Get-Item $nginxPath).FullName
+          $htmlDir = Join-Path $nginxDir "html"
+
+          Copy-Item ./quickstart-artifact/quickstart.json $htmlDir/
+
+          # Replace IIS listening on port 80 by nginx
+          Stop-Service -Name w3svc
+          Set-Service -Name nginx -StartupType Manual
+          Start-Service -Name nginx
+          Start-Sleep -Seconds 2
+
+      # Windows runner contains Python 3.9, update to the minimum required version
+      - name: Install Python
+        if: runner.os == 'Windows'
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.10'
+
+      # Needed for Zephyr SDK installation, not available on Windows runner
+      - name: Install wget
+        if: runner.os == 'Windows'
+        run: choco install wget
+
+      - name: Install nRF Util
+        if: matrix.example.sdk_flag == 'ncs'
+        shell: pwsh
+        run: |
+          $baseUrl = "https://files.nordicsemi.com/artifactory/swtools/external/nrfutil/executables"
+          $url = "$baseUrl/${{ matrix.environment.nrfutil_link }}"
+          if ($IsWindows) {
+            $output = "nrfutil.exe"
+          } else {
+            $output = "nrfutil"
+          }
+
+          Write-Host "Downloading nrfutil from $url"
+          Invoke-WebRequest -Uri $url -OutFile $output
+
+          if (-not $IsWindows) {
+            chmod +x $output
+          }
+
+          # Add to PATH for subsequent steps
+          $nrfutilDir = (Get-Item $output).DirectoryName
+          echo "$nrfutilDir" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+          # Verify installation
+          & ./$output --version
+
+          # Prevent infinite wait for admin consent to create this folder on macOS
+          if ($IsMacOS) {
+            sudo mkdir -p /opt/nordic/ncs
+            sudo chgrp staff /opt/nordic/ncs
+            sudo chmod 3775 /opt/nordic/ncs
+          }
+
+      - name: Run spotflowup.ps1
+        if: matrix.script == 'powershell'
+        shell: pwsh
+        run: >
+          $nginxPort="${{ matrix.environment.os == 'macos-latest' && '8080' || '80' }}"
+
+          ./zephyr/ci/spotflowup.ps1
+          -${{ matrix.example.sdk_flag }}
+          -board ${{ matrix.example.board }}
+          -workspaceFolder ${{ matrix.environment.workspace_dir }}
+          -spotflowRevision ${{ github.sha }}
+          -quickstartJsonUrl "http://localhost:$nginxPort/quickstart.json"
+          -gitHubToken ${{ secrets.GITHUB_TOKEN }}
+          -autoConfirm
+
+      - name: Run spotflowup.sh
+        if: matrix.script == 'bash'
+        shell: bash
+        run: >
+          nginx_port="${{ matrix.environment.os == 'macos-latest' && '8080' || '80' }}"
+
+          source ./zephyr/ci/spotflowup.sh
+          --${{ matrix.example.sdk_flag }}
+          --board ${{ matrix.example.board }}
+          --workspace-folder ${{ matrix.environment.workspace_dir }}
+          --spotflow-revision ${{ github.sha }}
+          --quickstart-json-url "http://localhost:$nginx_port/quickstart.json"
+          --github-token ${{ secrets.GITHUB_TOKEN }}
+          --auto-confirm
+
+      - name: Build Zephyr application
+        if: matrix.example.sdk_flag == 'zephyr'
+        shell: pwsh
+        working-directory: ${{ matrix.environment.workspace_dir }}
+        run: |
+          # Activate virtual environment
+          if ($IsWindows) {
+            .venv/Scripts/Activate.ps1
+          } else {
+            .venv/bin/Activate.ps1
+          }
+
+          Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
+          west build --board ${{ matrix.example.board_target }}
+
+      - name: Build nRF Connect SDK application
+        if: matrix.example.sdk_flag == 'ncs'
+        shell: pwsh
+        working-directory: ${{ matrix.environment.workspace_dir }}
+        run: |
+          $ncsVersion = Get-Content nrf/VERSION
+
+          Set-Location "${{ matrix.example.module_path }}/zephyr/samples/logs"
+          nrfutil sdk-manager toolchain launch --ncs-version "v$ncsVersion" -- `
+            west build --board ${{ matrix.example.board_target }}
+
+  publish-downloads:
+    needs: test-spotflowup
+    # Don't run in forks and PRs
+    if: github.repository == 'spotflow-io/device-sdk' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+    environment: cdn
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download quickstart.json artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: quickstart-json
+          path: ./quickstart-artifact
+
+      - name: Login to Azure
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.DOWNLOADS_CDN_SUBSCRIPTION_ID }}
+
+      - name: Publish quickstart.json
+        run: >
+          az storage blob upload
+          --auth-mode login
+          --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
+          --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
+          --name 'quickstart.json'
+          --file './quickstart-artifact/quickstart.json'
+          --content-type 'application/json'
+          --overwrite
+
+      - name: Publish spotflowup.sh
+        run: >
+          az storage blob upload
+          --auth-mode login
+          --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
+          --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
+          --name 'spotflowup.sh'
+          --file './zephyr/ci/spotflowup.sh'
+          --content-type 'application/x-shellscript'
+          --overwrite
+
+      - name: Publish spotflowup.ps1
+        run: >
+          az storage blob upload
+          --auth-mode login
+          --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
+          --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
+          --name 'spotflowup.ps1'
+          --file './zephyr/ci/spotflowup.ps1'
+          --content-type 'application/powershell'
+          --overwrite
+
+      - name: Wait before purging CDN
+        run: sleep 60
+
+      - name: Purge quickstart.json in CDN
+        run: >
+          az cdn endpoint purge
+          --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
+          --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
+          --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
+          --content-paths '/quickstart.json'
+          --no-wait
+
+      - name: Purge spotflowup.sh in CDN
+        run: >
+          az cdn endpoint purge
+          --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
+          --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
+          --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
+          --content-paths '/spotflowup.sh'
+          --no-wait
+
+      - name: Purge spotflowup.ps1 in CDN
+        run: >
+          az cdn endpoint purge
+          --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
+          --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
+          --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
+          --content-paths '/spotflowup.ps1'
+          --no-wait
