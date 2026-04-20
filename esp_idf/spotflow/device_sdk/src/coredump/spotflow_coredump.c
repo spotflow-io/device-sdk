@@ -17,7 +17,7 @@
 #include "buildid/spotflow_build_id.h"
 #endif
 
-// static const char* TAG = "SPOTFLOW_COREDUMP";
+static const char* TAG = "SPOTFLOW_COREDUMP";
 
 #define COREDUMP_PARTITION_NAME "coredump"
 
@@ -71,7 +71,7 @@ esp_err_t spotflow_coredump_backend(void)
 {
 	size_t coredump_addr = 0;
 	size_t coredump_size = 0;
-
+	int rc = 0;
 	// Retrieve the coredump image address and size
 	esp_err_t err = esp_core_dump_image_get(&coredump_addr, &coredump_size);
 	if (err != ESP_OK) {
@@ -120,8 +120,17 @@ esp_err_t spotflow_coredump_backend(void)
 		return ESP_ERR_NO_MEM;
 	}
 
+	err = esp_core_dump_image_check();
+	if (err != ESP_OK) {
+		SPOTFLOW_LOG("Coredump is invalid, will attempt to send error report to cloud.");
+		ESP_LOGE(TAG, "Coredump is invalid: checksum mismatch.");
+
+		// Send an empty coredump to at least indicate that the error occurred
+		coredump_info.size = 0;
+	}
+
 	// Process coredump in chunks
-	while (coredump_info.offset < coredump_info.size) {
+	do {
 		// Calculate remaining size and current chunk size
 		size_t remaining_size = coredump_info.size - coredump_info.offset;
 		size_t current_chunk_size =
@@ -150,7 +159,7 @@ esp_err_t spotflow_coredump_backend(void)
 
 #ifdef CONFIG_SPOTFLOW_USE_BUILD_ID
 		if (coredump_info.chunk_ordinal == 0) {
-			int rc = spotflow_build_id_get(&build_id, &build_id_len);
+			rc = spotflow_build_id_get(&build_id, &build_id_len);
 			if (rc != 0) {
 				SPOTFLOW_LOG("Failed to get build ID for coredump: %d", rc);
 			} else {
@@ -165,7 +174,7 @@ esp_err_t spotflow_coredump_backend(void)
 
 		int64_t device_uptime_ms = esp_timer_get_time() / 1000;
 
-		int rc = spotflow_cbor_encode_coredump(
+		rc = spotflow_cbor_encode_coredump(
 		    chunk_buffer, current_chunk_size, coredump_info.chunk_ordinal,
 		    coredump_info.coredump_id, is_last_chunk, build_id, build_id_len,
 		    device_uptime_ms, &cbor_data, &cbor_data_len);
@@ -189,11 +198,17 @@ esp_err_t spotflow_coredump_backend(void)
 		coredump_info.chunk_ordinal++;
 		coredump_info.offset += current_chunk_size;
 
-		SPOTFLOW_LOG("Sent chunk %d: %zu/%zu bytes (%.1f%%)\n",
-			     coredump_info.chunk_ordinal - 1, coredump_info.offset,
-			     coredump_info.size,
-			     (float)coredump_info.offset * 100.0f / coredump_info.size);
-	}
+		if (coredump_info.size > 0) {
+			SPOTFLOW_LOG("Sent chunk %d: %zu/%zu bytes (%.1f%%)\n",
+				coredump_info.chunk_ordinal - 1, coredump_info.offset,
+				coredump_info.size,
+				(float)coredump_info.offset * 100.0f / coredump_info.size);
+		}
+		else {
+			SPOTFLOW_LOG("Sent chunk %d: 0/0 bytes (100%%) - Invalid coredump report sent\n",
+				coredump_info.chunk_ordinal - 1);
+		}
+	} while (coredump_info.offset < coredump_info.size);
 
 	free(chunk_buffer);
 	SPOTFLOW_LOG(

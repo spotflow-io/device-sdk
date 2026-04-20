@@ -40,6 +40,14 @@ config SPOTFLOW_CBOR_LOG_MAX_LEN
 		Size of the buffer used by Spotflow logging backend to serialize the logs to CBOR format.
 		Increase this value if you experience issues with logs being dropped because of buffer overflow.
 
+config SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
+	bool "Include log body template in sent logs"
+	default y
+	help
+		If enabled, logs sent to Spotflow include both the interpolated log message body and the
+		original format template.
+		If disabled, only the interpolated body is sent, reducing CBOR payload size.
+
 config SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL
 	int "Spotflow SDK log component log level"
 	default SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL

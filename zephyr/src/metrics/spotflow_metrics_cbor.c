@@ -186,10 +186,14 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 	return 0;
 }
 
-int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, size_t* len)
+int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t* buffer, size_t buffer_size,
+					   size_t* len)
 {
-	uint8_t buffer[64]; /* Small static buffer for ~40 bytes output */
-	ZCBOR_STATE_E(state, 1, buffer, sizeof(buffer), 1);
+	if (buffer == NULL || len == NULL) {
+		return -EINVAL;
+	}
+
+	ZCBOR_STATE_E(state, 1, buffer, buffer_size, 1);
 
 	bool succ = true;
 
@@ -219,16 +223,7 @@ int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, si
 		return -EINVAL;
 	}
 
-	/* Allocate and copy */
-	size_t encoded_len = state->payload - buffer;
-	*data = k_malloc(encoded_len);
-	if (!*data) {
-		LOG_ERR("Failed to allocate heartbeat payload");
-		return -ENOMEM;
-	}
-
-	memcpy(*data, buffer, encoded_len);
-	*len = encoded_len;
+	*len = state->payload - buffer;
 
 	return 0;
 }
