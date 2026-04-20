@@ -1,0 +1,13 @@
+/* External flash chip - Winbond */
+&w25q64jvssiq {
+	partitions {
+		storage_partition: partition@0 {
+			label = "storage";
+			reg = <0x0 0x100000>; /* first 1MB of 8 MB flash */
+		};
+		coredump_partition: partition@700000 {
+			label = "coredump-partition";
+			reg = <0x700000 0x100000>; /* last 1MB of 8 MB flash */
+		};
+	};
+};

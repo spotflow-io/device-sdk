@@ -19,9 +19,7 @@
 	};
 };
 
-/* External flash chip - winbond - for more information see:
- * zephyr/boards/nxp/frdm_rw612/frdm_rw612_common.dtsi
- */
+/* External flash chip - Winbond */
 &w25q512jvfiq {
 	partitions {
 		coredump_partition: partition@3f00000 {
