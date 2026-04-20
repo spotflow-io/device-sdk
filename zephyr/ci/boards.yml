@@ -340,6 +340,10 @@ vendors:
       - id: nucleo_h7a3zi_q
         name: Nucleo H7A3ZI-Q
 
+      - id: nucleo_h7s3l8
+        name: Nucleo H7S3L8
+        board: nucleo_h7s3l8/stm32h7s3xx/ext_flash_app
+
       - id: nucleo_n657x0_q
         name: Nucleo N657X0-Q
 
