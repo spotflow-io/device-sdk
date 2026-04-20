@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 
 # Include the components directory of the main application:
 #
-set(EXTRA_COMPONENT_DIRS "../../../../device_sdk")
+set(EXTRA_COMPONENT_DIRS "../../../../../device_sdk")
 
 # Set the components to include the tests for.
 # This can be overridden from CMake cache:
