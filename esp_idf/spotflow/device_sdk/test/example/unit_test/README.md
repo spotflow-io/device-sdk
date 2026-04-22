@@ -1,6 +1,6 @@
 # Test skeleton
 
-This project is only for testing the componnent that's why it's main is inside the `test/example_unit_test.c`. For testing we are using the esp idf unity framework.
+This project is only for testing the component that's why it's main is inside the `test/main/example_unit_test.c`. For testing we are using the ESP-IDF Unity framework.
 ## Configurations
 
 ## Instructions for running the example.
