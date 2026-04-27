@@ -44,7 +44,7 @@ int spotflow_poll_and_process_enqueued_metrics(void)
 	/* Peek without removing */
 	rc = xQueuePeek(g_spotflow_metrics_msgq, &msg, 0);
 	if (rc != pdTRUE) {
-		return 0; /* Queue empty */
+		return SPOTFLOW_MESSAGE_QUEUE_EMPTY; /* Queue empty */
 	}
 
 	/* Publish while message is still safely in queue */
