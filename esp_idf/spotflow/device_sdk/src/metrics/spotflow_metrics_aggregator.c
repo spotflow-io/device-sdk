@@ -103,7 +103,7 @@ int aggregator_report_value(struct spotflow_metric_base* metric,
 
 	if (!ts) {
 		SPOTFLOW_LOG("Time series pool full for metric '%s' (%u/%u)", metric->name,
-			 ctx->timeseries_count, ctx->timeseries_capacity);
+			     ctx->timeseries_count, ctx->timeseries_capacity);
 		xSemaphoreGive(metric->lock);
 		return -ENOSPC;
 	}
@@ -290,12 +290,12 @@ static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 	int rc = spotflow_metrics_cbor_encode_no_aggregation(
 	    metric, labels, label_count, value_int, value_float, esp_timer_get_time() / 1000ULL,
 	    seq_num, &cbor_data, &cbor_len);
-	if (rc < 0)
-		return rc;
-
-	rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
-	if (rc < 0)
+	if (rc < 0) {
 		free(cbor_data);
+		return rc;
+	}
+	rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
+	free(cbor_data);
 	return rc;
 }
 
@@ -314,8 +314,7 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 	}
 
 	rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
-	if (rc < 0)
-		free(cbor_data);
+	free(cbor_data);
 	reset_timeseries_state(metric, ts);
 	return rc;
 }
