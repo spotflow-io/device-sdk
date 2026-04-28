@@ -137,6 +137,9 @@ vendors:
 
       - id: frdm_rw612
         name: FRDM-RW612
+        manifest: west-zephyr-nxp-frdm-rw612.yml
+        callout: >-
+          Zephyr 4.3.0 should be used because of an unknown error in coredump sample on Zephyr 4.4.0.
         blob: hal_nxp
         connection: ["ethernet", "wifi"]
         build_samples: ["logs"]
