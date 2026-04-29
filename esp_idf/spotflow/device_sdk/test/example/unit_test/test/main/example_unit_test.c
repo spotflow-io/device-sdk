@@ -18,11 +18,13 @@ void app_main(void)
     unity_run_all_tests();
     UNITY_END();
 
-    print_banner("Starting interactive test menu");
     /* This function will not return, and will be busy waiting for UART input.
      * Make sure that task watchdog is disabled if you use this function.
      */
+#ifdef CONFIG_SPOTFLOW_ENABLE_TEST_MENU
+    print_banner("Running tests using Unity's menu");
     unity_run_menu();
+#endif
 }
 
 static void print_banner(const char* text)
