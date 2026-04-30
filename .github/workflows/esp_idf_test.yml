@@ -6,11 +6,11 @@ on:
       - main
     paths:
       - 'esp_idf/**'
-      - '.github/workflows/esp-idf-test.yml'
+      - '.github/workflows/esp_idf_test.yml'
   pull_request:
     paths:
       - 'esp_idf/**'
-      - '.github/workflows/esp-idf-test.yml'
+      - '.github/workflows/esp_idf_test.yml'
 
 permissions:
   contents: read
@@ -33,72 +33,46 @@ jobs:
         with:
           submodules: 'recursive'
 
-      - name: Build unit test app
+      - name: Install expect
+        run: apt-get update && apt-get install -y expect
+
+      - name: Build and run unit tests
         run: |
           . /opt/esp/idf/export.sh
           cd esp_idf/spotflow/device_sdk/test/example/unit_test/test
           idf.py set-target esp32
-          idf.py build
-
-      - name: Run tests on QEMU and check results
-        run: |
-          . /opt/esp/idf/export.sh
-          cd esp_idf/spotflow/device_sdk/test/example/unit_test/test
-
-          echo "▶ Starting QEMU in background..."
-
-          qemu-system-xtensa \
-            -M esp32 \
-            -m 4M \
-            -drive file=build/qemu_flash.bin,if=mtd,format=raw \
-            -drive file=build/qemu_efuse.bin,if=none,format=raw,id=efuse \
-            -global driver=nvram.esp32.efuse,property=drive,value=efuse \
-            -global driver=timer.esp32.timg,property=wdt_disable,value=true \
-            -nic user,model=open_eth \
-            -nographic \
-            -serial tcp::5556,server,nowait \
-            > /tmp/qemu_stderr.txt 2>&1 &
-          QEMU_PID=$!
-          echo "QEMU PID: $QEMU_PID"
-
-          # Wait until TCP 5556 is accepting connections (up to 30s)
-          echo "▶ Waiting for QEMU to bind port 5556..."
-          for i in $(seq 1 30); do
-            if nc -z localhost 5556 2>/dev/null; then
-              echo "✅ QEMU port ready after ${i}s"
-              break
-            fi
-            if ! kill -0 "$QEMU_PID" 2>/dev/null; then
-              echo "❌ QEMU process died before port was ready"
-              cat /tmp/qemu_stderr.txt
+          
+          echo "Building and starting QEMU..."
+          
+          # Create expect script to monitor output and exit QEMU
+          cat > run_qemu.exp << 'EOF'
+          #!/usr/bin/expect -f
+          set timeout 600
+          log_file -a qemu_output.txt
+          
+          spawn idf.py qemu
+          
+          expect {
+            "Returned from app_main()" {
+              send "\x01x"
+              sleep 1
+              expect eof
+            }
+            timeout {
+              send "\x01x"
+              puts "Timeout reached"
               exit 1
-            fi
-            sleep 1
-          done
-
-          if ! nc -z localhost 5556 2>/dev/null; then
-            echo "❌ QEMU port 5556 never became ready"
-            cat /tmp/qemu_stderr.txt
-            exit 1
-          fi
-
-          echo "▶ Reading serial output..."
-          touch qemu_output.txt
-
-          timeout 120 bash -c '
-            while IFS= read -r line; do
-              echo "$line"
-              echo "$line" >> qemu_output.txt
-              if echo "$line" | grep -qE "^[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored"; then
-                break
-              fi
-            done < /dev/tcp/localhost/5556
-          ' || true
-
-          echo "▶ Stopping QEMU..."
-          kill "$QEMU_PID" 2>/dev/null || true
-          wait "$QEMU_PID" 2>/dev/null || true
-
+            }
+            eof {
+              puts "Unexpected EOF"
+              exit 1
+            }
+          }
+          EOF
+          
+          chmod +x run_qemu.exp
+          ./run_qemu.exp
+          
           echo ""
           echo "--- Test Summary ---"
           grep -E "PASS|FAIL|ERROR|Tests|Failures|Ignored" qemu_output.txt || true
@@ -107,16 +81,14 @@ jobs:
           SUMMARY=$(grep -E "^[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored" qemu_output.txt | tail -1)
 
           if [ -z "$SUMMARY" ]; then
-            echo "❌ No Unity summary line found — QEMU may have crashed or timed out"
-            echo "--- Full QEMU output ---"
+            echo "❌ No Unity summary line found — tests may not have completed"
+            echo "--- Full output ---"
             cat qemu_output.txt
-            echo "--- QEMU stderr ---"
-            cat /tmp/qemu_stderr.txt
             exit 1
           fi
 
           echo "Unity summary: $SUMMARY"
-          FAILURES=$(echo "$SUMMARY" | awk '{print $4}')
+          FAILURES=$(echo "$SUMMARY" | awk '{print $3}')
 
           if [ "$FAILURES" -eq 0 ]; then
             echo "✅ All tests passed"
