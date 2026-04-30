@@ -117,7 +117,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
       # Needed for Zephyr SDK installation, not available on Windows runner
       - name: Install wget

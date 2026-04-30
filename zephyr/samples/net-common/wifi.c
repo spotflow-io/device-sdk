@@ -1,4 +1,3 @@
-#include <errno.h>
 #include <stdbool.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -20,7 +19,6 @@ LOG_MODULE_REGISTER(spotflow_sample_wifi, LOG_LEVEL_INF);
 
 #define WIFI_SSID CONFIG_NET_WIFI_SSID
 #define WIFI_PSK CONFIG_NET_WIFI_PASSWORD
-#define WIFI_CONNECT_MAX_RETRIES 5
 #define WIFI_CONNECT_RETRY_DELAY_S 2
 
 static struct net_if* sta_iface;
@@ -42,7 +40,6 @@ static void schedule_wifi_reconnect(void);
 
 int connect_to_wifi(void)
 {
-	int retries = 0;
 	int ret;
 
 	if (!sta_iface) {
@@ -66,23 +63,12 @@ int connect_to_wifi(void)
 
 	LOG_INF("Connecting to SSID: %s", sta_config.ssid);
 
-	do {
-		ret =
-		    net_mgmt(NET_REQUEST_WIFI_CONNECT, sta_iface, &sta_config, sizeof(sta_config));
-		if (ret == 0) {
-			break;
-		}
-
-		if (retries++ < WIFI_CONNECT_MAX_RETRIES) {
-			LOG_WRN("Unable to connect to (%s): %d, retrying", WIFI_SSID, ret);
-			k_sleep(K_SECONDS(WIFI_CONNECT_RETRY_DELAY_S));
-		} else {
-			break;
-		}
-	} while (true);
+	/* Keep retries event-driven to avoid overlapping connect attempts. */
+	ret = net_mgmt(NET_REQUEST_WIFI_CONNECT, sta_iface, &sta_config, sizeof(sta_config));
 
 	if (ret) {
 		wifi_connect_in_progress = false;
+		schedule_wifi_reconnect();
 		LOG_ERR("Unable to Connect to (%s): %d", WIFI_SSID, ret);
 	}
 

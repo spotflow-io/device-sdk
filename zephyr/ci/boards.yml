@@ -1,6 +1,6 @@
 defaults:
   manifest: west-zephyr.yml
-  sdk_version: 0.17.4
+  sdk_version: 1.0.1
 
 vendors:
 
@@ -137,6 +137,11 @@ vendors:
 
       - id: frdm_rw612
         name: FRDM-RW612
+        manifest: west-zephyr-nxp-frdm-rw612.yml
+        sdk_version: 0.17.4
+        callout: >-
+          Zephyr 4.3.0 should be used because of an unknown error in coredump sample on
+          Zephyr 4.4.0.
         blob: hal_nxp
         connection: ["ethernet", "wifi"]
         build_samples: ["logs"]
@@ -243,11 +248,6 @@ vendors:
       - id: rpi_pico_w
         name: Raspberry Pi Pico W
         board: rpi_pico/rp2040/w
-        manifest: west-zephyr-raspberrypi-pico-w.yml
-        callout: >-
-          Zephyr 4.2.1 should be used because of the
-          <a href='https://github.com/zephyrproject-rtos/zephyr/issues/96224'>regression</a>
-          in Zephyr 4.3.0.
         build_samples: ["logs"]
 
       - id: rpi_pico2_w
@@ -338,6 +338,10 @@ vendors:
 
       - id: nucleo_h7a3zi_q
         name: Nucleo H7A3ZI-Q
+
+      - id: nucleo_h7s3l8
+        name: Nucleo H7S3L8
+        board: nucleo_h7s3l8/stm32h7s3xx/ext_flash_app
 
       - id: nucleo_n657x0_q
         name: Nucleo N657X0-Q
