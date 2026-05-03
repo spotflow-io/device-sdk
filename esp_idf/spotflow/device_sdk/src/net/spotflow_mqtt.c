@@ -169,6 +169,14 @@ void spotflow_mqtt_publish(void* pvParameters)
 			}
 			// If no coredump pending, send regular log messages
 #endif
+#ifdef CONFIG_SPOTFLOW_METRICS
+			if (notify_value & SPOTFLOW_MQTT_NOTIFY_METRICS) {
+				if (spotflow_poll_and_process_enqueued_metrics() ==
+				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
+					clear_mask |= SPOTFLOW_MQTT_NOTIFY_METRICS;
+				}
+			}
+#endif
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
 				spotflow_config_send_pending_message();
 				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
@@ -179,14 +187,6 @@ void spotflow_mqtt_publish(void* pvParameters)
 					clear_mask |= SPOTFLOW_MQTT_NOTIFY_LOGS;
 				}
 			}
-#ifdef CONFIG_SPOTFLOW_METRICS
-			if (notify_value & SPOTFLOW_MQTT_NOTIFY_METRICS) {
-				if (spotflow_poll_and_process_enqueued_metrics() ==
-				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
-					clear_mask |= SPOTFLOW_MQTT_NOTIFY_METRICS;
-				}
-			}
-#endif
 			xEventGroupClearBits(spotflow_mqtt_event_group, clear_mask);
 		} else {
 			SPOTFLOW_LOG("MQTT outbox not empty; waiting for messages to be sent.\n");

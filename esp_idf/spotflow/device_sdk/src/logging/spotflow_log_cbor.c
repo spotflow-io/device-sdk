@@ -44,6 +44,7 @@ typedef enum {
 // 	SPOTFLOW_LOG("\n");
 // }
 
+static uint8_t spotflow_log_cbor_convert_char_log_lvl(const char lvl);
 /**
  * @brief To create the message format for logs in CBOR format
  *
@@ -111,13 +112,12 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, size_t* out_len
 		cbor_encoder_close_container(&map_encoder, &labels_encoder); // }
 	}else{
 		SPOTFLOW_DEBUG("Log source is empty, skipping source field in CBOR");
-	}	
+	}
 
 	cbor_encoder_close_container(&array_encoder, &map_encoder); // }
 	// Allocate buffer for JSON string (adjust size as needed)
 
 	*out_len = cbor_encoder_get_buffer_size(&array_encoder, buf);
-	// print_cbor_hex(buf, *out_len);
 	return buf;
 }
 

@@ -152,7 +152,9 @@ void spotflow_metrics_system_network_collect(void)
 	}
 
 	// Iterate over all interfaces
-	for (int i = 0; i < esp_netif_get_nr_of_ifs(); i++) {
+	for (int i = 0; i < esp_netif_get_nr_of_ifs() &&
+	     i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES;
+	     i++) {
 		if (!g_hooks[i].active) {
 			continue;
 		}

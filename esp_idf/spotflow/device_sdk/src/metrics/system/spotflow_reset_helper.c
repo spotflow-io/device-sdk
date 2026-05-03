@@ -34,8 +34,8 @@ static const struct {
 	{ ESP_RST_EXT, "PIN" },
 	{ ESP_RST_SW, "SOFTWARE" },
 	{ ESP_RST_PANIC, "PANIC" },
-	{ ESP_RST_INT_WDT, "INT_WDT" },
-	{ ESP_RST_TASK_WDT, "TASK_WDT" },
+	{ ESP_RST_INT_WDT, "WATCHDOG_INTERRUPT" },
+	{ ESP_RST_TASK_WDT, "WATCHDOG_TASK" },
 	{ ESP_RST_WDT, "WATCHDOG" },
 	{ ESP_RST_DEEPSLEEP, "LOW_POWER_WAKE" },
 	{ ESP_RST_BROWNOUT, "BROWNOUT" },
@@ -48,6 +48,33 @@ static const struct {
 };
 
 #define RESET_CAUSE_COUNT (sizeof(reset_cause_map) / sizeof(reset_cause_map[0]))
+
+static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len);
+
+void spotflow_report_reboot_reason(void)
+{
+	uint32_t cause = esp_reset_reason();
+	char reset_str[64];
+
+	/* Report as immediate event metric */
+	static struct spotflow_metric_int* reset_cause_metric;
+	int rc = spotflow_register_metric_int_with_labels(
+	    SPOTFLOW_METRIC_NAME_BOOT_RESET, SPOTFLOW_AGG_INTERVAL_NONE, 1, 1, &reset_cause_metric);
+	if (rc < 0) {
+		SPOTFLOW_LOG("Failed to register reset cause metric: %d", rc);
+		return;
+	}
+
+	reset_cause_to_string(cause, reset_str, sizeof(reset_str));
+	struct spotflow_label labels[] = { { .key = "reason", .value = reset_str } };
+	rc = spotflow_report_metric_int_with_labels(reset_cause_metric, 1, labels, 1);
+	if (rc < 0) {
+		SPOTFLOW_LOG("Failed to report reset cause: %d", rc);
+		return;
+	}
+
+	SPOTFLOW_DEBUG("Reset cause reported: 0x%08x, %s", (unsigned int)cause, reset_str);
+}
 
 static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len)
 {
@@ -73,29 +100,4 @@ static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len)
 			first = false;
 		}
 	}
-}
-
-void spotflow_report_reboot_reason(void)
-{
-	uint32_t cause = esp_reset_reason();
-	char reset_str[64];
-
-	/* Report as immediate event metric */
-	static struct spotflow_metric_int* reset_cause_metric;
-	int rc = spotflow_register_metric_int_with_labels(
-	    SPOTFLOW_METRIC_NAME_BOOT_RESET, SPOTFLOW_AGG_INTERVAL_NONE, 1, 1, &reset_cause_metric);
-	if (rc < 0) {
-		SPOTFLOW_LOG("Failed to register reset cause metric: %d", rc);
-		return;
-	}
-
-	reset_cause_to_string(cause, reset_str, sizeof(reset_str));
-	struct spotflow_label labels[] = { { .key = "reason", .value = reset_str } };
-	rc = spotflow_report_metric_int_with_labels(reset_cause_metric, 1, labels, 1);
-	if (rc < 0) {
-		SPOTFLOW_LOG("Failed to report reset cause: %d", rc);
-		return;
-	}
-
-	SPOTFLOW_DEBUG("Reset cause reported: 0x%08x, %s", (unsigned int)cause, reset_str);
 }
