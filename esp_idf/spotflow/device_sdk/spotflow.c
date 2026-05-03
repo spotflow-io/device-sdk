@@ -33,16 +33,18 @@ vprintf_like_t original_vprintf = NULL;
 void spotflow_metrics(void)
 {
 	spotflow_metrics_init();
-    spotflow_metrics_net_init();
+	spotflow_metrics_net_init();
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 	spotflow_metrics_heartbeat_init();
+#endif
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
 	spotflow_metrics_system_init();
 #endif
 }
 #endif
 
 /**
- * @brief 
+ * @brief
  * @details To utilize the esp_log_set_vprintf function to expose the logs
  */
 void spotflow_init(void)
