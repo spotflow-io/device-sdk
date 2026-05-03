@@ -49,49 +49,53 @@ endif()
 # ---------------------------------------------------------------------------
 if(CONFIG_SPOTFLOW_METRICS)
     file(GLOB METRICS_SRCS CONFIGURE_DEPENDS "src/metrics/*.c")
-    file(GLOB METRICS_SYSTEM_SRCS CONFIGURE_DEPENDS "src/metrics/system/*.c")
+# ---------------------------------------------------------------------------
+# Optional: Individual System Metrics
+# ---------------------------------------------------------------------------
+    if(CONFIG_SPOTFLOW_METRICS_SYSTEM)
+      file(GLOB METRICS_SYSTEM_SRCS CONFIGURE_DEPENDS "src/metrics/system/*.c")
 
-    # -- Prune disabled system metric sources --
-    if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE)
-        list(REMOVE_ITEM METRICS_SYSTEM_SRCS
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_reset_helper.c"
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system.c"
-        )
-    endif()
+      # -- Prune disabled system metric sources --
+      if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE)
+          list(REMOVE_ITEM METRICS_SYSTEM_SRCS
+              "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_reset_helper.c"
+          )
+      endif()
 
-    if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION)
-        list(REMOVE_ITEM METRICS_SYSTEM_SRCS
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_connection.c"
-        )
-    endif()
+      if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION)
+          list(REMOVE_ITEM METRICS_SYSTEM_SRCS
+              "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_connection.c"
+          )
+      endif()
 
-    if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP)
-        list(REMOVE_ITEM METRICS_SYSTEM_SRCS
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_heap.c"
-        )
-    endif()
+      if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP)
+          list(REMOVE_ITEM METRICS_SYSTEM_SRCS
+              "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_heap.c"
+          )
+      endif()
 
-    if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK)
-        list(REMOVE_ITEM METRICS_SYSTEM_SRCS
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_network.c"
-        )
-    else()
-        idf_build_set_property(COMPILE_DEFINITIONS
-            "LWIP_SNMP=1;MIB2_STATS=1;LWIP_NETIF_EXT_STATUS_CALLBACK=1"
-            APPEND
-        )
-    endif()
+      if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK)
+          list(REMOVE_ITEM METRICS_SYSTEM_SRCS
+              "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_network.c"
+          )
+      else()
+          idf_build_set_property(COMPILE_DEFINITIONS
+              "LWIP_SNMP=1;MIB2_STATS=1;LWIP_NETIF_EXT_STATUS_CALLBACK=1"
+              APPEND
+          )
+      endif()
 
-    if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_CPU)
-        list(REMOVE_ITEM METRICS_SYSTEM_SRCS
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_cpu.c"
-        )
-    endif()
+      if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_CPU)
+          list(REMOVE_ITEM METRICS_SYSTEM_SRCS
+              "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_cpu.c"
+          )
+      endif()
 
-    if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK)
-        list(REMOVE_ITEM METRICS_SYSTEM_SRCS
-            "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_stack.c"
-        )
+      if(NOT CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK)
+          list(REMOVE_ITEM METRICS_SYSTEM_SRCS
+              "${CMAKE_CURRENT_SOURCE_DIR}/src/metrics/system/spotflow_metrics_system_stack.c"
+          )
+      endif()
     endif()
 
     list(APPEND SRCS ${METRICS_SRCS} ${METRICS_SYSTEM_SRCS})

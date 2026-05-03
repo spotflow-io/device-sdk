@@ -68,6 +68,5 @@ menuconfig SPOTFLOW_METRICS
             range 10 3600
             help
                 How often to send heartbeat messages.
-
+    rsource "./Kconfig.metrics_systems"
     endif # SPOTFLOW_METRICS
-rsource "./Kconfig.metrics_systems"
