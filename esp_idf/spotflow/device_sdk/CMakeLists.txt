@@ -11,9 +11,6 @@ file(GLOB SRCS
 )
 
 set(INCLUDE_DIRS
-    "include/net"
-    "include/logging"
-    "include/configs"
     "include"
 )
 
@@ -23,7 +20,6 @@ set(PRIV_REQUIRES
     nvs_flash
     esp_netif
     app_update
-    espcoredump
 )
 
 # ---------------------------------------------------------------------------
@@ -31,17 +27,19 @@ set(PRIV_REQUIRES
 # ---------------------------------------------------------------------------
 if(CONFIG_SPOTFLOW_USE_BUILD_ID)
     list(APPEND SRCS "src/buildid/spotflow_build_id.c")
-    list(APPEND INCLUDE_DIRS "include/buildid")
     list(APPEND PRIV_REQUIRES esp_app_format)
 endif()
 
 # ---------------------------------------------------------------------------
 # Optional: Coredump
 # ---------------------------------------------------------------------------
+if(CONFIG_SPOTFLOW_COREDUMP_BACKEND)
+list(APPEND PRIV_REQUIRES espcoredump)
+endif()
+
 if(CONFIG_ESP_COREDUMP_ENABLE)
     file(GLOB COREDUMP_SRCS "src/coredump/*.c")
     list(APPEND SRCS ${COREDUMP_SRCS})
-    list(APPEND INCLUDE_DIRS "include/coredump")
 endif()
 
 # ---------------------------------------------------------------------------
@@ -99,12 +97,6 @@ if(CONFIG_SPOTFLOW_METRICS)
     endif()
 
     list(APPEND SRCS ${METRICS_SRCS} ${METRICS_SYSTEM_SRCS})
-    list(APPEND INCLUDE_DIRS "include/metrics")
-
-    # Only expose system headers if any system sources are being built
-    if(METRICS_SYSTEM_SRCS)
-        list(APPEND INCLUDE_DIRS "include/metrics/system")
-    endif()
 endif()
 
 # ---------------------------------------------------------------------------

@@ -7,7 +7,12 @@
 extern "C" {
 #endif
 
+/**
+ * @brief Initialize the metrics registry. It is already called internally by the SDK, so users typically do not need to call this.
+ *
+ */
 void spotflow_metrics_init(void);
+
 /**
  * @brief Register a label-less integer metric
  *

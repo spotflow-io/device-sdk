@@ -6,13 +6,6 @@
 static int validate_labels(const struct spotflow_metric_base* base,
 			   const struct spotflow_label* labels, uint8_t label_count);
 
-/**
- * @brief Report an integer metric value
- *
- * @param metric
- * @param value
- * @return int
- */
 int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value)
 {
 	if (metric == NULL) {
@@ -31,13 +24,6 @@ int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value
 	return aggregator_report_value(base, NULL, 0, value, 0.0);
 }
 
-/**
- * @brief Report a float metric value
- *
- * @param metric
- * @param value
- * @return int
- */
 int spotflow_report_metric_float(struct spotflow_metric_float* metric, float value)
 {
 	if (metric == NULL) {
@@ -56,15 +42,6 @@ int spotflow_report_metric_float(struct spotflow_metric_float* metric, float val
 	return aggregator_report_value(base, NULL, 0, 0, value);
 }
 
-/**
- * @brief Report an integer metric value with labels
- *
- * @param metric
- * @param value
- * @param labels
- * @param label_count
- * @return int
- */
 int spotflow_report_metric_int_with_labels(struct spotflow_metric_int* metric, int64_t value,
 					   const struct spotflow_label* labels, uint8_t label_count)
 {
@@ -89,15 +66,6 @@ int spotflow_report_metric_int_with_labels(struct spotflow_metric_int* metric, i
 	return aggregator_report_value(base, labels, label_count, value, 0.0);
 }
 
-/**
- * @brief Report a float metric value with labels
- *
- * @param metric
- * @param value
- * @param labels
- * @param label_count
- * @return int
- */
 int spotflow_report_metric_float_with_labels(struct spotflow_metric_float* metric, float value,
 					     const struct spotflow_label* labels,
 					     uint8_t label_count)
@@ -123,12 +91,6 @@ int spotflow_report_metric_float_with_labels(struct spotflow_metric_float* metri
 	return aggregator_report_value(base, labels, label_count, 0, value);
 }
 
-/**
- * @brief Report an event
- *
- * @param metric
- * @return int
- */
 int spotflow_report_event(struct spotflow_metric_int* metric)
 {
 	if (metric == NULL) {
@@ -147,14 +109,6 @@ int spotflow_report_event(struct spotflow_metric_int* metric)
 	return aggregator_report_value(base, NULL, 0, 1, 0.0);
 }
 
-/**
- * @brief Report an event with labels
- *
- * @param metric
- * @param labels
- * @param label_count
- * @return int
- */
 int spotflow_report_event_with_labels(struct spotflow_metric_int* metric,
 				      const struct spotflow_label* labels, uint8_t label_count)
 {

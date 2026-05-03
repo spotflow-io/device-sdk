@@ -6,13 +6,6 @@
 
 static struct spotflow_metric_int* g_connection_state_metric;
 
-/**
- * @brief Initialize connection metrics
- *
- * Registers connection_mqtt_connected metric.
- *
- * @return Number of metrics registered on success, negative errno on failure
- */
 int spotflow_metrics_system_connection_init(void)
 {
 	int rc =
@@ -27,11 +20,6 @@ int spotflow_metrics_system_connection_init(void)
 	return 1;
 }
 
-/**
- * @brief Report connection state
- *
- * @param connected
- */
 void spotflow_metrics_system_connection_report(bool connected)
 {
 	if (!g_connection_state_metric) {
