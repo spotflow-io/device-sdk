@@ -72,6 +72,8 @@ void spotflow_metrics_heartbeat_init(void)
 		return;
 	}
 
+	// Calling it at once afterwards periodic timer will call after set interval.
+	heartbeat_timer_callback(NULL);
 	const esp_timer_create_args_t timer_args = { .callback = &heartbeat_timer_callback,
 						     .arg = NULL,
 						     .name = "heartbeat_timer" };
