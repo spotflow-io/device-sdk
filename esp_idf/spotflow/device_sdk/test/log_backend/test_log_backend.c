@@ -1,3 +1,7 @@
+/**
+ * Test cases for the spotflow log backend with cloud integration.
+ * Currently unfinished as it depends on integration with mock MQTT broker.
+ */
 #include "test_common.h"
 #include "cbor.h"
 
