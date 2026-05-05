@@ -1,5 +1,4 @@
 #include "test_common.h"
-#include "cbor.h"
 
 /* optimized property keys */
 #define KEY_MESSAGE_TYPE 0x00
@@ -42,7 +41,7 @@ void tearDown(void)
 
 /* Helper function to verify CBOR integer key-value pairs */
 static bool contains_cbor_uint_value(const uint8_t* cbor_data, size_t cbor_len, uint32_t key,
-				   uint64_t expected_value)
+				     uint64_t expected_value)
 {
 	CborParser parser;
 	CborValue map, element;
@@ -96,6 +95,72 @@ static bool contains_cbor_uint_value(const uint8_t* cbor_data, size_t cbor_len, 
 	return false;
 }
 
+static bool cbor_text_equals(CborValue* element, const char* expected_text, size_t expected_len)
+{
+	if (!cbor_value_is_text_string(element)) {
+		return false;
+	}
+
+	size_t value_len;
+	if (cbor_value_calculate_string_length(element, &value_len) != CborNoError ||
+	    value_len != expected_len) {
+		return false;
+	}
+
+	if (value_len == 0U) {
+		return true;
+	}
+
+	char* buf = (char*)malloc(value_len + 1U);
+	if (buf == NULL) {
+		return false;
+	}
+
+	size_t copied = value_len + 1U;
+	bool match = false;
+
+	if ((cbor_value_copy_text_string(element, buf, &copied, NULL) == CborNoError) &&
+	    (strncmp(buf, expected_text, value_len) == 0)) {
+		match = true;
+	}
+
+	free(buf);
+	return match;
+}
+
+static bool get_cbor_key(CborValue* element, uint64_t* key)
+{
+	if (!cbor_value_is_unsigned_integer(element) ||
+	    cbor_value_get_uint64(element, key) != CborNoError) {
+		return false;
+	}
+
+	return (cbor_value_advance(element) == CborNoError);
+}
+
+static bool find_cbor_text_value(CborValue* element, uint32_t key, const char* expected_text,
+				 size_t expected_len)
+{
+	while (!cbor_value_at_end(element)) {
+		uint64_t current_key;
+
+		if (!get_cbor_key(element, &current_key)) {
+			(void)cbor_value_advance(element);
+			continue;
+		}
+
+		if (current_key == (uint64_t)key) {
+			return cbor_text_equals(element, expected_text, expected_len);
+		}
+
+		if (cbor_value_advance(element) != CborNoError) {
+			break;
+		}
+	}
+
+	return false;
+}
+
 /* Helper function to verify CBOR integer key with text string value */
 static bool contains_cbor_text_value(const uint8_t* cbor_data, size_t cbor_len, uint32_t key,
 				     const char* expected_text)
@@ -115,55 +180,8 @@ static bool contains_cbor_text_value(const uint8_t* cbor_data, size_t cbor_len, 
 	    (cbor_value_enter_container(&map, &element) != CborNoError)) {
 		return false;
 	}
-
-	while (!cbor_value_at_end(&element)) {
-		uint64_t current_key;
-
-		if (!cbor_value_is_unsigned_integer(&element) ||
-		    (cbor_value_get_uint64(&element, &current_key) != CborNoError) ||
-		    (cbor_value_advance(&element) != CborNoError)) {
-			(void)cbor_value_advance(&element);
-			continue;
-		}
-
-		if (current_key == (uint64_t)key) {
-			bool match = false;
-
-			if (cbor_value_is_text_string(&element)) {
-				size_t value_len;
-				if (cbor_value_calculate_string_length(&element, &value_len) ==
-				    CborNoError) {
-					if (value_len == expected_len) {
-						if (value_len == 0U) {
-							match = true;
-						} else {
-							char* buf = (char*)malloc(value_len + 1U);
-							if (buf != NULL) {
-								size_t copied = value_len + 1U;
-								if ((cbor_value_copy_text_string(
-									 &element, buf, &copied,
-									 NULL) == CborNoError) &&
-								    (strncmp(buf, expected_text,
-									     value_len) == 0)) {
-									match = true;
-								}
-								free(buf);
-							}
-						}
-					}
-				}
-			}
-
-			return match;
-		}
-
-		if (cbor_value_advance(&element) != CborNoError) {
-			break;
-		}
-	}
-
-	(void)cbor_value_leave_container(&map, &element);
-	return false;
+	bool result = find_cbor_text_value(&element, key, expected_text, expected_len);
+	return result;
 }
 
 TEST_CASE("CBOR encodes a simple log correctly", "[spotflow][cbor]")

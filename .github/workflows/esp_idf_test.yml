@@ -41,17 +41,18 @@ jobs:
           . /opt/esp/idf/export.sh
           cd esp_idf/spotflow/device_sdk/test/example/unit_test/test
           idf.py set-target esp32
-          
+
           echo "Building and starting QEMU..."
-          
+
           # Create expect script to monitor output and exit QEMU
           cat > run_qemu.exp << 'EOF'
           #!/usr/bin/expect -f
+          # Increase timeout in case of code execution takes time.
           set timeout 600
           log_file -a qemu_output.txt
-          
+
           spawn idf.py qemu
-          
+
           expect {
             "Returned from app_main()" {
               send "\x01x"
@@ -69,10 +70,10 @@ jobs:
             }
           }
           EOF
-          
+
           chmod +x run_qemu.exp
           ./run_qemu.exp
-          
+
           echo ""
           echo "--- Test Summary ---"
           grep -E "PASS|FAIL|ERROR|Tests|Failures|Ignored" qemu_output.txt || true
