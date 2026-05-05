@@ -8,7 +8,7 @@ extern "C" {
 #endif
 
 /**
- * @brief Initialize metrics network layer
+ * @brief Initialize metrics network layer.
  *
  * Initializes message queue for metrics transmission.
  * Called once during SDK initialization.
@@ -16,7 +16,7 @@ extern "C" {
 void spotflow_metrics_net_init(void);
 
 /**
- * @brief Poll and process one enqueued metric message
+ * @brief Poll and process one enqueued metric message.
  *
  * Dequeues one message from the metrics queue and publishes via MQTT.
  * Called repeatedly by processor thread to drain the queue.
@@ -26,7 +26,7 @@ void spotflow_metrics_net_init(void);
 int spotflow_poll_and_process_enqueued_metrics(void);
 
 /**
- * @brief Create the enqueu metric messages
+ * @brief Enqueue a metric message for sending.
  *
  */
 int spotflow_metrics_enqueue(uint8_t* payload, size_t len);
