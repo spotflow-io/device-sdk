@@ -91,7 +91,7 @@ int spotflow_metrics_cbor_encode_aggregated(struct spotflow_metric_base* metric,
 	*cbor_data = malloc(len);
 	if (!*cbor_data) {
 		free(buffer);
-		return -12;
+		return -ENOMEM;
 	}
 	memcpy(*cbor_data, buffer, len);
 	*cbor_len = len;
@@ -223,7 +223,7 @@ int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, si
 	size_t encoded_len = cbor_encoder_get_buffer_size(&encoder, buffer);
 	*data = malloc(encoded_len);
 	if (!*data)
-		return -12;
+		return -ENOMEM;
 
 	memcpy(*data, buffer, encoded_len);
 	*len = encoded_len;

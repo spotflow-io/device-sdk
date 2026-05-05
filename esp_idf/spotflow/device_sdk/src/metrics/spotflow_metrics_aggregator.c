@@ -122,8 +122,8 @@ int aggregator_report_value(struct spotflow_metric_base* metric,
 		uint32_t interval_ms = get_interval_ms(metric->agg_interval);
 		if (interval_ms > 0) {
 			uint32_t jitter = esp_random() % (interval_ms / 10);
-			esp_timer_start_once(ctx->aggregation_timer,
-					     (interval_ms - jitter) * 1000ULL);
+			ESP_ERROR_CHECK(esp_timer_start_once(ctx->aggregation_timer,
+							     (interval_ms - jitter) * 1000ULL));
 			ctx->timer_started = true;
 		}
 	}
@@ -340,7 +340,8 @@ static void aggregation_timer_callback(void* arg)
 
 	uint32_t interval_ms = get_interval_ms(metric->agg_interval);
 	if (interval_ms > 0)
-		esp_timer_start_once(ctx->aggregation_timer, interval_ms * 1000ULL);
+		ESP_ERROR_CHECK(
+		    esp_timer_start_once(ctx->aggregation_timer, interval_ms * 1000ULL));
 
 	xSemaphoreGive(metric->lock);
 }

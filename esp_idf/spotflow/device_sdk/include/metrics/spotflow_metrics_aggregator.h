@@ -7,9 +7,6 @@
 extern "C" {
 #endif
 
-/* External message queue (defined in spotflow_metrics_net.c) */
-extern struct QueueHandle_t g_spotflow_metrics_msgq;
-
 /**
  * @brief Register metric with aggregator
  *

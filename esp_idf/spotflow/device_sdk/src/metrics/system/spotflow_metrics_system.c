@@ -152,8 +152,8 @@ static void collection_timer_handler(void* arg)
 
 	spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_METRICS);
 	/* Restart the timer */
-	esp_timer_start_once(g_collection_timer,
-			     CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL * 1000000ULL);
+	ESP_ERROR_CHECK(esp_timer_start_once(
+	    g_collection_timer, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL * 1000000ULL));
 }
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
