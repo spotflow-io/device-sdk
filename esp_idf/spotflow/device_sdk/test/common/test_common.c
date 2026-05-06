@@ -90,8 +90,5 @@ bool contains_cbor_key(const uint8_t* cbor_data, size_t cbor_len, uint32_t key,
 		}
 	}
 
-	/* Leave the container (not strictly necessary for verification) */
-	(void)cbor_value_leave_container(&map, &element);
-
 	return result;
 }

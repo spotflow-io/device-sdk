@@ -39,62 +39,6 @@ void tearDown(void)
 	}
 }
 
-/* Helper function to verify CBOR integer key-value pairs */
-static bool contains_cbor_uint_value(const uint8_t* cbor_data, size_t cbor_len, uint32_t key,
-				     uint64_t expected_value)
-{
-	CborParser parser;
-	CborValue map, element;
-	CborError err;
-
-	if ((cbor_data == NULL) || (cbor_len == 0U)) {
-		return false;
-	}
-
-	err = cbor_parser_init(cbor_data, cbor_len, 0U, &parser, &map);
-	if ((err != CborNoError) || (!cbor_value_is_map(&map))) {
-		return false;
-	}
-
-	err = cbor_value_enter_container(&map, &element);
-	if (err != CborNoError) {
-		return false;
-	}
-
-	while (!cbor_value_at_end(&element)) {
-		uint64_t current_key, current_value;
-
-		if (!cbor_value_is_unsigned_integer(&element)) {
-			(void)cbor_value_advance(&element);
-			(void)cbor_value_advance(&element);
-			continue;
-		}
-
-		if (cbor_value_get_uint64(&element, &current_key) != CborNoError) {
-			break;
-		}
-
-		if (cbor_value_advance(&element) != CborNoError) {
-			break;
-		}
-
-		if (current_key == (uint64_t)key) {
-			bool match =
-			    (cbor_value_is_unsigned_integer(&element) &&
-			     (cbor_value_get_uint64(&element, &current_value) == CborNoError) &&
-			     (current_value == expected_value));
-			return match;
-		}
-
-		if (cbor_value_advance(&element) != CborNoError) {
-			break;
-		}
-	}
-
-	(void)cbor_value_leave_container(&map, &element);
-	return false;
-}
-
 static bool cbor_text_equals(CborValue* element, const char* expected_text, size_t expected_len)
 {
 	if (!cbor_value_is_text_string(element)) {
@@ -200,7 +144,7 @@ TEST_CASE("CBOR encodes a simple log correctly", "[spotflow][cbor]")
 
 	/* Verify message type */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
+	    contains_cbor_key(cbor_buf, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
 
 	/* Verify body content */
 	TEST_SPOTFLOW_ASSERT_TRUE(contains_cbor_text_value(cbor_buf, cbor_len, KEY_BODY, body));
@@ -211,15 +155,15 @@ TEST_CASE("CBOR encodes a simple log correctly", "[spotflow][cbor]")
 
 	/* Verify severity */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_SEVERITY, LOG_SEVERITY_INFO));
+	    contains_cbor_key(cbor_buf, cbor_len, KEY_SEVERITY, LOG_SEVERITY_INFO));
 
 	/* Verify metadata - sequence number */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_SEQUENCE_NUMBER, 1U));
+	    contains_cbor_key(cbor_buf, cbor_len, KEY_SEQUENCE_NUMBER, 1U));
 
 	/* Verify metadata - uptime */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_DEVICE_UPTIME_MS, 1000U));
+	    contains_cbor_key(cbor_buf, cbor_len, KEY_DEVICE_UPTIME_MS, 1000U));
 
 	free(cbor_buf);
 	cbor_buf = NULL;
@@ -241,17 +185,17 @@ TEST_CASE("CBOR handles empty source string", "[spotflow][cbor]")
 
 	/* Verify basic structure - message type should be LOGS_MESSAGE_TYPE */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
+	    contains_cbor_key(cbor_buf, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
 
 	/* Verify metadata fields */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_SEQUENCE_NUMBER, 1U));
+	    contains_cbor_key(cbor_buf, cbor_len, KEY_SEQUENCE_NUMBER, 1U));
 
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_DEVICE_UPTIME_MS, 100U));
+	    contains_cbor_key(cbor_buf, cbor_len, KEY_DEVICE_UPTIME_MS, 100U));
 
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_SEVERITY, LOG_SEVERITY_WARN));
+	    contains_cbor_key(cbor_buf, cbor_len, KEY_SEVERITY, LOG_SEVERITY_WARN));
 
 	/* Verify body template */
 	TEST_SPOTFLOW_ASSERT_TRUE(
