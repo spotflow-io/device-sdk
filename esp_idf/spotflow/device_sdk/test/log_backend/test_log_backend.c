@@ -96,9 +96,9 @@ TEST_CASE("Test CBOR keys for different severities", "[spotflow][log_backend][cb
 
 	// Verifying that the CBOR contains the correct keys for ERROR severity (0x3C)
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_data, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
+	    contains_cbor_uint_value(cbor_data, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_data, cbor_len, KEY_SEVERITY, LOG_SEVERITY_ERROR));
+	    contains_cbor_uint_value(cbor_data, cbor_len, KEY_SEVERITY, LOG_SEVERITY_ERROR));
 
 	// Test for INFO severity
 	ESP_LOGI("TAG", "%s", log_msg);
@@ -107,7 +107,7 @@ TEST_CASE("Test CBOR keys for different severities", "[spotflow][log_backend][cb
 	// Verify INFO severity (0x28) is present in the CBOR
 	cbor_data = (uint8_t*)queue_msg.ptr;
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_data, cbor_len, KEY_SEVERITY, LOG_SEVERITY_INFO));
+	    contains_cbor_uint_value(cbor_data, cbor_len, KEY_SEVERITY, LOG_SEVERITY_INFO));
 
 	// Test for DEBUG severity
 	ESP_LOGD("TAG", "%s", log_msg);
@@ -116,7 +116,7 @@ TEST_CASE("Test CBOR keys for different severities", "[spotflow][log_backend][cb
 	// Verify DEBUG severity (0x1E)
 	cbor_data = (uint8_t*)queue_msg.ptr;
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_data, cbor_len, KEY_SEVERITY, LOG_SEVERITY_DEBUG));
+	    contains_cbor_uint_value(cbor_data, cbor_len, KEY_SEVERITY, LOG_SEVERITY_DEBUG));
 
 	// Test for WARN severity
 	ESP_LOGW("TAG", "%s", log_msg);
@@ -125,7 +125,7 @@ TEST_CASE("Test CBOR keys for different severities", "[spotflow][log_backend][cb
 	// Verify WARN severity (0x32)
 	cbor_data = (uint8_t*)queue_msg.ptr;
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_data, cbor_len, KEY_SEVERITY, LOG_SEVERITY_WARN));
+	    contains_cbor_uint_value(cbor_data, cbor_len, KEY_SEVERITY, LOG_SEVERITY_WARN));
 
 	// Cleanup
 	esp_log_set_vprintf(NULL); // Reset to default vprintf behavior

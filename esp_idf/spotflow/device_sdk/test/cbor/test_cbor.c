@@ -144,7 +144,7 @@ TEST_CASE("CBOR encodes a simple log correctly", "[spotflow][cbor]")
 
 	/* Verify message type */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_buf, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
+	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
 
 	/* Verify body content */
 	TEST_SPOTFLOW_ASSERT_TRUE(contains_cbor_text_value(cbor_buf, cbor_len, KEY_BODY, body));
@@ -155,15 +155,15 @@ TEST_CASE("CBOR encodes a simple log correctly", "[spotflow][cbor]")
 
 	/* Verify severity */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_buf, cbor_len, KEY_SEVERITY, LOG_SEVERITY_INFO));
+	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_SEVERITY, LOG_SEVERITY_INFO));
 
 	/* Verify metadata - sequence number */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_buf, cbor_len, KEY_SEQUENCE_NUMBER, 1U));
+	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_SEQUENCE_NUMBER, 1U));
 
 	/* Verify metadata - uptime */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_buf, cbor_len, KEY_DEVICE_UPTIME_MS, 1000U));
+	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_DEVICE_UPTIME_MS, 1000U));
 
 	free(cbor_buf);
 	cbor_buf = NULL;
@@ -185,17 +185,17 @@ TEST_CASE("CBOR handles empty source string", "[spotflow][cbor]")
 
 	/* Verify basic structure - message type should be LOGS_MESSAGE_TYPE */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_buf, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
+	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_MESSAGE_TYPE, LOGS_MESSAGE_TYPE));
 
 	/* Verify metadata fields */
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_buf, cbor_len, KEY_SEQUENCE_NUMBER, 1U));
+	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_SEQUENCE_NUMBER, 1U));
 
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_buf, cbor_len, KEY_DEVICE_UPTIME_MS, 100U));
+	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_DEVICE_UPTIME_MS, 100U));
 
 	TEST_SPOTFLOW_ASSERT_TRUE(
-	    contains_cbor_key(cbor_buf, cbor_len, KEY_SEVERITY, LOG_SEVERITY_WARN));
+	    contains_cbor_uint_value(cbor_buf, cbor_len, KEY_SEVERITY, LOG_SEVERITY_WARN));
 
 	/* Verify body template */
 	TEST_SPOTFLOW_ASSERT_TRUE(

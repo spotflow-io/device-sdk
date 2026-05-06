@@ -23,7 +23,7 @@
  * @return true
  * @return false
  */
-bool contains_cbor_key(const uint8_t* cbor_data, size_t cbor_len, uint32_t key,
+bool contains_cbor_uint_value(const uint8_t* cbor_data, size_t cbor_len, uint32_t key,
 			      uint32_t expected_value);
 
 #endif // SPOTFLOW_TEST_COMMON_H

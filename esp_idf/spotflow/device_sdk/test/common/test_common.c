@@ -1,6 +1,6 @@
 #include "test_common.h"
 
-bool contains_cbor_key(const uint8_t* cbor_data, size_t cbor_len, uint32_t key,
+bool contains_cbor_uint_value(const uint8_t* cbor_data, size_t cbor_len, uint32_t key,
 			      uint32_t expected_value)
 {
 	bool result = false;
