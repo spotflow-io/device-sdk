@@ -11,7 +11,9 @@
 #include <esp_timer.h>
 
 /* Single-slot buffer for pending heartbeat (size 1, silent overwrite) */
-static struct spotflow_mqtt_metrics_msg* g_pending_heartbeat;
+static struct spotflow_mqtt_metrics_msg g_pending_heartbeat;
+static uint8_t g_pending_heartbeat_payload[SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN];
+static bool g_pending_heartbeat_valid;
 static SemaphoreHandle_t g_heartbeat_mutex;
 
 /* Periodic heartbeat timer handle */
@@ -27,33 +29,23 @@ static void heartbeat_timer_callback(void* arg)
 	int64_t uptime_ms = esp_timer_get_time() / 1000; // microseconds → milliseconds
 
 	/* Encode heartbeat message */
-	uint8_t* payload = NULL;
 	size_t len = 0;
-	int rc = spotflow_metrics_cbor_encode_heartbeat(uptime_ms, &payload, &len);
+	int rc = spotflow_metrics_cbor_encode_heartbeat(uptime_ms, g_pending_heartbeat_payload,
+							sizeof(g_pending_heartbeat_payload), &len);
 	if (rc != 0) {
 		SPOTFLOW_LOG("Failed to encode heartbeat: %d", rc);
 		return;
 	}
 
-	/* Allocate message structure */
-	struct spotflow_mqtt_metrics_msg* new_msg = malloc(sizeof(*new_msg));
-	if (!new_msg) {
-		SPOTFLOW_LOG("Failed to allocate heartbeat message");
-		free(payload);
-		return;
-	}
-
-	new_msg->payload = payload;
-	new_msg->len = len;
-
 	/* Silent overwrite of pending heartbeat */
 	if (xSemaphoreTake(g_heartbeat_mutex, portMAX_DELAY)) {
-		if (g_pending_heartbeat) {
-			free(g_pending_heartbeat->payload);
-			free(g_pending_heartbeat);
+		if (g_pending_heartbeat_valid) {
 			SPOTFLOW_DEBUG("Overwriting pending heartbeat");
 		}
-		g_pending_heartbeat = new_msg;
+		g_pending_heartbeat.payload = g_pending_heartbeat_payload;
+		g_pending_heartbeat.len = len;
+		g_pending_heartbeat_valid = true;
+
 		xSemaphoreGive(g_heartbeat_mutex);
 	}
 
@@ -95,16 +87,21 @@ void spotflow_metrics_heartbeat_init(void)
  */
 int spotflow_poll_and_process_heartbeat(void)
 {
-	struct spotflow_mqtt_metrics_msg* msg = NULL;
-
+	struct spotflow_mqtt_metrics_msg msg;
+	uint8_t payload_copy[SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN];
+	bool has_pending = false;
 	/* Atomically dequeue pending heartbeat */
-	if (xSemaphoreTake(g_heartbeat_mutex, portMAX_DELAY)) {
+	xSemaphoreTake(g_heartbeat_mutex, portMAX_DELAY);
+
+	if (g_pending_heartbeat_valid) {
 		msg = g_pending_heartbeat;
-		g_pending_heartbeat = NULL;
-		xSemaphoreGive(g_heartbeat_mutex);
+		memcpy(payload_copy, g_pending_heartbeat.payload, g_pending_heartbeat.len);
+		msg.payload = payload_copy;
+		g_pending_heartbeat_valid = false;
+		has_pending = true;
 	}
 
-	if (!msg) {
+	if (!has_pending) {
 		return 0; /* No heartbeat pending */
 	}
 
@@ -113,7 +110,7 @@ int spotflow_poll_and_process_heartbeat(void)
 	int rc = 0;
 
 	for (int retry = 0; retry <= 3; retry++) {
-		rc = spotflow_mqtt_publish_message(SPOTFLOW_MQTT_LOG_TOPIC, msg->payload, msg->len,
+		rc = spotflow_mqtt_publish_message(SPOTFLOW_MQTT_LOG_TOPIC, msg.payload, msg.len,
 						   SPOTFLOW_MQTT_LOG_QOS);
 
 		if (rc != -EAGAIN)
@@ -125,10 +122,6 @@ int spotflow_poll_and_process_heartbeat(void)
 			vTaskDelay(pdMS_TO_TICKS(retry_delays_ms[retry]));
 		}
 	}
-
-	/* Always free message memory */
-	free(msg->payload);
-	free(msg);
 
 	if (rc < 0) {
 		SPOTFLOW_LOG("Failed to publish heartbeat: %d", rc);
