@@ -201,12 +201,15 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 	return 0;
 }
 
-int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, size_t* len)
+int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t* buffer, size_t buffer_size,
+					   size_t* len)
 {
-	uint8_t buffer[64];
+	if (buffer == NULL || len == NULL) {
+		return -EINVAL;
+	}
 	CborEncoder encoder, map;
 	CborError err;
-	cbor_encoder_init(&encoder, buffer, sizeof(buffer), 0);
+	cbor_encoder_init(&encoder, buffer, buffer_size, 0);
 
 	CBOR_CHECK(cbor_encoder_create_map(&encoder, &map, 4));
 
@@ -221,11 +224,7 @@ int spotflow_metrics_cbor_encode_heartbeat(int64_t uptime_ms, uint8_t** data, si
 	CBOR_CHECK(cbor_encoder_close_container(&encoder, &map));
 
 	size_t encoded_len = cbor_encoder_get_buffer_size(&encoder, buffer);
-	*data = malloc(encoded_len);
-	if (!*data)
-		return -ENOMEM;
 
-	memcpy(*data, buffer, encoded_len);
 	*len = encoded_len;
 
 	return 0;
