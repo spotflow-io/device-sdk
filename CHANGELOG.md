@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.8.0] - 2026-05-07
+
 ### Added
 * Added sample for Ethernet on FRDM_RW612
 * Added Coredump for ESP IDF.
