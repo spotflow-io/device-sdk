@@ -35,17 +35,7 @@ static netif_ext_callback_t g_netif_callback;
  * @param p
  * @return err_t
  */
-static err_t hooked_linkoutput(struct netif* netif, struct pbuf* p)
-{
-	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES; i++) {
-		if (g_hooks[i].active && g_hooks[i].lwip_netif == netif) {
-			g_hooks[i].tx_bytes += p->tot_len;
-			return g_hooks[i].original_linkoutput(netif, p);
-		}
-	}
-	/* Should never reach here, but fall back safely */
-	return netif->linkoutput(netif, p);
-}
+static err_t hooked_linkoutput(struct netif* netif, struct pbuf* p);
 
 /**
  * @brief Hook for handling network receive operations
@@ -54,16 +44,7 @@ static err_t hooked_linkoutput(struct netif* netif, struct pbuf* p)
  * @param netif
  * @return err_t
  */
-static err_t hooked_input(struct pbuf* p, struct netif* netif)
-{
-	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES; i++) {
-		if (g_hooks[i].active && g_hooks[i].lwip_netif == netif) {
-			g_hooks[i].rx_bytes += p->tot_len;
-			return g_hooks[i].original_input(p, netif);
-		}
-	}
-	return netif->input(p, netif);
-}
+static err_t hooked_input(struct pbuf* p, struct netif* netif);
 
 /**
  * @brief Callback for handling netif extension events
@@ -73,38 +54,7 @@ static err_t hooked_input(struct pbuf* p, struct netif* netif)
  * @param args
  */
 static void netif_ext_callback(struct netif* netif, netif_nsc_reason_t reason,
-			       const netif_ext_callback_args_t* args)
-{
-	if (!(reason & LWIP_NSC_NETIF_ADDED)) {
-		return;
-	}
-
-	/* Only hook WiFi STA (st) and AP (ap) netifs, skip loopback */
-	if (netif->name[0] == 'l' && netif->name[1] == 'o') {
-		return;
-	}
-
-	/* Find a free slot */
-	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES; i++) {
-		if (!g_hooks[i].active) {
-			g_hooks[i].lwip_netif = netif;
-			g_hooks[i].original_linkoutput = netif->linkoutput;
-			g_hooks[i].original_input = netif->input;
-			g_hooks[i].tx_bytes = 0;
-			g_hooks[i].rx_bytes = 0;
-			g_hooks[i].active = true;
-			snprintf(g_hooks[i].name, sizeof(g_hooks[i].name), "%c%c%d", netif->name[0],
-				 netif->name[1], netif->num);
-
-			/* Install hooks */
-			netif->linkoutput = hooked_linkoutput;
-			netif->input = hooked_input;
-
-			SPOTFLOW_LOG("Installed byte hooks on netif %s", g_hooks[i].name);
-			break;
-		}
-	}
-}
+			       const netif_ext_callback_args_t* args);
 
 /**
  * @brief Initialize network metrics
@@ -176,5 +126,62 @@ void spotflow_metrics_system_network_collect(void)
 
 		SPOTFLOW_DEBUG("Network %s: TX=%" PRIu64 " bytes, RX=%" PRIu64 " bytes",
 			       g_hooks[i].name, tx, rx);
+	}
+}
+
+static err_t hooked_linkoutput(struct netif* netif, struct pbuf* p)
+{
+	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES; i++) {
+		if (g_hooks[i].active && g_hooks[i].lwip_netif == netif) {
+			g_hooks[i].tx_bytes += p->tot_len;
+			return g_hooks[i].original_linkoutput(netif, p);
+		}
+	}
+	/* Should never reach here, but fall back safely */
+	return netif->linkoutput(netif, p);
+}
+
+static err_t hooked_input(struct pbuf* p, struct netif* netif)
+{
+	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES; i++) {
+		if (g_hooks[i].active && g_hooks[i].lwip_netif == netif) {
+			g_hooks[i].rx_bytes += p->tot_len;
+			return g_hooks[i].original_input(p, netif);
+		}
+	}
+	return netif->input(p, netif);
+}
+
+static void netif_ext_callback(struct netif* netif, netif_nsc_reason_t reason,
+			       const netif_ext_callback_args_t* args)
+{
+	if (!(reason & LWIP_NSC_NETIF_ADDED)) {
+		return;
+	}
+
+	/* Only hook WiFi STA (st) and AP (ap) netifs, skip loopback */
+	if (netif->name[0] == 'l' && netif->name[1] == 'o') {
+		return;
+	}
+
+	/* Find a free slot */
+	for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES; i++) {
+		if (!g_hooks[i].active) {
+			g_hooks[i].lwip_netif = netif;
+			g_hooks[i].original_linkoutput = netif->linkoutput;
+			g_hooks[i].original_input = netif->input;
+			g_hooks[i].tx_bytes = 0;
+			g_hooks[i].rx_bytes = 0;
+			g_hooks[i].active = true;
+			snprintf(g_hooks[i].name, sizeof(g_hooks[i].name), "%c%c%d", netif->name[0],
+				 netif->name[1], netif->num);
+
+			/* Install hooks */
+			netif->linkoutput = hooked_linkoutput;
+			netif->input = hooked_input;
+
+			SPOTFLOW_LOG("Installed byte hooks on netif %s", g_hooks[i].name);
+			break;
+		}
 	}
 }

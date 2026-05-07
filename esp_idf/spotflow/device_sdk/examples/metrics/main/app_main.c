@@ -1,3 +1,12 @@
+/*
+ * Spotflow Metrics Sample Application
+ *
+ * This example demonstrates:
+ * - System metrics auto-collection (memory, heap, network, CPU)
+ * - Custom application metrics (label-less and labeled)
+ * - Integration with logs
+ */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -15,6 +24,7 @@
 #include <sys/param.h>
 
 static const char* TAG = "spotflow_testing";
+
 /* Metric handles - using type-specific handles */
 static struct spotflow_metric_int* g_app_counter_metric;
 static struct spotflow_metric_float* g_temperature_metric;
@@ -45,6 +55,8 @@ void app_main(void)
 	ESP_ERROR_CHECK(example_connect());
 
 	spotflow_init();
+
+	/* Initialize application metrics */
 	int rc = init_application_metrics();
 	if (rc < 0) {
 		ESP_LOGI(TAG, "Failed to initialize application metrics");
@@ -54,17 +66,18 @@ void app_main(void)
 	xTaskCreate(temperature_task, "temperature_task", 4096, NULL, 5, NULL);
 
 	ESP_LOGI(TAG, "Starting metric reporting...");
-
+	/* Main loop - report metrics periodically */
 	for (int iteration = 0; iteration < 100; iteration++) {
 		ESP_LOGI(TAG, "=== Iteration %d ===", iteration);
-
+		/* Report label-less counter every iteration */
 		report_counter_metric();
 
-		/* Simulate multiple HTTP requests */
+		/* Report multiple HTTP requests to demonstrate labeled metrics */
 		for (int req = 0; req < 3; req++) {
 			report_request_duration_metric();
 		}
 
+		/* Add some application logs */
 		if (iteration % 10 == 0) {
 			ESP_LOGI(TAG, "Periodic health check at iteration %d", iteration);
 		}
@@ -77,23 +90,29 @@ void app_main(void)
 	}
 }
 
-/* ========================= */
-
+/**
+ * @brief Initialize application metrics
+ */
 static int init_application_metrics(void)
 {
 	int rc;
+
+	/* Register label-less integer metric - aggregated over 1 minute */
 	rc = spotflow_register_metric_int("app_counter", SPOTFLOW_AGG_INTERVAL_1MIN,
 					  &g_app_counter_metric);
 	if (rc < 0) {
-		ESP_LOGI(TAG, "Failed to register app_counter metric: %d", rc);
+		ESP_LOGE(TAG, "Failed to register app_counter metric: %d", rc);
 		return rc;
 	}
 
 	ESP_LOGI(TAG, "Registered metric: app_counter");
-
-	rc = spotflow_register_metric_float_with_labels("http_request_duration_ms",
-							SPOTFLOW_AGG_INTERVAL_1MIN, 18, 3,
-							&g_request_duration_metric);
+	/* Register labeled float metric - aggregated over 1 minute */
+	/* Supports up to 18 unique label combinations (3 endpoints x 2 methods x 3 statuses) */
+	rc = spotflow_register_metric_float_with_labels(
+	    "http_request_duration_ms", SPOTFLOW_AGG_INTERVAL_1MIN,
+	    18, /* max_timeseries: 3 endpoints x 2 methods x 3 statuses = 18 */
+	    3, /* max_labels */
+	    &g_request_duration_metric);
 
 	if (rc < 0) {
 		ESP_LOGI(TAG, "Failed to register request_duration metric: %d", rc);
@@ -105,8 +124,9 @@ static int init_application_metrics(void)
 	return 0;
 }
 
-/* ========================= */
-
+/**
+ * @brief Simulate application counter metric
+ */
 static void report_counter_metric(void)
 {
 	static int counter = 0;
@@ -120,8 +140,9 @@ static void report_counter_metric(void)
 	}
 }
 
-/* ========================= */
-
+/**
+ * @brief Simulate temperature sensor reading (immediate metric)
+ */
 static void report_temperature_metric(void)
 {
 	double temperature = 20.0 + ((double)(esp_random() % 500) / 100.0);
@@ -134,8 +155,11 @@ static void report_temperature_metric(void)
 	}
 }
 
-/* ========================= */
-
+/**
+ * @brief Temperature monitoring thread entry point
+ *
+ * Reports temperature metric every 10 seconds in a dedicated thread.
+ */
 static void temperature_task(void* arg)
 {
 	int rc = spotflow_register_metric_float("temperature_celsius", SPOTFLOW_AGG_INTERVAL_NONE,
@@ -155,10 +179,12 @@ static void temperature_task(void* arg)
 	}
 }
 
-/* ========================= */
-
+/**
+ * @brief Simulate HTTP request duration with labels
+ */
 static void report_request_duration_metric(void)
 {
+	/* Simulate different endpoints and methods */
 	const char* endpoints[] = { "/api/users", "/api/products", "/health" };
 	const char* methods[] = { "GET", "POST" };
 	const char* status_codes[] = { "200", "404", "500" };
@@ -167,8 +193,10 @@ static void report_request_duration_metric(void)
 	const char* method = methods[esp_random() % 2];
 	const char* status = status_codes[esp_random() % 3];
 
+	/* Simulate duration between 10ms and 500ms */
 	double duration_ms = 10.0 + ((double)(esp_random() % 4900) / 10.0);
 
+	/* Define labels */
 	struct spotflow_label labels[] = { { .key = "endpoint", .value = endpoint },
 					   { .key = "method", .value = method },
 					   { .key = "status", .value = status } };

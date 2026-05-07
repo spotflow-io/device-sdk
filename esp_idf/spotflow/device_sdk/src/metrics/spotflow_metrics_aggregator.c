@@ -132,8 +132,6 @@ int aggregator_report_value(struct spotflow_metric_base* metric,
 	return 0;
 }
 
-/* --- Internal functions --- */
-
 static bool labels_equal(const struct metric_timeseries_state* ts,
 			 const struct spotflow_label* labels, uint8_t label_count)
 {
@@ -217,6 +215,8 @@ static void init_timeseries_aggregation_state(struct metric_timeseries_state* ts
 	} else if (type == SPOTFLOW_METRIC_TYPE_FLOAT) {
 		ts->min_float = FLT_MAX;
 		ts->max_float = -FLT_MAX;
+	} else {
+		SPOTFLOW_LOG("Invalid metric type: %d", type);
 	}
 }
 
