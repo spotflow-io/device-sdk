@@ -74,14 +74,8 @@ int spotflow_metrics_enqueue(uint8_t* payload, size_t len)
 		return -EINVAL;
 	}
 
-	struct spotflow_mqtt_metrics_msg* msg = malloc(sizeof(*msg));
+	struct spotflow_mqtt_metrics_msg* msg = malloc(sizeof(*msg) + len);
 	if (!msg) {
-		return -ENOMEM;
-	}
-
-	msg->payload = malloc(len);
-	if (!msg->payload) {
-		free(msg);
 		return -ENOMEM;
 	}
 
@@ -89,7 +83,6 @@ int spotflow_metrics_enqueue(uint8_t* payload, size_t len)
 	msg->len = len;
 
 	if (xQueueSend(g_spotflow_metrics_msgq, &msg, 0) != pdTRUE) {
-		free(msg->payload);
 		free(msg);
 		return -EAGAIN;
 	}

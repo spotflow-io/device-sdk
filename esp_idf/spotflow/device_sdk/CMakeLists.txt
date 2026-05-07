@@ -78,7 +78,7 @@ if(CONFIG_SPOTFLOW_METRICS)
           )
       else()
           idf_build_set_property(COMPILE_DEFINITIONS
-              "LWIP_SNMP=1;MIB2_STATS=1;LWIP_NETIF_EXT_STATUS_CALLBACK=1"
+              "LWIP_SNMP=1;MIB2_STATS=1;LWIP_NETIF_EXT_STATUS_CALLBACK=1" # Some additional configs for LWIP networking Stats which are not exposed by esp idf.
               APPEND
           )
       endif()

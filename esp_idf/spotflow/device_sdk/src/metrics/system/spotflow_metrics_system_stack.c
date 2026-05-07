@@ -20,6 +20,10 @@ static SemaphoreHandle_t g_tracked_threads_mutex;
 static bool g_tracked_threads_initialized;
 #endif
 
+/**
+ * @brief As this is not exposed so to get stacks stats we had to use pointer casting.
+ * 
+ */
 typedef struct
     tskTaskControlBlock /* The old naming convention is used to prevent breaking kernel aware debuggers. */
 {
@@ -253,18 +257,17 @@ static void report_thread_stack(TaskHandle_t thread, void* user_data)
 		return;
 	}
 
-	UBaseType_t unused_bytes = uxTaskGetStackHighWaterMark(thread);
-	if (unused_bytes == (UBaseType_t)-1) {
+	UBaseType_t unused_words = uxTaskGetStackHighWaterMark(thread);
+	if (unused_words == (UBaseType_t)-1) {
 		return;
 	}
 
 	TaskStatus_t task_status;
 	vTaskGetInfo(thread, &task_status, pdFALSE, eInvalid);
-	// TCB_t* pxTCB = (TCB_t*)thread;
-	// UBaseType_t total_words = pxTCB->pxEndOfStack - pxTCB->pxStack;
+
 	TCB_t_Minimal* pxTCB = (TCB_t_Minimal*)thread;
-	uint32_t stack_size = (uint32_t)pxTCB->pxEndOfStack - (uint32_t)pxTCB->pxStack;
-	size_t used_bytes = stack_size - unused_bytes;
+	uint32_t stack_size = (uint32_t)pxTCB->pxTopOfStack - (uint32_t)pxTCB->pxStack;
+	size_t used_bytes = stack_size - unused_words;
 
 	char thread_label[32];
 	const char* name = pcTaskGetName(thread);
@@ -278,7 +281,7 @@ static void report_thread_stack(TaskHandle_t thread, void* user_data)
 	struct spotflow_label labels[] = { { .key = "thread", .value = thread_label } };
 
 	int rc =
-	    spotflow_report_metric_int_with_labels(g_stack_free_metric, unused_bytes, labels, 1);
+	    spotflow_report_metric_int_with_labels(g_stack_free_metric, unused_words, labels, 1);
 	if (rc < 0) {
 		SPOTFLOW_LOG("Failed to report stack free metric for %s: %d", thread_label, rc);
 	}
@@ -294,5 +297,5 @@ static void report_thread_stack(TaskHandle_t thread, void* user_data)
 	int pct_int = (int)used_percent;
 	int pct_frac = (int)(used_percent * 100) % 100;
 	SPOTFLOW_DEBUG("Stack: thread=%s, used=%d.%01d%%, free=%zu bytes", thread_label, pct_int,
-		       pct_frac, unused_bytes);
+		       pct_frac, unused_words);
 }
