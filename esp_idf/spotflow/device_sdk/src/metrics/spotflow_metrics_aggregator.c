@@ -325,8 +325,10 @@ static void aggregation_timer_callback(void* arg)
 	struct spotflow_metric_base* metric = ctx->metric;
 	int64_t timestamp_ms = esp_timer_get_time() / 1000ULL;
 
-	if (xSemaphoreTake(metric->lock, portMAX_DELAY) != pdTRUE)
+	if (xSemaphoreTake(metric->lock, portMAX_DELAY) != pdTRUE) {
+		SPOTFLOW_LOG("Aggregation window closed for metric.");
 		return;
+	}
 
 	for (uint16_t i = 0; i < ctx->timeseries_capacity; i++) {
 		struct metric_timeseries_state* ts = &ctx->timeseries[i];
