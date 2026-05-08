@@ -295,7 +295,9 @@ static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 		return rc;
 	}
 	rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
-	free(cbor_data);
+	if (rc < 0) {
+		free(cbor_data);
+	}
 	return rc;
 }
 
@@ -314,7 +316,9 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 	}
 
 	rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
-	free(cbor_data);
+	if (rc < 0) {
+		return rc;
+	}
 	reset_timeseries_state(metric, ts);
 	return rc;
 }
@@ -326,7 +330,7 @@ static void aggregation_timer_callback(void* arg)
 	int64_t timestamp_ms = esp_timer_get_time() / 1000ULL;
 
 	if (xSemaphoreTake(metric->lock, portMAX_DELAY) != pdTRUE) {
-		SPOTFLOW_LOG("Aggregation window closed for metric.");
+		SPOTFLOW_DEBUG("Aggregation window closed for metric.");
 		return;
 	}
 

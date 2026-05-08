@@ -74,18 +74,37 @@ int spotflow_metrics_enqueue(uint8_t* payload, size_t len)
 		return -EINVAL;
 	}
 
-	struct spotflow_mqtt_metrics_msg* msg = malloc(sizeof(*msg) + len);
+	struct spotflow_mqtt_metrics_msg* msg = malloc(sizeof(*msg));
 	if (!msg) {
 		return -ENOMEM;
 	}
 
-	memcpy(msg->payload, payload, len);
+	msg->payload = payload;
 	msg->len = len;
 
+	/* Try to enqueue */
+	if (xQueueSend(g_spotflow_metrics_msgq, &msg, 0) == pdTRUE) {
+		spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_METRICS);
+		return 0;
+	}
+
+	/* Queue is full → drop one old metirc */
+	struct spotflow_mqtt_metrics_msg* dropped = NULL;
+
+	if (xQueueReceive(g_spotflow_metrics_msgq, &dropped, 0) == pdTRUE) {
+		SPOTFLOW_DEBUG("Queue full dropped oldest metric");
+		free(dropped->payload);
+		free(dropped);
+	}
+
+	/* Retry enqueue */
 	if (xQueueSend(g_spotflow_metrics_msgq, &msg, 0) != pdTRUE) {
+		/* Still failing → drop current metric too */
+		free(msg->payload);
 		free(msg);
 		return -EAGAIN;
 	}
+
 	spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_METRICS);
 	return 0;
 }
