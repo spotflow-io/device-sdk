@@ -107,8 +107,7 @@ int spotflow_metrics_system_init(void)
 	const esp_timer_create_args_t timer_args = { .callback = &collection_timer_handler,
 						     .name = "system_metrics_timer" };
 	ESP_ERROR_CHECK(esp_timer_create(&timer_args, &g_collection_timer));
-	ESP_ERROR_CHECK(esp_timer_start_once(
-	    g_collection_timer, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL * 1000000ULL));
+	collection_timer_handler(NULL);
 
 	atomic_store(&g_system_metrics_init_state, 2);
 
