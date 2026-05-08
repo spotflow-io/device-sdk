@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.8.0] - 2026-05-07
+
 ### Added
 * Added sample for Ethernet on FRDM_RW612
 * Added Coredump for ESP IDF.
@@ -26,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added a hash check on coredump partition to make sure coredump is valid.
 * Added Zephyr Kconfig option `CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE` to control whether log body template is sent with log body, reducing CBOR payload size when disabled.
 * Added Metrics in ESP IDF.
+* Added ESP IDF component tests.
+* Added support for Zephyr v4.4.0.
 
 ### Removed
 * Removed configdefault for MAIN_STACK_SIZE

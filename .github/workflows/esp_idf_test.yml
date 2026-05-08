@@ -1,0 +1,100 @@
+name: ESP-IDF QEMU Unit Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'esp_idf/**'
+      - '.github/workflows/esp_idf_test.yml'
+  pull_request:
+    paths:
+      - 'esp_idf/**'
+      - '.github/workflows/esp_idf_test.yml'
+
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  unit-test:
+    runs-on: ubuntu-latest
+
+    container:
+      image: espressif/idf:release-v5.5
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: 'recursive'
+
+      - name: Install expect
+        run: apt-get update && apt-get install -y expect
+
+      - name: Build and run unit tests
+        run: |
+          . /opt/esp/idf/export.sh
+          cd esp_idf/spotflow/device_sdk/test/example/unit_test/test
+          idf.py set-target esp32
+
+          echo "Building and starting QEMU..."
+
+          # Create expect script to monitor output and exit QEMU
+          cat > run_qemu.exp << 'EOF'
+          #!/usr/bin/expect -f
+          # Increase timeout in case of code execution takes time.
+          set timeout 600
+          log_file -a qemu_output.txt
+
+          spawn idf.py qemu
+
+          expect {
+            "Returned from app_main()" {
+              send "\x01x"
+              sleep 1
+              expect eof
+            }
+            timeout {
+              send "\x01x"
+              puts "Timeout reached"
+              exit 1
+            }
+            eof {
+              puts "Unexpected EOF"
+              exit 1
+            }
+          }
+          EOF
+
+          chmod +x run_qemu.exp
+          ./run_qemu.exp
+
+          echo ""
+          echo "--- Test Summary ---"
+          grep -E "PASS|FAIL|ERROR|Tests|Failures|Ignored" qemu_output.txt || true
+          echo "--------------------"
+
+          SUMMARY=$(grep -E "^[0-9]+ Tests [0-9]+ Failures [0-9]+ Ignored" qemu_output.txt | tail -1)
+
+          if [ -z "$SUMMARY" ]; then
+            echo "❌ No Unity summary line found — tests may not have completed"
+            echo "--- Full output ---"
+            cat qemu_output.txt
+            exit 1
+          fi
+
+          echo "Unity summary: $SUMMARY"
+          FAILURES=$(echo "$SUMMARY" | awk '{print $3}')
+
+          if [ "$FAILURES" -eq 0 ]; then
+            echo "✅ All tests passed"
+          else
+            echo "❌ $FAILURES test(s) failed"
+            grep ":FAIL" qemu_output.txt || true
+            exit 1
+          fi

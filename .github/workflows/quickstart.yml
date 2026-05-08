@@ -117,7 +117,7 @@ jobs:
         if: runner.os == 'Windows'
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: '3.12'
 
       # Needed for Zephyr SDK installation, not available on Windows runner
       - name: Install wget
@@ -233,7 +233,7 @@ jobs:
           path: ./quickstart-artifact
 
       - name: Login to Azure
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ secrets.AZURE_CLIENT_ID }}
           tenant-id: ${{ secrets.AZURE_TENANT_ID }}
@@ -272,32 +272,32 @@ jobs:
           --content-type 'application/powershell'
           --overwrite
 
-      - name: Wait before purging CDN
+      - name: Wait before purging Azure Front Door
         run: sleep 60
 
-      - name: Purge quickstart.json in CDN
+      - name: Purge quickstart.json in Azure Front Door
         run: >
-          az cdn endpoint purge
+          az afd endpoint purge
           --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
           --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
-          --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
+          --endpoint-name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
           --content-paths '/quickstart.json'
           --no-wait
 
-      - name: Purge spotflowup.sh in CDN
+      - name: Purge spotflowup.sh in Azure Front Door
         run: >
-          az cdn endpoint purge
+          az afd endpoint purge
           --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
           --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
-          --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
+          --endpoint-name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
           --content-paths '/spotflowup.sh'
           --no-wait
 
-      - name: Purge spotflowup.ps1 in CDN
+      - name: Purge spotflowup.ps1 in Azure Front Door
         run: >
-          az cdn endpoint purge
+          az afd endpoint purge
           --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
           --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
-          --name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
+          --endpoint-name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
           --content-paths '/spotflowup.ps1'
           --no-wait
