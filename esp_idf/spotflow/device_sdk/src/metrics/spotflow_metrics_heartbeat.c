@@ -19,6 +19,10 @@ static SemaphoreHandle_t g_heartbeat_mutex;
 /* Periodic heartbeat timer handle */
 static esp_timer_handle_t g_heartbeat_timer;
 
+/* Retry delays for MQTT publish */
+static int g_retry_count = 0;
+static int64_t g_next_retry_time_us = 0;
+static const uint16_t retry_delays_ms[] = { 10, 100, 1000 };
 /**
  * @brief Timer callback for generating heartbeat messages
  *
@@ -87,40 +91,63 @@ void spotflow_metrics_heartbeat_init(void)
  */
 int spotflow_poll_and_process_heartbeat(void)
 {
+	int64_t now_us = esp_timer_get_time();
+
+	/* Check if retry delay has passed */
+	if (g_next_retry_time_us > 0 && now_us < g_next_retry_time_us) {
+		return 0; /* Still waiting for retry delay */
+	}
+
 	struct spotflow_mqtt_metrics_msg msg;
-	uint8_t payload_copy[SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN];
 	bool has_pending = false;
-	/* Atomically dequeue pending heartbeat */
-	xSemaphoreTake(g_heartbeat_mutex, portMAX_DELAY);
+
+	/* Try to acquire mutex without blocking */
+	if (xSemaphoreTake(g_heartbeat_mutex, 0) != pdTRUE) {
+		return 0; /* Mutex busy, skip this poll */
+	}
 
 	if (g_pending_heartbeat_valid) {
 		msg = g_pending_heartbeat;
-		memcpy(payload_copy, g_pending_heartbeat.payload, g_pending_heartbeat.len);
-		msg.payload = payload_copy;
-		g_pending_heartbeat_valid = false;
 		has_pending = true;
 	}
+
+	xSemaphoreGive(g_heartbeat_mutex);
 
 	if (!has_pending) {
 		return 0; /* No heartbeat pending */
 	}
 
-	/* Publish heartbeat with exponential backoff on transient errors */
-	static const int retry_delays_ms[] = { 10, 100, 1000 };
-	int rc = 0;
+	/* Attempt publish without blocking */
+	int rc = spotflow_mqtt_publish_message(SPOTFLOW_MQTT_LOG_TOPIC, msg.payload, msg.len,
+					       SPOTFLOW_MQTT_LOG_QOS);
 
-	for (int retry = 0; retry <= 3; retry++) {
-		rc = spotflow_mqtt_publish_message(SPOTFLOW_MQTT_LOG_TOPIC, msg.payload, msg.len,
-						   SPOTFLOW_MQTT_LOG_QOS);
-
-		if (rc != -EAGAIN)
-			break; // published or failed with real error
-
-		if (retry < 3) {
-			SPOTFLOW_DEBUG("MQTT busy, retrying heartbeat in %d ms...",
-				       retry_delays_ms[retry]);
-			vTaskDelay(pdMS_TO_TICKS(retry_delays_ms[retry]));
+	if (rc == -EAGAIN) {
+		/* Schedule retry */
+		if (g_retry_count < 3) {
+			g_next_retry_time_us = now_us + (retry_delays_ms[g_retry_count] * 1000);
+			g_retry_count++;
+			SPOTFLOW_DEBUG("MQTT busy, retry #%d scheduled in %d ms", g_retry_count,
+				       retry_delays_ms[g_retry_count - 1]);
+		} else {
+			/* Max retries exceeded, drop heartbeat */
+			SPOTFLOW_LOG("Heartbeat dropped after max retries");
+			if (xSemaphoreTake(g_heartbeat_mutex, 0) == pdTRUE) {
+				g_pending_heartbeat_valid = false;
+				g_retry_count = 0;
+				g_next_retry_time_us = 0;
+				xSemaphoreGive(g_heartbeat_mutex);
+			}
+			return -1;
 		}
+		return 0;
+	}
+
+	/* Success or fatal error */
+	if (xSemaphoreTake(g_heartbeat_mutex, 0) == pdTRUE) {
+		g_pending_heartbeat_valid = false;
+		g_retry_count = 0;
+		g_next_retry_time_us = 0;
+		xSemaphoreGive(g_heartbeat_mutex);
 	}
 
 	if (rc < 0) {
