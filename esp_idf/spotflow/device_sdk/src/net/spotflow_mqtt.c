@@ -43,7 +43,7 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 	switch ((esp_mqtt_event_id_t)event_id) {
 	case MQTT_EVENT_CONNECTED:
 		SPOTFLOW_LOG("MQTT_EVENT_CONNECTED");
-		xTaskCreate(spotflow_mqtt_publish, "mqtt_publish",
+		xTaskCreate(spotflow_mqtt_publish, "spotflow_mqtt_publish",
 			    CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN * 2, NULL, 5,
 			    &mqtt_publish_task_handle);
 		spotflow_mqtt_subscribe(event->client, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
@@ -159,6 +159,10 @@ void spotflow_mqtt_publish(void* pvParameters)
 
 		if ((esp_mqtt_client_get_outbox_size(spotflow_client) <
 		     CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)) {
+			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
+				spotflow_config_send_pending_message();
+				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
+			}
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 			// Try to send coredump messages first
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_COREDUMP) {
@@ -171,16 +175,13 @@ void spotflow_mqtt_publish(void* pvParameters)
 #endif
 #ifdef CONFIG_SPOTFLOW_METRICS
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_METRICS) {
+				SPOTFLOW_LOG("Notified to send metrics\n");
 				if (spotflow_poll_and_process_enqueued_metrics() ==
 				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
 					clear_mask |= SPOTFLOW_MQTT_NOTIFY_METRICS;
 				}
 			}
 #endif
-			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
-				spotflow_config_send_pending_message();
-				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
-			}
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_LOGS) {
 				if (spotflow_logging_send_message() ==
 				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
@@ -315,7 +316,7 @@ int spotflow_mqtt_publish_message(const char* topic, const uint8_t* data, int le
 		SPOTFLOW_LOG("Error %d occurred sending MQTT (log). Retrying\n", msg_id);
 		return -1;
 	} else {
-		SPOTFLOW_LOG("Log message sent successfully topic %s.\n", topic);
+		SPOTFLOW_DEBUG("Log message sent successfully topic %s.\n", topic);
 		return 0;
 	}
 }

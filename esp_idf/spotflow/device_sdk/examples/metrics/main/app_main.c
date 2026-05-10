@@ -82,7 +82,7 @@ void app_main(void)
 			ESP_LOGI(TAG, "Periodic health check at iteration %d", iteration);
 		}
 
-		vTaskDelay(pdMS_TO_TICKS(2000));
+		vTaskDelay(5000 / portTICK_PERIOD_MS); //Delay for 5s
 	}
 
 	while (1) {

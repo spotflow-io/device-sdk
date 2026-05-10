@@ -70,6 +70,38 @@ int spotflow_metrics_system_network_init(void)
 	/* Register netif extended callback — fires when any netif is added */
 	netif_add_ext_callback(&g_netif_callback, netif_ext_callback);
 
+	/* Hook already-existing interfaces */
+	struct netif* netif;
+	NETIF_FOREACH(netif)
+	{
+		/* Skip loopback */
+		if (netif->name[0] == 'l' && netif->name[1] == 'o') {
+			continue;
+		}
+
+		/* Find a free slot and install hooks */
+		for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES; i++) {
+			if (!g_hooks[i].active) {
+				g_hooks[i].lwip_netif = netif;
+				g_hooks[i].original_linkoutput = netif->linkoutput;
+				g_hooks[i].original_input = netif->input;
+				g_hooks[i].tx_bytes = 0;
+				g_hooks[i].rx_bytes = 0;
+				g_hooks[i].active = true;
+				snprintf(g_hooks[i].name, sizeof(g_hooks[i].name), "%c%c%d",
+					 netif->name[0], netif->name[1], netif->num);
+
+				/* Install hooks */
+				netif->linkoutput = hooked_linkoutput;
+				netif->input = hooked_input;
+
+				SPOTFLOW_LOG("Installed byte hooks on existing netif %s",
+					     g_hooks[i].name);
+				break;
+			}
+		}
+	}
+
 	rc = spotflow_register_metric_int_with_labels(
 	    SPOTFLOW_METRIC_NAME_NETWORK_TX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
 	    CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_tx_metric);
@@ -111,15 +143,21 @@ void spotflow_metrics_system_network_collect(void)
 		uint64_t tx = g_hooks[i].tx_bytes;
 		uint64_t rx = g_hooks[i].rx_bytes;
 
+		// TODO: Replace with spotflow_report_metric_uint64 when available
+		int64_t tx_bytes_capped = (tx > INT64_MAX) ? INT64_MAX : (int64_t)tx;
+		int64_t rx_bytes_capped = (rx > INT64_MAX) ? INT64_MAX : (int64_t)rx;
+
 		struct spotflow_label labels[] = { { .key = "interface",
 						     .value = g_hooks[i].name } };
 
-		int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, tx, labels, 1);
+		int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric,
+								tx_bytes_capped, labels, 1);
 		if (rc < 0) {
 			SPOTFLOW_LOG("Failed to report TX for %s", g_hooks[i].name);
 		}
 
-		rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, rx, labels, 1);
+		rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, rx_bytes_capped,
+							    labels, 1);
 		if (rc < 0) {
 			SPOTFLOW_LOG("Failed to report RX for %s", g_hooks[i].name);
 		}
