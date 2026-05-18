@@ -102,7 +102,7 @@ int spotflow_metrics_enqueue(uint8_t* payload, size_t len)
 		/* Still failing → drop current metric too */
 		free(msg->payload);
 		free(msg);
-		return -EAGAIN;
+		return -ENOBUFS;
 	}
 
 	spotflow_mqtt_notify_action(SPOTFLOW_MQTT_NOTIFY_METRICS);

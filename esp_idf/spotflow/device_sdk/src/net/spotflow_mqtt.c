@@ -13,8 +13,14 @@
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 #include "coredump/spotflow_coredump_net.h"
 #endif
+
 #ifdef CONFIG_SPOTFLOW_METRICS
 #include "metrics/spotflow_metrics_net.h"
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+#include "metrics/system/spotflow_metrics_system.h"
+#endif
+
 #endif
 esp_mqtt_client_handle_t spotflow_client = NULL;
 static TaskHandle_t mqtt_publish_task_handle = NULL;
@@ -48,9 +54,17 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 			    &mqtt_publish_task_handle);
 		spotflow_mqtt_subscribe(event->client, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
 					SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC_QOS);
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+		/* Report connection state to system metrics */
+		spotflow_metrics_system_report_connection_state(true);
+#endif
 		break;
 	case MQTT_EVENT_DISCONNECTED:
 		SPOTFLOW_LOG("MQTT_EVENT_DISCONNECTED");
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+		/* Report connection state to system metrics */
+		spotflow_metrics_system_report_connection_state(false);
+#endif
 		if (mqtt_publish_task_handle != NULL) {
 			vTaskDelete(mqtt_publish_task_handle); // Delete the task when disconnected
 			mqtt_publish_task_handle = NULL;

@@ -111,9 +111,8 @@ int spotflow_poll_and_process_heartbeat(void)
 		has_pending = true;
 	}
 
-	xSemaphoreGive(g_heartbeat_mutex);
-
 	if (!has_pending) {
+		xSemaphoreGive(g_heartbeat_mutex);
 		return 0; /* No heartbeat pending */
 	}
 
@@ -131,24 +130,21 @@ int spotflow_poll_and_process_heartbeat(void)
 		} else {
 			/* Max retries exceeded, drop heartbeat */
 			SPOTFLOW_LOG("Heartbeat dropped after max retries");
-			if (xSemaphoreTake(g_heartbeat_mutex, 0) == pdTRUE) {
-				g_pending_heartbeat_valid = false;
-				g_retry_count = 0;
-				g_next_retry_time_us = 0;
-				xSemaphoreGive(g_heartbeat_mutex);
-			}
+			g_pending_heartbeat_valid = false;
+			g_retry_count = 0;
+			g_next_retry_time_us = 0;
+			xSemaphoreGive(g_heartbeat_mutex);
 			return -1;
 		}
+		xSemaphoreGive(g_heartbeat_mutex); // Released the mutex so we can try again.
 		return 0;
 	}
 
 	/* Success or fatal error */
-	if (xSemaphoreTake(g_heartbeat_mutex, 0) == pdTRUE) {
-		g_pending_heartbeat_valid = false;
-		g_retry_count = 0;
-		g_next_retry_time_us = 0;
-		xSemaphoreGive(g_heartbeat_mutex);
-	}
+	g_pending_heartbeat_valid = false;
+	g_retry_count = 0;
+	g_next_retry_time_us = 0;
+	xSemaphoreGive(g_heartbeat_mutex);
 
 	if (rc < 0) {
 		SPOTFLOW_LOG("Failed to publish heartbeat: %d", rc);

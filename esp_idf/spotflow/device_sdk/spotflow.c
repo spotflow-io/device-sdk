@@ -24,6 +24,8 @@
 
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 #include "metrics/spotflow_metrics_heartbeat.h"
+#endif
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
 #include "metrics/system/spotflow_metrics_system.h"
 #endif
 
