@@ -17,11 +17,12 @@
 #define KEY_OS 0x0F
 /*not used in current version*/
 #define KEY_OS_VERSION 0x10
+#define KEY_DEVICE_UPTIME_MS 0x06
 
 #define CORE_DUMP_CHUNK_MESSAGE_TYPE 2
 #define ESP_IDF_OS_VALUE 2
 
-/* Should be approximately 47 bytes (including build ID), putting 64 to be safe */
+/* Should be approximately 57 bytes (including build ID), putting 64 to be safe */
 #define COREDUMPS_OVERHEAD 64
 
 /**
@@ -96,10 +97,10 @@
 int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_data_len,
 				  const int chunk_ordinal, const uint32_t core_dump_id,
 				  const bool last_chunk, const uint8_t* build_id_data,
-				  size_t build_id_data_len, uint8_t** cbor_data,
-				  size_t* cbor_data_len)
+				  size_t build_id_data_len, const int64_t device_uptime_ms,
+				  uint8_t** cbor_data, size_t* cbor_data_len)
 {
-	if (!coredump_data || coredump_data_len == 0) {
+	if (!coredump_data) {
 		SPOTFLOW_LOG("Invalid coredump input");
 		return -1;
 	}
@@ -126,7 +127,7 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 	// Encode key-value pairs one by one
 	err = cbor_encode_uint(&map_encoder, KEY_MESSAGE_TYPE);
 	if (err != CborNoError) {
-			goto fail;
+		goto fail;
 	}
 
 	err = cbor_encode_uint(&map_encoder, CORE_DUMP_CHUNK_MESSAGE_TYPE);
@@ -154,16 +155,17 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 		goto fail;
 	}
 
-	err = cbor_encode_uint(&map_encoder, KEY_CONTENT);
-	if (err != CborNoError) {
-		goto fail;
-	}
+	if(coredump_data_len != 0) {
+		err = cbor_encode_uint(&map_encoder, KEY_CONTENT);
+		if (err != CborNoError) {
+			goto fail;
+		}
 
-	err = cbor_encode_byte_string(&map_encoder, coredump_data, coredump_data_len);
-	if (err != CborNoError) {
-		goto fail;
+		err = cbor_encode_byte_string(&map_encoder, coredump_data, coredump_data_len);
+		if (err != CborNoError) {
+			goto fail;
+		}
 	}
-
 	err = cbor_encode_uint(&map_encoder, KEY_IS_LAST_CHUNK);
 	if (err != CborNoError) {
 		goto fail;
@@ -180,7 +182,7 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 		if (err != CborNoError) {
 			goto fail;
 		}
-			
+
 		err = cbor_encode_byte_string(&map_encoder, build_id_data, build_id_data_len);
 		if (err != CborNoError) {
 			goto fail;
@@ -194,6 +196,16 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 	}
 
 	err = cbor_encode_uint(&map_encoder, ESP_IDF_OS_VALUE);
+	if (err != CborNoError) {
+		goto fail;
+	}
+
+	err = cbor_encode_uint(&map_encoder, KEY_DEVICE_UPTIME_MS);
+	if (err != CborNoError) {
+		goto fail;
+	}
+
+	err = cbor_encode_int(&map_encoder, device_uptime_ms);
 	if (err != CborNoError) {
 		goto fail;
 	}

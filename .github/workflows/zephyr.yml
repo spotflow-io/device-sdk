@@ -148,7 +148,8 @@ jobs:
         run: |
           west sdk install \
             --version ${{ matrix.sdk_version }} \
-            --toolchains ${{ matrix.sdk_toolchain }}
+            --toolchains ${{ matrix.sdk_toolchain }} \
+            --personal-access-token ${{ secrets.GITHUB_TOKEN }}
 
       - name: Configure application
         working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/${{ matrix.sample }}

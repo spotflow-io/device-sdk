@@ -1,6 +1,7 @@
 ﻿#include <inttypes.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/socket.h>
 #include <version_helper.h>

@@ -19,14 +19,19 @@
 	};
 };
 
-/* External flash chip - winbond - for more information see:
- * zephyr/boards/nxp/frdm_rw612/frdm_rw612_common.dtsi
- */
+/* External flash chip - Winbond */
 &w25q512jvfiq {
 	partitions {
+		/* Reducing size by 1 MB to leave space for coredump */
+		storage_partition: partition@620000 {
+			label = "storage";
+			reg = <0x00620000 (DT_SIZE_M(57) - DT_SIZE_K(128))>;
+		};
+
+		/* Last 1MB of 64 MB flash */
 		coredump_partition: partition@3f00000 {
 			label = "coredump-partition";
-			reg   = <0x03F00000 DT_SIZE_M(1)>; /* last 1MB of 64 MB flash */
+			reg = <0x03f00000 DT_SIZE_M(1)>;
 		};
 	};
 };

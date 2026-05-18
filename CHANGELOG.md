@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+## [0.8.0] - 2026-05-07
+
 ### Added
 * Added sample for Ethernet on FRDM_RW612
 * Added Coredump for ESP IDF.
@@ -19,7 +21,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added CI/CD pipeline for Zephyr.
 * Added list of supported boards and generation of quickstart.json file.
 * Added spotflowup.sh and spotflowup.ps1 scripts for workspace setup.
-* Added interfaces for reporting metrics to Spotflow
+* Added interfaces for reporting metrics to Spotflow.
+* Added device uptime to coredump chunks.
+* Added support for Silicon Labs board DK2605A (siwx917_dk2605a).
+* Added recognition of ENOSYS status when getting reset cause.
+* Added a hash check on coredump partition to make sure coredump is valid.
+* Added Zephyr Kconfig option `CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE` to control whether log body template is sent with log body, reducing CBOR payload size when disabled.
+* Added ESP IDF component tests.
+* Added support for Zephyr v4.4.0.
 
 ### Removed
 * Removed configdefault for MAIN_STACK_SIZE
@@ -27,6 +36,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 * Added check of `CONFIG_MBEDTLS_MPI_MAX_SIZE` in CMake and explicitly set it for Nordic boards in samples
 * Hiding CPU system metrics on unsupported platforms
+* Added const modifier to the variable holding the certificate
+* Fixed checking of errors during log message encoding
+* Added unencoded and unallocated log messages to drop statistics
+* Deferred Wi-Fi reconnect from `wifi_event_handler` to workqueue context in Zephyr samples to avoid callback stack overflow; retry delay set to 2 seconds
+* Removed unnecessary heap allocation from the Zephyr log CBOR output context and heartbeat path by switching them to static storage
 
 ## [0.7.0] - 2025-11-18
 ### Added

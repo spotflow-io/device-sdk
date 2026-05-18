@@ -44,7 +44,6 @@ typedef enum {
 // 	SPOTFLOW_LOG("\n");
 // }
 
-static uint8_t spotflow_log_cbor_convert_char_log_lvl(const char lvl);
 /**
  * @brief To create the message format for logs in CBOR format
  *
@@ -53,8 +52,8 @@ static uint8_t spotflow_log_cbor_convert_char_log_lvl(const char lvl);
  * @param out_len
  * @return uint8_t*
  */
-uint8_t* spotflow_log_cbor(const char* log_template, char* body, const uint8_t severity,
-			   size_t* out_len, const struct message_metadata* metadata)
+uint8_t* spotflow_log_cbor(const char* log_template, char* body, size_t* out_len,
+			   const struct message_metadata* metadata)
 {
 	// Buffer to create array to cointain several items
 	CborEncoder array_encoder;
@@ -85,7 +84,7 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, const uint8_t s
 	cbor_encode_text_stringz(&map_encoder, body);
 
 	cbor_encode_uint(&map_encoder, KEY_SEVERITY);
-	cbor_encode_uint(&map_encoder, severity);
+	cbor_encode_uint(&map_encoder, metadata->severity);
 
 	cbor_encode_uint(&map_encoder, KEY_BODY_TEMPLATE);
 	cbor_encode_text_stringz(&map_encoder, log_template);
@@ -124,16 +123,14 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, const uint8_t s
  *
  * @param buffer
  */
-void spotflow_log_cbor_send(const char* fmt, char* buffer, const char log_severity,
-			    const struct message_metadata* metadata)
+void spotflow_log_cbor_send(const char* fmt, char* buffer, const struct message_metadata* metadata)
 {
 	size_t len = strlen(buffer);
-	uint8_t severity = spotflow_log_cbor_convert_char_log_lvl(log_severity);
-	int tmp_log_level = spotflow_cbor_convert_severity_to_log_level(severity);
+	int tmp_log_level = spotflow_cbor_convert_severity_to_log_level(metadata->severity);
 	int tmp_get_sent_log = spotflow_config_get_sent_log_level();
 	if ((tmp_log_level <= tmp_get_sent_log)) {
 		if (len > 0 && len < CONFIG_SPOTFLOW_LOG_BUFFER_SIZE) {
-			uint8_t* clog_cbor = spotflow_log_cbor(fmt, buffer, severity, &len,
+			uint8_t* clog_cbor = spotflow_log_cbor(fmt, buffer, &len,
 							       metadata); // It reuses the length
 
 			spotflow_queue_push(clog_cbor, len);

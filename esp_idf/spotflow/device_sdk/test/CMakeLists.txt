@@ -1,0 +1,14 @@
+idf_component_register(
+    SRC_DIRS
+        "queue"
+        "cbor"
+        "common"
+    INCLUDE_DIRS
+        "include"
+        "../include"
+    REQUIRES
+        unity
+        cmock
+        mqtt
+        cbor
+)

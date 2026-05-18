@@ -88,10 +88,6 @@ The following system metrics are automatically collected every 60 seconds (confi
 
 # Custom User Metrics
 
-> [!IMPORTANT]
-> Custom application metrics are fully supported and persisted by the Spotflow cloud.
-> Visualization for custom metrics in the cloud dashboard is coming soon.
-
 ## Label-less Metrics
 
 **app_counter** (integer, aggregated):

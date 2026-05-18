@@ -6,6 +6,7 @@
 #include <zephyr/dfu/mcuboot.h>
 #endif
 #include <zephyr/drivers/hwinfo.h>
+#include <errno.h>
 #include <stdio.h>
 
 LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
@@ -44,11 +45,15 @@ static bool append_cause_name(char* buf, size_t buf_len, size_t* used, bool* fir
 
 void spotflow_report_reboot_reason(void)
 {
-	uint32_t cause;
+	uint32_t cause = 0;
 	char reset_str[64];
+	bool reset_cause_supported = true;
 	int rc = hwinfo_get_reset_cause(&cause);
 
-	if (rc < 0) {
+	if (rc == -ENOSYS) {
+		reset_cause_supported = false;
+		LOG_WRN("Reset cause not supported on this board; reporting UNKNOWN");
+	} else if (rc < 0) {
 		LOG_WRN("Failed to get reset cause: %d", rc);
 		return;
 	}
@@ -74,7 +79,9 @@ void spotflow_report_reboot_reason(void)
 	LOG_DBG("Reset cause reported: 0x%08x, %s", cause, reset_str);
 
 	/* Clear reset cause after reporting */
-	hwinfo_clear_reset_cause();
+	if (reset_cause_supported) {
+		hwinfo_clear_reset_cause();
+	}
 }
 
 static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len)

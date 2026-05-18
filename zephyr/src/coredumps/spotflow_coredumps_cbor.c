@@ -7,7 +7,7 @@
 
 LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL);
 
-#define MAX_KEY_COUNT 8
+#define MAX_KEY_COUNT 9
 
 #define KEY_MESSAGE_TYPE 0x00
 #define KEY_COREDUMP_ID 0x09
@@ -18,11 +18,12 @@ LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_L
 #define KEY_OS 0x0F
 /*not used in current version*/
 #define KEY_OS_VERSION 0x10
+#define KEY_DEVICE_UPTIME_MS 0x06
 
 #define CORE_DUMP_CHUNK_MESSAGE_TYPE 2
 #define ZEPHYR_OS_VALUE 1
 
-/* Should be approximately 47 bytes (including build ID), putting 64 to be safe */
+/* Should be approximately 57 bytes (including build ID), putting 64 to be safe */
 #define ZCBOR_COREDUMPS_OVERHEAD 64
 
 uint8_t buffer[CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE + ZCBOR_COREDUMPS_OVERHEAD];
@@ -30,7 +31,8 @@ uint8_t buffer[CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE + ZCBOR_COREDUMPS_OVERHEAD];
 int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_data_len,
 				  int chunk_ordinal, uint32_t core_dump_id, bool last_chunk,
 				  const uint8_t* build_id_data, size_t build_id_data_len,
-				  uint8_t** cbor_data, size_t* cbor_data_len)
+				  int64_t device_uptime_ms, uint8_t** cbor_data,
+				  size_t* cbor_data_len)
 {
 	__ASSERT(coredump_data != NULL, "coredump_data is NULL");
 	__ASSERT(coredump_data_len > 0, "coredump_data_len is 0");
@@ -63,6 +65,9 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 
 	succ = succ && zcbor_uint32_put(state, KEY_OS);
 	succ = succ && zcbor_uint32_put(state, ZEPHYR_OS_VALUE);
+
+	succ = succ && zcbor_uint32_put(state, KEY_DEVICE_UPTIME_MS);
+	succ = succ && zcbor_int64_put(state, device_uptime_ms);
 
 	/* finish cbor */
 	succ = succ && zcbor_map_end_encode(state, MAX_KEY_COUNT);

@@ -2,7 +2,6 @@ menuconfig SPOTFLOW
 	bool "Enable Spotflow Observability"
 	default n
 	select HWINFO
-# 	used by both Coredumps and Logging
 	select ZCBOR
 	select MBEDTLS
 	select MBEDTLS_TLS_LIBRARY if NRF_SECURITY
@@ -24,6 +23,22 @@ menuconfig SPOTFLOW
 	select NET_MGMT_EVENT_INFO
 	select NET_CONNECTION_MANAGER
 	select DNS_RESOLVER
+	# PSA is required since Zephyr 4.4
+	select MBEDTLS_PSA_CRYPTO_C if !NRF_SECURITY
+	select MBEDTLS_PSA_CRYPTO_CLIENT if !NRF_SECURITY
+	select MBEDTLS_SSL_PROTO_TLS1_2 if !NRF_SECURITY
+	select MBEDTLS_X509_CRT_PARSE_C if !NRF_SECURITY
+	select PSA_WANT_ALG_ECDH if !NRF_SECURITY
+	select PSA_WANT_ALG_GCM if !NRF_SECURITY
+	select PSA_WANT_ALG_HMAC if !NRF_SECURITY
+	select PSA_WANT_ALG_RSA_PKCS1V15_SIGN if !NRF_SECURITY
+	select PSA_WANT_ALG_SHA_384 if !NRF_SECURITY
+	select PSA_WANT_ALG_TLS12_PRF if !NRF_SECURITY
+	select PSA_WANT_ECC_SECP_R1_256 if !NRF_SECURITY
+	select PSA_WANT_KEY_TYPE_AES if !NRF_SECURITY
+	select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_EXPORT if !NRF_SECURITY
+	select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_GENERATE if !NRF_SECURITY
+	select PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_IMPORT if !NRF_SECURITY
 	imply NET_SOCKETS_SOCKOPT_TLS
 	help
 		Enables Zephyr integration with Spotflow observability platform.
@@ -140,8 +155,8 @@ config SPOTFLOW_MQTT_THREAD_PRIORITY
 
 config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE
 	int "Size of Spotflow processing thread stack"
-	default 3072 if DEBUG_OPTIMIZATIONS
-	default 2560
+	default 4608 if DEBUG_OPTIMIZATIONS
+	default 4096
 	help
 		Size of the stack used by the Spotflow processing thread.
 		Increase this value if you experience issues with logs/tls handshake.
