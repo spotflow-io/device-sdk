@@ -13,3 +13,7 @@ modules/*west
 **/dependencies.lock
 **/.clangd
 esp_idf/spotflow/dist/*
+vscode-workspaces/**
+AGENTS.md
+CLAUDE.md
+**/sdconfig.local
