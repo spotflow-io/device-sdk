@@ -26,8 +26,13 @@ void spotflow_metrics_net_init(void);
 int spotflow_poll_and_process_enqueued_metrics(void);
 
 /**
- * @brief Enqueue a metric message for sending.
+ * @brief Enqueue a metric message for sending, by conforming it to
+ * the spotflow_mqtt_metrics_msg structure and placing it in the queue.
+ * If the queue is full drop the oldest metric queue msg.
  *
+ * @param payload Pointer to the metric message payload.
+ * @param len Length of the metric message payload.
+ * @return 1 on success, 0 if queue is full, negative errno on failure
  */
 int spotflow_metrics_enqueue(uint8_t* payload, size_t len);
 
