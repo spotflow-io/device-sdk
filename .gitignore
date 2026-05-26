@@ -16,4 +16,4 @@ esp_idf/spotflow/dist/*
 vscode-workspaces/**
 AGENTS.md
 CLAUDE.md
-**/sdconfig.local
+**/sdkconfig.local
