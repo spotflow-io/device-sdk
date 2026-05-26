@@ -22,7 +22,7 @@ static bool g_tracked_threads_initialized;
 
 /**
  * @brief As this is not exposed so to get stacks stats we had to use pointer casting.
- * 
+ *
  */
 typedef struct
     tskTaskControlBlock /* The old naming convention is used to prevent breaking kernel aware debuggers. */
@@ -167,7 +167,7 @@ void spotflow_metrics_system_stack_collect(void)
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 	// Enumerate all tasks
 	UBaseType_t task_count = uxTaskGetNumberOfTasks();
-	TaskStatus_t* task_array = pvPortMalloc(task_count * sizeof(TaskStatus_t));
+	TaskStatus_t* task_array = malloc(task_count * sizeof(TaskStatus_t));
 	if (task_array == NULL) {
 		SPOTFLOW_LOG("Failed to allocate memory for task enumeration");
 		return;
@@ -177,7 +177,7 @@ void spotflow_metrics_system_stack_collect(void)
 	for (UBaseType_t i = 0; i < task_count; i++) {
 		report_thread_stack(task_array[i].xHandle, NULL);
 	}
-	vPortFree(task_array);
+	free(task_array);
 #else
 	if (!g_tracked_threads_initialized) {
 		return;
