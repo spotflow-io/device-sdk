@@ -115,7 +115,7 @@ static int init_application_metrics(void)
 	    &g_request_duration_metric);
 
 	if (rc < 0) {
-		ESP_LOGI(TAG, "Failed to register request_duration metric: %d", rc);
+		ESP_LOGE(TAG, "Failed to register request_duration metric: %d", rc);
 		return rc;
 	}
 
