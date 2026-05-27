@@ -228,5 +228,20 @@ jobs:
             ${{ hashFiles('temp-manifest/zephyr/manifests/west-zephyr-native-sim.yml') }}
             ota-tests-${{ runner.os }}
 
+      - name: Cache Zephyr SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/zephyr-sdk-1.0.1
+          key: zephyr-sdk-1.0.1-native-sim-${{ runner.os }}
+
+      - name: Install SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          west sdk install \
+            --version 1.0.1 \
+            --toolchains x86_64-zephyr-elf \
+            --personal-access-token ${{ secrets.GITHUB_TOKEN }}
+
       - name: Run OTA native simulator tests
         run: west twister -T modules/lib/spotflow/zephyr/tests/ota -p native_sim --inline-logs
