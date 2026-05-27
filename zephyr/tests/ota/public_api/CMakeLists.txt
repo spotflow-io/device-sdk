@@ -6,11 +6,11 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(spotflow_ota_public_api)
 
 target_include_directories(app PRIVATE
-	${CMAKE_CURRENT_LIST_DIR}/../../../include
-	${CMAKE_CURRENT_LIST_DIR}/../common
+        ${CMAKE_CURRENT_LIST_DIR}/../../../include
+        ${CMAKE_CURRENT_LIST_DIR}/../common
 )
 
 target_sources(app PRIVATE
-	src/main.c
-	../common/spotflow_ota_test_fakes.c
+        src/main.c
+        ../common/spotflow_ota_test_fakes.c
 )

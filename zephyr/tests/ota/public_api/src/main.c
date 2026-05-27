@@ -50,7 +50,7 @@ ZTEST(spotflow_ota_public_api, test_public_headers_expose_expected_downloader_ty
 
 ZTEST(spotflow_ota_public_api, test_test_fakes_are_available_to_ota_suites)
 {
-	struct spotflow_ota_test_fake_mqtt *fake_mqtt;
+	struct spotflow_ota_test_fake_mqtt* fake_mqtt;
 
 	spotflow_ota_test_fakes_reset();
 	fake_mqtt = spotflow_ota_test_fake_mqtt_get();

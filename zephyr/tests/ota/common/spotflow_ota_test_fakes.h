@@ -10,14 +10,14 @@ extern "C" {
 
 struct spotflow_ota_test_fake_mqtt {
 	uint32_t publish_count;
-	const uint8_t *last_payload;
+	const uint8_t* last_payload;
 	size_t last_payload_len;
 	int publish_result;
 };
 
 void spotflow_ota_test_fakes_reset(void);
 
-struct spotflow_ota_test_fake_mqtt *spotflow_ota_test_fake_mqtt_get(void);
+struct spotflow_ota_test_fake_mqtt* spotflow_ota_test_fake_mqtt_get(void);
 
 #ifdef __cplusplus
 }
