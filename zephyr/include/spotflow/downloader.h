@@ -24,39 +24,39 @@ struct spotflow_downloader {
 	enum spotflow_downloader_state state;
 };
 
-#define SPOTFLOW_DEFINE_DOWNLOADER(name)                                                    \
-	struct spotflow_downloader name = {                                                 \
-		.state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE,                                \
+#define SPOTFLOW_DEFINE_DOWNLOADER(name)                     \
+	struct spotflow_downloader name = {                  \
+		.state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE, \
 	}
 
 struct spotflow_artifact_block {
 	size_t offset;
-	const uint8_t *data;
+	const uint8_t* data;
 	size_t data_len;
 	bool is_last;
 };
 
 struct spotflow_download_request {
-	const char *url;
-	const char *secret;
+	const char* url;
+	const char* secret;
 };
 
-typedef void (*spotflow_download_block_callback)(const struct spotflow_artifact_block *block,
-						 struct spotflow_downloader *downloader,
-						 void *callback_ctx);
+typedef void (*spotflow_download_block_callback)(const struct spotflow_artifact_block* block,
+						 struct spotflow_downloader* downloader,
+						 void* callback_ctx);
 
-int spotflow_download_artifact(struct spotflow_downloader *downloader,
-			       const struct spotflow_download_request *request,
-			       spotflow_download_block_callback callback, void *callback_ctx);
+int spotflow_download_artifact(struct spotflow_downloader* downloader,
+			       const struct spotflow_download_request* request,
+			       spotflow_download_block_callback callback, void* callback_ctx);
 
 enum spotflow_downloader_state
-spotflow_get_downloader_state(const struct spotflow_downloader *downloader);
+spotflow_get_downloader_state(const struct spotflow_downloader* downloader);
 
-int spotflow_pause_download(struct spotflow_downloader *downloader);
+int spotflow_pause_download(struct spotflow_downloader* downloader);
 
-int spotflow_resume_download(struct spotflow_downloader *downloader);
+int spotflow_resume_download(struct spotflow_downloader* downloader);
 
-int spotflow_cancel_download(struct spotflow_downloader *downloader);
+int spotflow_cancel_download(struct spotflow_downloader* downloader);
 
 #ifdef __cplusplus
 }
