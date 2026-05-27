@@ -11,6 +11,7 @@ add_subdirectory(src/metrics)
 add_subdirectory(src/ota)
 
 zephyr_include_directories(
+        include
         src
 )
 
