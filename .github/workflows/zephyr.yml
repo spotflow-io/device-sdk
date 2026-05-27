@@ -243,5 +243,8 @@ jobs:
             --toolchains x86_64-zephyr-elf \
             --personal-access-token ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Install native simulator dependencies
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y gcc-multilib g++-multilib
+
       - name: Run OTA native simulator tests
         run: west twister -T modules/lib/spotflow/zephyr/tests/ota -p native_sim --inline-logs
