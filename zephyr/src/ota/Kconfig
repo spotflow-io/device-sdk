@@ -27,4 +27,11 @@ config SPOTFLOW_OTA_DOWNLOAD_THREAD_STACK_SIZE
 	  Stack size in bytes for the dedicated OTA firmware download thread.
 	  Increase if you observe stack overflows during TLS or HTTP operations.
 
+config SPOTFLOW_OTA_MAX_ARTIFACTS
+	int "Maximum number of artifacts in an OTA update manifest"
+	default 4
+	range 1 32
+	help
+	  Maximum number of firmware artifacts accepted in one OTA update manifest.
+
 endif # SPOTFLOW_OTA
