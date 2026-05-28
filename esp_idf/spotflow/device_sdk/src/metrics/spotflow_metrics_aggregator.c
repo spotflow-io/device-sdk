@@ -317,6 +317,7 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 
 	rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
 	if (rc < 0) {
+		reset_timeseries_state(metric, ts);
 		return rc;
 	}
 	reset_timeseries_state(metric, ts);

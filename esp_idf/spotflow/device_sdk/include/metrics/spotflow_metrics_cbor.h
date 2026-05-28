@@ -16,7 +16,7 @@ extern "C" {
  * @brief Encode metric message to CBOR format
  *
  * Allocates and returns a CBOR-encoded buffer. Caller owns the buffer
- * and is responsible for freeing it with k_free().
+ * and is responsible for freeing it with free().
  *
  * @param metric Metric base handle
  * @param ts Time series state to encode
