@@ -14,6 +14,7 @@
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static char image_url[SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH + 1];
+static char image_secret[SPOTFLOW_OTA_ARTIFACT_SECRET_MAX_LENGTH + 1];
 static K_MUTEX_DEFINE(image_url_mutex);
 static K_SEM_DEFINE(download_sem, 0, 1);
 
@@ -79,6 +80,8 @@ static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 	k_mutex_lock(&image_url_mutex, K_FOREVER);
 	strncpy(image_url, artifact->url, sizeof(image_url) - 1);
 	image_url[sizeof(image_url) - 1] = '\0';
+	strncpy(image_secret, artifact->secret, sizeof(image_secret) - 1);
+	image_secret[sizeof(image_secret) - 1] = '\0';
 	k_mutex_unlock(&image_url_mutex);
 
 	k_sem_give(&download_sem);
@@ -92,17 +95,20 @@ static void ota_download_thread_entry(void* p1, void* p2, void* p3)
 
 	while (true) {
 		char image_url_copy[sizeof(image_url)];
+		char image_secret_copy[sizeof(image_secret)];
 
 		k_sem_take(&download_sem, K_FOREVER);
 
 		k_mutex_lock(&image_url_mutex, K_FOREVER);
 		strncpy(image_url_copy, image_url, sizeof(image_url_copy));
 		image_url_copy[sizeof(image_url_copy) - 1] = '\0';
+		strncpy(image_secret_copy, image_secret, sizeof(image_secret_copy));
+		image_secret_copy[sizeof(image_secret_copy) - 1] = '\0';
 		k_mutex_unlock(&image_url_mutex);
 
 		LOG_INF("OTA download triggered");
 
-		int rc = spotflow_ota_download_and_flash(image_url_copy);
+		int rc = spotflow_ota_download_and_flash(image_url_copy, image_secret_copy);
 
 		if (rc < 0) {
 			LOG_ERR("OTA firmware download failed: %d -- will retry on next update "

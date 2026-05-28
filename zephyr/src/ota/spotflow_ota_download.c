@@ -11,6 +11,7 @@
 #include <zephyr/sys/printk.h>
 
 #include "ota/spotflow_ota_download.h"
+#include "ota/spotflow_ota_cbor.h"
 #include "ota/spotflow_ota_url.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
@@ -20,6 +21,12 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 /* Timeout for the full HTTP download in milliseconds. */
 #define HTTP_DOWNLOAD_TIMEOUT_MS 120000
+
+#define OTA_AUTHORIZATION_HEADER_PREFIX "Authorization: OtaSecret "
+#define OTA_AUTHORIZATION_HEADER_SUFFIX "\r\n"
+#define OTA_AUTHORIZATION_HEADER_MAX_LEN                                                         \
+	(sizeof(OTA_AUTHORIZATION_HEADER_PREFIX) - 1 + SPOTFLOW_OTA_ARTIFACT_SECRET_MAX_LENGTH + \
+	 sizeof(OTA_AUTHORIZATION_HEADER_SUFFIX))
 
 struct ota_flash_ctx {
 	struct flash_img_context fctx;
@@ -31,8 +38,12 @@ static int connect_socket(const struct ota_url* url);
 static int http_response_cb(struct http_response* rsp, enum http_final_call final_data,
 			    void* user_data);
 
-int spotflow_ota_download_and_flash(const char* image_url)
+int spotflow_ota_download_and_flash(const char* image_url, const char* secret)
 {
+	if (image_url == NULL || secret == NULL) {
+		return -EINVAL;
+	}
+
 	struct ota_url url;
 	int rc = spotflow_ota_parse_url(image_url, &url);
 
@@ -58,6 +69,14 @@ int spotflow_ota_download_and_flash(const char* image_url)
 	}
 
 	static uint8_t recv_buf[CONFIG_IMG_BLOCK_BUF_SIZE];
+	char authorization_header[OTA_AUTHORIZATION_HEADER_MAX_LEN];
+	const char* optional_headers[] = {
+		authorization_header,
+		NULL,
+	};
+
+	snprintk(authorization_header, sizeof(authorization_header),
+		 OTA_AUTHORIZATION_HEADER_PREFIX "%s" OTA_AUTHORIZATION_HEADER_SUFFIX, secret);
 
 	struct http_request req = {
 		.method = HTTP_GET,
@@ -67,6 +86,7 @@ int spotflow_ota_download_and_flash(const char* image_url)
 		.response = http_response_cb,
 		.recv_buf = recv_buf,
 		.recv_buf_len = sizeof(recv_buf),
+		.optional_headers = optional_headers,
 	};
 
 	LOG_INF("Starting HTTP GET %s%s", url.host, url.path);

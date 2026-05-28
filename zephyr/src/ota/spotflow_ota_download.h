@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-int spotflow_ota_download_and_flash(const char* image_url);
+int spotflow_ota_download_and_flash(const char* image_url, const char* secret);
 
 #ifdef __cplusplus
 }
