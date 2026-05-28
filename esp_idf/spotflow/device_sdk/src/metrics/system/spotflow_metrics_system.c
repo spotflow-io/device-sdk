@@ -35,25 +35,10 @@
 
 static esp_timer_handle_t g_collection_timer = NULL;
 
-/* Initialization state: 0 = not initialized, 1 = in progress, 2 = fully initialized */
-static atomic_int g_system_metrics_init_state = ATOMIC_VAR_INIT(0);
-
 static void collection_timer_handler(void* arg);
 
 int spotflow_metrics_system_init(void)
 {
-	if (atomic_load(&g_system_metrics_init_state) == 2) {
-		return 0;
-	}
-
-	int expected = 0;
-	if (!atomic_compare_exchange_strong(&g_system_metrics_init_state, &expected, 1)) {
-		while (atomic_load(&g_system_metrics_init_state) != 2) {
-			taskYIELD();
-		}
-		return 0;
-	}
-
 	SPOTFLOW_DEBUG("Initializing system metrics auto-collection");
 
 	int registered_count = 0;
@@ -109,8 +94,6 @@ int spotflow_metrics_system_init(void)
 	ESP_ERROR_CHECK(esp_timer_create(&timer_args, &g_collection_timer));
 	collection_timer_handler(NULL);
 
-	atomic_store(&g_system_metrics_init_state, 2);
-
 	SPOTFLOW_LOG(
 	    "System metrics initialized: %d metrics registered, collection=%ds, aggregation=%ds",
 	    registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL,
@@ -122,9 +105,6 @@ int spotflow_metrics_system_init(void)
 void spotflow_metrics_system_report_connection_state(bool connected)
 {
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-	if (atomic_load(&g_system_metrics_init_state) != 2) {
-		return;
-	}
 	spotflow_metrics_system_connection_report(connected);
 #endif
 }
