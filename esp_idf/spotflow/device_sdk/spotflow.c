@@ -54,6 +54,9 @@ void spotflow_init(void)
 	original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
 
 	spotflow_queue_init(); //Initilize the queue
+#ifdef CONFIG_SPOTFLOW_METRICS
+	spotflow_metrics();
+#endif
 	spotflow_mqtt_app_start(); // Calling the mqtt_start from the init function.
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 	if (spotflow_is_coredump_available()) {
@@ -62,7 +65,4 @@ void spotflow_init(void)
 	}
 #endif
 	spotflow_config_init();
-#ifdef CONFIG_SPOTFLOW_METRICS
-	spotflow_metrics();
-#endif
 }
