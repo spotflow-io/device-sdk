@@ -6,14 +6,14 @@
 #include <zephyr/dfu/mcuboot.h>
 #include <zephyr/sys/reboot.h>
 
-#include "ota/spotflow_ota_download.h"
 #include "ota/spotflow_ota.h"
 #include "ota/spotflow_ota_cbor.h"
+#include "ota/spotflow_ota_download.h"
 #include "net/spotflow_mqtt.h"
 
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-static char image_url[SPOTFLOW_OTA_ARTIFACT_URL_BUFFER_LENGTH + 1];
+static char image_url[SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH + 1];
 static K_MUTEX_DEFINE(image_url_mutex);
 static K_SEM_DEFINE(download_sem, 0, 1);
 
@@ -43,7 +43,7 @@ static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 	int rc = spotflow_ota_cbor_decode_c2d(payload, len, &msg, &status);
 
 	if (rc < 0) {
-		if (status.has_trustworthy_attempt_id) {
+		if (status.has_trustworthy_attempt_id && status.has_attempt_error) {
 			LOG_ERR("Rejected OTA attempt %llu with attempt error %d",
 				status.attempt_id, status.attempt_error);
 		} else {

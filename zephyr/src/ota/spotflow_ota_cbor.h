@@ -16,8 +16,7 @@ extern "C" {
 #endif
 
 #define SPOTFLOW_OTA_ARTIFACT_SLUG_MAX_LENGTH 32
-#define SPOTFLOW_OTA_ARTIFACT_URL_PROTOCOL_MAX_LENGTH 117
-#define SPOTFLOW_OTA_ARTIFACT_URL_BUFFER_LENGTH 128
+#define SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH 128
 #define SPOTFLOW_OTA_ARTIFACT_SECRET_MAX_LENGTH 24
 #define SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH 64
 
@@ -32,7 +31,7 @@ enum spotflow_ota_cbor_artifact_type {
 };
 
 enum spotflow_ota_cbor_attempt_error {
-	SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_UNKNOWN = 0,
+	SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_UNKNOWN_ERROR = 0,
 	SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_ARTIFACT_COUNT_EXCEEDED = 1,
 	SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE = 2,
 	SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE = 3,
@@ -42,7 +41,7 @@ struct spotflow_ota_cbor_artifact {
 	enum spotflow_ota_cbor_artifact_type type;
 	char slug[SPOTFLOW_OTA_ARTIFACT_SLUG_MAX_LENGTH + 1];
 	bool is_main;
-	char url[SPOTFLOW_OTA_ARTIFACT_URL_BUFFER_LENGTH + 1];
+	char url[SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH + 1];
 	char secret[SPOTFLOW_OTA_ARTIFACT_SECRET_MAX_LENGTH + 1];
 	char version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
 };
@@ -64,6 +63,7 @@ struct spotflow_ota_cbor_c2d_msg {
 struct spotflow_ota_cbor_decode_status {
 	bool has_trustworthy_attempt_id;
 	uint64_t attempt_id;
+	bool has_attempt_error;
 	enum spotflow_ota_cbor_attempt_error attempt_error;
 };
 

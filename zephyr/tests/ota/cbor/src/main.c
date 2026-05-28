@@ -157,6 +157,7 @@ ZTEST(spotflow_ota_cbor, test_decode_update_artifacts)
 
 	zassert_ok(rc);
 	zassert_true(status.has_trustworthy_attempt_id);
+	zassert_false(status.has_attempt_error);
 	zassert_equal(status.attempt_id, 1);
 	zassert_equal(msg.type, SPOTFLOW_OTA_CBOR_MSG_UPDATE_ARTIFACTS);
 	zassert_equal(msg.attempt_id, 1);
@@ -183,6 +184,7 @@ ZTEST(spotflow_ota_cbor, test_decode_cancel_update)
 
 	zassert_ok(rc);
 	zassert_true(status.has_trustworthy_attempt_id);
+	zassert_false(status.has_attempt_error);
 	zassert_equal(msg.type, SPOTFLOW_OTA_CBOR_MSG_CANCEL_UPDATE);
 	zassert_equal(msg.attempt_id, 2);
 }
@@ -197,6 +199,7 @@ ZTEST(spotflow_ota_cbor, test_decode_report_update_results)
 
 	zassert_ok(rc);
 	zassert_true(status.has_trustworthy_attempt_id);
+	zassert_false(status.has_attempt_error);
 	zassert_equal(msg.type, SPOTFLOW_OTA_CBOR_MSG_REPORT_UPDATE_RESULTS);
 	zassert_equal(msg.attempt_id, 3);
 }
@@ -257,6 +260,7 @@ ZTEST(spotflow_ota_cbor, test_reject_unknown_artifact_type_with_attempt_error)
 
 	zassert_equal(rc, -EINVAL);
 	zassert_true(status.has_trustworthy_attempt_id);
+	zassert_true(status.has_attempt_error);
 	zassert_equal(status.attempt_id, 1);
 	zassert_equal(status.attempt_error, SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE);
 }
@@ -274,6 +278,7 @@ ZTEST(spotflow_ota_cbor, test_reject_zero_attempt_id_without_trustworthy_attempt
 
 	zassert_equal(rc, -EINVAL);
 	zassert_false(status.has_trustworthy_attempt_id);
+	zassert_false(status.has_attempt_error);
 }
 
 ZTEST_SUITE(spotflow_ota_cbor, NULL, NULL, NULL, NULL, NULL);
