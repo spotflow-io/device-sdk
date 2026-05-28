@@ -10,8 +10,8 @@ extern "C" {
 
 struct ota_url {
 	bool tls;
-	char host[64];
-	char path[64];
+	char host[128];
+	char path[128];
 	uint16_t port;
 };
 

@@ -23,14 +23,15 @@
 /* Maximum size of the payload of config C2D messages */
 #define C2D_PAYLOAD_BUFFER_SIZE 32
 
-/* Maximum size of the payload of OTA C2D messages (image URL up to 64 bytes + CBOR overhead) */
-#define OTA_C2D_PAYLOAD_BUFFER_SIZE 128
+/* Maximum size of the payload of OTA C2D messages */
+/* TODO: Calculate properly for production, this value is just for testing */
+#define OTA_C2D_PAYLOAD_BUFFER_SIZE 256
 
 #define DEFAULT_GENERAL_TIMEOUT_MSEC 500
 #define SPOTFLOW_MQTT_INGEST_CBOR_TOPIC "ingest-cbor"
 #define SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC "config-cbor-d2c"
 #define SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC "config-cbor-c2d"
-#define SPOTFLOW_MQTT_OTA_CBOR_C2D_TOPIC "ota-cbor"
+#define SPOTFLOW_MQTT_OTA_CBOR_C2D_TOPIC "ota-cbor-c2d"
 
 #define RC_STR(rc) ((rc) == 0 ? "OK" : "ERROR")
 
