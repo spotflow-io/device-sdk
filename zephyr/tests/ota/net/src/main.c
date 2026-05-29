@@ -43,8 +43,8 @@ static void expect_payload(const struct spotflow_ota_cbor_update_results* expect
 	uint8_t expected_payload[128];
 	size_t expected_len;
 
-	zassert_ok(spotflow_ota_cbor_encode_update_results(expected_message, expected_payload,
-						   sizeof(expected_payload), &expected_len));
+	zassert_ok(spotflow_ota_cbor_encode_update_results(
+	    expected_message, expected_payload, sizeof(expected_payload), &expected_len));
 
 	zassert_equal(fake_mqtt->last_payload_len, expected_len);
 	zassert_mem_equal(fake_mqtt->last_payload, expected_payload, expected_len);

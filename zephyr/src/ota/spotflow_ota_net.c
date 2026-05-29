@@ -162,13 +162,15 @@ static int append_unique_index(uint32_t* indexes, size_t* count, uint32_t index)
 static int set_result_index(struct spotflow_ota_cbor_update_results* message, uint32_t index,
 			    enum spotflow_ota_result result)
 {
+	if (result == SPOTFLOW_OTA_RESULT_PENDING) {
+		return 0;
+	}
+
 	remove_index(message->succeeded, &message->succeeded_count, index);
 	remove_index(message->failed, &message->failed_count, index);
 	remove_index(message->canceled, &message->canceled_count, index);
 
 	switch (result) {
-	case SPOTFLOW_OTA_RESULT_PENDING:
-		return 0;
 	case SPOTFLOW_OTA_RESULT_SUCCEEDED:
 		return append_unique_index(message->succeeded, &message->succeeded_count, index);
 	case SPOTFLOW_OTA_RESULT_FAILED:
