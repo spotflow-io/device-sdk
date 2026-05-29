@@ -4,88 +4,26 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
+#include "ota/spotflow_ota_cbor.h"
 #include "ota/spotflow_ota_net.h"
 
 #include "spotflow_ota_test_fakes.h"
 
 LOG_MODULE_REGISTER(spotflow_ota);
 
-static const uint8_t merged_results_payload[] = {
-	/* indefinite map */
-	0xbf,
-	/* messageType: UPDATE_RESULTS */
-	0x00,
-	0x09,
-	/* updateAttemptId: 11 */
-	0x18,
-	0x20,
-	0x0b,
-	/* succeeded: [0] */
-	0x18,
-	0x2a,
-	0x9f,
-	0x00,
-	0xff,
-	/* failed: [1] */
-	0x18,
-	0x2b,
-	0x9f,
-	0x01,
-	0xff,
-	/* canceled: [3] */
-	0x18,
-	0x2c,
-	0x9f,
-	0x03,
-	0xff,
-	/* end map */
-	0xff,
-};
-
-static const uint8_t attempt_error_payload[] = {
-	/* indefinite map */
-	0xbf,
-	/* messageType: UPDATE_RESULTS */
-	0x00,
-	0x09,
-	/* updateAttemptId: 12 */
-	0x18,
-	0x20,
-	0x0c,
-	/* updateAttemptError: CANNOT_PARSE_MESSAGE */
-	0x18,
-	0x2d,
-	0x03,
-	/* end map */
-	0xff,
-};
-
-static const uint8_t replacement_payload[] = {
-	/* indefinite map */
-	0xbf,
-	/* messageType: UPDATE_RESULTS */
-	0x00,
-	0x09,
-	/* updateAttemptId: 21 */
-	0x18,
-	0x20,
-	0x15,
-	/* failed: [2] */
-	0x18,
-	0x2b,
-	0x9f,
-	0x02,
-	0xff,
-	/* end map */
-	0xff,
-};
+static uint8_t published_payload[128];
 
 int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
 {
 	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
 
+	if (len > sizeof(published_payload)) {
+		return -ENOMEM;
+	}
+
 	fake_mqtt->publish_count++;
-	fake_mqtt->last_payload = payload;
+	memcpy(published_payload, payload, len);
+	fake_mqtt->last_payload = published_payload;
 	fake_mqtt->last_payload_len = len;
 
 	return fake_mqtt->publish_result;
@@ -99,9 +37,14 @@ static void before_each(void* fixture)
 	spotflow_ota_net_reset();
 }
 
-static void expect_payload(const uint8_t* expected_payload, size_t expected_len)
+static void expect_payload(const struct spotflow_ota_cbor_update_results* expected_message)
 {
 	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	uint8_t expected_payload[128];
+	size_t expected_len;
+
+	zassert_ok(spotflow_ota_cbor_encode_update_results(expected_message, expected_payload,
+						   sizeof(expected_payload), &expected_len));
 
 	zassert_equal(fake_mqtt->last_payload_len, expected_len);
 	zassert_mem_equal(fake_mqtt->last_payload, expected_payload, expected_len);
@@ -127,7 +70,17 @@ ZTEST(spotflow_ota_net, test_merge_succeeded_failed_and_canceled_arrays)
 	    spotflow_ota_net_prepare_results(11, second_results, ARRAY_SIZE(second_results)));
 	zassert_ok(spotflow_ota_net_send_pending_message());
 
-	expect_payload(merged_results_payload, sizeof(merged_results_payload));
+	const struct spotflow_ota_cbor_update_results expected_message = {
+		.attempt_id = 11,
+		.succeeded_count = 1,
+		.succeeded = { 0 },
+		.failed_count = 1,
+		.failed = { 1 },
+		.canceled_count = 1,
+		.canceled = { 3 },
+	};
+
+	expect_payload(&expected_message);
 }
 
 ZTEST(spotflow_ota_net, test_encode_and_send_pending_attempt_error)
@@ -136,7 +89,13 @@ ZTEST(spotflow_ota_net, test_encode_and_send_pending_attempt_error)
 	    12, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE));
 	zassert_ok(spotflow_ota_net_send_pending_message());
 
-	expect_payload(attempt_error_payload, sizeof(attempt_error_payload));
+	const struct spotflow_ota_cbor_update_results expected_message = {
+		.attempt_id = 12,
+		.has_attempt_error = true,
+		.attempt_error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE,
+	};
+
+	expect_payload(&expected_message);
 }
 
 ZTEST(spotflow_ota_net, test_preserve_pending_message_after_eagain)
@@ -193,7 +152,13 @@ ZTEST(spotflow_ota_net, test_replace_pending_data_for_new_attempt)
 	zassert_ok(spotflow_ota_net_prepare_results(21, new_results, ARRAY_SIZE(new_results)));
 	zassert_ok(spotflow_ota_net_send_pending_message());
 
-	expect_payload(replacement_payload, sizeof(replacement_payload));
+	const struct spotflow_ota_cbor_update_results expected_message = {
+		.attempt_id = 21,
+		.failed_count = 1,
+		.failed = { 2 },
+	};
+
+	expect_payload(&expected_message);
 }
 
 ZTEST_SUITE(spotflow_ota_net, NULL, NULL, before_each, NULL, NULL);
