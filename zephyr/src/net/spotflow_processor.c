@@ -29,6 +29,10 @@
 #endif
 #endif /* CONFIG_SPOTFLOW_METRICS */
 
+#ifdef CONFIG_SPOTFLOW_OTA
+#include "ota/spotflow_ota.h"
+#endif /* CONFIG_SPOTFLOW_OTA */
+
 #define APP_CONNECT_TIMEOUT_MS 10000
 
 #define LOG_DBG_PRINT_RESULT(func, rc) LOG_DBG("%s: %d <%s>", (func), rc, RC_STR(rc))
@@ -85,11 +89,14 @@ static void spotflow_mqtt_thread_entry(void)
 
 static int process_config_coredumps_or_logs()
 {
-	int rc = spotflow_config_send_pending_message();
+	int rc = 0;
+#ifdef CONFIG_SPOTFLOW_CONFIG
+	rc = spotflow_config_send_pending_message();
 	if (rc < 0) {
 		LOG_DBG("Failed to send pending configuration message: %d", rc);
 		return rc;
 	}
+#endif
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 	rc = spotflow_poll_and_process_enqueued_coredump_chunks();
 	if (rc < 0) {
@@ -133,10 +140,19 @@ static void process_mqtt()
 		return;
 	}
 
+#ifdef CONFIG_SPOTFLOW_CONFIG
 	rc = spotflow_config_init_session();
 	if (rc < 0) {
 		LOG_WRN("Failed to initialize configuration updating: %d", rc);
 	}
+#endif
+
+#ifdef CONFIG_SPOTFLOW_OTA
+	rc = spotflow_ota_init_session();
+	if (rc < 0) {
+		LOG_WRN("Failed to initialize OTA updates: %d", rc);
+	}
+#endif
 
 	/*  INNER LOOP: perform normal MQTT I/O until an error occurs. */
 	while (spotflow_mqtt_is_connected()) {

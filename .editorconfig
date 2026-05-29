@@ -18,7 +18,7 @@ max_line_length = 100
 indent_style = tab
 indent_size = 8
 
-# C
+# C (checked by clang-format, not by editorconfig-checker)
 [*.{c,h}]
 indent_style = tab
 indent_size = 8
