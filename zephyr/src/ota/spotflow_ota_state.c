@@ -9,7 +9,7 @@ struct attempt_state {
 	bool active;
 	uint64_t attempt_id;
 	struct spotflow_ota_update_msg update;
-	enum spotflow_ota_result results[SPOTFLOW_OTA_MAX_ARTIFACTS];
+	enum spotflow_ota_result results[CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS];
 	size_t current_artifact_index;
 	bool artifact_running;
 	size_t running_artifact_index;
@@ -340,7 +340,7 @@ static void clear_attempt(struct attempt_state* attempt)
 static int validate_update_msg(const struct spotflow_ota_update_msg* msg)
 {
 	if (msg == NULL || msg->attempt_id == 0 || msg->artifact_count == 0 ||
-	    msg->artifact_count > SPOTFLOW_OTA_MAX_ARTIFACTS) {
+	    msg->artifact_count > CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS) {
 		return -EINVAL;
 	}
 
@@ -355,10 +355,6 @@ static void start_attempt(const struct spotflow_ota_update_msg* msg, struct atte
 	attempt->update = *msg;
 
 	for (size_t i = 0; i < msg->artifact_count; i++) {
-		attempt->update.artifacts[i].download_request.url =
-		    attempt->update.artifacts[i].url;
-		attempt->update.artifacts[i].download_request.secret =
-		    attempt->update.artifacts[i].secret;
 		attempt->results[i] =
 		    msg->is_canceled ? SPOTFLOW_OTA_RESULT_CANCELED : SPOTFLOW_OTA_RESULT_PENDING;
 	}
@@ -370,13 +366,6 @@ static void start_attempt(const struct spotflow_ota_update_msg* msg, struct atte
 static void store_pending_update(const struct spotflow_ota_update_msg* msg)
 {
 	pending_update = *msg;
-
-	for (size_t i = 0; i < pending_update.artifact_count; i++) {
-		pending_update.artifacts[i].download_request.url = pending_update.artifacts[i].url;
-		pending_update.artifacts[i].download_request.secret =
-		    pending_update.artifacts[i].secret;
-	}
-
 	has_pending_update = true;
 }
 
@@ -384,8 +373,6 @@ static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 			      const struct spotflow_ota_artifact* source)
 {
 	*destination = *source;
-	destination->download_request.url = destination->url;
-	destination->download_request.secret = destination->secret;
 }
 
 static bool attempt_has_terminal_results(const struct attempt_state* attempt)

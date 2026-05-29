@@ -29,15 +29,16 @@ LOG_MODULE_DECLARE(spotflow_ota);
 #define KEY_UPDATE_ATTEMPT_ERROR 45
 
 #define ZCBOR_STATE_DEPTH 5
+#define ARTIFACT_TYPE_FIRMWARE 0x00
 
 static bool search_uint32_key(zcbor_state_t* state, uint32_t key);
 static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected);
 static void set_attempt_error(struct spotflow_ota_cbor_decode_status* status,
-			      enum spotflow_ota_cbor_attempt_error error);
+			      enum spotflow_ota_attempt_error error);
 static int decode_update_artifacts(zcbor_state_t* state, struct spotflow_ota_cbor_c2d_msg* msg,
 				   struct spotflow_ota_cbor_decode_status* status);
-static int decode_artifact(zcbor_state_t* state, struct spotflow_ota_cbor_artifact* artifact,
-			   enum spotflow_ota_cbor_attempt_error* error);
+static int decode_artifact(zcbor_state_t* state, struct spotflow_ota_artifact* artifact,
+			   enum spotflow_ota_attempt_error* error);
 static bool copy_tstr(zcbor_state_t* state, char* buffer, size_t buffer_len, size_t max_len);
 static bool encode_index_array(zcbor_state_t* state, uint32_t key, const uint32_t* indexes,
 			       size_t count);
@@ -75,6 +76,7 @@ int spotflow_ota_cbor_decode_c2d(const uint8_t* payload, size_t len,
 	status->attempt_id = attempt_id;
 	msg->attempt_id = attempt_id;
 	msg->type = message_type;
+	msg->payload.update.attempt_id = attempt_id;
 
 	int rc = 0;
 
@@ -86,7 +88,7 @@ int spotflow_ota_cbor_decode_c2d(const uint8_t* payload, size_t len,
 	case SPOTFLOW_OTA_CBOR_MSG_REPORT_UPDATE_RESULTS:
 		break;
 	default:
-		set_attempt_error(status, SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+		set_attempt_error(status, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 		rc = -EINVAL;
 		break;
 	}
@@ -96,7 +98,7 @@ int spotflow_ota_cbor_decode_c2d(const uint8_t* payload, size_t len,
 	}
 
 	if (!zcbor_unordered_map_end_decode(state)) {
-		set_attempt_error(status, SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+		set_attempt_error(status, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 		LOG_ERR("Malformed OTA C2D message map: %d", zcbor_peek_error(state));
 		return -EINVAL;
 	}
@@ -163,8 +165,7 @@ static int decode_update_artifacts(zcbor_state_t* state, struct spotflow_ota_cbo
 
 	if (search_uint32_key(state, KEY_IS_CANCELED)) {
 		if (!zcbor_bool_decode(state, &is_canceled)) {
-			set_attempt_error(status,
-					  SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+			set_attempt_error(status, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 			return -EINVAL;
 		}
 
@@ -172,22 +173,22 @@ static int decode_update_artifacts(zcbor_state_t* state, struct spotflow_ota_cbo
 	}
 
 	if (!search_uint32_key(state, KEY_MANIFEST) || !zcbor_list_start_decode(state)) {
-		set_attempt_error(status, SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+		set_attempt_error(status, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 		return -EINVAL;
 	}
 
 	bool main_seen = false;
 
 	while (!zcbor_array_at_end(state)) {
-		if (msg->payload.update.artifact_count >= SPOTFLOW_OTA_MAX_ARTIFACTS) {
+		if (msg->payload.update.artifact_count >= CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS) {
 			set_attempt_error(status,
-					  SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_ARTIFACT_COUNT_EXCEEDED);
+					  SPOTFLOW_OTA_ATTEMPT_ERROR_ARTIFACT_COUNT_EXCEEDED);
 			return -EINVAL;
 		}
 
-		struct spotflow_ota_cbor_artifact* artifact =
+		struct spotflow_ota_artifact* artifact =
 		    &msg->payload.update.artifacts[msg->payload.update.artifact_count];
-		enum spotflow_ota_cbor_attempt_error artifact_error;
+		enum spotflow_ota_attempt_error artifact_error;
 		int rc = decode_artifact(state, artifact, &artifact_error);
 
 		if (rc < 0) {
@@ -197,8 +198,8 @@ static int decode_update_artifacts(zcbor_state_t* state, struct spotflow_ota_cbo
 
 		if (artifact->is_main) {
 			if (main_seen) {
-				set_attempt_error(
-				    status, SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+				set_attempt_error(status,
+						  SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 				return -EINVAL;
 			}
 
@@ -209,21 +210,20 @@ static int decode_update_artifacts(zcbor_state_t* state, struct spotflow_ota_cbo
 	}
 
 	if (msg->payload.update.artifact_count == 0 || !zcbor_list_end_decode(state)) {
-		set_attempt_error(status, SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+		set_attempt_error(status, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 		return -EINVAL;
 	}
 
 	return 0;
 }
 
-static int decode_artifact(zcbor_state_t* state, struct spotflow_ota_cbor_artifact* artifact,
-			   enum spotflow_ota_cbor_attempt_error* error)
+static int decode_artifact(zcbor_state_t* state, struct spotflow_ota_artifact* artifact,
+			   enum spotflow_ota_attempt_error* error)
 {
-	*artifact = (struct spotflow_ota_cbor_artifact){ 0 };
-	artifact->type = SPOTFLOW_OTA_CBOR_ARTIFACT_TYPE_FIRMWARE;
+	*artifact = (struct spotflow_ota_artifact){ 0 };
 
 	if (!zcbor_unordered_map_start_decode(state)) {
-		*error = SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
+		*error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
 		return -EINVAL;
 	}
 
@@ -231,12 +231,12 @@ static int decode_artifact(zcbor_state_t* state, struct spotflow_ota_cbor_artifa
 
 	if (!search_uint32_key(state, KEY_ARTIFACT_TYPE) ||
 	    !zcbor_uint32_decode(state, &artifact_type)) {
-		*error = SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
+		*error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
 		return -EINVAL;
 	}
 
-	if (artifact_type != SPOTFLOW_OTA_CBOR_ARTIFACT_TYPE_FIRMWARE) {
-		*error = SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE;
+	if (artifact_type != ARTIFACT_TYPE_FIRMWARE) {
+		*error = SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE;
 		return -EINVAL;
 	}
 
@@ -252,18 +252,18 @@ static int decode_artifact(zcbor_state_t* state, struct spotflow_ota_cbor_artifa
 	    !search_uint32_key(state, KEY_VERSION) ||
 	    !copy_tstr(state, artifact->version, sizeof(artifact->version),
 		       SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH)) {
-		*error = SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
+		*error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
 		return -EINVAL;
 	}
 
 	if (search_uint32_key(state, KEY_IS_MAIN) &&
 	    !zcbor_bool_decode(state, &artifact->is_main)) {
-		*error = SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
+		*error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
 		return -EINVAL;
 	}
 
 	if (!zcbor_unordered_map_end_decode(state)) {
-		*error = SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
+		*error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
 		return -EINVAL;
 	}
 
@@ -281,7 +281,7 @@ static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected)
 }
 
 static void set_attempt_error(struct spotflow_ota_cbor_decode_status* status,
-			      enum spotflow_ota_cbor_attempt_error error)
+			      enum spotflow_ota_attempt_error error)
 {
 	status->has_attempt_error = true;
 	status->attempt_error = error;

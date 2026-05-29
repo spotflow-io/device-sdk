@@ -164,9 +164,8 @@ ZTEST(spotflow_ota_cbor, test_decode_update_artifacts)
 	zassert_false(msg.payload.update.is_canceled);
 	zassert_equal(msg.payload.update.artifact_count, 1);
 
-	const struct spotflow_ota_cbor_artifact* artifact = &msg.payload.update.artifacts[0];
+	const struct spotflow_ota_artifact* artifact = &msg.payload.update.artifacts[0];
 
-	zassert_equal(artifact->type, SPOTFLOW_OTA_CBOR_ARTIFACT_TYPE_FIRMWARE);
 	zassert_true(artifact->is_main);
 	zassert_str_equal(artifact->slug, "main");
 	zassert_str_equal(artifact->url, "https://a");
@@ -233,7 +232,7 @@ ZTEST(spotflow_ota_cbor, test_encode_update_results_with_attempt_error)
 	struct spotflow_ota_cbor_update_results msg = {
 		.attempt_id = 9,
 		.has_attempt_error = true,
-		.attempt_error = SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE,
+		.attempt_error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE,
 		.succeeded_count = 1,
 		.succeeded = { 0 },
 	};
@@ -262,7 +261,7 @@ ZTEST(spotflow_ota_cbor, test_reject_unknown_artifact_type_with_attempt_error)
 	zassert_true(status.has_trustworthy_attempt_id);
 	zassert_true(status.has_attempt_error);
 	zassert_equal(status.attempt_id, 1);
-	zassert_equal(status.attempt_error, SPOTFLOW_OTA_CBOR_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE);
+	zassert_equal(status.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE);
 }
 
 ZTEST(spotflow_ota_cbor, test_reject_zero_attempt_id_without_trustworthy_attempt_id)

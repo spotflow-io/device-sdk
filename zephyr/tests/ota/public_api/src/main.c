@@ -2,7 +2,6 @@
 
 #include <zephyr/ztest.h>
 
-#include <spotflow/downloader.h>
 #include <spotflow/ota.h>
 
 #include "spotflow_ota_test_fakes.h"

@@ -65,7 +65,7 @@ static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 		return;
 	}
 
-	const struct spotflow_ota_cbor_artifact* artifact = &msg.payload.update.artifacts[0];
+	const struct spotflow_ota_artifact* artifact = &msg.payload.update.artifacts[0];
 
 	for (size_t i = 0; i < msg.payload.update.artifact_count; i++) {
 		if (msg.payload.update.artifacts[i].is_main) {

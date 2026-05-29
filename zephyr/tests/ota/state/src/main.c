@@ -59,8 +59,6 @@ ZTEST(spotflow_ota_state, test_accept_first_attempt_and_ignore_duplicate)
 	zassert_equal(job.attempt_id, 1);
 	zassert_equal(job.artifact_index, 0);
 	zassert_str_equal(job.artifact.slug, "artifact-0");
-	zassert_equal_ptr(job.artifact.download_request.url, job.artifact.url);
-	zassert_equal_ptr(job.artifact.download_request.secret, job.artifact.secret);
 
 	rc = spotflow_ota_state_accept_update(&msg, &action);
 

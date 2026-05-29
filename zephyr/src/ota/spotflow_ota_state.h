@@ -49,7 +49,7 @@ struct spotflow_ota_state_snapshot {
 	uint64_t pending_attempt_id;
 	bool has_attempt_error;
 	enum spotflow_ota_attempt_error attempt_error;
-	enum spotflow_ota_result artifact_results[SPOTFLOW_OTA_MAX_ARTIFACTS];
+	enum spotflow_ota_result artifact_results[CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS];
 	struct spotflow_ota_main_firmware_state main_firmware_state;
 };
 
