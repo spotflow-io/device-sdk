@@ -1,11 +1,14 @@
 #include <errno.h>
 #include <string.h>
 
+#include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
 #include "ota/spotflow_ota_net.h"
 
 #include "spotflow_ota_test_fakes.h"
+
+LOG_MODULE_REGISTER(spotflow_ota);
 
 static const uint8_t merged_results_payload[] = {
 	/* indefinite map */
