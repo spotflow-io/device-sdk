@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stdint.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/semphr.h"
@@ -257,17 +258,16 @@ static void report_thread_stack(TaskHandle_t thread, void* user_data)
 		return;
 	}
 
-	UBaseType_t unused_words = uxTaskGetStackHighWaterMark(thread);
-	if (unused_words == (UBaseType_t)-1) {
-		return;
-	}
-
-	TaskStatus_t task_status;
-	vTaskGetInfo(thread, &task_status, pdFALSE, eInvalid);
-
 	TCB_t_Minimal* pxTCB = (TCB_t_Minimal*)thread;
-	uint32_t stack_size = (uint32_t)pxTCB->pxTopOfStack - (uint32_t)pxTCB->pxStack;
-	size_t used_bytes = stack_size - unused_words;
+	uint32_t stack_base = (uint32_t)pxTCB->pxStack; // Lowest address
+	uint32_t stack_top =
+	    (uint32_t)pxTCB->pxTopOfStack; // Highest address currently used (grows downwards)
+	uint32_t stack_end =
+	    (uint32_t)pxTCB->pxEndOfStack; // Current Position (Moves downwards as stack is used)
+
+	uint32_t total_bytes = stack_end - stack_base;
+	uint32_t free_bytes = stack_top - stack_base;
+	uint32_t used_bytes = stack_end - stack_top;
 
 	char thread_label[32];
 	const char* name = pcTaskGetName(thread);
@@ -280,13 +280,12 @@ static void report_thread_stack(TaskHandle_t thread, void* user_data)
 
 	struct spotflow_label labels[] = { { .key = "thread", .value = thread_label } };
 
-	int rc =
-	    spotflow_report_metric_int_with_labels(g_stack_free_metric, unused_words, labels, 1);
+	int rc = spotflow_report_metric_int_with_labels(g_stack_free_metric, free_bytes, labels, 1);
 	if (rc < 0) {
 		SPOTFLOW_LOG("Failed to report stack free metric for %s: %d", thread_label, rc);
 	}
 
-	float used_percent = (float)used_bytes / (float)stack_size * 100.0f;
+	float used_percent = (float)used_bytes / (float)total_bytes * 100.0f;
 	rc = spotflow_report_metric_float_with_labels(g_stack_used_percent_metric, used_percent,
 						      labels, 1);
 	if (rc < 0) {
@@ -296,6 +295,8 @@ static void report_thread_stack(TaskHandle_t thread, void* user_data)
 
 	int pct_int = (int)used_percent;
 	int pct_frac = (int)(used_percent * 100) % 100;
-	SPOTFLOW_DEBUG("Stack: thread=%s, used=%d.%01d%%, free=%zu bytes", thread_label, pct_int,
-		       pct_frac, unused_words);
+	SPOTFLOW_DEBUG("Stack: thread=%s, total_bytes = %u, used_bytes=%u, free=%u bytes, "
+		       "used_percent=%d.%01d%%",
+		       thread_label, (unsigned int)total_bytes, (unsigned int)used_bytes,
+		       (unsigned int)free_bytes, pct_int, pct_frac);
 }

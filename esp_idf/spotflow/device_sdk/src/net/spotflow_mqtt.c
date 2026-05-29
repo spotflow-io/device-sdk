@@ -50,8 +50,8 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 	case MQTT_EVENT_CONNECTED:
 		SPOTFLOW_LOG("MQTT_EVENT_CONNECTED");
 		xTaskCreate(spotflow_mqtt_publish, "spotflow_mqtt_publish",
-			    CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN * 2, NULL, 5,
-			    &mqtt_publish_task_handle);
+			    CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN * 2, NULL,
+			    CONFIG_SPOTFLOW_MQTT_TASK_PRIORITY, &mqtt_publish_task_handle);
 		spotflow_mqtt_subscribe(event->client, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
 					SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC_QOS);
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
@@ -113,7 +113,6 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 
 void spotflow_mqtt_app_start(void)
 {
-	spotflow_mqtt_event_group = xEventGroupCreate();
 	static char device_id[32]; // For saving the device ID
 	uint8_t mac[6]; //The Mac Address string
 	esp_read_mac(mac, ESP_MAC_WIFI_STA); // Read the mac Address
@@ -342,4 +341,9 @@ int spotflow_mqtt_publish_message(const char* topic, const uint8_t* data, int le
 void spotflow_mqtt_notify_action(uint32_t action_type)
 {
 	xEventGroupSetBits(spotflow_mqtt_event_group, action_type);
+}
+
+void spotflow_mqtt_event_group_init(void)
+{
+	spotflow_mqtt_event_group = xEventGroupCreate();
 }
