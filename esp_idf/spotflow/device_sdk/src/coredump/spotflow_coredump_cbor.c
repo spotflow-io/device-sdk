@@ -26,61 +26,6 @@
 #define COREDUMPS_OVERHEAD 64
 
 /**
- * @brief Print Cbor hex for debugging purposes
- *
- * @param buf
- * @param len
- */
-// static void print_cbor_hex(const uint8_t* buf, size_t len)
-// {
-// 	SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
-// 	for (size_t i = 0; i < len; i++) {
-// 		printf("%02X ", buf[i]); // print each byte as 2-digit hex
-// 		if ((i + 1) % 16 == 0) // 16 bytes per line
-// 			printf("\n");
-// 	}
-// 	printf("\n");
-// }
-
-// --- Simple Base64 encoder ---
-// static const char base64_table[] =
-//     "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-
-/**
-	* @brief helper function for debugging Coredumps CBOR encodings for displaying over terminal in base64 encoding
-	*  helper function mainly for debugging
-	* @param data Cbor
-	* @param len Size of Cbor
-	*/
-// static void print_cbor_base64(const uint8_t* data, size_t len)
-// {
-// 	size_t out_len = 4 * ((len + 2) / 3);
-// 	char* out = malloc(out_len + 1);
-// 	if (!out) {
-// 		SPOTFLOW_LOG("Failed to allocate Base64 buffer");
-// 		return;
-// 	}
-
-// 	size_t i = 0, j = 0;
-// 	while (i < len) {
-// 		uint32_t octet_a = i < len ? data[i++] : 0;
-// 		uint32_t octet_b = i < len ? data[i++] : 0;
-// 		uint32_t octet_c = i < len ? data[i++] : 0;
-
-// 		uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
-
-// 		out[j++] = base64_table[(triple >> 18) & 0x3F];
-// 		out[j++] = base64_table[(triple >> 12) & 0x3F];
-// 		out[j++] = (i > len + 1) ? '=' : base64_table[(triple >> 6) & 0x3F];
-// 		out[j++] = (i > len) ? '=' : base64_table[triple & 0x3F];
-// 	}
-// 	out[j] = '\0';
-
-// 	SPOTFLOW_LOG("CBOR Base64 (%zu bytes encoded): %s", len, out);
-// 	free(out);
-// }
-
-/**
  * @brief Encode the cbor
  *
  * @param coredump_data Core dump data chunk
@@ -155,7 +100,7 @@ int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_
 		goto fail;
 	}
 
-	if(coredump_data_len != 0) {
+	if (coredump_data_len != 0) {
 		err = cbor_encode_uint(&map_encoder, KEY_CONTENT);
 		if (err != CborNoError) {
 			goto fail;

@@ -33,12 +33,12 @@ void spotflow_log_backend_try_set_runtime_filter(uint8_t level);
 
 #if CONFIG_SPOTFLOW_DEBUG_MESSAGE_TERMINAL
 
-#define SPOTFLOW_DEBUG(fmt, ...) printf("[SPOTFLOW] " fmt "\n", ##__VA_ARGS__)
+#define SPOTFLOW_DEBUG(fmt, ...) printf("[SPOTFLOW_DEBUG] " fmt "\n", ##__VA_ARGS__)
 
 #else
 
 #define SPOTFLOW_DEBUG(fmt, ...) \
-	do {                   \
+	do {                     \
 	} while (0)
 
 #endif

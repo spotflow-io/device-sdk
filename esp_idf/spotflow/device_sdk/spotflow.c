@@ -17,10 +17,36 @@
 
 #include "configs/spotflow_config.h"
 
+#ifdef CONFIG_SPOTFLOW_METRICS
+#include "metrics/spotflow_metrics_registry.h"
+#include "metrics/spotflow_metrics_net.h"
+#endif
+
+#ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+#include "metrics/spotflow_metrics_heartbeat.h"
+#endif
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
+#include "metrics/system/spotflow_metrics_system.h"
+#endif
+
 vprintf_like_t original_vprintf = NULL;
 
+#ifdef CONFIG_SPOTFLOW_METRICS
+void spotflow_metrics(void)
+{
+	spotflow_metrics_init();
+	spotflow_metrics_net_init();
+#ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
+	spotflow_metrics_heartbeat_init();
+#endif
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
+	spotflow_metrics_system_init();
+#endif
+}
+#endif
+
 /**
- * @brief 
+ * @brief
  * @details To utilize the esp_log_set_vprintf function to expose the logs
  */
 void spotflow_init(void)
@@ -28,6 +54,10 @@ void spotflow_init(void)
 	original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
 
 	spotflow_queue_init(); //Initilize the queue
+	spotflow_mqtt_event_group_init(); //Initialize the MQTT event group
+#ifdef CONFIG_SPOTFLOW_METRICS
+	spotflow_metrics();
+#endif
 	spotflow_mqtt_app_start(); // Calling the mqtt_start from the init function.
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 	if (spotflow_is_coredump_available()) {

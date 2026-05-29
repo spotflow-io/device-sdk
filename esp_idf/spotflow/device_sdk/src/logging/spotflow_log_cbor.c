@@ -28,23 +28,6 @@ typedef enum {
 } LogSeverity;
 
 /**
- * @brief Debugging Function not to be used in Production
- *
- * @param buf
- * @param len
- */
-// static void print_cbor_hex(const uint8_t* buf, size_t len)
-// {
-// 	SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
-// 	for (size_t i = 0; i < len; i++) {
-// 		SPOTFLOW_LOG("%02X ", buf[i]); // print each byte as 2-digit hex
-// 		if ((i + 1) % 16 == 0) // 16 bytes per line
-// 			SPOTFLOW_LOG("\n");
-// 	}
-// 	SPOTFLOW_LOG("\n");
-// }
-
-/**
  * @brief To create the message format for logs in CBOR format
  *
  * @param body
@@ -114,7 +97,6 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, size_t* out_len
 	// Allocate buffer for JSON string (adjust size as needed)
 
 	*out_len = cbor_encoder_get_buffer_size(&array_encoder, buf);
-	// print_cbor_hex(buf, *out_len);
 	return buf;
 }
 
