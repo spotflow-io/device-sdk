@@ -36,7 +36,12 @@ static netif_ext_callback_t g_netif_callback;
  * @return err_t
  */
 static err_t hooked_linkoutput(struct netif* netif, struct pbuf* p);
-
+/**
+ * @brief Install hooks for a network interface.
+ *
+ * @param netif
+ */
+static void install_netif_hooks(struct netif* netif);
 /**
  * @brief Hook for handling network receive operations
  *
@@ -74,32 +79,7 @@ int spotflow_metrics_system_network_init(void)
 	struct netif* netif;
 	NETIF_FOREACH(netif)
 	{
-		/* Skip loopback */
-		if (netif->name[0] == 'l' && netif->name[1] == 'o') {
-			continue;
-		}
-
-		/* Find a free slot and install hooks */
-		for (int i = 0; i < CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES; i++) {
-			if (!g_hooks[i].active) {
-				g_hooks[i].lwip_netif = netif;
-				g_hooks[i].original_linkoutput = netif->linkoutput;
-				g_hooks[i].original_input = netif->input;
-				g_hooks[i].tx_bytes = 0;
-				g_hooks[i].rx_bytes = 0;
-				g_hooks[i].active = true;
-				snprintf(g_hooks[i].name, sizeof(g_hooks[i].name), "%c%c%d",
-					 netif->name[0], netif->name[1], netif->num);
-
-				/* Install hooks */
-				netif->linkoutput = hooked_linkoutput;
-				netif->input = hooked_input;
-
-				SPOTFLOW_LOG("Installed byte hooks on existing netif %s",
-					     g_hooks[i].name);
-				break;
-			}
-		}
+		install_netif_hooks(netif);
 	}
 
 	rc = spotflow_register_metric_int_with_labels(
@@ -197,6 +177,11 @@ static void netif_ext_callback(struct netif* netif, netif_nsc_reason_t reason,
 		return;
 	}
 
+	install_netif_hooks(netif);
+}
+
+static void install_netif_hooks(struct netif* netif)
+{
 	/* Only hook WiFi STA (st) and AP (ap) netifs, skip loopback */
 	if (netif->name[0] == 'l' && netif->name[1] == 'o') {
 		return;

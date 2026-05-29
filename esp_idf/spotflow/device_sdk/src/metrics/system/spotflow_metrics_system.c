@@ -37,6 +37,8 @@ static esp_timer_handle_t g_collection_timer = NULL;
 
 static void collection_timer_handler(void* arg);
 
+static void spotflow_metrics_collection_task(void* arg);
+
 int spotflow_metrics_system_init(void)
 {
 	SPOTFLOW_DEBUG("Initializing system metrics auto-collection");
@@ -92,7 +94,8 @@ int spotflow_metrics_system_init(void)
 	const esp_timer_create_args_t timer_args = { .callback = &collection_timer_handler,
 						     .name = "system_metrics_timer" };
 	ESP_ERROR_CHECK(esp_timer_create(&timer_args, &g_collection_timer));
-	collection_timer_handler(NULL);
+	/* Immediate first run */
+	ESP_ERROR_CHECK(esp_timer_start_once(g_collection_timer, 0));
 
 	SPOTFLOW_LOG(
 	    "System metrics initialized: %d metrics registered, collection=%ds, aggregation=%ds",
@@ -102,6 +105,25 @@ int spotflow_metrics_system_init(void)
 	return 0;
 }
 
+static void collection_timer_handler(void* arg)
+{
+	BaseType_t ret;
+
+	/* Spawn worker task */
+	ret = xTaskCreate(spotflow_metrics_collection_task, "spotflow_metrics_task",
+			  4096, /* stack size */
+			  NULL, tskIDLE_PRIORITY + 1, NULL);
+
+	if (ret != pdPASS) {
+		SPOTFLOW_LOG("Failed to create metrics task");
+
+		/* Retry later even if task creation failed */
+		ESP_ERROR_CHECK(esp_timer_start_once(
+		    g_collection_timer,
+		    CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL * 1000000ULL));
+	}
+}
+
 void spotflow_metrics_system_report_connection_state(bool connected)
 {
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
@@ -109,7 +131,7 @@ void spotflow_metrics_system_report_connection_state(bool connected)
 #endif
 }
 
-static void collection_timer_handler(void* arg)
+static void spotflow_metrics_collection_task(void* arg)
 {
 	SPOTFLOW_LOG("Collecting system metrics...");
 
@@ -133,6 +155,9 @@ static void collection_timer_handler(void* arg)
 	/* Restart the timer */
 	ESP_ERROR_CHECK(esp_timer_start_once(
 	    g_collection_timer, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL * 1000000ULL));
+
+	/* Destroy task */
+	vTaskDelete(NULL);
 }
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
