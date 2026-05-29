@@ -291,13 +291,12 @@ static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 	    metric, labels, label_count, value_int, value_float, esp_timer_get_time() / 1000ULL,
 	    seq_num, &cbor_data, &cbor_len);
 	if (rc < 0) {
-		free(cbor_data);
+		if (cbor_data) {
+			free(cbor_data);
+		}
 		return rc;
 	}
 	rc = spotflow_metrics_enqueue(cbor_data, cbor_len);
-	if (rc < 0) {
-		free(cbor_data);
-	}
 	return rc;
 }
 
@@ -311,6 +310,7 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 	int rc = spotflow_metrics_cbor_encode_aggregated(metric, ts, timestamp_ms, seq_num,
 							 &cbor_data, &cbor_len);
 	if (rc < 0) {
+		free(cbor_data);
 		reset_timeseries_state(metric, ts);
 		return rc;
 	}
