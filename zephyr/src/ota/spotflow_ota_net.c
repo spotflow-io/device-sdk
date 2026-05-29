@@ -11,7 +11,11 @@
 
 struct pending_message_state {
 	bool has_pending;
-	struct spotflow_ota_cbor_update_results message;
+	uint64_t attempt_id;
+	bool has_attempt_error;
+	enum spotflow_ota_attempt_error attempt_error;
+	size_t artifact_count;
+	enum spotflow_ota_result artifact_results[CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS];
 	uint8_t buffer[SPOTFLOW_OTA_NET_MAX_CBOR_SIZE];
 	size_t encoded_len;
 };
@@ -21,9 +25,6 @@ static struct pending_message_state pending_message;
 
 static void clear_pending_message_locked(void);
 static int encode_pending_message_locked(void);
-static void remove_index(uint32_t* indexes, size_t* count, uint32_t index);
-static int set_result_index(struct spotflow_ota_cbor_update_results* message, uint32_t index,
-			    enum spotflow_ota_result result);
 
 void spotflow_ota_net_reset(void)
 {
@@ -43,25 +44,28 @@ int spotflow_ota_net_prepare_results(uint64_t attempt_id,
 
 	k_mutex_lock(&pending_message_mutex, K_FOREVER);
 
-	if (!pending_message.has_pending || pending_message.message.attempt_id != attempt_id) {
+	if (!pending_message.has_pending || pending_message.attempt_id != attempt_id) {
 		clear_pending_message_locked();
 		pending_message.has_pending = true;
-		pending_message.message.attempt_id = attempt_id;
+		pending_message.attempt_id = attempt_id;
+		pending_message.artifact_count = artifact_count;
 	}
 
-	if (pending_message.message.has_attempt_error) {
+	if (pending_message.has_attempt_error) {
 		k_mutex_unlock(&pending_message_mutex);
 		return 0;
 	}
 
-	for (size_t i = 0; i < artifact_count; i++) {
-		int rc =
-		    set_result_index(&pending_message.message, (uint32_t)i, artifact_results[i]);
+	if (artifact_count > pending_message.artifact_count) {
+		pending_message.artifact_count = artifact_count;
+	}
 
-		if (rc < 0) {
-			k_mutex_unlock(&pending_message_mutex);
-			return rc;
+	for (size_t i = 0; i < artifact_count; i++) {
+		if (artifact_results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
+			continue;
 		}
+
+		pending_message.artifact_results[i] = artifact_results[i];
 	}
 
 	int rc = encode_pending_message_locked();
@@ -80,9 +84,9 @@ int spotflow_ota_net_prepare_attempt_error(uint64_t attempt_id,
 	k_mutex_lock(&pending_message_mutex, K_FOREVER);
 	clear_pending_message_locked();
 	pending_message.has_pending = true;
-	pending_message.message.attempt_id = attempt_id;
-	pending_message.message.has_attempt_error = true;
-	pending_message.message.attempt_error = attempt_error;
+	pending_message.attempt_id = attempt_id;
+	pending_message.has_attempt_error = true;
+	pending_message.attempt_error = attempt_error;
 
 	int rc = encode_pending_message_locked();
 
@@ -113,6 +117,9 @@ int spotflow_ota_net_send_pending_message(void)
 static void clear_pending_message_locked(void)
 {
 	memset(&pending_message, 0, sizeof(pending_message));
+	for (size_t i = 0; i < ARRAY_SIZE(pending_message.artifact_results); i++) {
+		pending_message.artifact_results[i] = SPOTFLOW_OTA_RESULT_PENDING;
+	}
 }
 
 static int encode_pending_message_locked(void)
@@ -121,63 +128,33 @@ static int encode_pending_message_locked(void)
 		return 0;
 	}
 
-	return spotflow_ota_cbor_encode_update_results(
-	    &pending_message.message, pending_message.buffer, sizeof(pending_message.buffer),
-	    &pending_message.encoded_len);
-}
+	struct spotflow_ota_cbor_update_results message = {
+		.attempt_id = pending_message.attempt_id,
+		.has_attempt_error = pending_message.has_attempt_error,
+		.attempt_error = pending_message.attempt_error,
+	};
 
-static void remove_index(uint32_t* indexes, size_t* count, uint32_t index)
-{
-	for (size_t i = 0; i < *count; i++) {
-		if (indexes[i] != index) {
-			continue;
-		}
-
-		for (size_t j = i + 1; j < *count; j++) {
-			indexes[j - 1] = indexes[j];
-		}
-
-		(*count)--;
-		return;
-	}
-}
-
-static int append_unique_index(uint32_t* indexes, size_t* count, uint32_t index)
-{
-	for (size_t i = 0; i < *count; i++) {
-		if (indexes[i] == index) {
-			return 0;
+	if (!pending_message.has_attempt_error) {
+		for (size_t i = 0; i < pending_message.artifact_count; i++) {
+			switch (pending_message.artifact_results[i]) {
+			case SPOTFLOW_OTA_RESULT_PENDING:
+				break;
+			case SPOTFLOW_OTA_RESULT_SUCCEEDED:
+				message.succeeded[message.succeeded_count++] = (uint32_t)i;
+				break;
+			case SPOTFLOW_OTA_RESULT_FAILED:
+				message.failed[message.failed_count++] = (uint32_t)i;
+				break;
+			case SPOTFLOW_OTA_RESULT_CANCELED:
+				message.canceled[message.canceled_count++] = (uint32_t)i;
+				break;
+			default:
+				return -EINVAL;
+			}
 		}
 	}
 
-	if (*count >= CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS) {
-		return -EINVAL;
-	}
-
-	indexes[*count] = index;
-	(*count)++;
-	return 0;
-}
-
-static int set_result_index(struct spotflow_ota_cbor_update_results* message, uint32_t index,
-			    enum spotflow_ota_result result)
-{
-	if (result == SPOTFLOW_OTA_RESULT_PENDING) {
-		return 0;
-	}
-
-	remove_index(message->succeeded, &message->succeeded_count, index);
-	remove_index(message->failed, &message->failed_count, index);
-	remove_index(message->canceled, &message->canceled_count, index);
-
-	switch (result) {
-	case SPOTFLOW_OTA_RESULT_SUCCEEDED:
-		return append_unique_index(message->succeeded, &message->succeeded_count, index);
-	case SPOTFLOW_OTA_RESULT_FAILED:
-		return append_unique_index(message->failed, &message->failed_count, index);
-	case SPOTFLOW_OTA_RESULT_CANCELED:
-		return append_unique_index(message->canceled, &message->canceled_count, index);
-	default:
-		return -EINVAL;
-	}
+	return spotflow_ota_cbor_encode_update_results(&message, pending_message.buffer,
+						       sizeof(pending_message.buffer),
+						       &pending_message.encoded_len);
 }
