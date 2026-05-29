@@ -7,6 +7,7 @@
 #include "esp_netif.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
+#include "example_common_private.h"
 #include "protocol_examples_common.h"
 
 #include "esp_log.h"
@@ -103,6 +104,7 @@ void app_main(void)
      */
 	while (example_connect() != ESP_OK) {
 		ESP_LOGE(TAG, "Network connection failed; retrying in 5 seconds");
+		example_wifi_stop();
 		vTaskDelay(5000 / portTICK_PERIOD_MS);
 	}
 
