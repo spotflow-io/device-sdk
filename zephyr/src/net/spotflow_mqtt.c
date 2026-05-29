@@ -31,6 +31,7 @@
 #define SPOTFLOW_MQTT_INGEST_CBOR_TOPIC "ingest-cbor"
 #define SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC "config-cbor-d2c"
 #define SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC "config-cbor-c2d"
+#define SPOTFLOW_MQTT_OTA_CBOR_D2C_TOPIC "ota-cbor-d2c"
 #define SPOTFLOW_MQTT_OTA_CBOR_C2D_TOPIC "ota-cbor-c2d"
 
 #define RC_STR(rc) ((rc) == 0 ? "OK" : "ERROR")
@@ -48,6 +49,7 @@ struct mqtt_config {
 	struct mqtt_utf8 ingest_topic;
 	struct mqtt_utf8 config_d2c_topic;
 	struct mqtt_utf8 config_c2d_topic;
+	struct mqtt_utf8 ota_d2c_topic;
 	struct mqtt_utf8 ota_c2d_topic;
 };
 
@@ -80,6 +82,7 @@ static struct mqtt_config spotflow_mqtt_config = {
 	.ingest_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_INGEST_CBOR_TOPIC),
 	.config_d2c_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC),
 	.config_c2d_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC),
+	.ota_d2c_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_OTA_CBOR_D2C_TOPIC),
 	.ota_c2d_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_OTA_CBOR_C2D_TOPIC),
 };
 
@@ -321,6 +324,11 @@ int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len)
 int spotflow_mqtt_publish_config_cbor_msg(uint8_t* payload, size_t len)
 {
 	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.config_d2c_topic);
+}
+
+int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
+{
+	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.ota_d2c_topic);
 }
 
 static int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len, struct mqtt_utf8 topic)

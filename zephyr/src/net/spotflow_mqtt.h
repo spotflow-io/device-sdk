@@ -19,6 +19,7 @@ int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback)
 int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback);
 int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len);
 int spotflow_mqtt_publish_config_cbor_msg(uint8_t* payload, size_t len);
+int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len);
 void spotflow_mqtt_abort_mqtt();
 int spotflow_mqtt_send_live();
 
