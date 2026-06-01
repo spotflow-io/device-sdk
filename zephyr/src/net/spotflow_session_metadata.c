@@ -5,14 +5,18 @@
 #include "spotflow_build_id.h"
 #include "net/spotflow_session_metadata.h"
 #include "net/spotflow_mqtt.h"
+#ifdef CONFIG_SPOTFLOW_OTA
+#include "ota/spotflow_ota.h"
+#endif
 
 #include <zephyr/random/random.h>
 
-#define MAX_KEY_COUNT 3
+#define MAX_KEY_COUNT 4
 
 #define KEY_MESSAGE_TYPE 0x00
 #define KEY_BUILD_ID 0x0E
 #define KEY_DEVICE_RUN_ID 0x1E
+#define KEY_LAST_UPDATE_ATTEMPT_ID 41
 
 #define SESSION_METADATA_MESSAGE_TYPE 1
 
@@ -24,13 +28,17 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 static uint64_t device_run_id = 0;
 
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
-					uint64_t run_id, uint8_t* buffer, size_t buffer_len,
+					uint64_t run_id, bool include_last_update_attempt_id,
+					uint64_t last_update_attempt_id, uint8_t* buffer,
+					size_t buffer_len,
 					size_t* cbor_data_len);
 
 int spotflow_session_metadata_send(void)
 {
 	const uint8_t* build_id = NULL;
 	uint16_t build_id_len = 0;
+	bool include_last_update_attempt_id = false;
+	uint64_t last_update_attempt_id = 0;
 
 	/* Generate device run ID once per boot */
 	if (device_run_id == 0) {
@@ -49,11 +57,18 @@ int spotflow_session_metadata_send(void)
 	}
 #endif
 
+#ifdef CONFIG_SPOTFLOW_OTA
+	include_last_update_attempt_id = true;
+	last_update_attempt_id = spotflow_ota_get_last_received_attempt_id();
+#endif
+
 	uint8_t buffer[MAX_CBOR_SIZE];
 	size_t cbor_data_len = 0;
 
-	rc = cbor_encode_session_metadata(build_id, build_id_len, device_run_id, buffer,
-					  sizeof(buffer), &cbor_data_len);
+	rc = cbor_encode_session_metadata(build_id, build_id_len, device_run_id,
+					  include_last_update_attempt_id,
+					  last_update_attempt_id, buffer, sizeof(buffer),
+					  &cbor_data_len);
 	if (rc < 0) {
 		LOG_DBG("Failed to encode session metadata: %d", rc);
 		return rc;
@@ -63,7 +78,9 @@ int spotflow_session_metadata_send(void)
 }
 
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
-					uint64_t run_id, uint8_t* buffer, size_t buffer_len,
+					uint64_t run_id, bool include_last_update_attempt_id,
+					uint64_t last_update_attempt_id, uint8_t* buffer,
+					size_t buffer_len,
 					size_t* cbor_data_len)
 {
 	ZCBOR_STATE_E(state, 1, buffer, buffer_len, 1);
@@ -80,6 +97,11 @@ static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t bui
 	if (build_id_data != NULL) {
 		succ = succ && zcbor_uint32_put(state, KEY_BUILD_ID);
 		succ = succ && zcbor_bstr_encode_ptr(state, build_id_data, build_id_data_len);
+	}
+
+	if (include_last_update_attempt_id) {
+		succ = succ && zcbor_uint32_put(state, KEY_LAST_UPDATE_ATTEMPT_ID);
+		succ = succ && zcbor_uint64_put(state, last_update_attempt_id);
 	}
 
 	succ = succ && zcbor_map_end_encode(state, MAX_KEY_COUNT);

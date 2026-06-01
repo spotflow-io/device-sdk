@@ -133,6 +133,16 @@ static int process_config_coredumps_or_logs()
 static void process_mqtt()
 {
 	int rc;
+
+#ifdef CONFIG_SPOTFLOW_OTA
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		LOG_WRN("Failed to initialize OTA updates: %d", rc);
+		spotflow_mqtt_abort_mqtt();
+		return;
+	}
+#endif
+
 	rc = spotflow_session_metadata_send();
 	if (rc < 0) {
 		LOG_WRN("Failed to send session metadata, aborting MQTT: %d", rc);
