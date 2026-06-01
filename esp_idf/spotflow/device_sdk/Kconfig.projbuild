@@ -3,7 +3,9 @@ menu "Spotflow"
         int "Task priority for MQTT tasks to send logs, coredump and other logs data to cloud"
         default 6
         help
-            Lower number means higher priority. It should be medium to high priority for smooth data flow.
+            Lower values indicate lower priority, with 0 being the lowest.
+    	    A medium to high priority is recommended to ensure timely data delivery.
+
     config SPOTFLOW_SERVER_HOSTNAME
         string "Hostname of Spotflow observability platform"
         default "mqtts://mqtt.spotflow.io:8883"
