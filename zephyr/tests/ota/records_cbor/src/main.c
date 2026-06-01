@@ -3,6 +3,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
+#include "spotflow_build_id.h"
 #include "ota/spotflow_ota_records_cbor.h"
 
 LOG_MODULE_REGISTER(spotflow_ota);
@@ -27,9 +28,8 @@ static void expect_probation_equal(const struct spotflow_ota_probation* actual,
 	zassert_equal(actual->artifact_index, expected->artifact_index);
 	zassert_str_equal(actual->slug, expected->slug);
 	zassert_str_equal(actual->version, expected->version);
-	zassert_equal(actual->expected_build_id_len, expected->expected_build_id_len);
 	zassert_mem_equal(actual->expected_build_id, expected->expected_build_id,
-			  expected->expected_build_id_len);
+			  SPOTFLOW_BUILD_ID_LENGTH);
 }
 
 ZTEST(spotflow_ota_records_cbor, test_round_trip_attempt_record)
@@ -80,9 +80,8 @@ ZTEST(spotflow_ota_records_cbor, test_round_trip_probation_record)
 		.artifact_index = 1,
 		.slug = "main",
 		.version = "1.2.3",
-		.expected_build_id_len = SPOTFLOW_OTA_BUILD_ID_MAX_LENGTH,
 	};
-	for (size_t i = 0; i < input.expected_build_id_len; i++) {
+	for (size_t i = 0; i < SPOTFLOW_BUILD_ID_LENGTH; i++) {
 		input.expected_build_id[i] = (uint8_t)(i + 1);
 	}
 
@@ -100,7 +99,8 @@ ZTEST(spotflow_ota_records_cbor, test_round_trip_probation_record)
 ZTEST(spotflow_ota_records_cbor, test_reject_unsupported_attempt_schema)
 {
 	static const uint8_t payload[] = {
-		0xa4, 0x00, 0x02, 0x01, 0x01, 0x03, 0x01, 0x04, 0xf4, 0x05, 0x81, 0x00,
+		0xa7, 0x00, 0x02, 0x01, 0x01, 0x02, 0xf4, 0x03,
+		0x00, 0x04, 0x01, 0x05, 0xf4, 0x06, 0x81, 0x00,
 	};
 	struct spotflow_ota_persisted_attempt decoded;
 
@@ -115,9 +115,8 @@ ZTEST(spotflow_ota_records_cbor, test_reject_truncated_probation_record)
 		.artifact_index = 0,
 		.slug = "main",
 		.version = "2.0.0",
-		.expected_build_id_len = SPOTFLOW_OTA_BUILD_ID_MAX_LENGTH,
 	};
-	for (size_t i = 0; i < input.expected_build_id_len; i++) {
+	for (size_t i = 0; i < SPOTFLOW_BUILD_ID_LENGTH; i++) {
 		input.expected_build_id[i] = (uint8_t)(0xa0 + i);
 	}
 

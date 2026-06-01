@@ -4,6 +4,7 @@
 #include <zephyr/settings/settings.h>
 #include <zephyr/ztest.h>
 
+#include "spotflow_build_id.h"
 #include "ota/spotflow_ota_persistence.h"
 
 LOG_MODULE_REGISTER(spotflow_ota);
@@ -154,9 +155,8 @@ ZTEST(spotflow_ota_persistence, test_save_and_load_probation)
 		.artifact_index = 1,
 		.slug = "main",
 		.version = "3.0.0",
-		.expected_build_id_len = SPOTFLOW_OTA_BUILD_ID_MAX_LENGTH,
 	};
-	for (size_t i = 0; i < probation.expected_build_id_len; i++) {
+	for (size_t i = 0; i < SPOTFLOW_BUILD_ID_LENGTH; i++) {
 		probation.expected_build_id[i] = (uint8_t)(0x55 + i);
 	}
 
@@ -172,7 +172,7 @@ ZTEST(spotflow_ota_persistence, test_save_and_load_probation)
 	zassert_str_equal(loaded.slug, probation.slug);
 	zassert_str_equal(loaded.version, probation.version);
 	zassert_mem_equal(loaded.expected_build_id, probation.expected_build_id,
-			  probation.expected_build_id_len);
+			  SPOTFLOW_BUILD_ID_LENGTH);
 	zassert_ok(spotflow_ota_persistence_clear_probation());
 	zassert_str_equal(last_deleted_name, "spotflow/ota/probation");
 }

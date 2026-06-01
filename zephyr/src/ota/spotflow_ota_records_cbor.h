@@ -7,6 +7,7 @@
 
 #include <spotflow/ota.h>
 
+#include "spotflow_build_id.h"
 #include "ota/spotflow_ota_types.h"
 
 #ifdef __cplusplus
@@ -14,7 +15,6 @@ extern "C" {
 #endif
 
 #define SPOTFLOW_OTA_RECORDS_CBOR_SCHEMA_VERSION 1
-#define SPOTFLOW_OTA_BUILD_ID_MAX_LENGTH 20
 
 struct spotflow_ota_persisted_attempt {
 	uint64_t attempt_id;
@@ -30,8 +30,7 @@ struct spotflow_ota_probation {
 	uint32_t artifact_index;
 	char slug[SPOTFLOW_OTA_ARTIFACT_SLUG_MAX_LENGTH + 1];
 	char version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
-	size_t expected_build_id_len;
-	uint8_t expected_build_id[SPOTFLOW_OTA_BUILD_ID_MAX_LENGTH];
+	uint8_t expected_build_id[SPOTFLOW_BUILD_ID_LENGTH];
 };
 
 int spotflow_ota_records_cbor_encode_attempt(const struct spotflow_ota_persisted_attempt* attempt,
