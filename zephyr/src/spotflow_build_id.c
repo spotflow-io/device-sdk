@@ -11,7 +11,7 @@
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
 
 BUILD_ASSERT(sizeof((uint8_t[]){ SPOTFLOW_BINDESC_ID_BUILD_ID_ORIGINAL_CONTENT }) ==
-	     SPOTFLOW_BUILD_ID_LENGTH,
+		 SPOTFLOW_BUILD_ID_LENGTH,
 	     "Build ID length must match SPOTFLOW_BUILD_ID_LENGTH");
 
 #ifdef CONFIG_BINDESC
