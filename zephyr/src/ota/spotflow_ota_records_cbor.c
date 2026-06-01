@@ -13,11 +13,10 @@ LOG_MODULE_DECLARE(spotflow_ota);
 
 #define KEY_SCHEMA_VERSION 0
 #define KEY_ATTEMPT_ID 1
-#define KEY_HAS_ATTEMPT_ERROR 2
-#define KEY_ATTEMPT_ERROR 3
-#define KEY_ARTIFACT_COUNT 4
-#define KEY_ACTIONABLE_CANCELLATION 5
-#define KEY_ARTIFACT_RESULTS 6
+#define KEY_ATTEMPT_ERROR 2
+#define KEY_ARTIFACT_COUNT 3
+#define KEY_ACTIONABLE_CANCELLATION 4
+#define KEY_ARTIFACT_RESULTS 5
 
 #define KEY_PROBATION_ARTIFACT_INDEX 2
 #define KEY_PROBATION_SLUG 3
@@ -25,7 +24,7 @@ LOG_MODULE_DECLARE(spotflow_ota);
 #define KEY_PROBATION_EXPECTED_BUILD_ID 5
 
 #define ZCBOR_STATE_DEPTH 4
-#define ATTEMPT_RECORD_MAP_ENTRIES 7
+#define ATTEMPT_RECORD_MAP_ENTRIES 6
 #define PROBATION_RECORD_MAP_ENTRIES 5
 
 static bool decode_expected_uint32_key(zcbor_state_t* state, uint32_t expected);
@@ -54,22 +53,25 @@ int spotflow_ota_records_cbor_encode_attempt(const struct spotflow_ota_persisted
 	success = success && zcbor_uint32_put(state, SPOTFLOW_OTA_RECORDS_CBOR_SCHEMA_VERSION);
 	success = success && zcbor_uint32_put(state, KEY_ATTEMPT_ID);
 	success = success && zcbor_uint64_put(state, attempt->attempt_id);
-	success = success && zcbor_uint32_put(state, KEY_HAS_ATTEMPT_ERROR);
-	success = success && zcbor_bool_put(state, attempt->has_attempt_error);
-	success = success && zcbor_uint32_put(state, KEY_ATTEMPT_ERROR);
-	success = success && zcbor_uint32_put(state, attempt->attempt_error);
-	success = success && zcbor_uint32_put(state, KEY_ARTIFACT_COUNT);
-	success = success && zcbor_uint32_put(state, (uint32_t)attempt->artifact_count);
-	success = success && zcbor_uint32_put(state, KEY_ACTIONABLE_CANCELLATION);
-	success = success && zcbor_bool_put(state, attempt->actionable_cancellation);
-	success = success && zcbor_uint32_put(state, KEY_ARTIFACT_RESULTS);
-	success = success && zcbor_list_start_encode(state, attempt->artifact_count);
 
-	for (size_t i = 0; success && i < attempt->artifact_count; i++) {
-		success = success && zcbor_uint32_put(state, (uint32_t)attempt->artifact_results[i]);
+	if (attempt->has_attempt_error) {
+		success = success && zcbor_uint32_put(state, KEY_ATTEMPT_ERROR);
+		success = success && zcbor_uint32_put(state, attempt->attempt_error);
+	} else {
+		success = success && zcbor_uint32_put(state, KEY_ARTIFACT_COUNT);
+		success = success && zcbor_uint32_put(state, (uint32_t)attempt->artifact_count);
+		success = success && zcbor_uint32_put(state, KEY_ACTIONABLE_CANCELLATION);
+		success = success && zcbor_bool_put(state, attempt->actionable_cancellation);
+		success = success && zcbor_uint32_put(state, KEY_ARTIFACT_RESULTS);
+		success = success && zcbor_list_start_encode(state, attempt->artifact_count);
+
+		for (size_t i = 0; success && i < attempt->artifact_count; i++) {
+			success = success &&
+			    zcbor_uint32_put(state, (uint32_t)attempt->artifact_results[i]);
+		}
+
+		success = success && zcbor_list_end_encode(state, attempt->artifact_count);
 	}
-
-	success = success && zcbor_list_end_encode(state, attempt->artifact_count);
 	success = success && zcbor_map_end_encode(state, ATTEMPT_RECORD_MAP_ENTRIES);
 
 	if (!success) {
@@ -97,7 +99,7 @@ int spotflow_ota_records_cbor_decode_attempt(const uint8_t* payload, size_t len,
 
 	bool success = zcbor_map_start_decode(state);
 	uint32_t schema_version;
-	bool has_attempt_error;
+	uint32_t next_key;
 	uint32_t attempt_error;
 	uint32_t artifact_count;
 	bool actionable_cancellation;
@@ -107,28 +109,32 @@ int spotflow_ota_records_cbor_decode_attempt(const uint8_t* payload, size_t len,
 	success = success && zcbor_uint32_decode(state, &schema_version);
 	success = success && decode_expected_uint32_key(state, KEY_ATTEMPT_ID);
 	success = success && zcbor_uint64_decode(state, &attempt->attempt_id);
-	success = success && decode_expected_uint32_key(state, KEY_HAS_ATTEMPT_ERROR);
-	success = success && zcbor_bool_decode(state, &has_attempt_error);
-	success = success && decode_expected_uint32_key(state, KEY_ATTEMPT_ERROR);
-	success = success && zcbor_uint32_decode(state, &attempt_error);
-	success = success && decode_expected_uint32_key(state, KEY_ARTIFACT_COUNT);
-	success = success && zcbor_uint32_decode(state, &artifact_count);
-	success = success && decode_expected_uint32_key(state, KEY_ACTIONABLE_CANCELLATION);
-	success = success && zcbor_bool_decode(state, &actionable_cancellation);
-	success = success && decode_expected_uint32_key(state, KEY_ARTIFACT_RESULTS);
-	success = success && zcbor_list_start_decode(state);
+	success = success && zcbor_uint32_decode(state, &next_key);
 
 	if (!success || schema_version != SPOTFLOW_OTA_RECORDS_CBOR_SCHEMA_VERSION ||
 	    attempt->attempt_id == 0) {
 		return -EINVAL;
 	}
 
-	if (artifact_count > CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS) {
+	if (next_key == KEY_ATTEMPT_ERROR) {
+		if (!zcbor_uint32_decode(state, &attempt_error) || !zcbor_map_end_decode(state)) {
+			return -EINVAL;
+		}
+
+		attempt->has_attempt_error = true;
+		attempt->attempt_error = attempt_error;
+		return validate_attempt(attempt);
+	}
+
+	if (next_key != KEY_ARTIFACT_COUNT || !zcbor_uint32_decode(state, &artifact_count) ||
+	    artifact_count > CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS ||
+	    !decode_expected_uint32_key(state, KEY_ACTIONABLE_CANCELLATION) ||
+	    !zcbor_bool_decode(state, &actionable_cancellation) ||
+	    !decode_expected_uint32_key(state, KEY_ARTIFACT_RESULTS) ||
+	    !zcbor_list_start_decode(state)) {
 		return -EINVAL;
 	}
 
-	attempt->has_attempt_error = has_attempt_error;
-	attempt->attempt_error = attempt_error;
 	attempt->artifact_count = artifact_count;
 	attempt->actionable_cancellation = actionable_cancellation;
 
@@ -268,11 +274,11 @@ static int validate_attempt(const struct spotflow_ota_persisted_attempt* attempt
 		return -EINVAL;
 	}
 
-	if (attempt->attempt_error > SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE) {
-		return -EINVAL;
-	}
-
 	if (attempt->has_attempt_error) {
+		if (attempt->attempt_error > SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE) {
+			return -EINVAL;
+		}
+
 		return 0;
 	}
 
