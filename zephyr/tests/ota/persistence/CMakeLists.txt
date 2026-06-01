@@ -8,6 +8,7 @@ project(spotflow_ota_persistence)
 target_include_directories(app PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/../../../include
         ${CMAKE_CURRENT_LIST_DIR}/../../../src
+        ${CMAKE_CURRENT_LIST_DIR}/../common
 )
 
 target_compile_definitions(app PRIVATE
@@ -16,6 +17,7 @@ target_compile_definitions(app PRIVATE
 
 target_sources(app PRIVATE
         src/main.c
+        ../common/spotflow_ota_test_settings.c
         ../../../src/ota/spotflow_ota_records_cbor.c
         ../../../src/ota/spotflow_ota_persistence.c
 )
