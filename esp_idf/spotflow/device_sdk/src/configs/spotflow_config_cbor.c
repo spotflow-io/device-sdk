@@ -4,7 +4,7 @@
 #include "cbor.h"
 #include "configs/spotflow_config_cbor.h"
 #include "configs/spotflow_config_persistence.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 
 #define MAX_KEY_COUNT 4
 

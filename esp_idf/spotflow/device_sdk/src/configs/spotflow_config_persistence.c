@@ -4,7 +4,7 @@
 #include "nvs.h"
 #include "esp_err.h"
 #include "configs/spotflow_config_persistence.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "configs/spotflow_config_cbor.h"
 
 #define SPOTFLOW_SENT_LOG_LEVEL_KEY "Spotflow_S_L"

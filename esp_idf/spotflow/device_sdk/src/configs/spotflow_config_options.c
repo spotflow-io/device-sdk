@@ -3,6 +3,7 @@
 
 #include "esp_log.h"
 #include "esp_log_level.h"
+#include "spotflow.h"
 #include "logging/spotflow_log_backend.h"
 #include "configs/spotflow_config_options.h"
 

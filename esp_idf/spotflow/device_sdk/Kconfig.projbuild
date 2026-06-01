@@ -28,6 +28,14 @@ menu "Spotflow"
     config BROKER_CERTIFICATE_OVERRIDDEN
         bool
         default y if BROKER_CERTIFICATE_OVERRIDE != ""
+        help
+            This option is automatically set when BROKER_CERTIFICATE_OVERRIDE is filled in. It indicates that the broker certificate is provided directly in the configuration.
+
+    config SPOTFLOW_MQTT_TASK_SIZE
+        int "MQTT Task Stack Size"
+        default 3096
+        help
+          MQTT task size. Calculated as 2x CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN.
 
     choice SPOTFLOW_INTERNAL_LOGS
         prompt "Set log level of spotflow internal logs"
@@ -42,7 +50,7 @@ menu "Spotflow"
 
         config SPOTFLOW_MESSAGE_TERMINAL
             bool "logs"
-        
+
         config SPOTFLOW_INTERNAL_LOGS_DISABLED
             bool "Disabled"
 
