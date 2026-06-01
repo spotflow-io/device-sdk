@@ -3,6 +3,7 @@
 #include <zcbor_decode.h>
 
 #include <zephyr/logging/log.h>
+#include <zephyr/random/random.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/ztest.h>
 
@@ -36,6 +37,7 @@ static struct fake_setting_entry fake_entries[8];
 static uint8_t published_payload[128];
 static size_t published_payload_len;
 static uint32_t ota_subscription_count;
+static uint8_t fake_random_seed;
 
 static int decode_session_metadata(const uint8_t* payload, size_t len,
 				   struct decoded_session_metadata* metadata);
@@ -114,6 +116,15 @@ int settings_load_subtree_direct(const char* subtree, settings_load_direct_cb cb
 	return 0;
 }
 
+void z_impl_sys_rand_get(void* dst, size_t len)
+{
+	uint8_t* bytes = dst;
+
+	for (size_t i = 0; i < len; i++) {
+		bytes[i] = ++fake_random_seed;
+	}
+}
+
 int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len)
 {
 	if (len > sizeof(published_payload)) {
@@ -139,6 +150,7 @@ static void before_each(void* fixture)
 	memset(published_payload, 0, sizeof(published_payload));
 	published_payload_len = 0;
 	ota_subscription_count = 0;
+	fake_random_seed = 0;
 	spotflow_ota_reset();
 }
 
