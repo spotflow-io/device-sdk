@@ -3,6 +3,8 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
         spotflow_ota_cbor.c
         spotflow_ota_download.c
         spotflow_ota_net.c
+        spotflow_ota_persistence.c
+        spotflow_ota_records_cbor.c
         spotflow_ota_state.c
         spotflow_ota_url.c
 )
