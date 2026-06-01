@@ -98,8 +98,8 @@ int settings_load_subtree_direct(const char* subtree, settings_load_direct_cb cb
 			continue;
 		}
 
-		int rc = cb(key, fake_entries[i].value_len, fake_settings_read, &fake_entries[i],
-			    param);
+		int rc =
+		    cb(key, fake_entries[i].value_len, fake_settings_read, &fake_entries[i], param);
 		if (rc != 0) {
 			return rc;
 		}
