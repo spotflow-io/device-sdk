@@ -79,6 +79,13 @@ static void spotflow_mqtt_thread_entry(void)
 #endif
 #endif
 
+#ifdef CONFIG_SPOTFLOW_OTA
+	int rc_ota = spotflow_ota_init();
+	if (rc_ota < 0) {
+		LOG_ERR("Failed to initialize OTA updates: %d", rc_ota);
+	}
+#endif
+
 	/* 1) OUTER LOOP: keep trying until mqtt_connected == true, reconnect if connection failed */
 	while (true) {
 		spotflow_mqtt_establish_mqtt();
@@ -133,15 +140,6 @@ static int process_config_coredumps_or_logs()
 static void process_mqtt()
 {
 	int rc;
-
-#ifdef CONFIG_SPOTFLOW_OTA
-	rc = spotflow_ota_init();
-	if (rc < 0) {
-		LOG_WRN("Failed to initialize OTA updates: %d", rc);
-		spotflow_mqtt_abort_mqtt();
-		return;
-	}
-#endif
 
 	rc = spotflow_session_metadata_send();
 	if (rc < 0) {
