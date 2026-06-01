@@ -30,8 +30,7 @@ static uint64_t device_run_id = 0;
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
 					uint64_t run_id, bool include_last_update_attempt_id,
 					uint64_t last_update_attempt_id, uint8_t* buffer,
-					size_t buffer_len,
-					size_t* cbor_data_len);
+					size_t buffer_len, size_t* cbor_data_len);
 
 int spotflow_session_metadata_send(void)
 {
@@ -66,9 +65,8 @@ int spotflow_session_metadata_send(void)
 	size_t cbor_data_len = 0;
 
 	rc = cbor_encode_session_metadata(build_id, build_id_len, device_run_id,
-					  include_last_update_attempt_id,
-					  last_update_attempt_id, buffer, sizeof(buffer),
-					  &cbor_data_len);
+					  include_last_update_attempt_id, last_update_attempt_id,
+					  buffer, sizeof(buffer), &cbor_data_len);
 	if (rc < 0) {
 		LOG_DBG("Failed to encode session metadata: %d", rc);
 		return rc;
@@ -80,8 +78,7 @@ int spotflow_session_metadata_send(void)
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
 					uint64_t run_id, bool include_last_update_attempt_id,
 					uint64_t last_update_attempt_id, uint8_t* buffer,
-					size_t buffer_len,
-					size_t* cbor_data_len)
+					size_t buffer_len, size_t* cbor_data_len)
 {
 	ZCBOR_STATE_E(state, 1, buffer, buffer_len, 1);
 

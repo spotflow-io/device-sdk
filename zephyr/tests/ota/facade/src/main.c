@@ -3,7 +3,6 @@
 #include <zcbor_decode.h>
 
 #include <zephyr/logging/log.h>
-#include <zephyr/random/random.h>
 #include <zephyr/settings/settings.h>
 #include <zephyr/ztest.h>
 
@@ -105,19 +104,14 @@ int settings_load_subtree_direct(const char* subtree, settings_load_direct_cb cb
 			continue;
 		}
 
-		int rc = cb(key, fake_entries[i].value_len, fake_settings_read, &fake_entries[i],
-			    param);
+		int rc =
+		    cb(key, fake_entries[i].value_len, fake_settings_read, &fake_entries[i], param);
 		if (rc != 0) {
 			return rc;
 		}
 	}
 
 	return 0;
-}
-
-uint32_t sys_rand32_get(void)
-{
-	return 0x11223344;
 }
 
 int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len)
