@@ -6,13 +6,7 @@
 #include "ota/spotflow_ota_state.h"
 #include "net/spotflow_mqtt.h"
 
-#ifdef CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
-#define SPOTFLOW_OTA_LOG_LEVEL CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
-#else
-#define SPOTFLOW_OTA_LOG_LEVEL CONFIG_LOG_DEFAULT_LEVEL
-#endif
-
-LOG_MODULE_REGISTER(spotflow_ota, SPOTFLOW_OTA_LOG_LEVEL);
+LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static K_MUTEX_DEFINE(ota_mutex);
 static bool ota_initialized;
