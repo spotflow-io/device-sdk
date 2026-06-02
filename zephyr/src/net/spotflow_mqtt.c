@@ -12,6 +12,7 @@
 #include "net/spotflow_connection_helper.h"
 #include "net/spotflow_device_id.h"
 #include "net/spotflow_tls.h"
+#include "ota/spotflow_ota_cbor.h"
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
 #include "../metrics/system/spotflow_metrics_system.h"
