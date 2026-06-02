@@ -13,6 +13,7 @@
 
 static struct spotflow_metric_int* g_network_tx_metric;
 static struct spotflow_metric_int* g_network_rx_metric;
+static SemaphoreHandle_t g_hooks_mutex = NULL;
 
 /* Per-interface byte counters */
 typedef struct {
@@ -71,7 +72,7 @@ int spotflow_metrics_system_network_init(void)
 	int rc;
 
 	memset(g_hooks, 0, sizeof(g_hooks));
-
+	g_hooks_mutex = xSemaphoreCreateMutex();
 	/* Register netif extended callback — fires when any netif is added */
 	netif_add_ext_callback(&g_netif_callback, netif_ext_callback);
 
@@ -182,6 +183,10 @@ static void netif_ext_callback(struct netif* netif, netif_nsc_reason_t reason,
 
 static void install_netif_hooks(struct netif* netif)
 {
+	if (g_hooks_mutex != NULL) {
+		xSemaphoreTake(g_hooks_mutex, portMAX_DELAY);
+	}
+
 	/* Only hook WiFi STA (st) and AP (ap) netifs, skip loopback */
 	if (netif->name[0] == 'l' && netif->name[1] == 'o') {
 		return;
@@ -206,5 +211,8 @@ static void install_netif_hooks(struct netif* netif)
 			SPOTFLOW_LOG("Installed byte hooks on netif %s", g_hooks[i].name);
 			break;
 		}
+	}
+	if (g_hooks_mutex != NULL) {
+		xSemaphoreGive(g_hooks_mutex);
 	}
 }
