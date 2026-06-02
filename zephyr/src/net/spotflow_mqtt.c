@@ -24,9 +24,33 @@
 /* Maximum size of the payload of config C2D messages */
 #define C2D_PAYLOAD_BUFFER_SIZE 32
 
-/* Maximum size of the payload of OTA C2D messages */
-/* Sized for full OTA manifest messages while keeping reads single-buffered in v1. */
-#define OTA_C2D_PAYLOAD_BUFFER_SIZE 2048
+/* Worst-case OTA manifest sizing for v1 C2D payload buffering. */
+#define MQTT_CBOR_SMALL_UINT_OVERHEAD 1
+#define MQTT_CBOR_UINT16_OVERHEAD 3
+#define MQTT_CBOR_BOOL_OVERHEAD 1
+#define MQTT_CBOR_TEXT_STRING_OVERHEAD(len) ((len) < 24 ? 1 : 2)
+#define MQTT_CBOR_TSTR_FIELD_SIZE(len) \
+	(MQTT_CBOR_UINT16_OVERHEAD + MQTT_CBOR_TEXT_STRING_OVERHEAD(len) + (len))
+#define MQTT_CBOR_ARTIFACT_MAP_OVERHEAD 1
+#define MQTT_CBOR_MANIFEST_ENTRY_SIZE                                                      \
+	(MQTT_CBOR_ARTIFACT_MAP_OVERHEAD + MQTT_CBOR_SMALL_UINT_OVERHEAD +                 \
+	 MQTT_CBOR_SMALL_UINT_OVERHEAD +                                                   \
+	 MQTT_CBOR_TSTR_FIELD_SIZE(SPOTFLOW_OTA_ARTIFACT_SLUG_MAX_LENGTH) +                \
+	 MQTT_CBOR_UINT16_OVERHEAD + MQTT_CBOR_BOOL_OVERHEAD + MQTT_CBOR_UINT16_OVERHEAD + \
+	 MQTT_CBOR_TSTR_FIELD_SIZE(SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH) +                 \
+	 MQTT_CBOR_UINT16_OVERHEAD +                                                       \
+	 MQTT_CBOR_TSTR_FIELD_SIZE(SPOTFLOW_OTA_ARTIFACT_SECRET_MAX_LENGTH) +              \
+	 MQTT_CBOR_UINT16_OVERHEAD +                                                       \
+	 MQTT_CBOR_TSTR_FIELD_SIZE(SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH))
+#define MQTT_CBOR_UPDATE_ARTIFACTS_FIXED_OVERHEAD                                              \
+	(1 + MQTT_CBOR_SMALL_UINT_OVERHEAD + MQTT_CBOR_SMALL_UINT_OVERHEAD +                   \
+	 MQTT_CBOR_UINT16_OVERHEAD + 9 + MQTT_CBOR_UINT16_OVERHEAD + MQTT_CBOR_BOOL_OVERHEAD + \
+	 MQTT_CBOR_UINT16_OVERHEAD + 2)
+#define OTA_C2D_PAYLOAD_BUFFER_WIGGLE_ROOM 64
+#define OTA_C2D_PAYLOAD_BUFFER_SIZE                                          \
+	(MQTT_CBOR_UPDATE_ARTIFACTS_FIXED_OVERHEAD +                         \
+	 CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS * MQTT_CBOR_MANIFEST_ENTRY_SIZE + \
+	 OTA_C2D_PAYLOAD_BUFFER_WIGGLE_ROOM)
 
 #define DEFAULT_GENERAL_TIMEOUT_MSEC 500
 #define SPOTFLOW_MQTT_INGEST_CBOR_TOPIC "ingest-cbor"
