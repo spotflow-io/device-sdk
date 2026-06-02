@@ -97,6 +97,13 @@ static void spotflow_mqtt_thread_entry(void)
 static int process_config_coredumps_or_logs()
 {
 	int rc = 0;
+#ifdef CONFIG_SPOTFLOW_OTA
+	rc = spotflow_ota_send_pending_message();
+	if (rc < 0) {
+		LOG_DBG("Failed to send pending OTA message: %d", rc);
+		return rc;
+	}
+#endif
 #ifdef CONFIG_SPOTFLOW_CONFIG
 	rc = spotflow_config_send_pending_message();
 	if (rc < 0) {
@@ -134,17 +141,6 @@ static int process_config_coredumps_or_logs()
 		}
 	}
 #endif
-
-#ifdef CONFIG_SPOTFLOW_OTA
-	if (rc == 0) {
-		rc = spotflow_ota_send_pending_message();
-		if (rc < 0) {
-			LOG_DBG("Failed to send pending OTA message: %d", rc);
-			return rc;
-		}
-	}
-#endif
-
 	return rc;
 }
 
