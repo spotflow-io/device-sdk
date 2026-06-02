@@ -36,18 +36,93 @@ static uint8_t fake_random_seed;
 static spotflow_mqtt_message_cb ota_callback;
 
 static const uint8_t valid_update_artifacts_payload[] = {
-	0xa3, 0x00, 0x06, 0x18, 0x20, 0x01, 0x18, 0x22, 0x81, 0xa6, 0x18, 0x23, 0x00,
-	0x18, 0x24, 0x64, 'm',	'a',  'i',  'n',  0x18, 0x25, 0xf5, 0x18, 0x26, 0x69,
-	'h',  't',  't',  'p',	's',  ':',  '/',  '/',	'a',  0x18, 0x27, 0x66, 's',
-	'e',  'c',  'r',  'e',	't',  0x18, 0x28, 0x65, '1',  '.',  '0',  '.',	'0',
+	/* map(3) */
+	0xa3,
+	/* messageType: UPDATE_ARTIFACTS */
+	0x00,
+	0x06,
+	/* updateAttemptId: 1 */
+	0x18,
+	0x20,
+	0x01,
+	/* manifest: array(1) */
+	0x18,
+	0x22,
+	0x81,
+	/* artifact: map(6) */
+	0xa6,
+	/* artifactType: FIRMWARE */
+	0x18,
+	0x23,
+	0x00,
+	/* slug: "main" */
+	0x18,
+	0x24,
+	0x64,
+	'm',
+	'a',
+	'i',
+	'n',
+	/* isMain: true */
+	0x18,
+	0x25,
+	0xf5,
+	/* url: "https://a" */
+	0x18,
+	0x26,
+	0x69,
+	'h',
+	't',
+	't',
+	'p',
+	's',
+	':',
+	'/',
+	'/',
+	'a',
+	/* secret: "secret" */
+	0x18,
+	0x27,
+	0x66,
+	's',
+	'e',
+	'c',
+	'r',
+	'e',
+	't',
+	/* version: "1.0.0" */
+	0x18,
+	0x28,
+	0x65,
+	'1',
+	'.',
+	'0',
+	'.',
+	'0',
 };
 
 static const uint8_t cancel_update_payload[] = {
-	0xa2, 0x00, 0x07, 0x18, 0x20, 0x01,
+	/* map(2) */
+	0xa2,
+	/* messageType: CANCEL_UPDATE */
+	0x00,
+	0x07,
+	/* updateAttemptId: 1 */
+	0x18,
+	0x20,
+	0x01,
 };
 
 static const uint8_t report_update_results_payload[] = {
-	0xa2, 0x00, 0x08, 0x18, 0x20, 0x01,
+	/* map(2) */
+	0xa2,
+	/* messageType: REPORT_UPDATE_RESULTS */
+	0x00,
+	0x08,
+	/* updateAttemptId: 1 */
+	0x18,
+	0x20,
+	0x01,
 };
 
 static int decode_session_metadata(const uint8_t* payload, size_t len,

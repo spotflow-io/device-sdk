@@ -439,6 +439,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		    utf8_starts_with(&evt->param.publish.message.topic.topic,
 				     &spotflow_mqtt_config.config_c2d_topic)) {
 			size_t bytes_read;
+			/* Consume the whole publish so the MQTT stream stays aligned. */
 			ret = read_publish_payload(client, c2d_payload_buffer,
 						   sizeof(c2d_payload_buffer), payload_len,
 						   &bytes_read, &truncated);
@@ -458,6 +459,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 			   utf8_starts_with(&evt->param.publish.message.topic.topic,
 					    &spotflow_mqtt_config.ota_c2d_topic)) {
 			size_t bytes_read;
+			/* Consume the whole publish so the MQTT stream stays aligned. */
 			ret = read_publish_payload(client, ota_c2d_payload_buffer,
 						   sizeof(ota_c2d_payload_buffer), payload_len,
 						   &bytes_read, &truncated);
@@ -485,6 +487,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 			}
 		}
 
+		/* QoS 1 is acknowledged only after the payload has been fully read. */
 		ret = acknowledge_publish_if_needed(client, &evt->param.publish);
 		if (ret < 0) {
 			LOG_ERR("Failed to acknowledge MQTT PUBLISH: %d", ret);
@@ -517,6 +520,7 @@ static int read_publish_payload(struct mqtt_client* client, uint8_t* buffer, siz
 			chunk_len = MIN(remaining, buffer_len - total_read);
 		}
 
+		/* MQTT_EVT_PUBLISH provides the length, but the payload must be pulled manually. */
 		int ret = mqtt_read_publish_payload(client, target_buffer, chunk_len);
 		if (ret < 0) {
 			return ret;
