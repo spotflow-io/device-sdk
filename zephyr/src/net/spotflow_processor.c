@@ -134,6 +134,17 @@ static int process_config_coredumps_or_logs()
 		}
 	}
 #endif
+
+#ifdef CONFIG_SPOTFLOW_OTA
+	if (rc == 0) {
+		rc = spotflow_ota_send_pending_message();
+		if (rc < 0) {
+			LOG_DBG("Failed to send pending OTA message: %d", rc);
+			return rc;
+		}
+	}
+#endif
+
 	return rc;
 }
 

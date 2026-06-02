@@ -25,6 +25,13 @@ int spotflow_ota_init(void);
 int spotflow_ota_init_session();
 
 /**
+ * @brief Send one pending OTA D2C message, if any.
+ *
+ * Called from the MQTT processing loop.
+ */
+int spotflow_ota_send_pending_message(void);
+
+/**
  * @brief Get the latest OTA attempt ID known to the SDK.
  *
  * Returns 0 when no OTA attempt has been recorded.

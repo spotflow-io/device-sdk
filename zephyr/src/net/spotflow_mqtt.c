@@ -6,6 +6,7 @@
 #include <zephyr/net/socket.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <string.h>
 
 #include "net/spotflow_mqtt.h"
 #include "net/spotflow_connection_helper.h"
@@ -24,8 +25,8 @@
 #define C2D_PAYLOAD_BUFFER_SIZE 32
 
 /* Maximum size of the payload of OTA C2D messages */
-/* TODO: Calculate properly for production, this value is just for testing */
-#define OTA_C2D_PAYLOAD_BUFFER_SIZE 256
+/* Sized for full OTA manifest messages while keeping reads single-buffered in v1. */
+#define OTA_C2D_PAYLOAD_BUFFER_SIZE 2048
 
 #define DEFAULT_GENERAL_TIMEOUT_MSEC 500
 #define SPOTFLOW_MQTT_INGEST_CBOR_TOPIC "ingest-cbor"
@@ -72,6 +73,10 @@ static int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len, struct m
 static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* evt);
 static bool utf8_starts_with(const struct mqtt_utf8* str, const struct mqtt_utf8* prefix);
 static void clear_fds(void);
+static int read_publish_payload(struct mqtt_client* client, uint8_t* buffer, size_t buffer_len,
+				size_t payload_len, size_t* bytes_read, bool* truncated);
+static int acknowledge_publish_if_needed(struct mqtt_client* client,
+					 const struct mqtt_publish_param* publish);
 
 static struct mqtt_config spotflow_mqtt_config = {
 	.host = CONFIG_SPOTFLOW_SERVER_HOSTNAME,
@@ -301,7 +306,7 @@ int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
 	struct mqtt_topic topics[] = {
 		{
 		    .topic = spotflow_mqtt_config.ota_c2d_topic,
-		    .qos = MQTT_QOS_0_AT_MOST_ONCE,
+		    .qos = MQTT_QOS_1_AT_LEAST_ONCE,
 		},
 	};
 
@@ -418,33 +423,121 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		}
 		LOG_DBG("PUBLISH packet id: %u", evt->param.publish.message_id);
 
+		size_t payload_len = evt->param.publish.message.payload.len;
+		bool truncated = false;
+		ret = 0;
+
 		/* The actual topic name is longer to distinguish between different devices */
 		if (mqtt_client_toolset.c2d_message_callback &&
 		    utf8_starts_with(&evt->param.publish.message.topic.topic,
 				     &spotflow_mqtt_config.config_c2d_topic)) {
-			ret = mqtt_read_publish_payload(client, c2d_payload_buffer,
-							sizeof(c2d_payload_buffer));
+			size_t bytes_read;
+			ret = read_publish_payload(client, c2d_payload_buffer,
+						   sizeof(c2d_payload_buffer), payload_len,
+						   &bytes_read, &truncated);
 			if (ret < 0) {
 				LOG_ERR("Failed to read PUBLISH payload: %d", ret);
 				break;
 			}
 
-			mqtt_client_toolset.c2d_message_callback(c2d_payload_buffer, ret);
+			if (!truncated) {
+				mqtt_client_toolset.c2d_message_callback(c2d_payload_buffer,
+									 bytes_read);
+			} else {
+				LOG_WRN("Discarding oversized config C2D payload (%u bytes)",
+					(unsigned int)payload_len);
+			}
 		} else if (mqtt_client_toolset.ota_message_callback &&
 			   utf8_starts_with(&evt->param.publish.message.topic.topic,
 					    &spotflow_mqtt_config.ota_c2d_topic)) {
-			ret = mqtt_read_publish_payload(client, ota_c2d_payload_buffer,
-							sizeof(ota_c2d_payload_buffer));
+			size_t bytes_read;
+			ret = read_publish_payload(client, ota_c2d_payload_buffer,
+						   sizeof(ota_c2d_payload_buffer), payload_len,
+						   &bytes_read, &truncated);
 			if (ret < 0) {
 				LOG_ERR("Failed to read PUBLISH payload: %d", ret);
 				break;
 			}
 
-			mqtt_client_toolset.ota_message_callback(ota_c2d_payload_buffer, ret);
+			if (!truncated) {
+				mqtt_client_toolset.ota_message_callback(ota_c2d_payload_buffer,
+									 bytes_read);
+			} else {
+				LOG_WRN("Discarding oversized OTA C2D payload (%u bytes)",
+					(unsigned int)payload_len);
+			}
+		} else {
+			uint8_t discard_buffer[64];
+			size_t ignored_bytes_read;
+
+			ret = read_publish_payload(client, discard_buffer, sizeof(discard_buffer),
+						   payload_len, &ignored_bytes_read, &truncated);
+			if (ret < 0) {
+				LOG_ERR("Failed to drain unexpected PUBLISH payload: %d", ret);
+				break;
+			}
+		}
+
+		ret = acknowledge_publish_if_needed(client, &evt->param.publish);
+		if (ret < 0) {
+			LOG_ERR("Failed to acknowledge MQTT PUBLISH: %d", ret);
 		}
 		break;
 	default:
 		break;
+	}
+}
+
+static int read_publish_payload(struct mqtt_client* client, uint8_t* buffer, size_t buffer_len,
+				size_t payload_len, size_t* bytes_read, bool* truncated)
+{
+	size_t total_read = 0;
+	uint8_t discard_buffer[64];
+
+	if (bytes_read == NULL || truncated == NULL) {
+		return -EINVAL;
+	}
+
+	*truncated = payload_len > buffer_len;
+
+	while (total_read < payload_len) {
+		size_t remaining = payload_len - total_read;
+		void* target_buffer = discard_buffer;
+		size_t chunk_len = MIN(remaining, sizeof(discard_buffer));
+
+		if (total_read < buffer_len) {
+			target_buffer = buffer + total_read;
+			chunk_len = MIN(remaining, buffer_len - total_read);
+		}
+
+		int ret = mqtt_read_publish_payload(client, target_buffer, chunk_len);
+		if (ret < 0) {
+			return ret;
+		}
+		if (ret == 0) {
+			return -EIO;
+		}
+
+		total_read += (size_t)ret;
+	}
+
+	*bytes_read = MIN(payload_len, buffer_len);
+	return 0;
+}
+
+static int acknowledge_publish_if_needed(struct mqtt_client* client,
+					 const struct mqtt_publish_param* publish)
+{
+	switch (publish->message.topic.qos) {
+	case MQTT_QOS_0_AT_MOST_ONCE:
+		return 0;
+	case MQTT_QOS_1_AT_LEAST_ONCE: {
+		const struct mqtt_puback_param ack = { .message_id = publish->message_id };
+
+		return mqtt_publish_qos1_ack(client, &ack);
+	}
+	default:
+		return -ENOTSUP;
 	}
 }
 

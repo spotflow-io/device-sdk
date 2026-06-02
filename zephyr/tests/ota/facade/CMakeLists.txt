@@ -20,8 +20,11 @@ target_compile_definitions(app PRIVATE
 target_sources(app PRIVATE
         src/main.c
         ../common/spotflow_ota_test_settings.c
+        ../common/spotflow_ota_test_fakes.c
         ../../../src/net/spotflow_session_metadata.c
         ../../../src/ota/spotflow_ota.c
+        ../../../src/ota/spotflow_ota_cbor.c
+        ../../../src/ota/spotflow_ota_net.c
         ../../../src/ota/spotflow_ota_persistence.c
         ../../../src/ota/spotflow_ota_records_cbor.c
         ../../../src/ota/spotflow_ota_state.c

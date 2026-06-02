@@ -9,7 +9,10 @@
 #include "net/spotflow_mqtt.h"
 #include "net/spotflow_session_metadata.h"
 #include "ota/spotflow_ota.h"
+#include "ota/spotflow_ota_cbor.h"
+#include "ota/spotflow_ota_state.h"
 #include "ota/spotflow_ota_persistence.h"
+#include "spotflow_ota_test_fakes.h"
 #include "spotflow_ota_test_settings.h"
 
 LOG_MODULE_REGISTER(spotflow_net);
@@ -30,6 +33,22 @@ static uint8_t published_payload[128];
 static size_t published_payload_len;
 static uint32_t ota_subscription_count;
 static uint8_t fake_random_seed;
+static spotflow_mqtt_message_cb ota_callback;
+
+static const uint8_t valid_update_artifacts_payload[] = {
+	0xa3, 0x00, 0x06, 0x18, 0x20, 0x01, 0x18, 0x22, 0x81, 0xa6, 0x18, 0x23, 0x00,
+	0x18, 0x24, 0x64, 'm',	'a',  'i',  'n',  0x18, 0x25, 0xf5, 0x18, 0x26, 0x69,
+	'h',  't',  't',  'p',	's',  ':',  '/',  '/',	'a',  0x18, 0x27, 0x66, 's',
+	'e',  'c',  'r',  'e',	't',  0x18, 0x28, 0x65, '1',  '.',  '0',  '.',	'0',
+};
+
+static const uint8_t cancel_update_payload[] = {
+	0xa2, 0x00, 0x07, 0x18, 0x20, 0x01,
+};
+
+static const uint8_t report_update_results_payload[] = {
+	0xa2, 0x00, 0x08, 0x18, 0x20, 0x01,
+};
 
 static int decode_session_metadata(const uint8_t* payload, size_t len,
 				   struct decoded_session_metadata* metadata);
@@ -59,18 +78,36 @@ int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len)
 int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
 {
 	zassert_not_null(callback);
+	ota_callback = callback;
 	ota_subscription_count++;
 	return 0;
+}
+
+int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
+{
+	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+
+	if (len > sizeof(published_payload)) {
+		return -ENOMEM;
+	}
+
+	fake_mqtt->publish_count++;
+	fake_mqtt->last_payload = published_payload;
+	fake_mqtt->last_payload_len = len;
+	memcpy(published_payload, payload, len);
+	return fake_mqtt->publish_result;
 }
 
 static void before_each(void* fixture)
 {
 	ARG_UNUSED(fixture);
 	spotflow_ota_test_settings_reset();
+	spotflow_ota_test_fakes_reset();
 	memset(published_payload, 0, sizeof(published_payload));
 	published_payload_len = 0;
 	ota_subscription_count = 0;
 	fake_random_seed = 0;
+	ota_callback = NULL;
 	spotflow_ota_reset();
 }
 
@@ -113,6 +150,96 @@ ZTEST(spotflow_ota_facade, test_ota_init_session_requests_subscription)
 {
 	zassert_ok(spotflow_ota_init_session());
 	zassert_equal(ota_subscription_count, 1);
+	zassert_not_null(ota_callback);
+}
+
+ZTEST(spotflow_ota_facade, test_c2d_handler_accepts_valid_update_message)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_init_session());
+	ota_callback((uint8_t*)valid_update_artifacts_payload,
+		     sizeof(valid_update_artifacts_payload));
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_true(snapshot.has_current_attempt);
+	zassert_equal(snapshot.current_attempt_id, 1);
+	zassert_equal(snapshot.artifact_count, 1);
+	zassert_equal(spotflow_ota_get_last_received_attempt_id(), 1);
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT);
+	zassert_equal(job.attempt_id, 1);
+}
+
+ZTEST(spotflow_ota_facade,
+      test_c2d_handler_classifies_malformed_message_with_trustworthy_attempt_id)
+{
+	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	struct spotflow_ota_state_snapshot snapshot;
+	uint8_t payload[sizeof(valid_update_artifacts_payload)];
+
+	memcpy(payload, valid_update_artifacts_payload, sizeof(payload));
+	payload[12] = 0x01;
+
+	zassert_ok(spotflow_ota_init_session());
+	ota_callback(payload, sizeof(payload));
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_true(snapshot.has_current_attempt);
+	zassert_true(snapshot.has_attempt_error);
+	zassert_equal(snapshot.current_attempt_id, 1);
+	zassert_equal(snapshot.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE);
+	zassert_equal(spotflow_ota_get_last_received_attempt_id(), 1);
+	zassert_ok(spotflow_ota_send_pending_message());
+	zassert_equal(fake_mqtt->publish_count, 0);
+}
+
+ZTEST(spotflow_ota_facade, test_c2d_handler_ignores_message_without_trustworthy_attempt_id)
+{
+	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	struct spotflow_ota_state_snapshot snapshot;
+	uint8_t payload[sizeof(cancel_update_payload)];
+
+	memcpy(payload, cancel_update_payload, sizeof(payload));
+	payload[5] = 0x00;
+
+	zassert_ok(spotflow_ota_init_session());
+	ota_callback(payload, sizeof(payload));
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_false(snapshot.has_current_attempt);
+	zassert_equal(spotflow_ota_get_last_received_attempt_id(), 0);
+	zassert_ok(spotflow_ota_send_pending_message());
+	zassert_equal(fake_mqtt->publish_count, 0);
+}
+
+ZTEST(spotflow_ota_facade, test_report_request_queues_current_attempt_results)
+{
+	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_cbor_update_results expected_message = {
+		.attempt_id = 1,
+		.failed_count = 1,
+		.failed = { 0 },
+	};
+
+	zassert_ok(spotflow_ota_init_session());
+	ota_callback((uint8_t*)valid_update_artifacts_payload,
+		     sizeof(valid_update_artifacts_payload));
+	zassert_ok(
+	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
+	ota_callback((uint8_t*)report_update_results_payload,
+		     sizeof(report_update_results_payload));
+	zassert_ok(spotflow_ota_send_pending_message());
+	zassert_equal(fake_mqtt->publish_count, 1);
+
+	uint8_t expected_payload[32];
+	size_t expected_len;
+	zassert_ok(spotflow_ota_cbor_encode_update_results(
+	    &expected_message, expected_payload, sizeof(expected_payload), &expected_len));
+	zassert_equal(fake_mqtt->last_payload_len, expected_len);
+	zassert_mem_equal(fake_mqtt->last_payload, expected_payload, expected_len);
 }
 
 ZTEST_SUITE(spotflow_ota_facade, NULL, NULL, before_each, NULL, NULL);

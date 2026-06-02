@@ -2,6 +2,8 @@
 #include <zephyr/logging/log.h>
 
 #include "ota/spotflow_ota.h"
+#include "ota/spotflow_ota_cbor.h"
+#include "ota/spotflow_ota_net.h"
 #include "ota/spotflow_ota_persistence.h"
 #include "ota/spotflow_ota_state.h"
 #include "net/spotflow_mqtt.h"
@@ -13,6 +15,8 @@ static bool ota_initialized;
 static uint64_t last_received_attempt_id;
 
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len);
+static void update_last_received_attempt_id(uint64_t attempt_id);
+static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* msg);
 
 int spotflow_ota_init(void)
 {
@@ -70,6 +74,11 @@ int spotflow_ota_init_session(void)
 	return 0;
 }
 
+int spotflow_ota_send_pending_message(void)
+{
+	return spotflow_ota_net_send_pending_message();
+}
+
 uint64_t spotflow_ota_get_last_received_attempt_id(void)
 {
 	uint64_t attempt_id;
@@ -88,12 +97,86 @@ void spotflow_ota_reset(void)
 	last_received_attempt_id = 0;
 	k_mutex_unlock(&ota_mutex);
 
+	spotflow_ota_net_reset();
 	spotflow_ota_state_reset();
 }
 
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 {
-	ARG_UNUSED(payload);
-	ARG_UNUSED(len);
-	LOG_DBG("Received OTA C2D payload before worker integration");
+	struct spotflow_ota_cbor_c2d_msg msg;
+	struct spotflow_ota_cbor_decode_status status;
+	int rc = spotflow_ota_cbor_decode_c2d(payload, len, &msg, &status);
+
+	if (status.has_trustworthy_attempt_id) {
+		update_last_received_attempt_id(status.attempt_id);
+	}
+
+	if (rc < 0) {
+		if (status.has_trustworthy_attempt_id && status.has_attempt_error) {
+			struct spotflow_ota_state_action action;
+
+			rc = spotflow_ota_state_reject_update(status.attempt_id,
+							      status.attempt_error, &action);
+			if (rc < 0) {
+				LOG_ERR("Failed to reject OTA attempt %llu: %d",
+					(unsigned long long)status.attempt_id, rc);
+				return;
+			}
+		}
+
+		return;
+	}
+
+	rc = handle_decoded_c2d_message(&msg);
+	if (rc < 0) {
+		LOG_ERR("Failed to handle OTA C2D message for attempt %llu: %d",
+			(unsigned long long)msg.attempt_id, rc);
+	}
+}
+
+static void update_last_received_attempt_id(uint64_t attempt_id)
+{
+	k_mutex_lock(&ota_mutex, K_FOREVER);
+	if (attempt_id > last_received_attempt_id) {
+		last_received_attempt_id = attempt_id;
+	}
+	k_mutex_unlock(&ota_mutex);
+}
+
+static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* msg)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	int rc;
+
+	switch (msg->type) {
+	case SPOTFLOW_OTA_CBOR_MSG_UPDATE_ARTIFACTS:
+		rc = spotflow_ota_state_accept_update(&msg->payload.update, &action);
+		break;
+	case SPOTFLOW_OTA_CBOR_MSG_CANCEL_UPDATE:
+		rc = spotflow_ota_state_accept_cancel(msg->attempt_id, &action);
+		break;
+	case SPOTFLOW_OTA_CBOR_MSG_REPORT_UPDATE_RESULTS:
+		rc = spotflow_ota_state_accept_report_request(msg->attempt_id, &action);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	if (rc < 0) {
+		return rc;
+	}
+
+	if (!action.report_requested) {
+		return 0;
+	}
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != msg->attempt_id ||
+	    snapshot.has_attempt_error) {
+		return 0;
+	}
+
+	return spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
+						snapshot.artifact_results, snapshot.artifact_count);
 }
