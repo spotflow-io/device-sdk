@@ -28,10 +28,6 @@
 /* Maximum size of the payload of config C2D messages */
 #define C2D_PAYLOAD_BUFFER_SIZE 32
 
-#ifdef CONFIG_SPOTFLOW_OTA
-#define OTA_C2D_PAYLOAD_BUFFER_SIZE SPOTFLOW_OTA_CBOR_MAX_C2D_MESSAGE_SIZE
-#endif
-
 #define DEFAULT_GENERAL_TIMEOUT_MSEC 500
 #define SPOTFLOW_MQTT_INGEST_CBOR_TOPIC "ingest-cbor"
 #define SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC "config-cbor-d2c"
@@ -106,7 +102,7 @@ static uint8_t c2d_payload_buffer[C2D_PAYLOAD_BUFFER_SIZE];
 
 #ifdef CONFIG_SPOTFLOW_OTA
 /* Buffer for OTA C2D messages */
-static uint8_t ota_c2d_payload_buffer[OTA_C2D_PAYLOAD_BUFFER_SIZE];
+static uint8_t ota_c2d_payload_buffer[SPOTFLOW_OTA_CBOR_MAX_C2D_MESSAGE_SIZE];
 #endif
 
 int spotflow_mqtt_poll()
@@ -305,13 +301,12 @@ int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback)
 	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
 }
 
+#ifdef CONFIG_SPOTFLOW_OTA
+
 int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
 {
 	ARG_UNUSED(callback);
 
-#ifndef CONFIG_SPOTFLOW_OTA
-	return -ENOTSUP;
-#else
 	mqtt_client_toolset.ota_message_callback = callback;
 
 	struct mqtt_topic topics[] = {
@@ -330,8 +325,9 @@ int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
 	mqtt_client_toolset.ota_sub_message_id = param.message_id;
 
 	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
-#endif
 }
+
+#endif /* CONFIG_SPOTFLOW_OTA */
 
 int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len)
 {
@@ -343,17 +339,17 @@ int spotflow_mqtt_publish_config_cbor_msg(uint8_t* payload, size_t len)
 	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.config_d2c_topic);
 }
 
+#ifdef CONFIG_SPOTFLOW_OTA
+
 int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
 {
 	ARG_UNUSED(payload);
 	ARG_UNUSED(len);
 
-#ifndef CONFIG_SPOTFLOW_OTA
-	return -ENOTSUP;
-#else
 	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.ota_d2c_topic);
-#endif
 }
+
+#endif /* CONFIG_SPOTFLOW_OTA */
 
 static int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len, struct mqtt_utf8 topic)
 {
