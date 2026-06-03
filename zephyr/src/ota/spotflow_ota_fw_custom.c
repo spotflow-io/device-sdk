@@ -29,13 +29,7 @@ spotflow_ota_fw_custom_process_artifact(uint64_t attempt_id,
 		.version = artifact->version,
 	};
 
-	enum spotflow_ota_result result = spotflow_on_handle_firmware_update(&info);
-
-	if (result == SPOTFLOW_OTA_RESULT_PENDING) {
-		return SPOTFLOW_OTA_RESULT_FAILED;
-	}
-
-	return result;
+	return spotflow_on_handle_firmware_update(&info);
 }
 
 void spotflow_ota_fw_custom_notify_canceled(void)

@@ -106,19 +106,26 @@ static const uint8_t valid_update_artifacts_payload[] = {
 };
 
 static const uint8_t valid_two_artifacts_payload[] = {
+	/* map(3) */
 	0xa3,
+	/* messageType: UPDATE_ARTIFACTS */
 	0x00,
 	0x06,
+	/* updateAttemptId: 1 */
 	0x18,
 	0x20,
 	0x01,
+	/* manifest: array(2) */
 	0x18,
 	0x22,
 	0x82,
+	/* artifact: map(6) */
 	0xa6,
+	/* artifactType: FIRMWARE */
 	0x18,
 	0x23,
 	0x00,
+	/* slug: "main" */
 	0x18,
 	0x24,
 	0x64,
@@ -126,9 +133,11 @@ static const uint8_t valid_two_artifacts_payload[] = {
 	'a',
 	'i',
 	'n',
+	/* isMain: true */
 	0x18,
 	0x25,
 	0xf5,
+	/* url: "https://a" */
 	0x18,
 	0x26,
 	0x69,
@@ -141,6 +150,7 @@ static const uint8_t valid_two_artifacts_payload[] = {
 	'/',
 	'/',
 	'a',
+	/* secret: "secret" */
 	0x18,
 	0x27,
 	0x66,
@@ -150,6 +160,7 @@ static const uint8_t valid_two_artifacts_payload[] = {
 	'r',
 	'e',
 	't',
+	/* version: "1.0.0" */
 	0x18,
 	0x28,
 	0x65,
@@ -158,19 +169,24 @@ static const uint8_t valid_two_artifacts_payload[] = {
 	'0',
 	'.',
 	'0',
+	/* artifact: map(6) */
 	0xa6,
+	/* artifactType: FIRMWARE */
 	0x18,
 	0x23,
 	0x00,
+	/* slug: "aux" */
 	0x18,
 	0x24,
 	0x63,
 	'a',
 	'u',
 	'x',
+	/* isMain: false */
 	0x18,
 	0x25,
 	0xf4,
+	/* url: "https://b" */
 	0x18,
 	0x26,
 	0x69,
@@ -183,6 +199,7 @@ static const uint8_t valid_two_artifacts_payload[] = {
 	'/',
 	'/',
 	'b',
+	/* secret: "secret2" */
 	0x18,
 	0x27,
 	0x67,
@@ -193,6 +210,7 @@ static const uint8_t valid_two_artifacts_payload[] = {
 	'e',
 	't',
 	'2',
+	/* version: "1.0.1" */
 	0x18,
 	0x28,
 	0x65,

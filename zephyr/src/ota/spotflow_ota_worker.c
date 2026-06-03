@@ -244,6 +244,10 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 	}
 
 	*result = spotflow_ota_fw_custom_process_artifact(job->attempt_id, &job->artifact);
+	/*
+	 * The public callback contract requires a terminal result. Therefore, returning the PENDING
+	 * result here is invalid and is treated as FAILED.
+	 */
 	if (*result == SPOTFLOW_OTA_RESULT_PENDING) {
 		*result = SPOTFLOW_OTA_RESULT_FAILED;
 	}
