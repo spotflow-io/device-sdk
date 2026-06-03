@@ -136,7 +136,7 @@ static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 			struct spotflow_ota_state_action action;
 
 			rc = spotflow_ota_state_reject_update(status.attempt_id,
-						      status.attempt_error, &action);
+							      status.attempt_error, &action);
 			if (rc < 0) {
 				LOG_ERR("Failed to reject OTA attempt %llu: %d",
 					(unsigned long long)status.attempt_id, rc);
@@ -280,7 +280,6 @@ static void handle_state_action(const struct spotflow_ota_state_action* action)
 	if (action->wake_worker) {
 		spotflow_ota_worker_wake();
 	}
-
 }
 
 static int prepare_persisted_results_for_attempt(uint64_t attempt_id)
@@ -298,9 +297,9 @@ static int prepare_persisted_results_for_attempt(uint64_t attempt_id)
 
 	if (attempt.has_attempt_error) {
 		return spotflow_ota_net_prepare_attempt_error(attempt.attempt_id,
-							 attempt.attempt_error);
+							      attempt.attempt_error);
 	}
 
 	return spotflow_ota_net_prepare_results(attempt.attempt_id, attempt.artifact_results,
-						 attempt.artifact_count);
+						attempt.artifact_count);
 }

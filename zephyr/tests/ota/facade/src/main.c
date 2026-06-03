@@ -249,19 +249,19 @@ static int decode_session_metadata(const uint8_t* payload, size_t len,
 				   struct decoded_session_metadata* metadata);
 static bool search_uint32_key(zcbor_state_t* state, uint32_t key);
 static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected);
-static void expect_update_results_payload(
-	const struct spotflow_ota_cbor_update_results* expected_message);
+static void
+expect_update_results_payload(const struct spotflow_ota_cbor_update_results* expected_message);
 static void wait_for_persisted_attempt(uint64_t attempt_id,
-			       const enum spotflow_ota_result* expected_results,
-			       size_t artifact_count);
+				       const enum spotflow_ota_result* expected_results,
+				       size_t artifact_count);
 static void wait_for_persisted_attempt_error(uint64_t attempt_id,
-				     enum spotflow_ota_attempt_error attempt_error);
+					     enum spotflow_ota_attempt_error attempt_error);
 
-enum spotflow_ota_result spotflow_on_handle_firmware_update(
-	const struct spotflow_firmware_info* info)
+enum spotflow_ota_result
+spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-		spotflow_ota_test_fake_callbacks_get();
+	    spotflow_ota_test_fake_callbacks_get();
 
 	fake_callbacks->handle_call_count++;
 	fake_callbacks->handle_thread = k_current_get();
@@ -287,7 +287,7 @@ enum spotflow_ota_result spotflow_on_handle_firmware_update(
 void spotflow_on_update_canceled(void)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-		spotflow_ota_test_fake_callbacks_get();
+	    spotflow_ota_test_fake_callbacks_get();
 
 	fake_callbacks->cancel_call_count++;
 	fake_callbacks->cancel_thread = k_current_get();
@@ -485,7 +485,7 @@ ZTEST(spotflow_ota_facade, test_report_request_queues_current_attempt_results)
 ZTEST(spotflow_ota_facade, test_version_match_skips_callback_and_reports_success)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-		spotflow_ota_test_fake_callbacks_get();
+	    spotflow_ota_test_fake_callbacks_get();
 	const enum spotflow_ota_result expected_results[] = {
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 	};
@@ -522,8 +522,7 @@ ZTEST(spotflow_ota_facade, test_rejected_attempt_is_persisted_and_reported)
 	zassert_ok(spotflow_ota_init_session());
 	ota_callback(payload, sizeof(payload));
 
-	wait_for_persisted_attempt_error(1,
-		SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE);
+	wait_for_persisted_attempt_error(1, SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ARTIFACT_TYPE);
 	zassert_ok(spotflow_ota_send_pending_message());
 	expect_update_results_payload(&expected_message);
 
@@ -535,10 +534,10 @@ ZTEST(spotflow_ota_facade, test_rejected_attempt_is_persisted_and_reported)
 }
 
 ZTEST(spotflow_ota_facade,
-	      test_pending_callback_result_is_mapped_to_failed_and_cancels_remaining_artifacts)
+      test_pending_callback_result_is_mapped_to_failed_and_cancels_remaining_artifacts)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-		spotflow_ota_test_fake_callbacks_get();
+	    spotflow_ota_test_fake_callbacks_get();
 	const enum spotflow_ota_result expected_results[] = {
 		SPOTFLOW_OTA_RESULT_FAILED,
 		SPOTFLOW_OTA_RESULT_CANCELED,
@@ -563,11 +562,10 @@ ZTEST(spotflow_ota_facade,
 	expect_update_results_payload(&expected_message);
 }
 
-ZTEST(spotflow_ota_facade,
-	      test_accepted_cancel_notifies_user_code_and_callback_can_return_canceled)
+ZTEST(spotflow_ota_facade, test_accepted_cancel_notifies_user_code_and_callback_can_return_canceled)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-		spotflow_ota_test_fake_callbacks_get();
+	    spotflow_ota_test_fake_callbacks_get();
 	const enum spotflow_ota_result expected_results[] = {
 		SPOTFLOW_OTA_RESULT_CANCELED,
 	};
@@ -602,7 +600,7 @@ ZTEST(spotflow_ota_facade,
 ZTEST(spotflow_ota_facade, test_late_cancel_does_not_notify_user_code)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-		spotflow_ota_test_fake_callbacks_get();
+	    spotflow_ota_test_fake_callbacks_get();
 	const enum spotflow_ota_result expected_results[] = {
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 	};
@@ -660,8 +658,8 @@ static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected)
 	return zcbor_uint32_pexpect(state, expected);
 }
 
-static void expect_update_results_payload(
-	const struct spotflow_ota_cbor_update_results* expected_message)
+static void
+expect_update_results_payload(const struct spotflow_ota_cbor_update_results* expected_message)
 {
 	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
 	uint8_t expected_payload[128];
@@ -674,8 +672,8 @@ static void expect_update_results_payload(
 }
 
 static void wait_for_persisted_attempt(uint64_t attempt_id,
-			       const enum spotflow_ota_result* expected_results,
-			       size_t artifact_count)
+				       const enum spotflow_ota_result* expected_results,
+				       size_t artifact_count)
 {
 	for (int i = 0; i < 100; i++) {
 		struct spotflow_ota_persisted_attempt attempt;
@@ -696,7 +694,7 @@ static void wait_for_persisted_attempt(uint64_t attempt_id,
 }
 
 static void wait_for_persisted_attempt_error(uint64_t attempt_id,
-				     enum spotflow_ota_attempt_error attempt_error)
+					     enum spotflow_ota_attempt_error attempt_error)
 {
 	for (int i = 0; i < 100; i++) {
 		struct spotflow_ota_persisted_attempt attempt;

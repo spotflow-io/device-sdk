@@ -38,10 +38,9 @@ int spotflow_ota_worker_init(void)
 		return 0;
 	}
 
-	ota_worker_tid = k_thread_create(&ota_worker_thread, ota_worker_stack,
-					 K_THREAD_STACK_SIZEOF(ota_worker_stack),
-					 ota_worker_entry, NULL, NULL, NULL,
-					 K_LOWEST_APPLICATION_THREAD_PRIO, 0, K_NO_WAIT);
+	ota_worker_tid = k_thread_create(
+	    &ota_worker_thread, ota_worker_stack, K_THREAD_STACK_SIZEOF(ota_worker_stack),
+	    ota_worker_entry, NULL, NULL, NULL, K_LOWEST_APPLICATION_THREAD_PRIO, 0, K_NO_WAIT);
 	k_thread_name_set(ota_worker_tid, "spotflow_ota");
 	return 0;
 }
@@ -133,7 +132,7 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 
 	if (result == SPOTFLOW_OTA_RESULT_SUCCEEDED) {
 		rc = spotflow_ota_persistence_save_installed_version(job->artifact.slug,
-							    job->artifact.version);
+								     job->artifact.version);
 		if (rc < 0) {
 			return rc;
 		}
@@ -183,7 +182,7 @@ static bool persist_and_enqueue_terminal_attempt_if_needed(void)
 	}
 
 	if (spotflow_ota_net_prepare_results(snapshot.current_attempt_id, snapshot.artifact_results,
-						 snapshot.artifact_count) < 0) {
+					     snapshot.artifact_count) < 0) {
 		return false;
 	}
 
@@ -219,7 +218,8 @@ static int persist_snapshot_attempt(const struct spotflow_ota_state_snapshot* sn
 		.actionable_cancellation = snapshot->actionable_cancellation,
 	};
 
-	memcpy(attempt.artifact_results, snapshot->artifact_results, sizeof(attempt.artifact_results));
+	memcpy(attempt.artifact_results, snapshot->artifact_results,
+	       sizeof(attempt.artifact_results));
 	return persist_attempt(&attempt);
 }
 
@@ -233,7 +233,8 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 	char installed_version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
 	bool has_installed_version = false;
 	int rc = spotflow_ota_persistence_load_installed_version(
-		job->artifact.slug, installed_version, sizeof(installed_version), &has_installed_version);
+	    job->artifact.slug, installed_version, sizeof(installed_version),
+	    &has_installed_version);
 	if (rc < 0) {
 		return rc;
 	}

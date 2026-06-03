@@ -44,12 +44,10 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 	return SPOTFLOW_OTA_RESULT_FAILED;
 }
 
-void __weak spotflow_on_update_canceled(void)
-{
-}
+void __weak spotflow_on_update_canceled(void) {}
 
-void __weak spotflow_on_main_firmware_update_progressed(
-	const struct spotflow_ota_main_firmware_state* state)
+void __weak
+spotflow_on_main_firmware_update_progressed(const struct spotflow_ota_main_firmware_state* state)
 {
 	ARG_UNUSED(state);
 }
