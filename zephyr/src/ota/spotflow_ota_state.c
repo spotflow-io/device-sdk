@@ -141,9 +141,13 @@ int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_st
 	}
 
 	current_attempt.actionable_cancellation = true;
-	cancel_pending_artifacts(&current_attempt);
 	action->accepted_cancel = true;
-	action->wake_worker = true;
+	action->wake_worker = !current_attempt.artifact_running;
+
+	if (!current_attempt.artifact_running) {
+		cancel_pending_artifacts(&current_attempt);
+	}
+
 	action->can_promote_pending =
 	    has_pending_update && attempt_has_terminal_results(&current_attempt);
 
@@ -244,6 +248,10 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 	current_attempt.artifact_running = false;
 	fill_action(action, current_attempt.attempt_id);
 
+	if (current_attempt.actionable_cancellation && result == SPOTFLOW_OTA_RESULT_SUCCEEDED) {
+		current_attempt.actionable_cancellation = false;
+	}
+
 	if (current_attempt.actionable_cancellation || result == SPOTFLOW_OTA_RESULT_FAILED ||
 	    result == SPOTFLOW_OTA_RESULT_CANCELED) {
 		current_attempt.actionable_cancellation = true;
@@ -251,7 +259,8 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 	}
 
 	advance_current_artifact(&current_attempt);
-	action->wake_worker = !attempt_has_terminal_results(&current_attempt);
+	action->wake_worker = !attempt_has_terminal_results(&current_attempt) &&
+	    !current_attempt.actionable_cancellation;
 	action->can_promote_pending =
 	    has_pending_update && attempt_has_terminal_results(&current_attempt);
 

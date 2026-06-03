@@ -155,11 +155,13 @@ ZTEST(spotflow_ota_state, test_running_artifact_result_is_preserved_after_cancel
 
 	zassert_ok(spotflow_ota_state_accept_cancel(11, &action));
 	zassert_true(action.accepted_cancel);
+	zassert_false(action.wake_worker);
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
-	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_true(snapshot.actionable_cancellation);
 
 	zassert_ok(
 	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED, &action));
@@ -167,7 +169,41 @@ ZTEST(spotflow_ota_state, test_running_artifact_result_is_preserved_after_cancel
 	spotflow_ota_state_get_snapshot(&snapshot);
 
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_false(snapshot.actionable_cancellation);
+	zassert_true(action.wake_worker);
+	zassert_false(spotflow_ota_state_is_update_canceled());
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.artifact_index, 1);
+}
+
+ZTEST(spotflow_ota_state, test_running_artifact_failure_after_cancel_cancels_remaining_artifacts)
+{
+	struct spotflow_ota_update_msg msg = make_update(12, 3);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&msg, &action));
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.artifact_index, 0);
+
+	zassert_ok(spotflow_ota_state_accept_cancel(12, &action));
+	zassert_true(action.accepted_cancel);
+	zassert_false(action.wake_worker);
+
+	zassert_ok(
+	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
+	zassert_false(action.wake_worker);
+	zassert_true(spotflow_ota_state_is_update_canceled());
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_equal(snapshot.artifact_results[2], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_true(snapshot.actionable_cancellation);
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
 }
 
 ZTEST(spotflow_ota_state, test_update_artifacts_with_is_canceled_finishes_attempt)
