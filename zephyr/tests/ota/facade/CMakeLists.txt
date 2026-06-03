@@ -24,8 +24,10 @@ target_sources(app PRIVATE
         ../../../src/net/spotflow_session_metadata.c
         ../../../src/ota/spotflow_ota.c
         ../../../src/ota/spotflow_ota_cbor.c
+        ../../../src/ota/spotflow_ota_fw_custom.c
         ../../../src/ota/spotflow_ota_net.c
         ../../../src/ota/spotflow_ota_persistence.c
         ../../../src/ota/spotflow_ota_records_cbor.c
         ../../../src/ota/spotflow_ota_state.c
+        ../../../src/ota/spotflow_ota_worker.c
 )

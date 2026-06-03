@@ -1,11 +1,17 @@
+#include <errno.h>
+
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include <spotflow/ota.h>
+
 #include "ota/spotflow_ota.h"
 #include "ota/spotflow_ota_cbor.h"
+#include "ota/spotflow_ota_fw_custom.h"
 #include "ota/spotflow_ota_net.h"
 #include "ota/spotflow_ota_persistence.h"
 #include "ota/spotflow_ota_state.h"
+#include "ota/spotflow_ota_worker.h"
 #include "net/spotflow_mqtt.h"
 
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
@@ -17,6 +23,8 @@ static uint64_t last_received_attempt_id;
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len);
 static void update_last_received_attempt_id(uint64_t attempt_id);
 static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* msg);
+static void handle_state_action(const struct spotflow_ota_state_action* action);
+static int prepare_persisted_results_for_attempt(uint64_t attempt_id);
 
 int spotflow_ota_init(void)
 {
@@ -53,6 +61,12 @@ int spotflow_ota_init(void)
 	ARG_UNUSED(probation);
 	ARG_UNUSED(has_probation);
 
+	rc = spotflow_ota_worker_init();
+	if (rc < 0) {
+		k_mutex_unlock(&ota_mutex);
+		return rc;
+	}
+
 	spotflow_ota_state_reset();
 	last_received_attempt_id = has_attempt ? attempt.attempt_id : 0;
 	ota_initialized = true;
@@ -65,7 +79,12 @@ int spotflow_ota_init(void)
 
 int spotflow_ota_init_session(void)
 {
-	int rc = spotflow_mqtt_request_ota_subscription(handle_ota_c2d_msg);
+	int rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	rc = spotflow_mqtt_request_ota_subscription(handle_ota_c2d_msg);
 	if (rc < 0) {
 		LOG_ERR("Failed to request subscription to OTA topic: %d", rc);
 		return rc;
@@ -99,6 +118,7 @@ void spotflow_ota_reset(void)
 
 	spotflow_ota_net_reset();
 	spotflow_ota_state_reset();
+	spotflow_ota_worker_reset();
 }
 
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
@@ -116,12 +136,14 @@ static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 			struct spotflow_ota_state_action action;
 
 			rc = spotflow_ota_state_reject_update(status.attempt_id,
-							      status.attempt_error, &action);
+						      status.attempt_error, &action);
 			if (rc < 0) {
 				LOG_ERR("Failed to reject OTA attempt %llu: %d",
 					(unsigned long long)status.attempt_id, rc);
 				return;
 			}
+
+			handle_state_action(&action);
 		}
 
 		return;
@@ -167,16 +189,118 @@ static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* ms
 		return rc;
 	}
 
+	handle_state_action(&action);
+
 	if (!action.report_requested) {
 		return 0;
 	}
 
 	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != msg->attempt_id ||
-	    snapshot.has_attempt_error) {
-		return 0;
+	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != msg->attempt_id) {
+		return prepare_persisted_results_for_attempt(msg->attempt_id);
+	}
+
+	if (snapshot.has_attempt_error) {
+		return prepare_persisted_results_for_attempt(msg->attempt_id);
 	}
 
 	return spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
 						snapshot.artifact_results, snapshot.artifact_count);
+}
+
+bool spotflow_is_update_canceled(void)
+{
+	return spotflow_ota_state_is_update_canceled();
+}
+
+int spotflow_get_main_firmware_update_state(struct spotflow_ota_main_firmware_state* state)
+{
+	if (state == NULL) {
+		return -EINVAL;
+	}
+
+	struct spotflow_ota_state_snapshot snapshot;
+	spotflow_ota_state_get_snapshot(&snapshot);
+	*state = snapshot.main_firmware_state;
+	return 0;
+}
+
+int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info)
+{
+	ARG_UNUSED(info);
+	return -ENOTSUP;
+}
+
+int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
+{
+	if (state != NULL) {
+		(void)spotflow_get_main_firmware_update_state(state);
+	}
+
+	return -ENOTSUP;
+}
+
+int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
+{
+	if (state != NULL) {
+		(void)spotflow_get_main_firmware_update_state(state);
+	}
+
+	return -ENOTSUP;
+}
+
+int spotflow_fail_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
+{
+	if (state != NULL) {
+		(void)spotflow_get_main_firmware_update_state(state);
+	}
+
+	return -ENOTSUP;
+}
+
+int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state* state)
+{
+	if (state != NULL) {
+		(void)spotflow_get_main_firmware_update_state(state);
+	}
+
+	return -ENOTSUP;
+}
+
+static void handle_state_action(const struct spotflow_ota_state_action* action)
+{
+	if (action == NULL) {
+		return;
+	}
+
+	if (action->accepted_cancel) {
+		spotflow_ota_fw_custom_notify_canceled();
+	}
+
+	if (action->wake_worker) {
+		spotflow_ota_worker_wake();
+	}
+
+}
+
+static int prepare_persisted_results_for_attempt(uint64_t attempt_id)
+{
+	struct spotflow_ota_persisted_attempt attempt;
+	bool has_attempt;
+	int rc = spotflow_ota_persistence_load_attempt(&attempt, &has_attempt);
+	if (rc < 0) {
+		return rc;
+	}
+
+	if (!has_attempt || attempt.attempt_id != attempt_id) {
+		return 0;
+	}
+
+	if (attempt.has_attempt_error) {
+		return spotflow_ota_net_prepare_attempt_error(attempt.attempt_id,
+							 attempt.attempt_error);
+	}
+
+	return spotflow_ota_net_prepare_results(attempt.attempt_id, attempt.artifact_results,
+						 attempt.artifact_count);
 }

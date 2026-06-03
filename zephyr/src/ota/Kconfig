@@ -35,4 +35,10 @@ config SPOTFLOW_OTA_MAX_ARTIFACTS
 	help
 	  Maximum number of firmware artifacts accepted in one OTA update manifest.
 
+config SPOTFLOW_OTA_THREAD_STACK_SIZE
+	int "Stack size for the OTA worker thread"
+	default 4096
+	help
+	  Stack size in bytes for the OTA worker thread.
+
 endif # SPOTFLOW_OTA
