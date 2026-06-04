@@ -9,6 +9,9 @@
 
 LOG_MODULE_REGISTER(ota_sample, LOG_LEVEL_INF);
 
+#define OTA_DOWNLOAD_MAX_ATTEMPTS 5
+#define OTA_DOWNLOAD_RETRY_DELAY_SEC 5
+
 enum spotflow_ota_result
 spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 {
@@ -37,18 +40,46 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 	 */
 	LOG_INF("Downloading delegated artifact '%s' version %s", info->slug, info->version);
 
-	/*
-	 * TODO: Replace by info->download_request->url and info->download_request->secret when the
-	 * TLS handshake is debugged
-	 */
-	int rc = spotflow_ota_download_and_flash(
-	    "https://roberthusak.cz/tmp/fota/rw612/image_confirmed", NULL);
-	if (rc < 0) {
-		LOG_ERR("Failed to download artifact '%s': %d", info->slug, rc);
+	int rc;
+	bool downloaded = false;
+
+	for (int attempt = 1; attempt <= OTA_DOWNLOAD_MAX_ATTEMPTS; attempt++) {
+		if (spotflow_is_update_canceled()) {
+			LOG_INF("OTA update canceled before download attempt %d/%d",
+				attempt, OTA_DOWNLOAD_MAX_ATTEMPTS);
+			return SPOTFLOW_OTA_RESULT_CANCELED;
+		}
+
+		LOG_INF("Download attempt %d/%d for artifact '%s'", attempt,
+			OTA_DOWNLOAD_MAX_ATTEMPTS, info->slug);
+
+		/*
+		* TODO: Replace by info->download_request->url and info->download_request->secret
+		* when the TLS handshake works
+		*/
+		rc = spotflow_ota_download_and_flash(
+		    "https://roberthusak.cz/tmp/fota/rw612/image_confirmed", NULL);
+		if (rc == 0) {
+			downloaded = true;
+			break;
+		}
+
+		LOG_ERR("Failed to download artifact '%s' (attempt %d/%d): %d", info->slug,
+			attempt, OTA_DOWNLOAD_MAX_ATTEMPTS, rc);
+		if (attempt < OTA_DOWNLOAD_MAX_ATTEMPTS) {
+			k_sleep(K_SECONDS(OTA_DOWNLOAD_RETRY_DELAY_SEC));
+		}
+	}
+	if (!downloaded) {
 		return SPOTFLOW_OTA_RESULT_FAILED;
 	}
 
 	LOG_INF("Artifact '%s' downloaded to the MCUboot upload slot", info->slug);
+
+	if (spotflow_is_update_canceled()) {
+		LOG_INF("OTA update canceled before requesting image upgrade");
+		return SPOTFLOW_OTA_RESULT_CANCELED;
+	}
 
 	LOG_INF("Requesting upgrade of the downloaded image");
 	rc = boot_request_upgrade(BOOT_UPGRADE_TEST);
@@ -68,7 +99,7 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 
 void spotflow_on_update_canceled(void)
 {
-	LOG_WRN("Current OTA attempt was canceled");
+	LOG_INF("Received OTA update cancellation");
 }
 
 int main(void)
