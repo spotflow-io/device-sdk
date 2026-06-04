@@ -12,6 +12,11 @@ test_sysbuild()
 
 add_subdirectory(../net-common ${CMAKE_CURRENT_BINARY_DIR}/net-common)
 
+# TODO: Remove before merging, only for testing
+target_include_directories(app PRIVATE
+    ${CMAKE_CURRENT_LIST_DIR}/../../src
+)
+
 target_sources(app PRIVATE
     src/main.c
 )
