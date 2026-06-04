@@ -44,7 +44,6 @@ typedef enum {
 // 	SPOTFLOW_LOG("\n");
 // }
 
-static uint8_t spotflow_log_cbor_convert_char_log_lvl(const char lvl);
 /**
  * @brief To create the message format for logs in CBOR format
  *
