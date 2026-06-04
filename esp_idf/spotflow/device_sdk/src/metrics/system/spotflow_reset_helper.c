@@ -1,6 +1,6 @@
 #include "metrics/system/spotflow_metrics_system.h"
 #include "metrics/spotflow_metrics_backend.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 
 #include <stdio.h>
 #include <string.h>

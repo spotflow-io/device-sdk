@@ -1,6 +1,6 @@
 #include "metrics/spotflow_metrics_heartbeat.h"
 #include "metrics/spotflow_metrics_cbor.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "logging/spotflow_log_net.h"
 
 #include <stdint.h>

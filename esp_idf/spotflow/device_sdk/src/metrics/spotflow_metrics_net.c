@@ -1,6 +1,6 @@
 #include "metrics/spotflow_metrics_net.h"
 #include "net/spotflow_mqtt.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "logging/spotflow_log_net.h"
 
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
