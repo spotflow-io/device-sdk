@@ -40,7 +40,7 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 
 int spotflow_ota_download_and_flash(const char* image_url, const char* secret)
 {
-	if (image_url == NULL || secret == NULL) {
+	if (image_url == NULL) {
 		return -EINVAL;
 	}
 
@@ -74,9 +74,14 @@ int spotflow_ota_download_and_flash(const char* image_url, const char* secret)
 		authorization_header,
 		NULL,
 	};
+	const char** req_optional_headers = NULL;
 
-	snprintk(authorization_header, sizeof(authorization_header),
-		 OTA_AUTHORIZATION_HEADER_PREFIX "%s" OTA_AUTHORIZATION_HEADER_SUFFIX, secret);
+	if (secret != NULL) {
+		snprintk(authorization_header, sizeof(authorization_header),
+			 OTA_AUTHORIZATION_HEADER_PREFIX "%s" OTA_AUTHORIZATION_HEADER_SUFFIX,
+			 secret);
+		req_optional_headers = optional_headers;
+	}
 
 	struct http_request req = {
 		.method = HTTP_GET,
@@ -86,7 +91,7 @@ int spotflow_ota_download_and_flash(const char* image_url, const char* secret)
 		.response = http_response_cb,
 		.recv_buf = recv_buf,
 		.recv_buf_len = sizeof(recv_buf),
-		.optional_headers = optional_headers,
+		.optional_headers = req_optional_headers,
 	};
 
 	LOG_INF("Starting HTTP GET %s%s", url.host, url.path);
