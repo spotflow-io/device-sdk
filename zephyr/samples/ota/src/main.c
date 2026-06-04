@@ -45,8 +45,8 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 
 	for (int attempt = 1; attempt <= OTA_DOWNLOAD_MAX_ATTEMPTS; attempt++) {
 		if (spotflow_is_update_canceled()) {
-			LOG_INF("OTA update canceled before download attempt %d/%d",
-				attempt, OTA_DOWNLOAD_MAX_ATTEMPTS);
+			LOG_INF("OTA update canceled before download attempt %d/%d", attempt,
+				OTA_DOWNLOAD_MAX_ATTEMPTS);
 			return SPOTFLOW_OTA_RESULT_CANCELED;
 		}
 
@@ -64,8 +64,8 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 			break;
 		}
 
-		LOG_ERR("Failed to download artifact '%s' (attempt %d/%d): %d", info->slug,
-			attempt, OTA_DOWNLOAD_MAX_ATTEMPTS, rc);
+		LOG_ERR("Failed to download artifact '%s' (attempt %d/%d): %d", info->slug, attempt,
+			OTA_DOWNLOAD_MAX_ATTEMPTS, rc);
 		if (attempt < OTA_DOWNLOAD_MAX_ATTEMPTS) {
 			k_sleep(K_SECONDS(OTA_DOWNLOAD_RETRY_DELAY_SEC));
 		}
