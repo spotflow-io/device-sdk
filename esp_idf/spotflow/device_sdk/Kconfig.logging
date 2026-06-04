@@ -1,9 +1,11 @@
 menu "Spotflow log menu"
-	config SPOTFLOW_LOG_BACKEND
-		bool "Spotflow logging backend"
-		default y
-		help
-			Enable sending logs to Spotflow cloud.
+	    config SPOTFLOW_LOG_BACKEND
+	    bool "Spotflow logging backend"
+	    default y
+	    depends on LOG_VERSION_1
+	    help
+	        Enable sending logs to Spotflow cloud. This backend requires ESP-IDF Log V1
+	        because it parses the combined log prefix from the vprintf hook.
 
 	if SPOTFLOW_LOG_BACKEND
 		config SPOTFLOW_LOG_BUFFER_SIZE
@@ -26,4 +28,5 @@ menu "Spotflow log menu"
 			default 5
 	endif
 
+    
 endmenu

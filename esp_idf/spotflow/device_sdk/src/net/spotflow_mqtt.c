@@ -16,6 +16,14 @@
 #include "coredump/spotflow_coredump_net.h"
 #endif
 
+#ifdef CONFIG_SPOTFLOW_METRICS
+#include "metrics/spotflow_metrics_net.h"
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+#include "metrics/system/spotflow_metrics_system.h"
+#endif
+
+#endif
 esp_mqtt_client_handle_t spotflow_client = NULL;
 static TaskHandle_t mqtt_publish_task_handle = NULL;
 EventGroupHandle_t spotflow_mqtt_event_group;
@@ -48,10 +56,17 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 		spotflow_mqtt_subscribe(event->client, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
 					SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC_QOS);
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+		/* Report connection state to system metrics */
+		spotflow_metrics_system_report_connection_state(true);
 #endif
 		break;
 	case MQTT_EVENT_DISCONNECTED:
 		SPOTFLOW_LOG("MQTT_EVENT_DISCONNECTED");
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+		/* Report connection state to system metrics */
+		spotflow_metrics_system_report_connection_state(false);
+#endif
 		if (mqtt_publish_task_handle != NULL) {
 			vTaskDelete(mqtt_publish_task_handle); // Delete the task when disconnected
 			mqtt_publish_task_handle = NULL;
@@ -139,7 +154,8 @@ void spotflow_mqtt_app_start(void)
 void spotflow_mqtt_publish(void* pvParameters)
 {
 	const EventBits_t ALL_BITS = SPOTFLOW_MQTT_NOTIFY_COREDUMP |
-	    SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG | SPOTFLOW_MQTT_NOTIFY_LOGS;
+	    SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG | SPOTFLOW_MQTT_NOTIFY_LOGS |
+	    SPOTFLOW_MQTT_NOTIFY_METRICS;
 
 	while (1) {
 		EventBits_t notify_value = xEventGroupWaitBits(spotflow_mqtt_event_group, ALL_BITS,
@@ -172,7 +188,15 @@ void spotflow_mqtt_publish(void* pvParameters)
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
 				spotflow_config_send_pending_message();
 				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
+#ifdef CONFIG_SPOTFLOW_METRICS
+			if (notify_value & SPOTFLOW_MQTT_NOTIFY_METRICS) {
+				SPOTFLOW_LOG("Notified to send metrics\n");
+				if (spotflow_poll_and_process_enqueued_metrics() ==
+				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
+					clear_mask |= SPOTFLOW_MQTT_NOTIFY_METRICS;
+				}
 			}
+#endif
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_LOGS) {
 				if (spotflow_logging_send_message() ==
 				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
@@ -308,7 +332,7 @@ int spotflow_mqtt_publish_message(const char* topic, const uint8_t* data, int le
 		SPOTFLOW_LOG("Error %d occurred sending MQTT (log). Retrying\n", msg_id);
 		return -1;
 	} else {
-		SPOTFLOW_LOG("Log message sent successfully topic %s.\n", topic);
+		SPOTFLOW_DEBUG("Log message sent successfully topic %s.\n", topic);
 		return 0;
 	}
 }

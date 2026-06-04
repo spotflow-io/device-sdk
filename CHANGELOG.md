@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Fixed
+* Fixed ESP-IDF Spotflow log backend parsing for Log V1 prefixes and corrected `va_list` handling in the `esp_log_set_vprintf()` hook.
+* Fixed ESP-IDF log CBOR encoding to omit unknown severity and missing source labels instead of emitting empty fallback metadata.
+* Fixed ESP-IDF coredump example Wi-Fi retry logic to clean up Wi-Fi state before reconnect attempts, preventing duplicate-netif assertion failures.
+* Added `LOG_VERSION_1` dependency for the ESP-IDF Spotflow log backend.
+
 ## [0.8.0] - 2026-05-07
 
 ### Added
@@ -30,6 +36,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added ESP IDF component tests.
 * Added support for Zephyr v4.4.0.
 * Fixed a bug in ESP IDF part which didn't allow parts of the sdk without logging.
+* Added Metrics in ESP IDF.
+
 
 ### Removed
 * Removed configdefault for MAIN_STACK_SIZE

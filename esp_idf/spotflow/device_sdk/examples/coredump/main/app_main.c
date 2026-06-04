@@ -7,6 +7,7 @@
 #include "esp_netif.h"
 #include "nvs_flash.h"
 #include "driver/gpio.h"
+#include "example_common_private.h"
 #include "protocol_examples_common.h"
 
 #include "esp_log.h"
@@ -101,7 +102,11 @@ void app_main(void)
      * Read "Establishing Wi-Fi or Ethernet Connection" section in
      * examples/protocols/README.md for more information about this function.
      */
-	ESP_ERROR_CHECK(example_connect());
+	while (example_connect() != ESP_OK) {
+		ESP_LOGE(TAG, "Network connection failed; retrying in 5 seconds");
+		example_wifi_stop();
+		vTaskDelay(5000 / portTICK_PERIOD_MS);
+	}
 
 	spotflow_init();
 
