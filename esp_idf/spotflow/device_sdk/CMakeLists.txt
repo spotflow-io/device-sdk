@@ -167,7 +167,8 @@ idf_component_register(
 # ---------------------------------------------------------------------------
 # Sanity check: MQTT buffer must be >= max CBOR log length
 # ---------------------------------------------------------------------------
-if(CONFIG_MQTT_BUFFER_SIZE LESS CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)
+if(DEFINED CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN
+   AND CONFIG_MQTT_BUFFER_SIZE LESS CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)
     message(WARNING
         "CONFIG_MQTT_BUFFER_SIZE (${CONFIG_MQTT_BUFFER_SIZE}) is smaller than "
         "CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN (${CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN}). "
