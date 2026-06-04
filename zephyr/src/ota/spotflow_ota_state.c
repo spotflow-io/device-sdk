@@ -65,7 +65,12 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 		has_pending_update = false;
 		fill_action(action, msg->attempt_id);
 		action->accepted_update = true;
-		action->wake_worker = !attempt_has_terminal_results(&current_attempt);
+		/*
+		 * Wake the worker even when the attempt is already terminal so it can
+		 * persist and report results (e.g. isCanceled for a previously unseen
+		 * attempt ID).
+		 */
+		action->wake_worker = true;
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
@@ -283,7 +288,7 @@ int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action)
 	has_pending_update = false;
 	fill_action(action, current_attempt.attempt_id);
 	action->promoted_pending = true;
-	action->wake_worker = !attempt_has_terminal_results(&current_attempt);
+	action->wake_worker = true;
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
