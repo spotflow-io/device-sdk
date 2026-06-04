@@ -52,7 +52,7 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 	case MQTT_EVENT_CONNECTED:
 		SPOTFLOW_LOG("MQTT_EVENT_CONNECTED");
 		xTaskCreate(spotflow_mqtt_publish, "mqtt_publish", CONFIG_SPOTFLOW_MQTT_TASK_SIZE,
-			    NULL, 5, &mqtt_publish_task_handle);
+			    NULL, CONFIG_SPOTFLOW_MQTT_TASK_PRIORITY, &mqtt_publish_task_handle);
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 		spotflow_mqtt_subscribe(event->client, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
 					SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC_QOS);
