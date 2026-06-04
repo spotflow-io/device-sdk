@@ -14,14 +14,22 @@
 #include "coredump/spotflow_coredump_net.h"
 #endif
 
+#ifdef CONFIG_SPOTFLOW_METRICS
+#include "metrics/spotflow_metrics_net.h"
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+#include "metrics/system/spotflow_metrics_system.h"
+#endif
+
+#endif
 esp_mqtt_client_handle_t spotflow_client = NULL;
 static TaskHandle_t mqtt_publish_task_handle = NULL;
 EventGroupHandle_t spotflow_mqtt_event_group;
 
 #if CONFIG_BROKER_CERTIFICATE_OVERRIDDEN == 1
 static const uint8_t mqtt_spotflow_io_pem_start[] =
-	"-----BEGIN CERTIFICATE-----\n" CONFIG_BROKER_CERTIFICATE_OVERRIDE
-	"\n-----END CERTIFICATE-----";
+    "-----BEGIN CERTIFICATE-----\n" CONFIG_BROKER_CERTIFICATE_OVERRIDE
+    "\n-----END CERTIFICATE-----";
 #else
 extern const uint8_t mqtt_spotflow_io_pem_start[] asm("_binary_x1_root_pem_start");
 #endif
@@ -41,14 +49,22 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 	switch ((esp_mqtt_event_id_t)event_id) {
 	case MQTT_EVENT_CONNECTED:
 		SPOTFLOW_LOG("MQTT_EVENT_CONNECTED");
-		xTaskCreate(spotflow_mqtt_publish, "mqtt_publish",
-				CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN * 2, NULL, 5,
-				&mqtt_publish_task_handle);
+		xTaskCreate(spotflow_mqtt_publish, "spotflow_mqtt_publish",
+			    CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN * 2, NULL,
+			    CONFIG_SPOTFLOW_MQTT_TASK_PRIORITY, &mqtt_publish_task_handle);
 		spotflow_mqtt_subscribe(event->client, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
 					SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC_QOS);
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+		/* Report connection state to system metrics */
+		spotflow_metrics_system_report_connection_state(true);
+#endif
 		break;
 	case MQTT_EVENT_DISCONNECTED:
 		SPOTFLOW_LOG("MQTT_EVENT_DISCONNECTED");
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+		/* Report connection state to system metrics */
+		spotflow_metrics_system_report_connection_state(false);
+#endif
 		if (mqtt_publish_task_handle != NULL) {
 			vTaskDelete(mqtt_publish_task_handle); // Delete the task when disconnected
 			mqtt_publish_task_handle = NULL;
@@ -62,9 +78,8 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 	case MQTT_EVENT_PUBLISHED:
 		SPOTFLOW_LOG("Message published. \n\n");
 		if (mqtt_publish_task_handle &&
-			 esp_mqtt_client_get_outbox_size(event->client) <
-			CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)
-		{
+		    esp_mqtt_client_get_outbox_size(event->client) <
+			CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN) {
 			xTaskNotifyGive(mqtt_publish_task_handle);
 		}
 		break;
@@ -77,15 +92,15 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 		SPOTFLOW_LOG("MQTT_EVENT_ERROR");
 		if (event->error_handle->error_type == MQTT_ERROR_TYPE_TCP_TRANSPORT) {
 			SPOTFLOW_LOG("Last error code reported from esp-tls: 0x%x",
-					 event->error_handle->esp_tls_last_esp_err);
+				     event->error_handle->esp_tls_last_esp_err);
 			SPOTFLOW_LOG("Last tls stack error number: 0x%x",
-					 event->error_handle->esp_tls_stack_err);
+				     event->error_handle->esp_tls_stack_err);
 			SPOTFLOW_LOG("Last captured errno : %d (%s)",
-					 event->error_handle->esp_transport_sock_errno,
-					 strerror(event->error_handle->esp_transport_sock_errno));
+				     event->error_handle->esp_transport_sock_errno,
+				     strerror(event->error_handle->esp_transport_sock_errno));
 		} else if (event->error_handle->error_type == MQTT_ERROR_TYPE_CONNECTION_REFUSED) {
 			SPOTFLOW_LOG("Connection refused error: 0x%x",
-					 event->error_handle->connect_return_code);
+				     event->error_handle->connect_return_code);
 		} else {
 			SPOTFLOW_LOG("Unknown error type: 0x%x", event->error_handle->error_type);
 		}
@@ -98,7 +113,6 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 
 void spotflow_mqtt_app_start(void)
 {
-	spotflow_mqtt_event_group = xEventGroupCreate();
 	static char device_id[32]; // For saving the device ID
 	uint8_t mac[6]; //The Mac Address string
 	esp_read_mac(mac, ESP_MAC_WIFI_STA); // Read the mac Address
@@ -114,19 +128,19 @@ void spotflow_mqtt_app_start(void)
 
 	const esp_mqtt_client_config_t mqtt_cfg = {
 		.broker = { .address.uri = CONFIG_SPOTFLOW_SERVER_HOSTNAME,
-				.verification.certificate = (const char*)mqtt_spotflow_io_pem_start },
+			    .verification.certificate = (const char*)mqtt_spotflow_io_pem_start },
 		.credentials.username = device_id,
 		.credentials.authentication.password = (const char*)CONFIG_SPOTFLOW_INGEST_KEY,
- #if CONFIG_MQTT_PROTOCOL_5
-		.session.protocol_ver = MQTT_PROTOCOL_V_5,  // Use MQTT v5 if enabled
-	#else
+#if CONFIG_MQTT_PROTOCOL_5
+		.session.protocol_ver = MQTT_PROTOCOL_V_5, // Use MQTT v5 if enabled
+#else
 		.session.protocol_ver = MQTT_PROTOCOL_V_3_1_1, // Default otherwise
 #endif
 	};
 
 	spotflow_client = esp_mqtt_client_init(&mqtt_cfg);
 	esp_mqtt_client_register_event(spotflow_client, ESP_EVENT_ANY_ID,
-					   spotflow_mqtt_event_handler, NULL);
+				       spotflow_mqtt_event_handler, NULL);
 	esp_mqtt_client_start(spotflow_client);
 }
 
@@ -138,53 +152,60 @@ void spotflow_mqtt_app_start(void)
 void spotflow_mqtt_publish(void* pvParameters)
 {
 	const EventBits_t ALL_BITS = SPOTFLOW_MQTT_NOTIFY_COREDUMP |
-		SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG |
-		SPOTFLOW_MQTT_NOTIFY_LOGS;
+	    SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG | SPOTFLOW_MQTT_NOTIFY_LOGS |
+	    SPOTFLOW_MQTT_NOTIFY_METRICS;
 
 	while (1) {
-		EventBits_t notify_value = xEventGroupWaitBits(
-			spotflow_mqtt_event_group,
-			ALL_BITS,
-			pdFALSE,	// Do not clear bits
-			pdFALSE,	// wait for ANY bit
-			portMAX_DELAY
-		);
+		EventBits_t notify_value = xEventGroupWaitBits(spotflow_mqtt_event_group, ALL_BITS,
+							       pdFALSE, // Do not clear bits
+							       pdFALSE, // wait for ANY bit
+							       portMAX_DELAY);
 		EventBits_t clear_mask = 0;
 		SPOTFLOW_LOG("Received notification value: %lu\n", notify_value);
 		// Only proceed if the outbox_size i.e. current message is smaller than overall mqtt_buffer.
 		// 2️⃣ Wait until MQTT outbox has space (zero polling)
 
 		while (esp_mqtt_client_get_outbox_size(spotflow_client) >=
-				CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)
-			{
-				ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
-			}
+		       CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN) {
+			ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
+		}
 
 		if ((esp_mqtt_client_get_outbox_size(spotflow_client) <
-			 CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)) {
+		     CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)) {
+			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
+				spotflow_config_send_pending_message();
+				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
+			}
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 			// Try to send coredump messages first
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_COREDUMP) {
-				if(spotflow_coredump_send_message() == SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
+				if (spotflow_coredump_send_message() ==
+				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
 					clear_mask |= SPOTFLOW_MQTT_NOTIFY_COREDUMP;
 				}
 			}
 			// If no coredump pending, send regular log messages
 #endif
-			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
-				spotflow_config_send_pending_message();
-				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
+#ifdef CONFIG_SPOTFLOW_METRICS
+			if (notify_value & SPOTFLOW_MQTT_NOTIFY_METRICS) {
+				SPOTFLOW_LOG("Notified to send metrics\n");
+				if (spotflow_poll_and_process_enqueued_metrics() ==
+				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
+					clear_mask |= SPOTFLOW_MQTT_NOTIFY_METRICS;
+				}
 			}
+#endif
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_LOGS) {
-				if (spotflow_logging_send_message() == SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
-				clear_mask |= SPOTFLOW_MQTT_NOTIFY_LOGS;
+				if (spotflow_logging_send_message() ==
+				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
+					clear_mask |= SPOTFLOW_MQTT_NOTIFY_LOGS;
 				}
 			}
 			xEventGroupClearBits(spotflow_mqtt_event_group, clear_mask);
 		} else {
 			SPOTFLOW_LOG("MQTT outbox not empty; waiting for messages to be sent.\n");
 			SPOTFLOW_LOG("MQTT Size %d \n",
-					 esp_mqtt_client_get_outbox_size(spotflow_client));
+				     esp_mqtt_client_get_outbox_size(spotflow_client));
 		}
 	}
 }
@@ -279,7 +300,8 @@ void spotflow_mqtt_on_message(const char* topic, int topic_len, const uint8_t* d
 	SPOTFLOW_LOG("MQTT Message Received on topic: %.*s", topic_len, topic);
 
 	// Check if the incoming topic prefix matches the config topic.
-	if (strncmp(topic, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC, strlen(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC)) == 0) {
+	if (strncmp(topic, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
+		    strlen(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC)) == 0) {
 		// Your config handling
 		SPOTFLOW_LOG("Dispatching to config handler...\n");
 		spotflow_config_handle_desired_message(data, data_len);
@@ -301,14 +323,13 @@ void spotflow_mqtt_on_message(const char* topic, int topic_len, const uint8_t* d
 int spotflow_mqtt_publish_message(const char* topic, const uint8_t* data, int len, int qos)
 {
 	int msg_id =
-		esp_mqtt_client_publish(spotflow_client, topic, (const char*)data, len, qos, 0);
+	    esp_mqtt_client_publish(spotflow_client, topic, (const char*)data, len, qos, 0);
 
 	if (msg_id < 0) {
 		SPOTFLOW_LOG("Error %d occurred sending MQTT (log). Retrying\n", msg_id);
 		return -1;
 	} else {
-		SPOTFLOW_LOG("Log message sent successfully topic %s.\n",
-				 topic);
+		SPOTFLOW_DEBUG("Log message sent successfully topic %s.\n", topic);
 		return 0;
 	}
 }
@@ -319,5 +340,10 @@ int spotflow_mqtt_publish_message(const char* topic, const uint8_t* data, int le
  */
 void spotflow_mqtt_notify_action(uint32_t action_type)
 {
-	 xEventGroupSetBits(spotflow_mqtt_event_group, action_type);
+	xEventGroupSetBits(spotflow_mqtt_event_group, action_type);
+}
+
+void spotflow_mqtt_event_group_init(void)
+{
+	spotflow_mqtt_event_group = xEventGroupCreate();
 }

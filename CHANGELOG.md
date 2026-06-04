@@ -35,6 +35,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added Zephyr Kconfig option `CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE` to control whether log body template is sent with log body, reducing CBOR payload size when disabled.
 * Added ESP IDF component tests.
 * Added support for Zephyr v4.4.0.
+* Added Metrics in ESP IDF.
+
 
 ### Removed
 * Removed configdefault for MAIN_STACK_SIZE

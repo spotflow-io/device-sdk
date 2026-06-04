@@ -1,4 +1,10 @@
 menu "Spotflow"
+    config SPOTFLOW_MQTT_TASK_PRIORITY
+        int "Task priority for MQTT tasks to send logs, coredump and other logs data to cloud"
+        default 6
+        help
+            Lower values indicate lower priority, with 0 being the lowest.
+    	    A medium to high priority is recommended to ensure timely data delivery.
 
     config SPOTFLOW_SERVER_HOSTNAME
         string "Hostname of Spotflow observability platform"
@@ -52,5 +58,6 @@ menu "Spotflow"
     rsource "./Kconfig.logging"
     rsource "./Kconfig.configs"
     rsource "./Kconfig.coredump"
+    rsource "./Kconfig.metrics"
 
 endmenu
