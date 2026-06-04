@@ -6,8 +6,6 @@ cmake_minimum_required(VERSION 3.16)
 file(GLOB SRCS
 	  "src/net/*.c"
 	  "spotflow.c"
-    "src/net/*.c"
-    "spotflow.c"
 )
 
 set(INCLUDE_DIRS
@@ -97,6 +95,7 @@ if(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN OR CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE)
     endif()
 else()
     message(STATUS "No CBOR or Coredump requirements found, using default MQTT task size")
+endif()
 # ---------------------------------------------------------------------------
 # Optional: Metrics
 # ---------------------------------------------------------------------------
