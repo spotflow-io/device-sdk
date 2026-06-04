@@ -56,6 +56,7 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 		spotflow_mqtt_subscribe(event->client, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
 					SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC_QOS);
+#endif
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
 		/* Report connection state to system metrics */
 		spotflow_metrics_system_report_connection_state(true);
@@ -188,6 +189,8 @@ void spotflow_mqtt_publish(void* pvParameters)
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
 				spotflow_config_send_pending_message();
 				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
+			}
+#endif
 #ifdef CONFIG_SPOTFLOW_METRICS
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_METRICS) {
 				SPOTFLOW_LOG("Notified to send metrics\n");
@@ -197,6 +200,7 @@ void spotflow_mqtt_publish(void* pvParameters)
 				}
 			}
 #endif
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_LOGS) {
 				if (spotflow_logging_send_message() ==
 				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {

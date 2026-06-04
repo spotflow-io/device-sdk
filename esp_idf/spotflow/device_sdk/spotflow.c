@@ -58,7 +58,8 @@ void spotflow_init(void)
 	original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
 	spotflow_queue_init(); //Initilize the queue
 	spotflow_config_init();
-	spotflow_mqtt_event_group_init(); //Initialize the MQTT event group
+#endif
+
 #ifdef CONFIG_SPOTFLOW_METRICS
 	spotflow_metrics();
 #endif
@@ -69,5 +70,4 @@ void spotflow_init(void)
 		spotflow_coredump_backend();
 	}
 #endif
-	spotflow_config_init();
 }
