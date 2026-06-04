@@ -1,6 +1,7 @@
 #ifndef SPOTFLOW_H
 #define SPOTFLOW_H
 
+#include <stdio.h>
 #include "esp_log.h"
 
 #ifdef __cplusplus
