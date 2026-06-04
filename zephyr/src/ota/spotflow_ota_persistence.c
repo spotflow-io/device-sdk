@@ -105,6 +105,11 @@ int spotflow_ota_persistence_save_attempt(const struct spotflow_ota_persisted_at
 	k_mutex_lock(&persistence_mutex, K_FOREVER);
 	rc = settings_save_one(SPOTFLOW_OTA_SETTINGS_PATH_ATTEMPT, buffer, encoded_len);
 	k_mutex_unlock(&persistence_mutex);
+
+	if (rc < 0) {
+		LOG_ERR("Failed to save OTA attempt settings record: %d", rc);
+	}
+
 	return rc;
 }
 
@@ -149,6 +154,11 @@ int spotflow_ota_persistence_save_probation(const struct spotflow_ota_probation*
 	k_mutex_lock(&persistence_mutex, K_FOREVER);
 	rc = settings_save_one(SPOTFLOW_OTA_SETTINGS_PATH_PROBATION, buffer, encoded_len);
 	k_mutex_unlock(&persistence_mutex);
+
+	if (rc < 0) {
+		LOG_ERR("Failed to save OTA probation settings record: %d", rc);
+	}
+
 	return rc;
 }
 
@@ -157,6 +167,11 @@ int spotflow_ota_persistence_clear_probation(void)
 	k_mutex_lock(&persistence_mutex, K_FOREVER);
 	int rc = settings_delete(SPOTFLOW_OTA_SETTINGS_PATH_PROBATION);
 	k_mutex_unlock(&persistence_mutex);
+
+	if (rc < 0) {
+		LOG_ERR("Failed to delete OTA probation settings record: %d", rc);
+	}
+
 	return rc;
 }
 
@@ -204,6 +219,11 @@ int spotflow_ota_persistence_save_installed_version(const char* slug, const char
 	k_mutex_lock(&persistence_mutex, K_FOREVER);
 	int rc = settings_save_one(path, version, strlen(version) + 1);
 	k_mutex_unlock(&persistence_mutex);
+
+	if (rc < 0) {
+		LOG_ERR("Failed to save OTA installed version for slug '%s': %d", slug, rc);
+	}
+
 	return rc;
 }
 

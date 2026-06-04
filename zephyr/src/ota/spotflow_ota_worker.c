@@ -115,10 +115,18 @@ static int process_rejected_attempt_job(const struct spotflow_ota_worker_job* jo
 
 	int rc = persist_attempt(&attempt);
 	if (rc < 0) {
+		LOG_ERR("Failed to persist rejected OTA attempt %llu: %d",
+			(unsigned long long)job->attempt_id, rc);
 		return rc;
 	}
 
-	return spotflow_ota_net_prepare_attempt_error(job->attempt_id, job->attempt_error);
+	rc = spotflow_ota_net_prepare_attempt_error(job->attempt_id, job->attempt_error);
+	if (rc < 0) {
+		LOG_ERR("Failed to queue rejected OTA attempt %llu for reporting: %d",
+			(unsigned long long)job->attempt_id, rc);
+	}
+
+	return rc;
 }
 
 static int process_artifact_job(const struct spotflow_ota_worker_job* job)
@@ -127,13 +135,21 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 	struct spotflow_ota_state_snapshot snapshot;
 	int rc = load_artifact_result(job, &result);
 	if (rc < 0) {
+		LOG_ERR("Failed to resolve OTA result for attempt %llu artifact %zu: %d",
+			(unsigned long long)job->attempt_id, job->artifact_index, rc);
 		return rc;
 	}
+
+	LOG_INF("OTA attempt %llu artifact %zu finished with result %d",
+		(unsigned long long)job->attempt_id, job->artifact_index, result);
 
 	if (result == SPOTFLOW_OTA_RESULT_SUCCEEDED) {
 		rc = spotflow_ota_persistence_save_installed_version(job->artifact.slug,
 								     job->artifact.version);
 		if (rc < 0) {
+			LOG_ERR("Failed to persist installed version for OTA attempt %llu artifact "
+				"'%s': %d",
+				(unsigned long long)job->attempt_id, job->artifact.slug, rc);
 			return rc;
 		}
 	}
@@ -141,6 +157,8 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 	struct spotflow_ota_state_action action;
 	rc = spotflow_ota_state_apply_artifact_result(job->artifact_index, result, &action);
 	if (rc < 0) {
+		LOG_ERR("Failed to apply OTA result for attempt %llu artifact %zu: %d",
+			(unsigned long long)job->attempt_id, job->artifact_index, rc);
 		return rc;
 	}
 
@@ -149,6 +167,8 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 	    !snapshot.has_attempt_error) {
 		rc = persist_snapshot_attempt(&snapshot);
 		if (rc < 0) {
+			LOG_ERR("Failed to persist OTA attempt %llu results before reporting: %d",
+				(unsigned long long)job->attempt_id, rc);
 			return rc;
 		}
 
@@ -156,6 +176,8 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 						      snapshot.artifact_results,
 						      snapshot.artifact_count);
 		if (rc < 0) {
+			LOG_ERR("Failed to queue OTA attempt %llu results for reporting: %d",
+				(unsigned long long)job->attempt_id, rc);
 			return rc;
 		}
 	}
@@ -178,11 +200,16 @@ static bool persist_and_enqueue_terminal_attempt_if_needed(void)
 	}
 
 	if (persist_snapshot_attempt(&snapshot) < 0) {
+		LOG_ERR("Failed to persist terminal OTA attempt %llu before idle handling",
+			(unsigned long long)snapshot.current_attempt_id);
 		return false;
 	}
 
 	if (spotflow_ota_net_prepare_results(snapshot.current_attempt_id, snapshot.artifact_results,
 					     snapshot.artifact_count) < 0) {
+		LOG_ERR(
+		    "Failed to queue terminal OTA attempt %llu for reporting during idle handling",
+		    (unsigned long long)snapshot.current_attempt_id);
 		return false;
 	}
 
@@ -258,5 +285,12 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 
 static int persist_attempt(const struct spotflow_ota_persisted_attempt* attempt)
 {
-	return spotflow_ota_persistence_save_attempt(attempt);
+	int rc = spotflow_ota_persistence_save_attempt(attempt);
+
+	if (rc < 0) {
+		LOG_ERR("Failed to save OTA attempt %llu: %d",
+			(unsigned long long)attempt->attempt_id, rc);
+	}
+
+	return rc;
 }
