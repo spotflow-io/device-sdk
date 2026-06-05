@@ -1,4 +1,4 @@
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "metrics/spotflow_metrics_backend.h"
 #include "metrics/spotflow_metrics_aggregator.h"
 #include <string.h>

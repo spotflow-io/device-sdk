@@ -1,6 +1,6 @@
 #include "metrics/system/spotflow_metrics_system.h"
 #include "metrics/system/spotflow_metrics_system_connection.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "net/spotflow_mqtt.h"
 
 #include <errno.h>

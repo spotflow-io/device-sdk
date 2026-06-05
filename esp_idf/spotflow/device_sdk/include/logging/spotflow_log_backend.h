@@ -19,30 +19,6 @@ struct message_metadata {
 int spotflow_log_backend(const char* fmt, va_list args);
 void spotflow_log_backend_try_set_runtime_filter(uint8_t level);
 
-#if CONFIG_SPOTFLOW_MESSAGE_TERMINAL || CONFIG_SPOTFLOW_DEBUG_MESSAGE_TERMINAL
-
-#define SPOTFLOW_LOG(fmt, ...) printf("[SPOTFLOW] " fmt "\n", ##__VA_ARGS__)
-
-#else
-
-#define SPOTFLOW_LOG(fmt, ...) \
-	do {                   \
-	} while (0)
-
-#endif
-
-#if CONFIG_SPOTFLOW_DEBUG_MESSAGE_TERMINAL
-
-#define SPOTFLOW_DEBUG(fmt, ...) printf("[SPOTFLOW_DEBUG] " fmt "\n", ##__VA_ARGS__)
-
-#else
-
-#define SPOTFLOW_DEBUG(fmt, ...) \
-	do {                     \
-	} while (0)
-
-#endif
-
 #ifdef __cplusplus
 }
 #endif

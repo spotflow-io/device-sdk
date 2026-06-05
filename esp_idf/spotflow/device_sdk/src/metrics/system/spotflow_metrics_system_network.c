@@ -2,7 +2,7 @@
 #include "metrics/system/spotflow_metrics_system.h"
 #include "metrics/spotflow_metrics_backend.h"
 #include "metrics/spotflow_metrics_types.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "esp_netif.h"
 #include "lwip/stats.h"
 #include "lwip/netif.h"

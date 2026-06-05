@@ -3,8 +3,10 @@
 #include <stddef.h>
 #include <string.h>
 #include "net/spotflow_mqtt.h"
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "logging/spotflow_log_backend.h"
 #include "logging/spotflow_log_queue.h"
+#endif
 #ifdef CONFIG_SPOTFLOW_USE_BUILD_ID
 #include "buildid/spotflow_build_id.h"
 #endif
@@ -51,10 +53,13 @@ void spotflow_metrics(void)
  */
 void spotflow_init(void)
 {
-	original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
-
-	spotflow_queue_init(); //Initilize the queue
 	spotflow_mqtt_event_group_init(); //Initialize the MQTT event group
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+	original_vprintf = esp_log_set_vprintf(spotflow_log_backend);
+	spotflow_queue_init(); //Initilize the queue
+	spotflow_config_init();
+#endif
+
 #ifdef CONFIG_SPOTFLOW_METRICS
 	spotflow_metrics();
 #endif
@@ -65,5 +70,4 @@ void spotflow_init(void)
 		spotflow_coredump_backend();
 	}
 #endif
-	spotflow_config_init();
 }

@@ -1,6 +1,6 @@
 #include "metrics/spotflow_metrics_cbor.h"
 #include "net/spotflow_mqtt.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "cbor.h"
 
 /* CBOR Protocol Keys (aligned with cloud backend) */

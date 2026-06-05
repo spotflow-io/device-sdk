@@ -1,7 +1,7 @@
 #include "spotflow.h"
 #include "net/spotflow_mqtt.h"
 #include "coredump/spotflow_coredump_cbor.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "cbor.h"
 
 // static const char* TAG = "SPOTFLOW_COREDUMP";

@@ -3,12 +3,14 @@
 #include "esp_event.h"
 #include "spotflow.h"
 #include "esp_tls.h"
-#include "logging/spotflow_log_backend.h"
-#include "logging/spotflow_log_net.h"
 #include "net/spotflow_mqtt.h"
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+#include "logging/spotflow_log_backend.h"
+#include "logging/spotflow_log_net.h"
 #include "configs/spotflow_config_net.h"
 #include "configs/spotflow_config.h"
+#endif
 
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 #include "coredump/spotflow_coredump_net.h"
@@ -49,11 +51,12 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 	switch ((esp_mqtt_event_id_t)event_id) {
 	case MQTT_EVENT_CONNECTED:
 		SPOTFLOW_LOG("MQTT_EVENT_CONNECTED");
-		xTaskCreate(spotflow_mqtt_publish, "spotflow_mqtt_publish",
-			    CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN * 2, NULL,
-			    CONFIG_SPOTFLOW_MQTT_TASK_PRIORITY, &mqtt_publish_task_handle);
+		xTaskCreate(spotflow_mqtt_publish, "mqtt_publish", CONFIG_SPOTFLOW_MQTT_TASK_SIZE,
+			    NULL, CONFIG_SPOTFLOW_MQTT_TASK_PRIORITY, &mqtt_publish_task_handle);
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 		spotflow_mqtt_subscribe(event->client, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
 					SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC_QOS);
+#endif
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
 		/* Report connection state to system metrics */
 		spotflow_metrics_system_report_connection_state(true);
@@ -79,7 +82,7 @@ static void spotflow_mqtt_event_handler(void* handler_args, esp_event_base_t bas
 		SPOTFLOW_LOG("Message published. \n\n");
 		if (mqtt_publish_task_handle &&
 		    esp_mqtt_client_get_outbox_size(event->client) <
-			CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN) {
+			CONFIG_SPOTFLOW_MQTT_TASK_SIZE / 2) {
 			xTaskNotifyGive(mqtt_publish_task_handle);
 		}
 		break;
@@ -166,16 +169,12 @@ void spotflow_mqtt_publish(void* pvParameters)
 		// 2️⃣ Wait until MQTT outbox has space (zero polling)
 
 		while (esp_mqtt_client_get_outbox_size(spotflow_client) >=
-		       CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN) {
+		       CONFIG_SPOTFLOW_MQTT_TASK_SIZE / 2) {
 			ulTaskNotifyTake(pdTRUE, portMAX_DELAY);
 		}
 
 		if ((esp_mqtt_client_get_outbox_size(spotflow_client) <
-		     CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)) {
-			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
-				spotflow_config_send_pending_message();
-				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
-			}
+		     CONFIG_SPOTFLOW_MQTT_TASK_SIZE / 2)) {
 #ifdef CONFIG_ESP_COREDUMP_ENABLE
 			// Try to send coredump messages first
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_COREDUMP) {
@@ -186,6 +185,12 @@ void spotflow_mqtt_publish(void* pvParameters)
 			}
 			// If no coredump pending, send regular log messages
 #endif
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+			if (notify_value & SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG) {
+				spotflow_config_send_pending_message();
+				clear_mask |= SPOTFLOW_MQTT_NOTIFY_CONFIG_MSG;
+			}
+#endif
 #ifdef CONFIG_SPOTFLOW_METRICS
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_METRICS) {
 				SPOTFLOW_LOG("Notified to send metrics\n");
@@ -195,12 +200,14 @@ void spotflow_mqtt_publish(void* pvParameters)
 				}
 			}
 #endif
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 			if (notify_value & SPOTFLOW_MQTT_NOTIFY_LOGS) {
 				if (spotflow_logging_send_message() ==
 				    SPOTFLOW_MESSAGE_QUEUE_EMPTY) {
 					clear_mask |= SPOTFLOW_MQTT_NOTIFY_LOGS;
 				}
 			}
+#endif
 			xEventGroupClearBits(spotflow_mqtt_event_group, clear_mask);
 		} else {
 			SPOTFLOW_LOG("MQTT outbox not empty; waiting for messages to be sent.\n");
@@ -298,7 +305,7 @@ void spotflow_mqtt_handle_data(esp_mqtt_event_handle_t event)
 void spotflow_mqtt_on_message(const char* topic, int topic_len, const uint8_t* data, int data_len)
 {
 	SPOTFLOW_LOG("MQTT Message Received on topic: %.*s", topic_len, topic);
-
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	// Check if the incoming topic prefix matches the config topic.
 	if (strncmp(topic, SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC,
 		    strlen(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC)) == 0) {
@@ -307,7 +314,7 @@ void spotflow_mqtt_on_message(const char* topic, int topic_len, const uint8_t* d
 		spotflow_config_handle_desired_message(data, data_len);
 		return;
 	}
-
+#endif
 	// Unknown topic
 	SPOTFLOW_LOG("WARNING: Unhandled topic: %.*s", topic_len, topic);
 }
@@ -343,6 +350,10 @@ void spotflow_mqtt_notify_action(uint32_t action_type)
 	xEventGroupSetBits(spotflow_mqtt_event_group, action_type);
 }
 
+/**
+ * @brief Initializes the MQTT event group for synchronization between MQTT events and the publishing task.
+ *
+ */
 void spotflow_mqtt_event_group_init(void)
 {
 	spotflow_mqtt_event_group = xEventGroupCreate();
