@@ -18,6 +18,7 @@ set(PRIV_REQUIRES
     nvs_flash
     esp_netif
     app_update
+    espcoredump
 )
 
 # ---- Optional logging source ----
@@ -34,13 +35,6 @@ endif()
 if(CONFIG_SPOTFLOW_USE_BUILD_ID)
     list(APPEND SRCS "src/buildid/spotflow_build_id.c")
     list(APPEND PRIV_REQUIRES esp_app_format)
-endif()
-
-# ---------------------------------------------------------------------------
-# Optional: Coredump
-# ---------------------------------------------------------------------------
-if(CONFIG_SPOTFLOW_COREDUMP_BACKEND)
-list(APPEND PRIV_REQUIRES espcoredump)
 endif()
 
 if(CONFIG_ESP_COREDUMP_ENABLE)
