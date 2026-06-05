@@ -42,17 +42,6 @@ if(CONFIG_ESP_COREDUMP_ENABLE)
     list(APPEND SRCS ${COREDUMP_SRCS})
 endif()
 
-# ---- Enforce MQTT buffer size sanity check ----
-if (CONFIG_MQTT_BUFFER_SIZE LESS CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN)
-	message(WARNING
-		"CONFIG_MQTT_BUFFER_SIZE (${CONFIG_MQTT_BUFFER_SIZE}) "
-		"is smaller than CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN (${CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN}). "
-		"Forcing MQTT_BUFFER_SIZE to match Spotflow requirements.")
-	# Force the MQTT buffer size to be large enough
-	set(CONFIG_MQTT_BUFFER_SIZE ${CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN} CACHE INT "MQTT buffer size" FORCE)
-endif()
-
-
 # Check if either dependency is configured
 if(CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN OR CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE)
     set(MIN_MQTT_TASK_REQUIRED_SIZE 0)
