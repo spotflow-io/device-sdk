@@ -18,8 +18,7 @@ static void before_each(void* fixture)
 	fake = spotflow_ota_platform_fake_get();
 }
 
-static void write_bindesc_build_id(size_t offset,
-				   const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+static void write_bindesc_build_id(size_t offset, const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
 	static const uint8_t bindesc_magic[] = { 0x46, 0x60, 0xa4, 0x7e, 0x5a, 0x3e, 0x86, 0xb9 };
 	uint8_t* p = fake->upload_slot + offset;
@@ -38,8 +37,7 @@ static void write_bindesc_build_id(size_t offset,
 	p[3] = 0x00;
 
 	fake->upload_image_start = 0;
-	fake->upload_image_size =
-	    offset + sizeof(bindesc_magic) + 4 + SPOTFLOW_BUILD_ID_LENGTH + 4;
+	fake->upload_image_size = offset + sizeof(bindesc_magic) + 4 + SPOTFLOW_BUILD_ID_LENGTH + 4;
 }
 
 ZTEST(spotflow_ota_platform_identity, test_platform_fake_records_upgrade_confirm_reboot)
