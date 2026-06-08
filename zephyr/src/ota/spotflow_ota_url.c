@@ -9,6 +9,16 @@
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
+#ifdef CONFIG_ZTEST
+const char spotflow_ota_url_log_tags[] =
+	"Failed to parse artifact URL"
+	"Artifact URL missing scheme"
+	"Unsupported artifact URL scheme"
+	"Artifact URL missing host"
+	"Artifact URL host field too long"
+	"Artifact URL path field too long";
+#endif
+
 int spotflow_ota_parse_url(const char* url, struct ota_url* out)
 {
 	struct http_parser_url parsed;
@@ -16,12 +26,12 @@ int spotflow_ota_parse_url(const char* url, struct ota_url* out)
 	http_parser_url_init(&parsed);
 
 	if (http_parser_parse_url(url, strlen(url), 0, &parsed) != 0) {
-		LOG_ERR("Failed to parse URL: %s", url);
+		LOG_ERR("Failed to parse artifact URL");
 		return -EINVAL;
 	}
 
 	if (!(parsed.field_set & BIT(UF_SCHEMA))) {
-		LOG_ERR("URL missing scheme: %s", url);
+		LOG_ERR("Artifact URL missing scheme");
 		return -EINVAL;
 	}
 
@@ -35,12 +45,12 @@ int spotflow_ota_parse_url(const char* url, struct ota_url* out)
 		out->tls = false;
 		out->port = 80;
 	} else {
-		LOG_ERR("Unsupported URL scheme in: %s", url);
+		LOG_ERR("Unsupported artifact URL scheme");
 		return -EINVAL;
 	}
 
 	if (!(parsed.field_set & BIT(UF_HOST))) {
-		LOG_ERR("URL missing host: %s", url);
+		LOG_ERR("Artifact URL missing host");
 		return -EINVAL;
 	}
 
@@ -48,7 +58,7 @@ int spotflow_ota_parse_url(const char* url, struct ota_url* out)
 	uint16_t host_len = parsed.field_data[UF_HOST].len;
 
 	if (host_len >= sizeof(out->host)) {
-		LOG_ERR("Host field too long in URL: %s", url);
+		LOG_ERR("Artifact URL host field too long");
 		return -EINVAL;
 	}
 
@@ -70,7 +80,7 @@ int spotflow_ota_parse_url(const char* url, struct ota_url* out)
 		}
 
 		if (copy_len >= sizeof(out->path)) {
-			LOG_ERR("Path field too long in URL: %s", url);
+			LOG_ERR("Artifact URL path field too long");
 			return -EINVAL;
 		}
 

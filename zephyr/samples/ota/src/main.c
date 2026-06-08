@@ -1,3 +1,6 @@
+#include <errno.h>
+
+#include <zephyr/dfu/flash_img.h>
 #include <zephyr/dfu/mcuboot.h>
 #include <zephyr/sys/reboot.h>
 #include <zephyr/logging/log.h>
@@ -5,12 +8,44 @@
 #include <spotflow/ota.h>
 
 #include "net.h"
-#include "ota/spotflow_ota_download.h"
 
 LOG_MODULE_REGISTER(ota_sample, LOG_LEVEL_INF);
 
-#define OTA_DOWNLOAD_MAX_ATTEMPTS 5
-#define OTA_DOWNLOAD_RETRY_DELAY_SEC 5
+struct ota_sample_flash_ctx {
+	struct flash_img_context fctx;
+	int write_err;
+};
+
+static SPOTFLOW_DEFINE_DOWNLOADER(ota_downloader);
+
+static void download_block_cb(const struct spotflow_artifact_block* block,
+			      struct spotflow_downloader* downloader, void* callback_ctx)
+{
+	ARG_UNUSED(downloader);
+
+	struct ota_sample_flash_ctx* ctx = callback_ctx;
+
+	if (ctx->write_err != 0) {
+		return;
+	}
+
+	if (block->data_len > 0) {
+		int rc = flash_img_buffered_write(&ctx->fctx, block->data, block->data_len,
+						  block->is_last);
+
+		if (rc < 0) {
+			LOG_ERR("flash_img_buffered_write failed: %d", rc);
+			ctx->write_err = rc;
+		}
+	} else if (block->is_last) {
+		int rc = flash_img_buffered_write(&ctx->fctx, NULL, 0, true);
+
+		if (rc < 0) {
+			LOG_ERR("flash_img_buffered_write flush failed: %d", rc);
+			ctx->write_err = rc;
+		}
+	}
+}
 
 enum spotflow_ota_result
 spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
@@ -34,43 +69,37 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 	}
 
 	/*
-	 * The sample currently uses delegated OTA artifacts to exercise the existing PoC
-	 * download-to-flash path. Publish the test firmware as a non-main artifact and the
-	 * sample will download it into the MCUboot upload slot.
+	 * The sample currently uses delegated OTA artifacts to exercise the downloader
+	 * streaming path. Publish the test firmware and the sample will download it into
+	 * the MCUboot upload slot.
 	 */
 	LOG_INF("Downloading delegated artifact '%s' version %s", info->slug, info->version);
 
-	int rc;
-	bool downloaded = false;
-
-	for (int attempt = 1; attempt <= OTA_DOWNLOAD_MAX_ATTEMPTS; attempt++) {
-		if (spotflow_is_update_canceled()) {
-			LOG_INF("OTA update canceled before download attempt %d/%d", attempt,
-				OTA_DOWNLOAD_MAX_ATTEMPTS);
-			return SPOTFLOW_OTA_RESULT_CANCELED;
-		}
-
-		LOG_INF("Download attempt %d/%d for artifact '%s'", attempt,
-			OTA_DOWNLOAD_MAX_ATTEMPTS, info->slug);
-
-		/*
-		* TODO: Replace by info->download_request->url and info->download_request->secret
-		* when the TLS handshake works
-		*/
-		rc = spotflow_ota_download_and_flash(
-		    "https://roberthusak.cz/tmp/fota/rw612/image_confirmed", NULL);
-		if (rc == 0) {
-			downloaded = true;
-			break;
-		}
-
-		LOG_ERR("Failed to download artifact '%s' (attempt %d/%d): %d", info->slug, attempt,
-			OTA_DOWNLOAD_MAX_ATTEMPTS, rc);
-		if (attempt < OTA_DOWNLOAD_MAX_ATTEMPTS) {
-			k_sleep(K_SECONDS(OTA_DOWNLOAD_RETRY_DELAY_SEC));
-		}
+	if (spotflow_is_update_canceled()) {
+		LOG_INF("OTA update canceled before download");
+		return SPOTFLOW_OTA_RESULT_CANCELED;
 	}
-	if (!downloaded) {
+
+	struct ota_sample_flash_ctx flash_ctx = { .write_err = 0 };
+	int rc = flash_img_init(&flash_ctx.fctx);
+
+	if (rc < 0) {
+		LOG_ERR("flash_img_init failed: %d", rc);
+		return SPOTFLOW_OTA_RESULT_FAILED;
+	}
+
+	rc = spotflow_download_artifact(&ota_downloader, info->download_request, download_block_cb,
+					&flash_ctx);
+	if (rc == -ECANCELED) {
+		LOG_INF("OTA update canceled during download");
+		return SPOTFLOW_OTA_RESULT_CANCELED;
+	}
+	if (rc < 0) {
+		LOG_ERR("Failed to download artifact '%s': %d", info->slug, rc);
+		return SPOTFLOW_OTA_RESULT_FAILED;
+	}
+	if (flash_ctx.write_err != 0) {
+		LOG_ERR("Flash write error during download: %d", flash_ctx.write_err);
 		return SPOTFLOW_OTA_RESULT_FAILED;
 	}
 

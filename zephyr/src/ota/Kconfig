@@ -41,4 +41,22 @@ config SPOTFLOW_OTA_THREAD_STACK_SIZE
 	help
 	  Stack size in bytes for the OTA worker thread.
 
+config SPOTFLOW_OTA_HTTP_TIMEOUT_MS
+	int "HTTP timeout for artifact downloads in milliseconds"
+	default 120000
+	help
+	  Maximum time allowed for a single artifact download HTTP request.
+
+config SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE
+	int "Receive buffer size for artifact downloads in bytes"
+	default 512
+	help
+	  Size of the HTTP response receive buffer used while streaming artifacts.
+
+config SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS
+	int "Delay between transient artifact download retries in milliseconds"
+	default 5000
+	help
+	  Delay before retrying an artifact download after a transient failure.
+
 endif # SPOTFLOW_OTA

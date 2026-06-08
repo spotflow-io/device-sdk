@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <zephyr/kernel.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -22,6 +24,9 @@ struct spotflow_downloader {
 	 * The fields are owned by the SDK and should not be modified by user code.
 	 */
 	enum spotflow_downloader_state state;
+	struct k_mutex mutex;
+	bool cancel_requested;
+	bool mutex_initialized;
 };
 
 #define SPOTFLOW_DEFINE_DOWNLOADER(name)                     \
