@@ -49,9 +49,12 @@ config SPOTFLOW_OTA_HTTP_TIMEOUT_MS
 
 config SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE
 	int "Receive buffer size for artifact downloads in bytes"
+	default IMG_BLOCK_BUF_SIZE if IMG_MANAGER
 	default 512
 	help
 	  Size of the HTTP response receive buffer used while streaming artifacts.
+	  When main-firmware image management is enabled, defaults to the image
+	  writer buffer size so download and flash paths can share the same block size.
 
 config SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS
 	int "Delay between transient artifact download retries in milliseconds"

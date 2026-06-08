@@ -29,19 +29,12 @@ static void download_block_cb(const struct spotflow_artifact_block* block,
 		return;
 	}
 
-	if (block->data_len > 0) {
+	if (block->data_len > 0 || block->is_last) {
 		int rc = flash_img_buffered_write(&ctx->fctx, block->data, block->data_len,
 						  block->is_last);
 
 		if (rc < 0) {
 			LOG_ERR("flash_img_buffered_write failed: %d", rc);
-			ctx->write_err = rc;
-		}
-	} else if (block->is_last) {
-		int rc = flash_img_buffered_write(&ctx->fctx, NULL, 0, true);
-
-		if (rc < 0) {
-			LOG_ERR("flash_img_buffered_write flush failed: %d", rc);
 			ctx->write_err = rc;
 		}
 	}

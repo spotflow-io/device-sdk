@@ -4,14 +4,16 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "ota/spotflow_ota_limits.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct ota_url {
 	bool tls;
-	char host[128];
-	char path[128];
+	char host[SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH + 1];
+	char path[SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH + 1];
 	uint16_t port;
 };
 

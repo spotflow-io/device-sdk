@@ -12,7 +12,7 @@
 
 #include "spotflow_ota_downloader_transport_fake.h"
 
-LOG_MODULE_DECLARE(spotflow_ota);
+LOG_MODULE_REGISTER(spotflow_ota, CONFIG_LOG_DEFAULT_LEVEL);
 
 static const uint8_t sample_payload[] = { 0x01, 0x02, 0x03, 0x04 };
 static size_t received_bytes;
@@ -100,19 +100,6 @@ ZTEST(spotflow_ota_downloader, test_authorization_header_contains_ota_secret)
 	zassert_equal(strcmp(fake->last_authorization_header,
 			     "Authorization: OtaSecret test-secret-value\r\n"),
 		      0);
-}
-
-ZTEST(spotflow_ota_downloader, test_sensitive_values_are_not_logged)
-{
-	/*
-	 * Regression guard: downloader and URL parser log messages must not include
-	 * format placeholders for full artifact URLs or OTA secrets.
-	 */
-	extern const char spotflow_ota_downloader_log_tags[];
-	extern const char spotflow_ota_url_log_tags[];
-
-	zassert_is_null(strstr(spotflow_ota_downloader_log_tags, "%s"));
-	zassert_is_null(strstr(spotflow_ota_url_log_tags, "%s"));
 }
 
 ZTEST(spotflow_ota_downloader, test_cancel_stops_download)

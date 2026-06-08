@@ -16,12 +16,11 @@ target_compile_definitions(app PRIVATE
         CONFIG_SPOTFLOW_OTA=1
         CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS=1
         CONFIG_SPOTFLOW_OTA_HTTP_TIMEOUT_MS=1000
-        CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE=512
+        CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE=1024
 )
 
 target_sources(app PRIVATE
         src/main.c
-        spotflow_ota_log_stub.c
         spotflow_ota_downloader_transport_fake.c
         ../../../src/ota/spotflow_ota_downloader.c
         ../../../src/ota/spotflow_ota_url.c

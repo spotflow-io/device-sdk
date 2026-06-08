@@ -26,12 +26,12 @@ struct spotflow_downloader {
 	enum spotflow_downloader_state state;
 	struct k_mutex mutex;
 	bool cancel_requested;
-	bool mutex_initialized;
 };
 
 #define SPOTFLOW_DEFINE_DOWNLOADER(name)                     \
 	struct spotflow_downloader name = {                  \
 		.state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE, \
+		.mutex = Z_MUTEX_INITIALIZER(name.mutex),    \
 	}
 
 struct spotflow_artifact_block {
@@ -43,6 +43,7 @@ struct spotflow_artifact_block {
 
 struct spotflow_download_request {
 	const char* url;
+	/* Must not be logged by application or SDK code. */
 	const char* secret;
 };
 

@@ -7,14 +7,11 @@
 
 #include <spotflow/ota.h>
 
+#include "ota/spotflow_ota_limits.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-#define SPOTFLOW_OTA_ARTIFACT_SLUG_MAX_LENGTH 32
-#define SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH 128
-#define SPOTFLOW_OTA_ARTIFACT_SECRET_MAX_LENGTH 24
-#define SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH 64
 
 enum spotflow_ota_attempt_error {
 	SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR = 0,

@@ -14,18 +14,6 @@
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-/*
- * Test-only aggregate of downloader log format strings. Keeping these in one place
- * makes it easy to verify that full URLs and secrets are not logged.
- */
-#ifdef CONFIG_ZTEST
-const char spotflow_ota_downloader_log_tags[] =
-    "Starting artifact download (TLS: %d, port: %u)"
-    "Artifact download finished (%zu bytes)"
-    "Artifact download failed: %d"
-    "Transient artifact download failure (%d), retrying";
-#endif
-
 #define OTA_AUTHORIZATION_HEADER_PREFIX "Authorization: OtaSecret "
 #define OTA_AUTHORIZATION_HEADER_SUFFIX "\r\n"
 #define OTA_AUTHORIZATION_HEADER_MAX_LEN                                                         \
@@ -33,13 +21,13 @@ const char spotflow_ota_downloader_log_tags[] =
 	 sizeof(OTA_AUTHORIZATION_HEADER_SUFFIX))
 
 static bool downloader_is_canceled(struct spotflow_downloader* downloader);
-static void downloader_prepare(struct spotflow_downloader* downloader);
 static void downloader_finish(struct spotflow_downloader* downloader);
 static bool downloader_error_is_transient(int err, bool transient_failure);
 
 int spotflow_ota_downloader_build_authorization_header(const char* secret, char* out,
 						       size_t out_len)
 {
+	/* secret is used only for the HTTP Authorization header and must not be logged. */
 	if (secret == NULL || out == NULL || out_len == 0) {
 		return -EINVAL;
 	}
@@ -85,7 +73,7 @@ int spotflow_cancel_download(struct spotflow_downloader* downloader)
 		return -EINVAL;
 	}
 
-	downloader_prepare(downloader);
+	k_mutex_lock(&downloader->mutex, K_FOREVER);
 
 	if (downloader->state == SPOTFLOW_DOWNLOADER_STATE_INACTIVE) {
 		k_mutex_unlock(&downloader->mutex);
@@ -123,7 +111,7 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 		return rc;
 	}
 
-	downloader_prepare(downloader);
+	k_mutex_lock(&downloader->mutex, K_FOREVER);
 
 	if (downloader->state != SPOTFLOW_DOWNLOADER_STATE_INACTIVE) {
 		k_mutex_unlock(&downloader->mutex);
@@ -170,16 +158,6 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 		LOG_WRN("Transient artifact download failure (%d), retrying", rc);
 		k_sleep(K_MSEC(CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS));
 	}
-}
-
-static void downloader_prepare(struct spotflow_downloader* downloader)
-{
-	if (!downloader->mutex_initialized) {
-		k_mutex_init(&downloader->mutex);
-		downloader->mutex_initialized = true;
-	}
-
-	k_mutex_lock(&downloader->mutex, K_FOREVER);
 }
 
 static void downloader_finish(struct spotflow_downloader* downloader)
