@@ -65,6 +65,7 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 
 	if (info == NULL || info->download_request == NULL || info->download_request->url == NULL ||
 	    info->download_request->secret == NULL) {
+		LOG_ERR("Download request is NULL or missing URL or secret");
 		return SPOTFLOW_OTA_RESULT_FAILED;
 	}
 
@@ -88,8 +89,15 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 		return SPOTFLOW_OTA_RESULT_FAILED;
 	}
 
-	rc = spotflow_download_artifact(&ota_downloader, info->download_request, download_block_cb,
-					&flash_ctx);
+	/*
+	 * TODO: Replace by info->download_request when the TLS handshake works
+	 */
+	struct spotflow_download_request request = {
+		.url = "https://www.roberthusak.cz/tmp/fota/rw612/image_confirmed",
+		.secret = "12345",
+	};
+
+	rc = spotflow_download_artifact(&ota_downloader, &request, download_block_cb, &flash_ctx);
 	if (rc == -ECANCELED) {
 		LOG_INF("OTA update canceled during download");
 		return SPOTFLOW_OTA_RESULT_CANCELED;
