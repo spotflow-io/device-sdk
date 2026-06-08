@@ -34,6 +34,16 @@ void spotflow_ota_test_settings_reset(void)
 	memset(last_deleted_name, 0, sizeof(last_deleted_name));
 }
 
+void spotflow_ota_test_settings_exhaust_capacity(void)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(fake_entries); i++) {
+		char name[SETTINGS_FULL_NAME_LEN];
+
+		snprintk(name, sizeof(name), "spotflow/ota/fill/%zu", i);
+		zassert_ok(settings_save_one(name, "x", 1));
+	}
+}
+
 const char* spotflow_ota_test_settings_get_last_saved_name(void)
 {
 	return last_saved_name;

@@ -291,8 +291,8 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	if (job->artifact.is_main) {
-		*result = spotflow_ota_fw_main_process_artifact(job->attempt_id, job->artifact_index,
-								&job->artifact);
+		*result = spotflow_ota_fw_main_process_artifact(
+		    job->attempt_id, job->artifact_index, &job->artifact);
 		return 0;
 	}
 #endif

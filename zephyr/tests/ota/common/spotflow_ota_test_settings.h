@@ -9,6 +9,8 @@ extern "C" {
 
 void spotflow_ota_test_settings_reset(void);
 
+void spotflow_ota_test_settings_exhaust_capacity(void);
+
 const char* spotflow_ota_test_settings_get_last_saved_name(void);
 
 const char* spotflow_ota_test_settings_get_last_deleted_name(void);

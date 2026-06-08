@@ -6,6 +6,7 @@
 #include "spotflow_build_id.h"
 #include "ota/spotflow_ota_identity.h"
 #include "ota/spotflow_ota_platform.h"
+#include "spotflow_ota_bindesc_test_util.h"
 #include "spotflow_ota_platform_fake.h"
 
 static struct spotflow_ota_platform_fake* fake;
@@ -20,24 +21,12 @@ static void before_each(void* fixture)
 
 static void write_bindesc_build_id(size_t offset, const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
-	static const uint8_t bindesc_magic[] = { 0x46, 0x60, 0xa4, 0x7e, 0x5a, 0x3e, 0x86, 0xb9 };
-	uint8_t* p = fake->upload_slot + offset;
+	size_t end = spotflow_ota_test_bindesc_write_build_id(
+	    fake->upload_slot, sizeof(fake->upload_slot), offset, build_id);
 
-	memcpy(p, bindesc_magic, sizeof(bindesc_magic));
-	p += sizeof(bindesc_magic);
-	p[0] = 0xf0;
-	p[1] = 0x25;
-	p[2] = SPOTFLOW_BUILD_ID_LENGTH;
-	p[3] = 0x00;
-	memcpy(p + 4, build_id, SPOTFLOW_BUILD_ID_LENGTH);
-	p += 4 + SPOTFLOW_BUILD_ID_LENGTH;
-	p[0] = 0xff;
-	p[1] = 0xff;
-	p[2] = 0x00;
-	p[3] = 0x00;
-
+	zassert_true(end > 0);
 	fake->upload_image_start = 0;
-	fake->upload_image_size = offset + sizeof(bindesc_magic) + 4 + SPOTFLOW_BUILD_ID_LENGTH + 4;
+	fake->upload_image_size = end;
 }
 
 ZTEST(spotflow_ota_platform_identity, test_platform_fake_records_upgrade_confirm_reboot)

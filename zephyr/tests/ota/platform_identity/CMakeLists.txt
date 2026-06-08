@@ -18,6 +18,7 @@ target_compile_definitions(app PRIVATE
 
 target_sources(app PRIVATE
         src/main.c
+        ../common/spotflow_ota_bindesc_test_util.c
         ../common/spotflow_ota_platform_fake.c
         ../../../src/ota/spotflow_ota_identity.c
         ../../../src/spotflow_build_id.c

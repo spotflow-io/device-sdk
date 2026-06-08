@@ -2,7 +2,6 @@
 #include <string.h>
 
 #include <zephyr/logging/log.h>
-#include <zephyr/settings/settings.h>
 #include <zephyr/ztest.h>
 
 #include <spotflow/ota.h>
@@ -11,6 +10,7 @@
 #include "ota/spotflow_ota_persistence.h"
 #include "ota/spotflow_ota_state.h"
 #include "spotflow_build_id.h"
+#include "spotflow_ota_bindesc_test_util.h"
 #include "spotflow_ota_downloader_transport_fake.h"
 #include "spotflow_ota_platform_fake.h"
 #include "spotflow_ota_test_settings.h"
@@ -23,8 +23,6 @@ static enum spotflow_ota_phase progress_phases[8];
 static size_t progress_phase_count;
 static uint8_t download_payload[128];
 static size_t download_payload_len;
-
-static const uint8_t bindesc_magic[] = { 0x46, 0x60, 0xa4, 0x7e, 0x5a, 0x3e, 0x86, 0xb9 };
 
 static struct spotflow_ota_artifact main_artifact = {
 	.is_main = true,
@@ -42,39 +40,20 @@ static struct spotflow_ota_artifact secondary_artifact = {
 	.version = "2.0.0",
 };
 
-static void append_bindesc_build_id(uint8_t* buffer, size_t buffer_size, size_t* offset,
-				    const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
-{
-	zassert_true(*offset + sizeof(bindesc_magic) + 4 + SPOTFLOW_BUILD_ID_LENGTH + 4 <=
-		     buffer_size);
-
-	memcpy(buffer + *offset, bindesc_magic, sizeof(bindesc_magic));
-	*offset += sizeof(bindesc_magic);
-
-	buffer[(*offset)++] = 0xf0;
-	buffer[(*offset)++] = 0x25;
-	buffer[(*offset)++] = SPOTFLOW_BUILD_ID_LENGTH;
-	buffer[(*offset)++] = 0x00;
-	memcpy(buffer + *offset, build_id, SPOTFLOW_BUILD_ID_LENGTH);
-	*offset += SPOTFLOW_BUILD_ID_LENGTH;
-	buffer[(*offset)++] = 0xff;
-	buffer[(*offset)++] = 0xff;
-	buffer[(*offset)++] = 0x00;
-	buffer[(*offset)++] = 0x00;
-}
-
 static void build_download_payload(uint8_t* buffer, size_t buffer_size, size_t* payload_len)
 {
 	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
 	size_t offset = 32;
+	size_t end;
 
 	for (size_t i = 0; i < SPOTFLOW_BUILD_ID_LENGTH; i++) {
 		build_id[i] = (uint8_t)(0x10 + i);
 	}
 
 	memset(buffer, 0xFF, buffer_size);
-	append_bindesc_build_id(buffer, buffer_size, &offset, build_id);
-	*payload_len = offset;
+	end = spotflow_ota_test_bindesc_write_build_id(buffer, buffer_size, offset, build_id);
+	zassert_true(end > 0);
+	*payload_len = end;
 }
 
 static struct spotflow_ota_update_msg build_two_artifact_update(void)
@@ -122,7 +101,8 @@ static void apply_main_result(enum spotflow_ota_result result)
 	zassert_ok(spotflow_ota_state_apply_artifact_result(0, result, &action));
 }
 
-void spotflow_on_main_firmware_update_progressed(const struct spotflow_ota_main_firmware_state* state)
+void spotflow_on_main_firmware_update_progressed(
+    const struct spotflow_ota_main_firmware_state* state)
 {
 	zassert_not_null(state);
 	zassert_true(progress_phase_count < ARRAY_SIZE(progress_phases));
@@ -214,13 +194,7 @@ ZTEST(spotflow_ota_fw_main, test_probation_persistence_failure_fails_safely)
 {
 	struct spotflow_ota_state_snapshot snapshot;
 
-	for (size_t i = 0; i < 8; i++) {
-		char name[SETTINGS_FULL_NAME_LEN];
-
-		snprintk(name, sizeof(name), "spotflow/ota/fill/%zu", i);
-		zassert_ok(settings_save_one(name, "x", 1));
-	}
-
+	spotflow_ota_test_settings_exhaust_capacity();
 	accept_two_artifact_update();
 	apply_main_result(spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact));
 

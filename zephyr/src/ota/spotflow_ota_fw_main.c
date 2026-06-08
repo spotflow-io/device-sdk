@@ -34,16 +34,16 @@ void spotflow_ota_fw_main_reset(void)
 	k_mutex_unlock(&main_firmware_downloader.mutex);
 }
 
-enum spotflow_ota_result spotflow_ota_fw_main_process_artifact(uint64_t attempt_id,
-							       size_t artifact_index,
-							       const struct spotflow_ota_artifact* artifact)
+enum spotflow_ota_result
+spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index,
+				      const struct spotflow_ota_artifact* artifact)
 {
 	if (artifact == NULL || artifact->url[0] == '\0' || artifact->secret[0] == '\0') {
 		return SPOTFLOW_OTA_RESULT_FAILED;
 	}
 
-	if (spotflow_ota_state_store_main_firmware_artifact(attempt_id, artifact_index,
-							  artifact) < 0) {
+	if (spotflow_ota_state_store_main_firmware_artifact(attempt_id, artifact_index, artifact) <
+	    0) {
 		return SPOTFLOW_OTA_RESULT_FAILED;
 	}
 

@@ -12,9 +12,9 @@
 extern "C" {
 #endif
 
-enum spotflow_ota_result spotflow_ota_fw_main_process_artifact(uint64_t attempt_id,
-							       size_t artifact_index,
-							       const struct spotflow_ota_artifact* artifact);
+enum spotflow_ota_result
+spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index,
+				      const struct spotflow_ota_artifact* artifact);
 
 void spotflow_ota_fw_main_reset(void);
 
