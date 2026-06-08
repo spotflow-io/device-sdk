@@ -13,3 +13,7 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
         spotflow_ota_url.c
         spotflow_ota_worker.c
 )
+
+zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+        spotflow_ota_fw_main.c
+)

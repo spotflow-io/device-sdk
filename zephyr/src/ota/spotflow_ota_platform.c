@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <errno.h>
 #include <stddef.h>
 
@@ -8,6 +9,8 @@
 #include <zephyr/sys/reboot.h>
 
 #include "ota/spotflow_ota_platform.h"
+
+static struct flash_img_context upload_ctx;
 
 int spotflow_ota_platform_request_test_upgrade(void)
 {
@@ -93,4 +96,18 @@ int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
 
 	return rc;
 #endif
+}
+
+int spotflow_ota_platform_begin_image_write(void)
+{
+	return flash_img_init(&upload_ctx);
+}
+
+int spotflow_ota_platform_write_image_block(const uint8_t* data, size_t len, bool is_last)
+{
+	if (data == NULL && len > 0) {
+		return -EINVAL;
+	}
+
+	return flash_img_buffered_write(&upload_ctx, data, len, is_last);
 }

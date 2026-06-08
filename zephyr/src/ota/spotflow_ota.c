@@ -227,8 +227,13 @@ int spotflow_get_main_firmware_update_state(struct spotflow_ota_main_firmware_st
 
 int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info)
 {
-	ARG_UNUSED(info);
-	return -ENOTSUP;
+	if (info == NULL) {
+		return -EINVAL;
+	}
+
+	struct spotflow_download_request request;
+
+	return spotflow_ota_state_get_main_firmware_info(info, &request);
 }
 
 int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state* state)

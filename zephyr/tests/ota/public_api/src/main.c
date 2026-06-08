@@ -87,7 +87,9 @@ ZTEST(spotflow_ota_public_api, test_public_ota_functions_are_linkable)
 	zassert_false(spotflow_is_update_canceled());
 	zassert_ok(spotflow_get_main_firmware_update_state(&state));
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
-	zassert_equal(spotflow_get_main_firmware_update_info(NULL), -ENOTSUP);
+	zassert_equal(spotflow_get_main_firmware_update_info(NULL), -EINVAL);
+	struct spotflow_firmware_info info;
+	zassert_equal(spotflow_get_main_firmware_update_info(&info), -ENOENT);
 	zassert_equal(spotflow_pause_main_firmware_update(&state), -ENOTSUP);
 	zassert_equal(spotflow_resume_main_firmware_update(&state), -ENOTSUP);
 	zassert_equal(spotflow_fail_main_firmware_update(&state), -ENOTSUP);

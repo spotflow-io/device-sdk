@@ -1,3 +1,4 @@
+#include <stdbool.h>
 #include <errno.h>
 #include <string.h>
 
@@ -108,4 +109,45 @@ int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
 
 	return bindesc_open_ram(handle, fake->upload_slot + partition_offset, max_size);
 #endif
+}
+
+int spotflow_ota_platform_begin_image_write(void)
+{
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+
+	if (fake->begin_write_result != 0) {
+		return fake->begin_write_result;
+	}
+
+	fake->upload_image_start = 0;
+	fake->upload_image_size = 0;
+	memset(fake->upload_slot, 0, sizeof(fake->upload_slot));
+
+	return 0;
+}
+
+int spotflow_ota_platform_write_image_block(const uint8_t* data, size_t len, bool is_last)
+{
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+
+	ARG_UNUSED(is_last);
+
+	if (fake->write_result != 0) {
+		return fake->write_result;
+	}
+
+	if (data == NULL && len > 0) {
+		return -EINVAL;
+	}
+
+	if (fake->upload_image_size + len > sizeof(fake->upload_slot)) {
+		return -ENOMEM;
+	}
+
+	if (len > 0) {
+		memcpy(fake->upload_slot + fake->upload_image_size, data, len);
+		fake->upload_image_size += len;
+	}
+
+	return 0;
 }

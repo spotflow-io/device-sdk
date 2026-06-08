@@ -26,6 +26,10 @@ int spotflow_ota_platform_get_upload_image_info(size_t* image_start, size_t* ima
 int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
 					      size_t partition_offset);
 
+int spotflow_ota_platform_begin_image_write(void);
+
+int spotflow_ota_platform_write_image_block(const uint8_t* data, size_t len, bool is_last);
+
 #ifdef __cplusplus
 }
 #endif

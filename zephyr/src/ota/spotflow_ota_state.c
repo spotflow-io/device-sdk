@@ -17,6 +17,10 @@ struct attempt_state {
 	bool has_attempt_error;
 	enum spotflow_ota_attempt_error attempt_error;
 	bool rejected_job_pending;
+	bool main_firmware_awaiting_reboot;
+	bool has_main_firmware_artifact;
+	size_t main_firmware_artifact_index;
+	struct spotflow_ota_artifact main_firmware_artifact;
 	struct spotflow_ota_main_firmware_state main_firmware_state;
 };
 
@@ -206,6 +210,7 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 	}
 
 	if (!current_attempt.actionable_cancellation && !current_attempt.artifact_running &&
+	    !current_attempt.main_firmware_awaiting_reboot &&
 	    current_attempt.current_artifact_index < current_attempt.update.artifact_count &&
 	    current_attempt.results[current_attempt.current_artifact_index] ==
 		SPOTFLOW_OTA_RESULT_PENDING) {
@@ -329,6 +334,122 @@ void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapsho
 	       sizeof(snapshot->artifact_results));
 
 	k_mutex_unlock(&state_mutex);
+}
+
+int spotflow_ota_state_set_main_firmware_phase(enum spotflow_ota_phase phase,
+					       struct spotflow_ota_main_firmware_state* out_state)
+{
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	current_attempt.main_firmware_state.phase = phase;
+	current_attempt.main_firmware_state.is_paused = false;
+	current_attempt.main_firmware_state.result = SPOTFLOW_OTA_RESULT_PENDING;
+
+	if (out_state != NULL) {
+		*out_state = current_attempt.main_firmware_state;
+	}
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+int spotflow_ota_state_set_main_firmware_result(enum spotflow_ota_result result,
+						struct spotflow_ota_main_firmware_state* out_state)
+{
+	if (result == SPOTFLOW_OTA_RESULT_PENDING) {
+		return -EINVAL;
+	}
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	current_attempt.main_firmware_state.result = result;
+	if (result != SPOTFLOW_OTA_RESULT_SUCCEEDED) {
+		current_attempt.main_firmware_state.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
+	}
+
+	if (out_state != NULL) {
+		*out_state = current_attempt.main_firmware_state;
+	}
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+int spotflow_ota_state_store_main_firmware_artifact(uint64_t attempt_id, size_t artifact_index,
+						    const struct spotflow_ota_artifact* artifact)
+{
+	if (artifact == NULL) {
+		return -EINVAL;
+	}
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active || current_attempt.attempt_id != attempt_id) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	current_attempt.has_main_firmware_artifact = true;
+	current_attempt.main_firmware_artifact_index = artifact_index;
+	copy_artifact_out(&current_attempt.main_firmware_artifact, artifact);
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* info,
+					      struct spotflow_download_request* request_out)
+{
+	if (info == NULL || request_out == NULL) {
+		return -EINVAL;
+	}
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active || !current_attempt.has_main_firmware_artifact) {
+		k_mutex_unlock(&state_mutex);
+		return -ENOENT;
+	}
+
+	info->attempt_id = current_attempt.attempt_id;
+	info->slug = current_attempt.main_firmware_artifact.slug;
+	info->is_main = current_attempt.main_firmware_artifact.is_main;
+	info->version = current_attempt.main_firmware_artifact.version;
+	request_out->url = current_attempt.main_firmware_artifact.url;
+	request_out->secret = current_attempt.main_firmware_artifact.secret;
+	info->download_request = request_out;
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_action* action)
+{
+	clear_action(action);
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active || !current_attempt.artifact_running) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	current_attempt.artifact_running = false;
+	current_attempt.main_firmware_awaiting_reboot = true;
+	fill_action(action, current_attempt.attempt_id);
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
 }
 
 static void clear_action(struct spotflow_ota_state_action* action)

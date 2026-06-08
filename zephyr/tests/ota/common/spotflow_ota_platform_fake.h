@@ -20,6 +20,8 @@ struct spotflow_ota_platform_fake {
 	bool image_confirmed;
 	int read_result;
 	int image_info_result;
+	int begin_write_result;
+	int write_result;
 	size_t upload_image_start;
 	size_t upload_image_size;
 	uint8_t upload_slot[SPOTFLOW_OTA_PLATFORM_FAKE_UPLOAD_SLOT_SIZE];

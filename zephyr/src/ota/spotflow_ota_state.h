@@ -77,6 +77,20 @@ bool spotflow_ota_state_is_update_canceled(void);
 
 void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapshot);
 
+int spotflow_ota_state_set_main_firmware_phase(enum spotflow_ota_phase phase,
+					       struct spotflow_ota_main_firmware_state* out_state);
+
+int spotflow_ota_state_set_main_firmware_result(enum spotflow_ota_result result,
+						struct spotflow_ota_main_firmware_state* out_state);
+
+int spotflow_ota_state_store_main_firmware_artifact(uint64_t attempt_id, size_t artifact_index,
+						    const struct spotflow_ota_artifact* artifact);
+
+int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* info,
+					      struct spotflow_download_request* request_out);
+
+int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_action* action);
+
 #ifdef __cplusplus
 }
 #endif

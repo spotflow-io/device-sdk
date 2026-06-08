@@ -5,6 +5,9 @@
 #include <zephyr/logging/log.h>
 
 #include "ota/spotflow_ota_fw_custom.h"
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+#include "ota/spotflow_ota_fw_main.h"
+#endif
 #include "ota/spotflow_ota_net.h"
 #include "ota/spotflow_ota_persistence.h"
 #include "ota/spotflow_ota_state.h"
@@ -154,6 +157,21 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 		}
 	}
 
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (job->artifact.is_main && result == SPOTFLOW_OTA_RESULT_PENDING) {
+		struct spotflow_ota_state_action pending_action;
+
+		rc = spotflow_ota_state_finish_main_firmware_prereboot(&pending_action);
+		if (rc < 0) {
+			LOG_ERR("Failed to finalize pre-reboot main firmware for attempt %llu: %d",
+				(unsigned long long)job->attempt_id, rc);
+			return rc;
+		}
+
+		return 0;
+	}
+#endif
+
 	struct spotflow_ota_state_action action;
 	rc = spotflow_ota_state_apply_artifact_result(job->artifact_index, result, &action);
 	if (rc < 0) {
@@ -270,6 +288,14 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 		*result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
 		return 0;
 	}
+
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (job->artifact.is_main) {
+		*result = spotflow_ota_fw_main_process_artifact(job->attempt_id, job->artifact_index,
+								&job->artifact);
+		return 0;
+	}
+#endif
 
 	*result = spotflow_ota_fw_custom_process_artifact(job->attempt_id, &job->artifact);
 	/*
