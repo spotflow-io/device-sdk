@@ -144,8 +144,8 @@ static int connect_socket(const struct ota_url* url)
 			return -errno;
 		}
 
-		rc = zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, url->host,
-				      strlen(url->host) + 1);
+		rc =
+		    zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, url->host, strlen(url->host) + 1);
 		if (rc < 0) {
 			LOG_ERR("Failed to set TLS hostname: %d", errno);
 			zsock_close(sock);

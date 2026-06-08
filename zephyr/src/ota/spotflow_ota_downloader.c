@@ -20,16 +20,16 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
  */
 #ifdef CONFIG_ZTEST
 const char spotflow_ota_downloader_log_tags[] =
-	"Starting artifact download (TLS: %d, port: %u)"
-	"Artifact download finished (%zu bytes)"
-	"Artifact download failed: %d"
-	"Transient artifact download failure (%d), retrying";
+    "Starting artifact download (TLS: %d, port: %u)"
+    "Artifact download finished (%zu bytes)"
+    "Artifact download failed: %d"
+    "Transient artifact download failure (%d), retrying";
 #endif
 
 #define OTA_AUTHORIZATION_HEADER_PREFIX "Authorization: OtaSecret "
 #define OTA_AUTHORIZATION_HEADER_SUFFIX "\r\n"
 #define OTA_AUTHORIZATION_HEADER_MAX_LEN                                                         \
-	(sizeof(OTA_AUTHORIZATION_HEADER_PREFIX) - 1 + SPOTFLOW_OTA_DOWNLOAD_SECRET_MAX_LENGTH +   \
+	(sizeof(OTA_AUTHORIZATION_HEADER_PREFIX) - 1 + SPOTFLOW_OTA_DOWNLOAD_SECRET_MAX_LENGTH + \
 	 sizeof(OTA_AUTHORIZATION_HEADER_SUFFIX))
 
 static bool downloader_is_canceled(struct spotflow_downloader* downloader);
@@ -44,9 +44,9 @@ int spotflow_ota_downloader_build_authorization_header(const char* secret, char*
 		return -EINVAL;
 	}
 
-	int written = snprintk(out, out_len, OTA_AUTHORIZATION_HEADER_PREFIX "%s"
-						       OTA_AUTHORIZATION_HEADER_SUFFIX,
-			       secret);
+	int written =
+	    snprintk(out, out_len,
+		     OTA_AUTHORIZATION_HEADER_PREFIX "%s" OTA_AUTHORIZATION_HEADER_SUFFIX, secret);
 
 	if (written < 0 || (size_t)written >= out_len) {
 		return -ENOMEM;
@@ -117,9 +117,8 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 
 	char authorization_header[OTA_AUTHORIZATION_HEADER_MAX_LEN];
 
-	rc = spotflow_ota_downloader_build_authorization_header(request->secret,
-								authorization_header,
-								sizeof(authorization_header));
+	rc = spotflow_ota_downloader_build_authorization_header(
+	    request->secret, authorization_header, sizeof(authorization_header));
 	if (rc < 0) {
 		return rc;
 	}

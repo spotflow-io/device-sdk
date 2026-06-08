@@ -11,8 +11,7 @@
 
 static struct spotflow_ota_downloader_transport_fake transport_fake;
 
-struct spotflow_ota_downloader_transport_fake*
-spotflow_ota_downloader_transport_fake_get(void)
+struct spotflow_ota_downloader_transport_fake* spotflow_ota_downloader_transport_fake_get(void)
 {
 	return &transport_fake;
 }

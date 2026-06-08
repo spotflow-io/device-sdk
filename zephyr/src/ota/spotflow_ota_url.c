@@ -10,13 +10,12 @@
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #ifdef CONFIG_ZTEST
-const char spotflow_ota_url_log_tags[] =
-	"Failed to parse artifact URL"
-	"Artifact URL missing scheme"
-	"Unsupported artifact URL scheme"
-	"Artifact URL missing host"
-	"Artifact URL host field too long"
-	"Artifact URL path field too long";
+const char spotflow_ota_url_log_tags[] = "Failed to parse artifact URL"
+					 "Artifact URL missing scheme"
+					 "Unsupported artifact URL scheme"
+					 "Artifact URL missing host"
+					 "Artifact URL host field too long"
+					 "Artifact URL path field too long";
 #endif
 
 int spotflow_ota_parse_url(const char* url, struct ota_url* out)

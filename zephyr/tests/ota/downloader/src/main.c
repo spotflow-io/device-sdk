@@ -134,8 +134,7 @@ ZTEST(spotflow_ota_downloader, test_cancel_stops_download)
 			cancel_after_delay, &downloader, NULL, NULL, K_PRIO_PREEMPT(0), 0,
 			K_NO_WAIT);
 
-	download_result =
-	    spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL);
+	download_result = spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL);
 
 	k_thread_join(&cancel_thread, K_FOREVER);
 
