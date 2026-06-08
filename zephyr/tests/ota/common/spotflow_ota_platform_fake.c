@@ -1,6 +1,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include <zephyr/bindesc.h>
+
 #include "spotflow_ota_platform_fake.h"
 
 static struct spotflow_ota_platform_fake platform_fake;
@@ -80,4 +82,30 @@ int spotflow_ota_platform_get_upload_image_info(size_t* image_start, size_t* ima
 	}
 
 	return 0;
+}
+
+int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
+					      size_t partition_offset)
+{
+#if !IS_ENABLED(CONFIG_BINDESC_READ_RAM)
+	ARG_UNUSED(handle);
+	ARG_UNUSED(partition_offset);
+
+	return -ENOTSUP;
+#else
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+	size_t image_end = fake->upload_image_start + fake->upload_image_size;
+	size_t max_size;
+
+	if (partition_offset >= image_end || partition_offset >= sizeof(fake->upload_slot)) {
+		return -EINVAL;
+	}
+
+	max_size = image_end - partition_offset;
+	if (max_size > sizeof(fake->upload_slot) - partition_offset) {
+		max_size = sizeof(fake->upload_slot) - partition_offset;
+	}
+
+	return bindesc_open_ram(handle, fake->upload_slot + partition_offset, max_size);
+#endif
 }

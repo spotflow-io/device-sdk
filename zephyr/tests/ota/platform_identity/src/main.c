@@ -108,6 +108,21 @@ ZTEST(spotflow_ota_platform_identity, test_identity_reads_downloaded_build_id)
 	zassert_mem_equal(expected, downloaded, SPOTFLOW_BUILD_ID_LENGTH);
 }
 
+ZTEST(spotflow_ota_platform_identity, test_identity_reads_downloaded_build_id_across_chunk_boundary)
+{
+	uint8_t expected[SPOTFLOW_BUILD_ID_LENGTH];
+	uint8_t downloaded[SPOTFLOW_BUILD_ID_LENGTH];
+
+	for (size_t i = 0; i < SPOTFLOW_BUILD_ID_LENGTH; i++) {
+		expected[i] = (uint8_t)(0xB0 + i);
+	}
+
+	write_bindesc_build_id(252, expected);
+
+	zassert_ok(spotflow_ota_identity_get_downloaded_build_id(downloaded));
+	zassert_mem_equal(expected, downloaded, SPOTFLOW_BUILD_ID_LENGTH);
+}
+
 ZTEST(spotflow_ota_platform_identity, test_downloaded_build_id_read_failure)
 {
 	fake->image_info_result = -EIO;

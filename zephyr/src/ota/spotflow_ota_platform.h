@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <zephyr/bindesc.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,6 +22,9 @@ void spotflow_ota_platform_reboot(void);
 int spotflow_ota_platform_read_upload_slot(size_t offset, uint8_t* dst, size_t len);
 
 int spotflow_ota_platform_get_upload_image_info(size_t* image_start, size_t* image_size);
+
+int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
+					      size_t partition_offset);
 
 #ifdef __cplusplus
 }

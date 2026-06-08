@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <stddef.h>
 
+#include <zephyr/bindesc.h>
 #include <zephyr/dfu/flash_img.h>
 #include <zephyr/dfu/mcuboot.h>
 #include <zephyr/storage/flash_map.h>
@@ -68,4 +69,28 @@ int spotflow_ota_platform_get_upload_image_info(size_t* image_start, size_t* ima
 	}
 
 	return 0;
+}
+
+int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
+					      size_t partition_offset)
+{
+#if !IS_ENABLED(CONFIG_BINDESC_READ_FLASH)
+	ARG_UNUSED(handle);
+	ARG_UNUSED(partition_offset);
+
+	return -ENOTSUP;
+#else
+	const struct flash_area* fa;
+	uint8_t slot_id = flash_img_get_upload_slot();
+	int rc = flash_area_open(slot_id, &fa);
+
+	if (rc != 0) {
+		return rc;
+	}
+
+	rc = bindesc_open_flash(handle, fa->fa_off + partition_offset, fa->fa_dev);
+	flash_area_close(fa);
+
+	return rc;
+#endif
 }
