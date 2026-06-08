@@ -1,0 +1,83 @@
+#include <errno.h>
+#include <string.h>
+
+#include "spotflow_ota_platform_fake.h"
+
+static struct spotflow_ota_platform_fake platform_fake;
+
+struct spotflow_ota_platform_fake* spotflow_ota_platform_fake_get(void)
+{
+	return &platform_fake;
+}
+
+void spotflow_ota_platform_fake_reset(struct spotflow_ota_platform_fake* fake)
+{
+	memset(fake, 0, sizeof(*fake));
+}
+
+int spotflow_ota_platform_request_test_upgrade(void)
+{
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+
+	fake->upgrade_request_count++;
+
+	return fake->upgrade_request_result;
+}
+
+int spotflow_ota_platform_confirm_image(void)
+{
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+
+	fake->confirm_count++;
+	if (fake->confirm_result == 0) {
+		fake->image_confirmed = true;
+	}
+
+	return fake->confirm_result;
+}
+
+bool spotflow_ota_platform_is_image_confirmed(void)
+{
+	return spotflow_ota_platform_fake_get()->image_confirmed;
+}
+
+void spotflow_ota_platform_reboot(void)
+{
+	spotflow_ota_platform_fake_get()->reboot_count++;
+}
+
+int spotflow_ota_platform_read_upload_slot(size_t offset, uint8_t* dst, size_t len)
+{
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+
+	if (fake->read_result != 0) {
+		return fake->read_result;
+	}
+
+	if (offset + len > sizeof(fake->upload_slot)) {
+		return -EINVAL;
+	}
+
+	memcpy(dst, fake->upload_slot + offset, len);
+
+	return 0;
+}
+
+int spotflow_ota_platform_get_upload_image_info(size_t* image_start, size_t* image_size)
+{
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+
+	if (fake->image_info_result != 0) {
+		return fake->image_info_result;
+	}
+
+	if (image_start != NULL) {
+		*image_start = fake->upload_image_start;
+	}
+
+	if (image_size != NULL) {
+		*image_size = fake->upload_image_size;
+	}
+
+	return 0;
+}

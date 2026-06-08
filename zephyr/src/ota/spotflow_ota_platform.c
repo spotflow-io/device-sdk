@@ -1,0 +1,71 @@
+#include <errno.h>
+#include <stddef.h>
+
+#include <zephyr/dfu/flash_img.h>
+#include <zephyr/dfu/mcuboot.h>
+#include <zephyr/storage/flash_map.h>
+#include <zephyr/sys/reboot.h>
+
+#include "ota/spotflow_ota_platform.h"
+
+int spotflow_ota_platform_request_test_upgrade(void)
+{
+	return boot_request_upgrade(BOOT_UPGRADE_TEST);
+}
+
+int spotflow_ota_platform_confirm_image(void)
+{
+	return boot_write_img_confirmed();
+}
+
+bool spotflow_ota_platform_is_image_confirmed(void)
+{
+	return boot_is_img_confirmed();
+}
+
+void spotflow_ota_platform_reboot(void)
+{
+	sys_reboot(SYS_REBOOT_COLD);
+}
+
+int spotflow_ota_platform_read_upload_slot(size_t offset, uint8_t* dst, size_t len)
+{
+	const struct flash_area* fa;
+	uint8_t slot_id = flash_img_get_upload_slot();
+	int rc = flash_area_open(slot_id, &fa);
+
+	if (rc != 0) {
+		return rc;
+	}
+
+	if (offset + len > fa->fa_size) {
+		flash_area_close(fa);
+		return -EINVAL;
+	}
+
+	rc = flash_area_read(fa, offset, dst, len);
+	flash_area_close(fa);
+
+	return rc;
+}
+
+int spotflow_ota_platform_get_upload_image_info(size_t* image_start, size_t* image_size)
+{
+	struct mcuboot_img_header header;
+	uint8_t slot_id = flash_img_get_upload_slot();
+	int rc = boot_read_bank_header(slot_id, &header, sizeof(header));
+
+	if (rc != 0) {
+		return rc;
+	}
+
+	if (image_start != NULL) {
+		*image_start = boot_get_image_start_offset(slot_id);
+	}
+
+	if (image_size != NULL) {
+		*image_size = header.h.v1.image_size;
+	}
+
+	return 0;
+}

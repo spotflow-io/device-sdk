@@ -62,4 +62,16 @@ config SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS
 	help
 	  Delay before retrying an artifact download after a transient failure.
 
+config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+	bool "Automatically handle main firmware OTA updates"
+	depends on SPOTFLOW_OTA
+	depends on ARCH_SUPPORTS_ROM_START || ARCH_POSIX
+	depends on SPOTFLOW_GENERATE_BUILD_ID
+	default n
+	help
+	  When enabled, the Spotflow OTA SDK downloads main firmware artifacts,
+	  requests an MCUboot test upgrade, and reconciles probation state after
+	  reboot. Requires binary descriptor support for downloaded-image build ID
+	  extraction.
+
 endif # SPOTFLOW_OTA
