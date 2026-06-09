@@ -124,16 +124,11 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
-	if (!current_attempt.active || attempt_has_terminal_results(&current_attempt)) {
+	if (!current_attempt.active) {
 		start_attempt(msg, &current_attempt);
 		has_pending_update = false;
 		fill_action(action, msg->attempt_id);
 		action->accepted_update = true;
-		/*
-		 * Wake the worker even when the attempt is already terminal so it can
-		 * persist and report results (e.g. isCanceled for a previously unseen
-		 * attempt ID).
-		 */
 		action->wake_worker = true;
 		k_mutex_unlock(&state_mutex);
 		return 0;
@@ -142,6 +137,16 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 	if (current_attempt.attempt_id == msg->attempt_id) {
 		fill_action(action, msg->attempt_id);
 		action->ignored_duplicate_update = true;
+		k_mutex_unlock(&state_mutex);
+		return 0;
+	}
+
+	if (attempt_has_terminal_results(&current_attempt)) {
+		start_attempt(msg, &current_attempt);
+		has_pending_update = false;
+		fill_action(action, msg->attempt_id);
+		action->accepted_update = true;
+		action->wake_worker = true;
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}

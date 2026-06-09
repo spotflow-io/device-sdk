@@ -206,6 +206,12 @@ static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* ms
 		return rc;
 	}
 
+	if (msg->type == SPOTFLOW_OTA_CBOR_MSG_UPDATE_ARTIFACTS &&
+	    action.ignored_duplicate_update) {
+		LOG_INF("Ignoring duplicate UPDATE_ARTIFACTS for OTA attempt %llu",
+			(unsigned long long)msg->payload.update.attempt_id);
+	}
+
 	handle_state_action(&action);
 
 	if (!action.report_requested) {

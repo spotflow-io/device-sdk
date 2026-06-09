@@ -307,6 +307,60 @@ ZTEST(spotflow_ota_state, test_report_request_matches_current_attempt_only)
 	zassert_equal(action.attempt_id, 5);
 }
 
+ZTEST(spotflow_ota_state, test_ignore_duplicate_update_after_terminal_failure)
+{
+	struct spotflow_ota_update_msg msg = make_update(13, 2);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
+	int rc;
+
+	zassert_ok(spotflow_ota_state_accept_update(&msg, &action));
+	zassert_ok(
+	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
+
+	rc = spotflow_ota_state_accept_update(&msg, &action);
+
+	zassert_ok(rc);
+	zassert_true(action.ignored_duplicate_update);
+	zassert_false(action.accepted_update);
+	zassert_false(action.wake_worker);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+
+	zassert_equal(snapshot.current_attempt_id, 13);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
+}
+
+ZTEST(spotflow_ota_state, test_accept_new_update_after_terminal_failure)
+{
+	struct spotflow_ota_update_msg first = make_update(14, 1);
+	struct spotflow_ota_update_msg second = make_update(15, 1);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&first, &action));
+	zassert_ok(
+	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
+
+	int rc = spotflow_ota_state_accept_update(&second, &action);
+
+	zassert_ok(rc);
+	zassert_true(action.accepted_update);
+	zassert_true(action.wake_worker);
+	zassert_equal(action.attempt_id, 15);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+
+	zassert_equal(snapshot.current_attempt_id, 15);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.attempt_id, 15);
+}
+
 ZTEST(spotflow_ota_state, test_failed_artifact_cancels_remaining_artifacts)
 {
 	struct spotflow_ota_update_msg msg = make_update(8, 3);

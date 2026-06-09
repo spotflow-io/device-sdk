@@ -184,6 +184,10 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 	}
 
 	if (identity == SPOTFLOW_OTA_IDENTITY_MISMATCH) {
+		LOG_INF("Main firmware rollback detected for OTA attempt %llu ('%s' %s): "
+			"reporting failure",
+			(unsigned long long)probation->attempt_id, probation->slug,
+			probation->version);
 		return complete_main_firmware_rollback(probation, action);
 	}
 
@@ -373,6 +377,9 @@ static int complete_main_firmware_success(const struct spotflow_ota_probation* p
 {
 	struct spotflow_ota_main_firmware_state state;
 	int rc;
+
+	LOG_INF("Main firmware update succeeded for OTA attempt %llu ('%s' %s)",
+		(unsigned long long)probation->attempt_id, probation->slug, probation->version);
 
 	rc = spotflow_ota_persistence_save_installed_version(probation->slug, probation->version);
 	if (rc < 0) {
