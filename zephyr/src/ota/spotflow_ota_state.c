@@ -497,7 +497,7 @@ int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
-	if (!current_attempt.active || !current_attempt.artifact_running) {
+	if (!current_attempt.active) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}

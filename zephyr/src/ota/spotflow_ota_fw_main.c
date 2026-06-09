@@ -134,8 +134,19 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 	}
 
 	notify_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+
+	rc = spotflow_ota_state_finish_main_firmware_prereboot(NULL);
+	if (rc < 0) {
+		LOG_ERR("Failed to finalize main firmware before reboot: %d", rc);
+		return fail_main_firmware();
+	}
+
 	spotflow_ota_platform_reboot();
 
+	/*
+	 * spotflow_ota_platform_reboot() does not return on hardware. The return below keeps
+	 * unit tests with a returning platform fake well-defined.
+	 */
 	return SPOTFLOW_OTA_RESULT_PENDING;
 }
 

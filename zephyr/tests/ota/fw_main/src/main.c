@@ -202,14 +202,15 @@ static void before_each(void* fixture)
 ZTEST(spotflow_ota_fw_main, test_happy_path_requests_test_upgrade_and_reboot)
 {
 	struct spotflow_ota_probation probation;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
 	bool has_probation;
-	enum spotflow_ota_result result;
 
 	accept_two_artifact_update();
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
 
-	result = spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact);
+	(void)spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact);
 
-	zassert_equal(result, SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(platform_fake->upgrade_request_count, 1);
 	zassert_equal(platform_fake->reboot_count, 1);
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
@@ -223,6 +224,11 @@ ZTEST(spotflow_ota_fw_main, test_happy_path_requests_test_upgrade_and_reboot)
 	zassert_equal(progress_phases[1], SPOTFLOW_OTA_PHASE_DOWNLOADING);
 	zassert_equal(progress_phases[2], SPOTFLOW_OTA_PHASE_PENDING_UPGRADE);
 	zassert_equal(progress_phases[3], SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
 }
 
 ZTEST(spotflow_ota_fw_main, test_download_failure_fails_main_and_cancels_remaining)

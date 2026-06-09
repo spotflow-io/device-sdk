@@ -30,6 +30,7 @@ bool spotflow_ota_platform_is_image_confirmed(void)
 void spotflow_ota_platform_reboot(void)
 {
 	sys_reboot(SYS_REBOOT_COLD);
+	CODE_UNREACHABLE;
 }
 
 int spotflow_ota_platform_read_upload_slot(size_t offset, uint8_t* dst, size_t len)
