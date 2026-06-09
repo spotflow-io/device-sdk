@@ -268,29 +268,69 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info)
 
 int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
 {
+#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	if (state != NULL) {
 		(void)spotflow_get_main_firmware_update_state(state);
 	}
 
 	return -ENOTSUP;
+#else
+	int rc;
+
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	return spotflow_ota_fw_main_pause_update(state);
+#endif
 }
 
 int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
 {
+#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	if (state != NULL) {
 		(void)spotflow_get_main_firmware_update_state(state);
 	}
 
 	return -ENOTSUP;
+#else
+	int rc;
+
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	return spotflow_ota_fw_main_resume_update(state);
+#endif
 }
 
 int spotflow_fail_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
 {
+#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	if (state != NULL) {
 		(void)spotflow_get_main_firmware_update_state(state);
 	}
 
 	return -ENOTSUP;
+#else
+	struct spotflow_ota_state_action action;
+	int rc;
+
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	rc = spotflow_ota_fw_main_fail_update(state, &action);
+	if (rc < 0) {
+		return rc;
+	}
+
+	handle_state_action(&action);
+	return 0;
+#endif
 }
 
 int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state* state)

@@ -100,6 +100,11 @@ int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_
 int spotflow_ota_state_enter_main_firmware_unconfirmed(
     struct spotflow_ota_main_firmware_state* out_state);
 
+int spotflow_ota_state_set_main_firmware_paused(bool paused,
+						struct spotflow_ota_main_firmware_state* out_state);
+
+int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index);
+
 void spotflow_ota_state_clear_main_firmware_awaiting_reboot(void);
 
 #ifdef __cplusplus

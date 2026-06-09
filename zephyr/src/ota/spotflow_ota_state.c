@@ -538,6 +538,44 @@ int spotflow_ota_state_enter_main_firmware_unconfirmed(
 	return 0;
 }
 
+int spotflow_ota_state_set_main_firmware_paused(bool paused,
+					       struct spotflow_ota_main_firmware_state* out_state)
+{
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	current_attempt.main_firmware_state.is_paused = paused;
+
+	if (out_state != NULL) {
+		*out_state = current_attempt.main_firmware_state;
+	}
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index)
+{
+	if (artifact_index == NULL) {
+		return -EINVAL;
+	}
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active || !current_attempt.has_main_firmware_artifact) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	*artifact_index = current_attempt.main_firmware_artifact_index;
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
 void spotflow_ota_state_clear_main_firmware_awaiting_reboot(void)
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);

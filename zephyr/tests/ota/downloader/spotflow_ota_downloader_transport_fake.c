@@ -70,6 +70,28 @@ int spotflow_ota_downloader_transport_download(
 		return -ECANCELED;
 	}
 
+	if (fake->block_until_pause) {
+		while (request->downloader->state != SPOTFLOW_DOWNLOADER_STATE_PAUSED) {
+			if (request->downloader->cancel_requested) {
+				fake->cancel_observed = true;
+				return -ECANCELED;
+			}
+
+			k_sleep(K_MSEC(10));
+		}
+
+		fake->pause_observed = true;
+
+		while (request->downloader->state == SPOTFLOW_DOWNLOADER_STATE_PAUSED) {
+			if (request->downloader->cancel_requested) {
+				fake->cancel_observed = true;
+				return -ECANCELED;
+			}
+
+			k_sleep(K_MSEC(10));
+		}
+	}
+
 	if (fake->payload != NULL && fake->payload_len > 0) {
 		struct spotflow_artifact_block block = {
 			.offset = 0,

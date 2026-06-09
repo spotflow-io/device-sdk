@@ -23,6 +23,8 @@ struct spotflow_ota_downloader_transport_fake {
 	uint16_t port;
 	bool block_until_cancel;
 	bool cancel_observed;
+	bool block_until_pause;
+	bool pause_observed;
 };
 
 void spotflow_ota_downloader_transport_fake_reset(

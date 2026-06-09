@@ -153,12 +153,55 @@ ZTEST(spotflow_ota_downloader, test_transient_errors_are_retried)
 	zassert_true(received_last_block);
 }
 
-ZTEST(spotflow_ota_downloader, test_pause_and_resume_return_enotsup)
+static void pause_and_resume_after_delay(void* downloader_ptr, void* arg2, void* arg3)
+{
+	ARG_UNUSED(arg2);
+	ARG_UNUSED(arg3);
+
+	k_sleep(K_MSEC(20));
+	zassert_ok(spotflow_pause_download(downloader_ptr));
+	k_sleep(K_MSEC(20));
+	zassert_ok(spotflow_resume_download(downloader_ptr));
+}
+
+ZTEST(spotflow_ota_downloader, test_pause_and_resume_block_download)
+{
+	struct spotflow_ota_downloader_transport_fake* fake =
+	    spotflow_ota_downloader_transport_fake_get();
+	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_download_request request = {
+		.url = "https://example.com/firmware.bin",
+		.secret = "secret",
+	};
+	struct k_thread control_thread;
+	k_thread_stack_t control_stack[1024];
+	int download_result = 0;
+
+	fake->block_until_pause = true;
+	fake->payload = sample_payload;
+	fake->payload_len = sizeof(sample_payload);
+
+	k_thread_create(&control_thread, control_stack, K_THREAD_STACK_SIZEOF(control_stack),
+			pause_and_resume_after_delay, &downloader, NULL, NULL, K_PRIO_PREEMPT(0),
+			0, K_NO_WAIT);
+
+	download_result = spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL);
+
+	k_thread_join(&control_thread, K_FOREVER);
+
+	zassert_equal(download_result, 0);
+	zassert_true(fake->pause_observed);
+	zassert_equal(received_bytes, sizeof(sample_payload));
+	zassert_equal(spotflow_get_downloader_state(&downloader),
+		      SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
+}
+
+ZTEST(spotflow_ota_downloader, test_pause_invalid_when_inactive)
 {
 	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
 
-	zassert_equal(spotflow_pause_download(&downloader), -ENOTSUP);
-	zassert_equal(spotflow_resume_download(&downloader), -ENOTSUP);
+	zassert_equal(spotflow_pause_download(&downloader), -EINVAL);
+	zassert_equal(spotflow_resume_download(&downloader), -EINVAL);
 }
 
 ZTEST_SUITE(spotflow_ota_downloader, NULL, NULL, before_each, NULL, NULL);

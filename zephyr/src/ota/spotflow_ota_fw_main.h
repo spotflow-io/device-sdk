@@ -25,6 +25,13 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* out_state,
 				       struct spotflow_ota_state_action* action);
 
+int spotflow_ota_fw_main_pause_update(struct spotflow_ota_main_firmware_state* out_state);
+
+int spotflow_ota_fw_main_resume_update(struct spotflow_ota_main_firmware_state* out_state);
+
+int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* out_state,
+				     struct spotflow_ota_state_action* action);
+
 void spotflow_ota_fw_main_reset(void);
 
 #ifdef __cplusplus
