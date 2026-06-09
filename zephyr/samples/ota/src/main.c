@@ -143,7 +143,21 @@ int main(void)
 	if (boot_is_img_confirmed()) {
 		LOG_INF("Current image is confirmed");
 	} else {
-		LOG_INF("Current image is NOT confirmed (test mode)");
+		struct spotflow_ota_main_firmware_state fw_state;
+
+		LOG_INF("Current image is NOT confirmed (test mode), confirming via Spotflow OTA");
+		(void)spotflow_get_main_firmware_update_state(&fw_state);
+		LOG_INF("Main firmware state before confirm: phase=%d result=%d", fw_state.phase,
+			fw_state.result);
+
+		int ret = spotflow_confirm_main_firmware_image(&fw_state);
+		if (ret < 0) {
+			LOG_ERR("Failed to confirm main firmware image: %d (phase=%d result=%d)", ret,
+				fw_state.phase, fw_state.result);
+		} else {
+			LOG_INF("Main firmware image confirmed successfully (phase=%d result=%d)",
+				fw_state.phase, fw_state.result);
+		}
 	}
 
 	/* Wait for the initialization of network device */
