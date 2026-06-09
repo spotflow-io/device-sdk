@@ -13,10 +13,6 @@ extern "C" {
 size_t spotflow_ota_test_bindesc_write_build_id(uint8_t* buffer, size_t buffer_size, size_t offset,
 						const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
 
-void spotflow_ota_test_set_running_build_id(const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
-
-void spotflow_ota_test_clear_running_build_id(void);
-
 #ifdef __cplusplus
 }
 #endif

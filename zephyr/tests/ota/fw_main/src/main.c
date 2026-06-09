@@ -12,6 +12,7 @@
 #include "ota/spotflow_ota_state.h"
 #include "spotflow_build_id.h"
 #include "spotflow_ota_bindesc_test_util.h"
+#include "spotflow_ota_build_id_fake.h"
 #include "spotflow_ota_downloader_transport_fake.h"
 #include "spotflow_ota_platform_fake.h"
 #include "spotflow_ota_test_fakes.h"
@@ -74,7 +75,7 @@ static void reset_test_state(void)
 {
 	spotflow_ota_test_settings_reset();
 	spotflow_ota_test_fakes_reset();
-	spotflow_ota_test_clear_running_build_id();
+	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
 	spotflow_ota_net_reset();
 	spotflow_ota_state_reset();
 	spotflow_ota_fw_main_reset();
@@ -183,7 +184,7 @@ static void setup_post_reboot_context(const uint8_t build_id[SPOTFLOW_BUILD_ID_L
 	accept_two_artifact_update();
 	zassert_ok(spotflow_ota_persistence_save_probation(&probation));
 	persist_pending_post_reboot_attempt();
-	spotflow_ota_test_set_running_build_id(build_id);
+	spotflow_ota_build_id_fake_set_running_build_id(build_id);
 	restore_post_reboot_state(&probation);
 
 	if (probation_out != NULL) {
@@ -375,7 +376,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_mismatch_reports_rollbac
 	fill_build_id(expected_build_id, 0x30);
 	fill_build_id(running_build_id, 0x40);
 	setup_post_reboot_context(expected_build_id, &probation);
-	spotflow_ota_test_set_running_build_id(running_build_id);
+	spotflow_ota_build_id_fake_set_running_build_id(running_build_id);
 
 	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
 	zassert_false(action.wake_worker);

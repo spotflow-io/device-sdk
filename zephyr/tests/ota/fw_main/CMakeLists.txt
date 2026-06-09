@@ -27,6 +27,7 @@ target_compile_definitions(app PRIVATE
 target_sources(app PRIVATE
         src/main.c
         ../common/spotflow_ota_bindesc_test_util.c
+        ../common/spotflow_ota_build_id_fake.c
         ../common/spotflow_ota_platform_fake.c
         ../common/spotflow_ota_test_fakes.c
         ../common/spotflow_ota_test_settings.c
@@ -41,6 +42,5 @@ target_sources(app PRIVATE
         ../../../src/ota/spotflow_ota_records_cbor.c
         ../../../src/ota/spotflow_ota_state.c
         ../../../src/ota/spotflow_ota_url.c
-        ../../../src/spotflow_build_id.c
         ${ZEPHYR_BASE}/subsys/net/lib/http/http_parser_url.c
 )

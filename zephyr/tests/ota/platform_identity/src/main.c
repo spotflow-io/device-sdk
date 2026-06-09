@@ -7,6 +7,7 @@
 #include "ota/spotflow_ota_identity.h"
 #include "ota/spotflow_ota_platform.h"
 #include "spotflow_ota_bindesc_test_util.h"
+#include "spotflow_ota_build_id_fake.h"
 #include "spotflow_ota_platform_fake.h"
 
 static struct spotflow_ota_platform_fake* fake;
@@ -15,6 +16,7 @@ static void before_each(void* fixture)
 {
 	ARG_UNUSED(fixture);
 
+	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
 	spotflow_ota_platform_fake_reset(spotflow_ota_platform_fake_get());
 	fake = spotflow_ota_platform_fake_get();
 }
@@ -63,14 +65,14 @@ ZTEST(spotflow_ota_platform_identity, test_identity_compare_match_and_mismatch)
 {
 	uint8_t running[SPOTFLOW_BUILD_ID_LENGTH];
 	uint8_t expected[SPOTFLOW_BUILD_ID_LENGTH];
-	int rc = spotflow_ota_identity_get_running_build_id(running);
 
-	if (rc == -ENOSYS) {
-		ztest_test_skip();
+	for (size_t i = 0; i < SPOTFLOW_BUILD_ID_LENGTH; i++) {
+		expected[i] = (uint8_t)(0xC0 + i);
 	}
 
-	zassert_ok(rc);
-	memcpy(expected, running, sizeof(expected));
+	spotflow_ota_build_id_fake_set_running_build_id(expected);
+	zassert_ok(spotflow_ota_identity_get_running_build_id(running));
+	zassert_mem_equal(expected, running, SPOTFLOW_BUILD_ID_LENGTH);
 
 	zassert_equal(spotflow_ota_identity_compare_probation(expected),
 		      SPOTFLOW_OTA_IDENTITY_MATCH);
