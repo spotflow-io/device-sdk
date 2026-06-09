@@ -182,8 +182,8 @@ ZTEST(spotflow_ota_downloader, test_pause_and_resume_block_download)
 	fake->payload_len = sizeof(sample_payload);
 
 	k_thread_create(&control_thread, control_stack, K_THREAD_STACK_SIZEOF(control_stack),
-			pause_and_resume_after_delay, &downloader, NULL, NULL, K_PRIO_PREEMPT(0),
-			0, K_NO_WAIT);
+			pause_and_resume_after_delay, &downloader, NULL, NULL, K_PRIO_PREEMPT(0), 0,
+			K_NO_WAIT);
 
 	download_result = spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL);
 

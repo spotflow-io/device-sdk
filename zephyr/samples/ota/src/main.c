@@ -152,8 +152,8 @@ int main(void)
 
 		int ret = spotflow_confirm_main_firmware_image(&fw_state);
 		if (ret < 0) {
-			LOG_ERR("Failed to confirm main firmware image: %d (phase=%d result=%d)", ret,
-				fw_state.phase, fw_state.result);
+			LOG_ERR("Failed to confirm main firmware image: %d (phase=%d result=%d)",
+				ret, fw_state.phase, fw_state.result);
 		} else {
 			LOG_INF("Main firmware image confirmed successfully (phase=%d result=%d)",
 				fw_state.phase, fw_state.result);

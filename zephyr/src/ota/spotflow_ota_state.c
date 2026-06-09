@@ -539,7 +539,7 @@ int spotflow_ota_state_enter_main_firmware_unconfirmed(
 }
 
 int spotflow_ota_state_set_main_firmware_paused(bool paused,
-					       struct spotflow_ota_main_firmware_state* out_state)
+						struct spotflow_ota_main_firmware_state* out_state)
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
