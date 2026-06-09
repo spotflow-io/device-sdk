@@ -242,6 +242,13 @@ int spotflow_get_main_firmware_update_state(struct spotflow_ota_main_firmware_st
 		return -EINVAL;
 	}
 
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	int rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+#endif
+
 	struct spotflow_ota_state_snapshot snapshot;
 	spotflow_ota_state_get_snapshot(&snapshot);
 	*state = snapshot.main_firmware_state;
@@ -297,6 +304,12 @@ int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state
 #else
 	struct spotflow_ota_state_action action;
 	int rc;
+
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		LOG_ERR("Failed to initialize OTA before main firmware confirmation: %d", rc);
+		return rc;
+	}
 
 	rc = spotflow_ota_fw_main_confirm_image(state, &action);
 	if (rc < 0) {

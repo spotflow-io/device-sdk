@@ -223,6 +223,9 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	if (!snapshot.has_current_attempt ||
 	    snapshot.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
+		LOG_ERR("Main firmware confirmation rejected: has_attempt=%d phase=%d result=%d",
+			snapshot.has_current_attempt, snapshot.main_firmware_state.phase,
+			snapshot.main_firmware_state.result);
 		if (out_state != NULL) {
 			*out_state = snapshot.main_firmware_state;
 		}
@@ -236,6 +239,10 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 	}
 
 	if (!has_probation || probation.attempt_id != snapshot.current_attempt_id) {
+		LOG_ERR("Main firmware confirmation rejected: has_probation=%d attempt_id=%llu "
+			"current_attempt_id=%llu",
+			has_probation, (unsigned long long)probation.attempt_id,
+			(unsigned long long)snapshot.current_attempt_id);
 		if (out_state != NULL) {
 			*out_state = snapshot.main_firmware_state;
 		}
