@@ -32,6 +32,8 @@ int spotflow_ota_fw_main_resume_update(struct spotflow_ota_main_firmware_state* 
 int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* out_state,
 				     struct spotflow_ota_state_action* action);
 
+void spotflow_ota_fw_main_wake_if_paused(void);
+
 void spotflow_ota_fw_main_reset(void);
 
 #ifdef __cplusplus

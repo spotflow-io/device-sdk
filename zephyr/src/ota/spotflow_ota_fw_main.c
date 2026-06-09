@@ -18,6 +18,8 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static SPOTFLOW_DEFINE_DOWNLOADER(main_firmware_downloader);
 
+static K_SEM_DEFINE(main_firmware_resume_sem, 0, 1);
+
 static bool user_fail_requested;
 
 struct main_firmware_flash_ctx {
@@ -29,6 +31,8 @@ static void notify_main_firmware_state(const struct spotflow_ota_main_firmware_s
 static enum spotflow_ota_result fail_main_firmware(void);
 static bool main_firmware_phase_allows_user_control(enum spotflow_ota_phase phase);
 static void fill_main_firmware_state_output(struct spotflow_ota_main_firmware_state* out_state);
+static void main_firmware_wake_paused_worker(void);
+static void main_firmware_drain_resume_sem(void);
 static void wait_while_paused(void);
 static int check_user_abort(void);
 static int complete_user_fail(struct spotflow_ota_state_action* action,
@@ -49,7 +53,10 @@ void spotflow_ota_fw_main_reset(void)
 	main_firmware_downloader.state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE;
 	main_firmware_downloader.cancel_requested = false;
 	k_mutex_unlock(&main_firmware_downloader.mutex);
+	while (k_sem_take(&main_firmware_downloader.resume_sem, K_NO_WAIT) == 0) {
+	}
 	user_fail_requested = false;
+	main_firmware_drain_resume_sem();
 }
 
 enum spotflow_ota_result
@@ -360,6 +367,8 @@ int spotflow_ota_fw_main_resume_update(struct spotflow_ota_main_firmware_state* 
 			fill_main_firmware_state_output(out_state);
 			return rc;
 		}
+	} else {
+		main_firmware_wake_paused_worker();
 	}
 
 	return 0;
@@ -386,11 +395,17 @@ int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* ou
 	}
 
 	user_fail_requested = true;
+	main_firmware_wake_paused_worker();
 
 	downloader_state = spotflow_get_downloader_state(&main_firmware_downloader);
 	if (downloader_state == SPOTFLOW_DOWNLOADER_STATE_DOWNLOADING ||
 	    downloader_state == SPOTFLOW_DOWNLOADER_STATE_PAUSED) {
 		(void)spotflow_cancel_download(&main_firmware_downloader);
+		fill_main_firmware_state_output(out_state);
+		return 0;
+	}
+
+	if (snapshot.main_firmware_state.is_paused) {
 		fill_main_firmware_state_output(out_state);
 		return 0;
 	}
@@ -401,6 +416,16 @@ int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* ou
 	}
 
 	return rc;
+}
+
+void spotflow_ota_fw_main_wake_if_paused(void)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	if (snapshot.has_current_attempt && snapshot.main_firmware_state.is_paused) {
+		main_firmware_wake_paused_worker();
+	}
 }
 
 static void notify_main_firmware_phase(enum spotflow_ota_phase phase)
@@ -459,6 +484,17 @@ static void fill_main_firmware_state_output(struct spotflow_ota_main_firmware_st
 	*out_state = snapshot.main_firmware_state;
 }
 
+static void main_firmware_wake_paused_worker(void)
+{
+	k_sem_give(&main_firmware_resume_sem);
+}
+
+static void main_firmware_drain_resume_sem(void)
+{
+	while (k_sem_take(&main_firmware_resume_sem, K_NO_WAIT) == 0) {
+	}
+}
+
 static void wait_while_paused(void)
 {
 	struct spotflow_ota_state_snapshot snapshot;
@@ -473,7 +509,7 @@ static void wait_while_paused(void)
 			return;
 		}
 
-		k_sleep(K_MSEC(10));
+		k_sem_take(&main_firmware_resume_sem, K_FOREVER);
 	}
 }
 

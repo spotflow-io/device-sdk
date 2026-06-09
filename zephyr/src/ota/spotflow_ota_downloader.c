@@ -21,7 +21,8 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 	 sizeof(OTA_AUTHORIZATION_HEADER_SUFFIX))
 
 static bool downloader_is_canceled(struct spotflow_downloader* downloader);
-static bool downloader_is_paused(struct spotflow_downloader* downloader);
+static void downloader_wake_waiters(struct spotflow_downloader* downloader);
+static void downloader_drain_resume_sem(struct spotflow_downloader* downloader);
 static void downloader_wait_if_paused(struct spotflow_downloader* downloader);
 static void downloader_finish(struct spotflow_downloader* downloader);
 static bool downloader_error_is_transient(int err, bool transient_failure);
@@ -90,6 +91,8 @@ int spotflow_resume_download(struct spotflow_downloader* downloader)
 	downloader->state = SPOTFLOW_DOWNLOADER_STATE_DOWNLOADING;
 	k_mutex_unlock(&downloader->mutex);
 
+	downloader_wake_waiters(downloader);
+
 	return 0;
 }
 
@@ -109,6 +112,8 @@ int spotflow_cancel_download(struct spotflow_downloader* downloader)
 	downloader->cancel_requested = true;
 	downloader->state = SPOTFLOW_DOWNLOADER_STATE_CANCELING;
 	k_mutex_unlock(&downloader->mutex);
+
+	downloader_wake_waiters(downloader);
 
 	return 0;
 }
@@ -145,6 +150,7 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 	}
 
 	downloader->cancel_requested = false;
+	downloader_drain_resume_sem(downloader);
 	downloader->state = SPOTFLOW_DOWNLOADER_STATE_DOWNLOADING;
 	k_mutex_unlock(&downloader->mutex);
 
@@ -198,6 +204,9 @@ static void downloader_finish(struct spotflow_downloader* downloader)
 	downloader->state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE;
 	downloader->cancel_requested = false;
 	k_mutex_unlock(&downloader->mutex);
+
+	downloader_wake_waiters(downloader);
+	downloader_drain_resume_sem(downloader);
 }
 
 static bool downloader_is_canceled(struct spotflow_downloader* downloader)
@@ -211,25 +220,30 @@ static bool downloader_is_canceled(struct spotflow_downloader* downloader)
 	return canceled;
 }
 
-static bool downloader_is_paused(struct spotflow_downloader* downloader)
+static void downloader_wake_waiters(struct spotflow_downloader* downloader)
 {
-	bool paused;
+	k_sem_give(&downloader->resume_sem);
+}
 
-	k_mutex_lock(&downloader->mutex, K_FOREVER);
-	paused = downloader->state == SPOTFLOW_DOWNLOADER_STATE_PAUSED;
-	k_mutex_unlock(&downloader->mutex);
-
-	return paused;
+static void downloader_drain_resume_sem(struct spotflow_downloader* downloader)
+{
+	while (k_sem_take(&downloader->resume_sem, K_NO_WAIT) == 0) {
+	}
 }
 
 static void downloader_wait_if_paused(struct spotflow_downloader* downloader)
 {
-	while (downloader_is_paused(downloader)) {
-		if (downloader_is_canceled(downloader)) {
+	while (true) {
+		k_mutex_lock(&downloader->mutex, K_FOREVER);
+		bool paused = downloader->state == SPOTFLOW_DOWNLOADER_STATE_PAUSED;
+		bool canceled = downloader->cancel_requested;
+		k_mutex_unlock(&downloader->mutex);
+
+		if (!paused || canceled) {
 			return;
 		}
 
-		k_sleep(K_MSEC(10));
+		k_sem_take(&downloader->resume_sem, K_FOREVER);
 	}
 }
 

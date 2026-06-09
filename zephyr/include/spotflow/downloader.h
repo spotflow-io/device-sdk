@@ -26,12 +26,14 @@ struct spotflow_downloader {
 	enum spotflow_downloader_state state;
 	struct k_mutex mutex;
 	bool cancel_requested;
+	struct k_sem resume_sem;
 };
 
 #define SPOTFLOW_DEFINE_DOWNLOADER(name)                     \
 	struct spotflow_downloader name = {                  \
 		.state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE, \
 		.mutex = Z_MUTEX_INITIALIZER(name.mutex),    \
+		.resume_sem = Z_SEM_INITIALIZER(name.resume_sem, 0, 1), \
 	}
 
 struct spotflow_artifact_block {
