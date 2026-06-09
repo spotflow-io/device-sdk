@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "ota/spotflow_ota_records_cbor.h"
 #include "ota/spotflow_ota_types.h"
 
 #ifdef __cplusplus
@@ -55,6 +56,11 @@ struct spotflow_ota_state_snapshot {
 
 void spotflow_ota_state_reset(void);
 
+int spotflow_ota_state_init_from_persistence(const struct spotflow_ota_persisted_attempt* attempt,
+					     bool has_attempt,
+					     const struct spotflow_ota_probation* probation,
+					     bool has_probation);
+
 int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 				     struct spotflow_ota_state_action* action);
 
@@ -90,6 +96,11 @@ int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* inf
 					      struct spotflow_download_request* request_out);
 
 int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_action* action);
+
+int spotflow_ota_state_enter_main_firmware_unconfirmed(
+    struct spotflow_ota_main_firmware_state* out_state);
+
+void spotflow_ota_state_clear_main_firmware_awaiting_reboot(void);
 
 #ifdef __cplusplus
 }

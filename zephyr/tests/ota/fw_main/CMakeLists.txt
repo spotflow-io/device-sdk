@@ -28,12 +28,15 @@ target_sources(app PRIVATE
         src/main.c
         ../common/spotflow_ota_bindesc_test_util.c
         ../common/spotflow_ota_platform_fake.c
+        ../common/spotflow_ota_test_fakes.c
         ../common/spotflow_ota_test_settings.c
         ../downloader/spotflow_ota_downloader_transport_fake.c
+        ../../../src/ota/spotflow_ota_cbor.c
         ../../../src/ota/spotflow_ota_downloader.c
         ../../../src/ota/spotflow_ota_fw_custom.c
         ../../../src/ota/spotflow_ota_fw_main.c
         ../../../src/ota/spotflow_ota_identity.c
+        ../../../src/ota/spotflow_ota_net.c
         ../../../src/ota/spotflow_ota_persistence.c
         ../../../src/ota/spotflow_ota_records_cbor.c
         ../../../src/ota/spotflow_ota_state.c

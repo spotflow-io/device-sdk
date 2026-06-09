@@ -8,6 +8,9 @@
 #include "ota/spotflow_ota.h"
 #include "ota/spotflow_ota_cbor.h"
 #include "ota/spotflow_ota_fw_custom.h"
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+#include "ota/spotflow_ota_fw_main.h"
+#endif
 #include "ota/spotflow_ota_net.h"
 #include "ota/spotflow_ota_persistence.h"
 #include "ota/spotflow_ota_state.h"
@@ -57,21 +60,32 @@ int spotflow_ota_init(void)
 		return rc;
 	}
 
-	/* TODO: Will be handled eventually */
-	ARG_UNUSED(probation);
-	ARG_UNUSED(has_probation);
-
 	rc = spotflow_ota_worker_init();
 	if (rc < 0) {
 		k_mutex_unlock(&ota_mutex);
 		return rc;
 	}
 
-	spotflow_ota_state_reset();
+	spotflow_ota_state_init_from_persistence(has_attempt ? &attempt : NULL, has_attempt,
+						 has_probation ? &probation : NULL, has_probation);
+
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	{
+		struct spotflow_ota_state_action action;
+
+		rc = spotflow_ota_fw_main_reconcile_startup(has_probation ? &probation : NULL,
+							    has_probation, &action);
+		if (rc < 0) {
+			k_mutex_unlock(&ota_mutex);
+			return rc;
+		}
+
+		handle_state_action(&action);
+	}
+#endif
+
 	last_received_attempt_id = has_attempt ? attempt.attempt_id : 0;
 	ota_initialized = true;
-
-	/* TODO: The attempt will be eventually propagated to the OTA state */
 
 	k_mutex_unlock(&ota_mutex);
 	return 0;
@@ -119,6 +133,9 @@ void spotflow_ota_reset(void)
 	spotflow_ota_net_reset();
 	spotflow_ota_state_reset();
 	spotflow_ota_worker_reset();
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	spotflow_ota_fw_main_reset();
+#endif
 }
 
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
@@ -265,11 +282,24 @@ int spotflow_fail_main_firmware_update(struct spotflow_ota_main_firmware_state* 
 
 int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state* state)
 {
+#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	if (state != NULL) {
 		(void)spotflow_get_main_firmware_update_state(state);
 	}
 
 	return -ENOTSUP;
+#else
+	struct spotflow_ota_state_action action;
+	int rc;
+
+	rc = spotflow_ota_fw_main_confirm_image(state, &action);
+	if (rc < 0) {
+		return rc;
+	}
+
+	handle_state_action(&action);
+	return 0;
+#endif
 }
 
 static void handle_state_action(const struct spotflow_ota_state_action* action)

@@ -34,8 +34,33 @@ const uint8_t bindesc_entry_spotflow_build_id[] = { SPOTFLOW_BINDESC_BUILD_ID_MO
 
 #endif
 
+static bool use_test_build_id_override;
+static uint8_t test_build_id_override[SPOTFLOW_BUILD_ID_LENGTH];
+
+void spotflow_build_id_set_test_override(const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+{
+	if (build_id == NULL) {
+		use_test_build_id_override = false;
+		return;
+	}
+
+	memcpy(test_build_id_override, build_id, SPOTFLOW_BUILD_ID_LENGTH);
+	use_test_build_id_override = true;
+}
+
+void spotflow_build_id_clear_test_override(void)
+{
+	use_test_build_id_override = false;
+}
+
 int spotflow_build_id_get(const uint8_t** build_id, uint16_t* build_id_len)
 {
+	if (use_test_build_id_override) {
+		*build_id = test_build_id_override;
+		*build_id_len = SPOTFLOW_BUILD_ID_LENGTH;
+		return 0;
+	}
+
 #ifdef CONFIG_BINDESC
 
 	const uint8_t* id_bytes = BINDESC_GET_BYTES(spotflow_build_id);

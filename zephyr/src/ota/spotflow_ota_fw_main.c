@@ -9,6 +9,7 @@
 #include "ota/spotflow_ota_fw_custom.h"
 #include "ota/spotflow_ota_fw_main.h"
 #include "ota/spotflow_ota_identity.h"
+#include "ota/spotflow_ota_net.h"
 #include "ota/spotflow_ota_persistence.h"
 #include "ota/spotflow_ota_platform.h"
 #include "ota/spotflow_ota_state.h"
@@ -22,9 +23,17 @@ struct main_firmware_flash_ctx {
 };
 
 static void notify_main_firmware_phase(enum spotflow_ota_phase phase);
+static void notify_main_firmware_state(const struct spotflow_ota_main_firmware_state* state);
 static enum spotflow_ota_result fail_main_firmware(void);
 static void download_block_cb(const struct spotflow_artifact_block* block,
 			      struct spotflow_downloader* downloader, void* callback_ctx);
+static int persist_prereboot_attempt(uint64_t attempt_id);
+static int persist_snapshot_and_enqueue_results(void);
+static int complete_main_firmware_success(const struct spotflow_ota_probation* probation,
+					  struct spotflow_ota_state_action* action);
+static int complete_main_firmware_rollback(const struct spotflow_ota_probation* probation,
+					   struct spotflow_ota_state_action* action);
+static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation);
 
 void spotflow_ota_fw_main_reset(void)
 {
@@ -112,6 +121,12 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 		return fail_main_firmware();
 	}
 
+	rc = persist_prereboot_attempt(attempt_id);
+	if (rc < 0) {
+		LOG_ERR("Failed to persist main firmware attempt before reboot: %d", rc);
+		return fail_main_firmware();
+	}
+
 	rc = spotflow_ota_platform_request_test_upgrade();
 	if (rc < 0) {
 		LOG_ERR("Failed to request main firmware test upgrade: %d", rc);
@@ -124,6 +139,117 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 	return SPOTFLOW_OTA_RESULT_PENDING;
 }
 
+int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* probation,
+					   bool has_probation,
+					   struct spotflow_ota_state_action* action)
+{
+	if (action == NULL) {
+		return -EINVAL;
+	}
+
+	memset(action, 0, sizeof(*action));
+
+	if (!has_probation || probation == NULL) {
+		return 0;
+	}
+
+	if (!main_artifact_is_pending(probation)) {
+		int rc = spotflow_ota_persistence_clear_probation();
+
+		if (rc < 0) {
+			LOG_ERR("Failed to clear stale main firmware probation record: %d", rc);
+			return rc;
+		}
+
+		return 0;
+	}
+
+	enum spotflow_ota_identity_cmp identity =
+	    spotflow_ota_identity_compare_probation(probation->expected_build_id);
+
+	if (identity == SPOTFLOW_OTA_IDENTITY_UNAVAILABLE) {
+		LOG_WRN("Main firmware probation record present but running identity unavailable");
+		return 0;
+	}
+
+	if (identity == SPOTFLOW_OTA_IDENTITY_MISMATCH) {
+		return complete_main_firmware_rollback(probation, action);
+	}
+
+	if (!spotflow_ota_platform_is_image_confirmed()) {
+		struct spotflow_ota_main_firmware_state state;
+		int rc = spotflow_ota_state_enter_main_firmware_unconfirmed(&state);
+
+		if (rc < 0) {
+			return rc;
+		}
+
+		notify_main_firmware_state(&state);
+		return 0;
+	}
+
+	return complete_main_firmware_success(probation, action);
+}
+
+int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* out_state,
+				       struct spotflow_ota_state_action* action)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_probation probation;
+	bool has_probation;
+	int rc;
+
+	if (action == NULL) {
+		return -EINVAL;
+	}
+
+	memset(action, 0, sizeof(*action));
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	if (!snapshot.has_current_attempt ||
+	    snapshot.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
+		if (out_state != NULL) {
+			*out_state = snapshot.main_firmware_state;
+		}
+
+		return -EINVAL;
+	}
+
+	rc = spotflow_ota_persistence_load_probation(&probation, &has_probation);
+	if (rc < 0) {
+		return rc;
+	}
+
+	if (!has_probation || probation.attempt_id != snapshot.current_attempt_id) {
+		if (out_state != NULL) {
+			*out_state = snapshot.main_firmware_state;
+		}
+
+		return -EINVAL;
+	}
+
+	rc = spotflow_ota_platform_confirm_image();
+	if (rc < 0) {
+		if (out_state != NULL) {
+			*out_state = snapshot.main_firmware_state;
+		}
+
+		return rc;
+	}
+
+	rc = complete_main_firmware_success(&probation, action);
+	if (rc < 0) {
+		return rc;
+	}
+
+	if (out_state != NULL) {
+		spotflow_ota_state_get_snapshot(&snapshot);
+		*out_state = snapshot.main_firmware_state;
+	}
+
+	return 0;
+}
+
 static void notify_main_firmware_phase(enum spotflow_ota_phase phase)
 {
 	struct spotflow_ota_main_firmware_state state;
@@ -132,7 +258,16 @@ static void notify_main_firmware_phase(enum spotflow_ota_phase phase)
 		return;
 	}
 
-	spotflow_on_main_firmware_update_progressed(&state);
+	notify_main_firmware_state(&state);
+}
+
+static void notify_main_firmware_state(const struct spotflow_ota_main_firmware_state* state)
+{
+	if (state == NULL) {
+		return;
+	}
+
+	spotflow_on_main_firmware_update_progressed(state);
 }
 
 static enum spotflow_ota_result fail_main_firmware(void)
@@ -140,7 +275,7 @@ static enum spotflow_ota_result fail_main_firmware(void)
 	struct spotflow_ota_main_firmware_state state;
 
 	if (spotflow_ota_state_set_main_firmware_result(SPOTFLOW_OTA_RESULT_FAILED, &state) == 0) {
-		spotflow_on_main_firmware_update_progressed(&state);
+		notify_main_firmware_state(&state);
 	}
 
 	return SPOTFLOW_OTA_RESULT_FAILED;
@@ -163,4 +298,160 @@ static void download_block_cb(const struct spotflow_artifact_block* block,
 
 	ctx->write_err =
 	    spotflow_ota_platform_write_image_block(block->data, block->data_len, block->is_last);
+}
+
+static int persist_prereboot_attempt(uint64_t attempt_id)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_persisted_attempt attempt;
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != attempt_id) {
+		return -EINVAL;
+	}
+
+	attempt = (struct spotflow_ota_persisted_attempt){
+		.attempt_id = snapshot.current_attempt_id,
+		.artifact_count = snapshot.artifact_count,
+		.actionable_cancellation = snapshot.actionable_cancellation,
+		.has_attempt_error = snapshot.has_attempt_error,
+		.attempt_error = snapshot.attempt_error,
+	};
+	memcpy(attempt.artifact_results, snapshot.artifact_results,
+	       sizeof(attempt.artifact_results));
+
+	return spotflow_ota_persistence_save_attempt(&attempt);
+}
+
+static int persist_snapshot_and_enqueue_results(void)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_persisted_attempt attempt;
+	int rc;
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	if (!snapshot.has_current_attempt || snapshot.has_attempt_error) {
+		return -EINVAL;
+	}
+
+	attempt = (struct spotflow_ota_persisted_attempt){
+		.attempt_id = snapshot.current_attempt_id,
+		.artifact_count = snapshot.artifact_count,
+		.actionable_cancellation = snapshot.actionable_cancellation,
+	};
+	memcpy(attempt.artifact_results, snapshot.artifact_results,
+	       sizeof(attempt.artifact_results));
+
+	rc = spotflow_ota_persistence_save_attempt(&attempt);
+	if (rc < 0) {
+		LOG_ERR("Failed to persist main firmware attempt results: %d", rc);
+		return rc;
+	}
+
+	rc = spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
+					      snapshot.artifact_results, snapshot.artifact_count);
+	if (rc < 0) {
+		LOG_ERR("Failed to queue main firmware attempt results: %d", rc);
+	}
+
+	return rc;
+}
+
+static int complete_main_firmware_success(const struct spotflow_ota_probation* probation,
+					  struct spotflow_ota_state_action* action)
+{
+	struct spotflow_ota_main_firmware_state state;
+	int rc;
+
+	rc = spotflow_ota_persistence_save_installed_version(probation->slug, probation->version);
+	if (rc < 0) {
+		LOG_ERR("Failed to persist installed main firmware version: %d", rc);
+		return rc;
+	}
+
+	rc = spotflow_ota_state_apply_artifact_result(probation->artifact_index,
+						      SPOTFLOW_OTA_RESULT_SUCCEEDED, action);
+	if (rc < 0) {
+		return rc;
+	}
+
+	rc = spotflow_ota_state_set_main_firmware_result(SPOTFLOW_OTA_RESULT_SUCCEEDED, &state);
+	if (rc < 0) {
+		return rc;
+	}
+
+	notify_main_firmware_state(&state);
+
+	rc = spotflow_ota_persistence_clear_probation();
+	if (rc < 0) {
+		LOG_ERR("Failed to clear main firmware probation record: %d", rc);
+		return rc;
+	}
+
+	spotflow_ota_state_clear_main_firmware_awaiting_reboot();
+
+	rc = persist_snapshot_and_enqueue_results();
+	if (rc < 0) {
+		return rc;
+	}
+
+	if (!action->wake_worker) {
+		struct spotflow_ota_state_snapshot snapshot;
+
+		spotflow_ota_state_get_snapshot(&snapshot);
+		for (size_t i = 0; i < snapshot.artifact_count; i++) {
+			if (snapshot.artifact_results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
+				action->wake_worker = true;
+				break;
+			}
+		}
+	}
+
+	return 0;
+}
+
+static int complete_main_firmware_rollback(const struct spotflow_ota_probation* probation,
+					   struct spotflow_ota_state_action* action)
+{
+	struct spotflow_ota_main_firmware_state state;
+	int rc;
+
+	rc = spotflow_ota_state_set_main_firmware_result(SPOTFLOW_OTA_RESULT_FAILED, &state);
+	if (rc < 0) {
+		return rc;
+	}
+
+	notify_main_firmware_state(&state);
+
+	rc = spotflow_ota_state_apply_artifact_result(probation->artifact_index,
+						      SPOTFLOW_OTA_RESULT_FAILED, action);
+	if (rc < 0) {
+		return rc;
+	}
+
+	rc = spotflow_ota_persistence_clear_probation();
+	if (rc < 0) {
+		LOG_ERR("Failed to clear main firmware probation record after rollback: %d", rc);
+		return rc;
+	}
+
+	spotflow_ota_state_clear_main_firmware_awaiting_reboot();
+
+	return persist_snapshot_and_enqueue_results();
+}
+
+static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != probation->attempt_id) {
+		return false;
+	}
+
+	if (probation->artifact_index >= snapshot.artifact_count) {
+		return false;
+	}
+
+	return snapshot.artifact_results[probation->artifact_index] == SPOTFLOW_OTA_RESULT_PENDING;
 }

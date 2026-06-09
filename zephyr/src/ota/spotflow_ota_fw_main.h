@@ -6,6 +6,8 @@
 
 #include <spotflow/ota.h>
 
+#include "ota/spotflow_ota_records_cbor.h"
+#include "ota/spotflow_ota_state.h"
 #include "ota/spotflow_ota_types.h"
 
 #ifdef __cplusplus
@@ -15,6 +17,13 @@ extern "C" {
 enum spotflow_ota_result
 spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index,
 				      const struct spotflow_ota_artifact* artifact);
+
+int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* probation,
+					   bool has_probation,
+					   struct spotflow_ota_state_action* action);
+
+int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* out_state,
+				       struct spotflow_ota_state_action* action);
 
 void spotflow_ota_fw_main_reset(void);
 

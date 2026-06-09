@@ -1,5 +1,6 @@
 #include <string.h>
 
+#include "spotflow_build_id.h"
 #include "spotflow_ota_bindesc_test_util.h"
 
 static const uint8_t bindesc_magic[] = { 0x46, 0x60, 0xa4, 0x7e, 0x5a, 0x3e, 0x86, 0xb9 };
@@ -29,4 +30,14 @@ size_t spotflow_ota_test_bindesc_write_build_id(uint8_t* buffer, size_t buffer_s
 	p[3] = 0x00;
 
 	return offset + record_size;
+}
+
+void spotflow_ota_test_set_running_build_id(const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+{
+	spotflow_build_id_set_test_override(build_id);
+}
+
+void spotflow_ota_test_clear_running_build_id(void)
+{
+	spotflow_build_id_clear_test_override();
 }

@@ -7,12 +7,14 @@
 #include <spotflow/ota.h>
 
 #include "ota/spotflow_ota_fw_main.h"
+#include "ota/spotflow_ota_net.h"
 #include "ota/spotflow_ota_persistence.h"
 #include "ota/spotflow_ota_state.h"
 #include "spotflow_build_id.h"
 #include "spotflow_ota_bindesc_test_util.h"
 #include "spotflow_ota_downloader_transport_fake.h"
 #include "spotflow_ota_platform_fake.h"
+#include "spotflow_ota_test_fakes.h"
 #include "spotflow_ota_test_settings.h"
 
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_LOG_DEFAULT_LEVEL);
@@ -71,6 +73,9 @@ static struct spotflow_ota_update_msg build_two_artifact_update(void)
 static void reset_test_state(void)
 {
 	spotflow_ota_test_settings_reset();
+	spotflow_ota_test_fakes_reset();
+	spotflow_ota_test_clear_running_build_id();
+	spotflow_ota_net_reset();
 	spotflow_ota_state_reset();
 	spotflow_ota_fw_main_reset();
 	spotflow_ota_persistence_init();
@@ -104,14 +109,86 @@ static void apply_main_result(enum spotflow_ota_result result)
 void spotflow_on_main_firmware_update_progressed(
     const struct spotflow_ota_main_firmware_state* state)
 {
-	zassert_not_null(state);
-	zassert_true(progress_phase_count < ARRAY_SIZE(progress_phases));
-	progress_phases[progress_phase_count++] = state->phase;
+	if (state != NULL && progress_phase_count < ARRAY_SIZE(progress_phases)) {
+		progress_phases[progress_phase_count++] = state->phase;
+	}
 }
 
 bool spotflow_is_update_canceled(void)
 {
 	return spotflow_ota_state_is_update_canceled();
+}
+
+int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
+{
+	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+
+	fake_mqtt->publish_count++;
+	fake_mqtt->last_payload = payload;
+	fake_mqtt->last_payload_len = len;
+
+	return fake_mqtt->publish_result;
+}
+
+static void fill_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH], uint8_t seed)
+{
+	for (size_t i = 0; i < SPOTFLOW_BUILD_ID_LENGTH; i++) {
+		build_id[i] = (uint8_t)(seed + i);
+	}
+}
+
+static struct spotflow_ota_probation
+build_probation_record(const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+{
+	struct spotflow_ota_probation probation = {
+		.attempt_id = 42,
+		.artifact_index = 0,
+	};
+
+	strncpy(probation.slug, "main", sizeof(probation.slug) - 1);
+	strncpy(probation.version, "1.0.0", sizeof(probation.version) - 1);
+	memcpy(probation.expected_build_id, build_id, SPOTFLOW_BUILD_ID_LENGTH);
+	return probation;
+}
+
+static void persist_pending_post_reboot_attempt(void)
+{
+	struct spotflow_ota_persisted_attempt attempt = {
+		.attempt_id = 42,
+		.artifact_count = 2,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_PENDING,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+
+	zassert_ok(spotflow_ota_persistence_save_attempt(&attempt));
+}
+
+static void restore_post_reboot_state(const struct spotflow_ota_probation* probation)
+{
+	struct spotflow_ota_persisted_attempt attempt;
+	bool has_attempt;
+
+	zassert_ok(spotflow_ota_persistence_load_attempt(&attempt, &has_attempt));
+	zassert_true(has_attempt);
+	zassert_ok(spotflow_ota_state_init_from_persistence(&attempt, true, probation, true));
+}
+
+static void setup_post_reboot_context(const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH],
+				      struct spotflow_ota_probation* probation_out)
+{
+	struct spotflow_ota_probation probation = build_probation_record(build_id);
+
+	accept_two_artifact_update();
+	zassert_ok(spotflow_ota_persistence_save_probation(&probation));
+	persist_pending_post_reboot_attempt();
+	spotflow_ota_test_set_running_build_id(build_id);
+	restore_post_reboot_state(&probation);
+
+	if (probation_out != NULL) {
+		*probation_out = probation;
+	}
 }
 
 static void before_each(void* fixture)
@@ -230,6 +307,132 @@ ZTEST(spotflow_ota_fw_main, test_finish_prereboot_keeps_main_artifact_pending)
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_false(spotflow_ota_state_get_worker_job(&job));
+}
+
+ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_unconfirmed_match)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_probation probation;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	bool has_probation;
+
+	fill_build_id(build_id, 0x10);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->image_confirmed = false;
+
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+	zassert_false(action.wake_worker);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
+	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_true(has_probation);
+}
+
+ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_probation probation;
+	char installed_version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
+	bool has_probation;
+	bool has_version;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+
+	fill_build_id(build_id, 0x20);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->image_confirmed = true;
+
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+	zassert_true(action.wake_worker);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_false(has_probation);
+	zassert_ok(spotflow_ota_persistence_load_installed_version(
+	    "main", installed_version, sizeof(installed_version), &has_version));
+	zassert_true(has_version);
+	zassert_str_equal(installed_version, "1.0.0");
+}
+
+ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_mismatch_reports_rollback)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_probation probation;
+	uint8_t expected_build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	uint8_t running_build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	bool has_probation;
+
+	fill_build_id(expected_build_id, 0x30);
+	fill_build_id(running_build_id, 0x40);
+	setup_post_reboot_context(expected_build_id, &probation);
+	spotflow_ota_test_set_running_build_id(running_build_id);
+
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+	zassert_false(action.wake_worker);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_false(has_probation);
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_api_persists_success_and_wakes_worker)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_main_firmware_state state;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_probation probation;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+
+	fill_build_id(build_id, 0x50);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->image_confirmed = false;
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+
+	zassert_ok(spotflow_ota_fw_main_confirm_image(&state, &action));
+	zassert_true(action.wake_worker);
+	zassert_equal(platform_fake->confirm_count, 1);
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_SUCCEEDED);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_invalid_phase_returns_current_state)
+{
+	struct spotflow_ota_main_firmware_state state;
+	struct spotflow_ota_state_action action;
+
+	zassert_equal(spotflow_ota_fw_main_confirm_image(&state, &action), -EINVAL);
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_rejects_non_unconfirmed_phase)
+{
+	struct spotflow_ota_main_firmware_state state;
+	struct spotflow_ota_state_action action;
+
+	accept_two_artifact_update();
+	zassert_ok(
+	    spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_DOWNLOADING, &state));
+
+	zassert_equal(spotflow_ota_fw_main_confirm_image(&state, &action), -EINVAL);
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_DOWNLOADING);
 }
 
 ZTEST_SUITE(spotflow_ota_fw_main, NULL, NULL, before_each, NULL, NULL);
