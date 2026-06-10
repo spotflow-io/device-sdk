@@ -5,6 +5,7 @@
 #include <zephyr/logging/log.h>
 
 #include "ota/spotflow_ota_fw_custom.h"
+#include "ota/spotflow_ota_log.h"
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 #include "ota/spotflow_ota_fw_main.h"
 #endif
@@ -116,6 +117,9 @@ static int process_rejected_attempt_job(const struct spotflow_ota_worker_job* jo
 		attempt.artifact_results[i] = SPOTFLOW_OTA_RESULT_PENDING;
 	}
 
+	LOG_INF("OTA attempt %llu rejected (%s)", (unsigned long long)job->attempt_id,
+		spotflow_ota_log_attempt_error_name(job->attempt_error));
+
 	int rc = persist_attempt(&attempt);
 	if (rc < 0) {
 		LOG_ERR("Failed to persist rejected OTA attempt %llu: %d",
@@ -136,6 +140,11 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 {
 	enum spotflow_ota_result result;
 	struct spotflow_ota_state_snapshot snapshot;
+
+	LOG_INF("OTA attempt %llu: started artifact '%s' %s (index %zu%s)",
+		(unsigned long long)job->attempt_id, job->artifact.slug, job->artifact.version,
+		job->artifact_index, job->artifact.is_main ? ", main" : "");
+
 	int rc = load_artifact_result(job, &result);
 	if (rc < 0) {
 		LOG_ERR("Failed to resolve OTA result for attempt %llu artifact %zu: %d",
@@ -143,8 +152,8 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 		return rc;
 	}
 
-	LOG_INF("OTA attempt %llu artifact %zu finished with result %d",
-		(unsigned long long)job->attempt_id, job->artifact_index, result);
+	LOG_INF("OTA attempt %llu: artifact '%s' %s %s", (unsigned long long)job->attempt_id,
+		job->artifact.slug, job->artifact.version, spotflow_ota_log_result_name(result));
 
 	if (result == SPOTFLOW_OTA_RESULT_SUCCEEDED) {
 		rc = spotflow_ota_persistence_save_installed_version(job->artifact.slug,
@@ -224,6 +233,11 @@ static bool persist_and_enqueue_terminal_attempt_if_needed(void)
 		return false;
 	}
 
+	LOG_DBG("OTA attempt %llu finished; promoting pending attempt %llu and discarding "
+		"superseded results",
+		(unsigned long long)snapshot.current_attempt_id,
+		(unsigned long long)snapshot.pending_attempt_id);
+
 	spotflow_ota_net_discard_pending();
 
 	struct spotflow_ota_state_action action;
@@ -276,6 +290,9 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 	}
 
 	if (has_installed_version && strcmp(installed_version, job->artifact.version) == 0) {
+		LOG_DBG("OTA attempt %llu: artifact '%s' already at version %s, skipping handler",
+			(unsigned long long)job->attempt_id, job->artifact.slug,
+			job->artifact.version);
 		*result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
 		return 0;
 	}

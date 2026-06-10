@@ -8,6 +8,7 @@
 #include "ota/spotflow_ota.h"
 #include "ota/spotflow_ota_cbor.h"
 #include "ota/spotflow_ota_fw_custom.h"
+#include "ota/spotflow_ota_log.h"
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 #include "ota/spotflow_ota_fw_main.h"
 #endif
@@ -52,6 +53,8 @@ int spotflow_ota_init(void)
 		return rc;
 	}
 
+	spotflow_ota_log_loaded_attempt(&attempt, has_attempt);
+
 	struct spotflow_ota_probation probation;
 	bool has_probation;
 	rc = spotflow_ota_persistence_load_probation(&probation, &has_probation);
@@ -59,6 +62,8 @@ int spotflow_ota_init(void)
 		k_mutex_unlock(&ota_mutex);
 		return rc;
 	}
+
+	spotflow_ota_log_loaded_probation(&probation, has_probation);
 
 	rc = spotflow_ota_worker_init();
 	if (rc < 0) {
@@ -86,6 +91,9 @@ int spotflow_ota_init(void)
 
 	last_received_attempt_id = has_attempt ? attempt.attempt_id : 0;
 	ota_initialized = true;
+
+	LOG_DBG("OTA initialized (last received attempt %llu)",
+		(unsigned long long)last_received_attempt_id);
 
 	k_mutex_unlock(&ota_mutex);
 	return 0;
@@ -206,10 +214,27 @@ static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* ms
 		return rc;
 	}
 
-	if (msg->type == SPOTFLOW_OTA_CBOR_MSG_UPDATE_ARTIFACTS &&
-	    action.ignored_duplicate_update) {
-		LOG_INF("Ignoring duplicate UPDATE_ARTIFACTS for OTA attempt %llu",
-			(unsigned long long)msg->payload.update.attempt_id);
+	if (msg->type == SPOTFLOW_OTA_CBOR_MSG_UPDATE_ARTIFACTS) {
+		if (action.accepted_update) {
+			LOG_INF("OTA attempt %llu accepted (%zu artifacts)",
+				(unsigned long long)msg->payload.update.attempt_id,
+				msg->payload.update.artifact_count);
+		} else if (action.ignored_duplicate_update) {
+			LOG_INF("Ignoring duplicate UPDATE_ARTIFACTS for OTA attempt %llu",
+				(unsigned long long)msg->payload.update.attempt_id);
+		} else if (action.superseded_current) {
+			spotflow_ota_state_get_snapshot(&snapshot);
+			LOG_DBG("OTA attempt %llu superseded; pending attempt %llu",
+				(unsigned long long)snapshot.current_attempt_id,
+				(unsigned long long)snapshot.pending_attempt_id);
+		}
+	} else if (msg->type == SPOTFLOW_OTA_CBOR_MSG_CANCEL_UPDATE) {
+		if (action.accepted_cancel) {
+			LOG_INF("OTA attempt %llu canceled", (unsigned long long)msg->attempt_id);
+		} else if (action.ignored_late_cancel) {
+			LOG_DBG("Ignoring late CANCEL_UPDATE for OTA attempt %llu",
+				(unsigned long long)msg->attempt_id);
+		}
 	}
 
 	handle_state_action(&action);

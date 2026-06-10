@@ -36,6 +36,7 @@ target_sources(app PRIVATE
         ../../../src/ota/spotflow_ota_downloader.c
         ../../../src/ota/spotflow_ota_fw_custom.c
         ../../../src/ota/spotflow_ota_fw_main.c
+        ../../../src/ota/spotflow_ota_log.c
         ../../../src/ota/spotflow_ota_identity.c
         ../../../src/ota/spotflow_ota_net.c
         ../../../src/ota/spotflow_ota_persistence.c

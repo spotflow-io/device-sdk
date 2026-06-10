@@ -154,7 +154,7 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 	downloader->state = SPOTFLOW_DOWNLOADER_STATE_DOWNLOADING;
 	k_mutex_unlock(&downloader->mutex);
 
-	LOG_INF("Starting artifact download (TLS: %d, port: %u)", url.tls, url.port);
+	LOG_DBG("Starting artifact download (TLS: %d, port: %u)", url.tls, url.port);
 
 	size_t total_bytes_downloaded = 0;
 
@@ -184,14 +184,14 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 		};
 
 		if (total_bytes_downloaded > 0) {
-			LOG_INF("Resuming artifact download from byte %zu", total_bytes_downloaded);
+			LOG_DBG("Resuming artifact download from byte %zu", total_bytes_downloaded);
 		}
 
 		rc = spotflow_ota_downloader_transport_download(&transport_request);
 		total_bytes_downloaded += attempt_bytes;
 
 		if (rc == 0) {
-			LOG_INF("Artifact download finished (%zu bytes)", total_bytes_downloaded);
+			LOG_DBG("Artifact download finished (%zu bytes)", total_bytes_downloaded);
 			downloader_finish(downloader);
 			return 0;
 		}

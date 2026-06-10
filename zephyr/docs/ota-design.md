@@ -169,6 +169,32 @@ remaining `CANCELED`; otherwise clear probation and wait for a new cloud attempt
 Delegated handlers should poll `spotflow_is_update_canceled()` and call
 `spotflow_cancel_download()` when a download is active.
 
+## Logging
+
+All OTA modules use the `spotflow_ota` log module (`CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL`).
+Use **DBG** during manual E2E validation; use **INF** or higher in production.
+
+**Never log:** full artifact URLs, OTA secrets, authorization headers, or raw CBOR payloads.
+
+**INF (normal operation):** messages an integrator should see without debug logging enabled.
+
+- Update attempt accepted, canceled, or rejected.
+- Artifact processing started and finished (`succeeded`, `failed`, `canceled`), including slug
+  and version.
+- Main firmware lifecycle outcomes (rollback detected, update succeeded after confirmation).
+
+**DBG (diagnostics):** details useful when validating persistence, supersession, and
+download plumbing.
+
+- OTA init and loaded persistence (latest attempt, probation, last received attempt ID).
+- Supersession and deferred promotion (pending attempt IDs, discarded superseded results).
+- Installed-version skip before invoking a delegated handler.
+- Main firmware phase transitions.
+- HTTP download start, resume offset, and byte counts (host/path are not logged).
+
+**WRN / ERR:** transient download retries; decode, persistence, platform, and worker
+failures. Include `attempt_id`, artifact slug, phase, or errno as appropriate.
+
 ## v1 non-goals
 
 - Persisting download byte offset across reboot (in-process retries resume with HTTP

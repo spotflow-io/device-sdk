@@ -9,6 +9,7 @@
 #include "ota/spotflow_ota_fw_custom.h"
 #include "ota/spotflow_ota_fw_main.h"
 #include "ota/spotflow_ota_identity.h"
+#include "ota/spotflow_ota_log.h"
 #include "ota/spotflow_ota_net.h"
 #include "ota/spotflow_ota_persistence.h"
 #include "ota/spotflow_ota_platform.h"
@@ -66,6 +67,9 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 	if (artifact == NULL || artifact->url[0] == '\0' || artifact->secret[0] == '\0') {
 		return SPOTFLOW_OTA_RESULT_FAILED;
 	}
+
+	LOG_INF("OTA attempt %llu: started main firmware artifact '%s' %s",
+		(unsigned long long)attempt_id, artifact->slug, artifact->version);
 
 	user_fail_requested = false;
 
@@ -195,8 +199,12 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 	memset(action, 0, sizeof(*action));
 
 	if (!has_probation || probation == NULL) {
+		LOG_DBG("No main firmware probation record to reconcile");
 		return 0;
 	}
+
+	LOG_DBG("Reconciling main firmware probation for OTA attempt %llu ('%s' %s)",
+		(unsigned long long)probation->attempt_id, probation->slug, probation->version);
 
 	if (!main_artifact_is_pending(probation)) {
 		int rc = spotflow_ota_persistence_clear_probation();
@@ -234,10 +242,14 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 			return rc;
 		}
 
+		LOG_DBG("Main firmware rebooted into unconfirmed image for OTA attempt %llu",
+			(unsigned long long)probation->attempt_id);
 		notify_main_firmware_state(&state);
 		return 0;
 	}
 
+	LOG_DBG("Main firmware already confirmed for OTA attempt %llu",
+		(unsigned long long)probation->attempt_id);
 	return complete_main_firmware_success(probation, action);
 }
 
@@ -471,6 +483,8 @@ static void notify_main_firmware_phase(enum spotflow_ota_phase phase)
 	if (spotflow_ota_state_set_main_firmware_phase(phase, &state) < 0) {
 		return;
 	}
+
+	LOG_DBG("Main firmware phase -> %s", spotflow_ota_log_phase_name(phase));
 
 	notify_main_firmware_state(&state);
 }
