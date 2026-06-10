@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.20.0)
 
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
-project(spotflow_ota_facade)
+project(spotflow_ota_worker)
 
 target_include_directories(app PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/../../../include
@@ -22,8 +22,6 @@ target_sources(app PRIVATE
         ../common/spotflow_ota_test_settings.c
         ../common/spotflow_ota_test_fakes.c
         ../common/spotflow_ota_test_wait.c
-        ../../../src/net/spotflow_session_metadata.c
-        ../../../src/ota/spotflow_ota.c
         ../../../src/ota/spotflow_ota_cbor.c
         ../../../src/ota/spotflow_ota_fw_custom.c
         ../../../src/ota/spotflow_ota_net.c

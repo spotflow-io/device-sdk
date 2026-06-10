@@ -193,7 +193,8 @@ west twister -T spotflow/zephyr/tests/ota -p native_sim --inline-logs
 | Persistence | `persistence/` | Settings test backend |
 | D2C networking | `net/` | MQTT publish |
 | Facade / MQTT routing | `facade/` | MQTT, worker |
-| Worker / delegation | `worker/` | Custom handler, persistence, net |
+| Worker orchestration | `worker/` | Worker idle promotion, deferred rejection, multi-artifact chain |
+| MQTT / facade integration | `facade/` | C2D routing, version skip, cancel threading |
 | Downloader | `downloader/` | Transport |
 | Platform / identity | `platform/` | MCUboot, build ID |
 | Main firmware | `fw_main/` | Downloader, platform, persistence, net |
