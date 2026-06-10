@@ -27,7 +27,9 @@ struct attempt_state {
 
 static struct attempt_state current_attempt;
 static struct spotflow_ota_update_msg pending_update;
-static bool has_pending_update;
+static bool has_pending_attempt;
+static bool pending_is_rejection;
+static enum spotflow_ota_attempt_error pending_rejection_error;
 static K_MUTEX_DEFINE(state_mutex);
 
 static void clear_action(struct spotflow_ota_state_action* action);
@@ -37,7 +39,14 @@ static void
 restore_main_firmware_artifact_from_probation(const struct spotflow_ota_probation* probation);
 static int validate_update_msg(const struct spotflow_ota_update_msg* msg);
 static void start_attempt(const struct spotflow_ota_update_msg* msg, struct attempt_state* attempt);
-static void store_pending_update(const struct spotflow_ota_update_msg* msg);
+static void start_rejected_attempt(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
+				   struct attempt_state* attempt);
+static void clear_pending_attempt(void);
+static void store_pending_manifest(const struct spotflow_ota_update_msg* msg);
+static void store_pending_rejection(uint64_t attempt_id, enum spotflow_ota_attempt_error error);
+static void apply_immediate_rejection(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
+				      struct spotflow_ota_state_action* action);
+static void supersede_current_for_pending(struct spotflow_ota_state_action* action);
 static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 			      const struct spotflow_ota_artifact* source);
 static bool attempt_has_terminal_results(const struct attempt_state* attempt);
@@ -50,8 +59,7 @@ void spotflow_ota_state_reset(void)
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);
 	clear_attempt(&current_attempt);
-	memset(&pending_update, 0, sizeof(pending_update));
-	has_pending_update = false;
+	clear_pending_attempt();
 	k_mutex_unlock(&state_mutex);
 }
 
@@ -62,7 +70,7 @@ int spotflow_ota_state_init_from_persistence(const struct spotflow_ota_persisted
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);
 	clear_attempt(&current_attempt);
-	has_pending_update = false;
+	clear_pending_attempt();
 
 	if (has_attempt && attempt != NULL && attempt->attempt_id != 0) {
 		current_attempt.active = true;
@@ -126,7 +134,7 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 
 	if (!current_attempt.active) {
 		start_attempt(msg, &current_attempt);
-		has_pending_update = false;
+		clear_pending_attempt();
 		fill_action(action, msg->attempt_id);
 		action->accepted_update = true;
 		action->wake_worker = true;
@@ -143,7 +151,7 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 
 	if (attempt_has_terminal_results(&current_attempt)) {
 		start_attempt(msg, &current_attempt);
-		has_pending_update = false;
+		clear_pending_attempt();
 		fill_action(action, msg->attempt_id);
 		action->accepted_update = true;
 		action->wake_worker = true;
@@ -151,13 +159,8 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 		return 0;
 	}
 
-	store_pending_update(msg);
-	current_attempt.actionable_cancellation = true;
-	cancel_pending_artifacts(&current_attempt);
-	fill_action(action, current_attempt.attempt_id);
-	action->superseded_current = true;
-	action->wake_worker = true;
-	action->can_promote_pending = attempt_has_terminal_results(&current_attempt);
+	store_pending_manifest(msg);
+	supersede_current_for_pending(action);
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -174,17 +177,15 @@ int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_atte
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
-	clear_attempt(&current_attempt);
-	current_attempt.active = true;
-	current_attempt.attempt_id = attempt_id;
-	current_attempt.has_attempt_error = true;
-	current_attempt.attempt_error = error;
-	current_attempt.rejected_job_pending = true;
-	has_pending_update = false;
+	if (!current_attempt.active || current_attempt.attempt_id == attempt_id ||
+	    attempt_has_terminal_results(&current_attempt)) {
+		apply_immediate_rejection(attempt_id, error, action);
+		k_mutex_unlock(&state_mutex);
+		return 0;
+	}
 
-	fill_action(action, attempt_id);
-	action->rejected_attempt = true;
-	action->wake_worker = true;
+	store_pending_rejection(attempt_id, error);
+	supersede_current_for_pending(action);
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -223,7 +224,7 @@ int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_st
 	}
 
 	action->can_promote_pending =
-	    has_pending_update && attempt_has_terminal_results(&current_attempt);
+	    has_pending_attempt && attempt_has_terminal_results(&current_attempt);
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -314,7 +315,7 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 	if (current_attempt.results[artifact_index] != SPOTFLOW_OTA_RESULT_PENDING) {
 		fill_action(action, current_attempt.attempt_id);
 		action->can_promote_pending =
-		    has_pending_update && attempt_has_terminal_results(&current_attempt);
+		    has_pending_attempt && attempt_has_terminal_results(&current_attempt);
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
@@ -337,7 +338,7 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 	action->wake_worker = !attempt_has_terminal_results(&current_attempt) &&
 	    !current_attempt.actionable_cancellation;
 	action->can_promote_pending =
-	    has_pending_update && attempt_has_terminal_results(&current_attempt);
+	    has_pending_attempt && attempt_has_terminal_results(&current_attempt);
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -349,13 +350,19 @@ int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action)
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
-	if (!has_pending_update || !attempt_has_terminal_results(&current_attempt)) {
+	if (!has_pending_attempt || !attempt_has_terminal_results(&current_attempt)) {
 		k_mutex_unlock(&state_mutex);
 		return -EAGAIN;
 	}
 
-	start_attempt(&pending_update, &current_attempt);
-	has_pending_update = false;
+	if (pending_is_rejection) {
+		start_rejected_attempt(pending_update.attempt_id, pending_rejection_error,
+				       &current_attempt);
+	} else {
+		start_attempt(&pending_update, &current_attempt);
+	}
+
+	clear_pending_attempt();
 	fill_action(action, current_attempt.attempt_id);
 	action->promoted_pending = true;
 	action->wake_worker = true;
@@ -390,8 +397,10 @@ void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapsho
 	snapshot->artifact_count = current_attempt.update.artifact_count;
 	snapshot->current_artifact_index = current_attempt.current_artifact_index;
 	snapshot->actionable_cancellation = current_attempt.actionable_cancellation;
-	snapshot->has_pending_attempt = has_pending_update;
+	snapshot->has_pending_attempt = has_pending_attempt;
 	snapshot->pending_attempt_id = pending_update.attempt_id;
+	snapshot->pending_is_rejection = pending_is_rejection;
+	snapshot->pending_rejection_error = pending_rejection_error;
 	snapshot->has_attempt_error = current_attempt.has_attempt_error;
 	snapshot->attempt_error = current_attempt.attempt_error;
 	snapshot->main_firmware_state = current_attempt.main_firmware_state;
@@ -629,10 +638,59 @@ static void start_attempt(const struct spotflow_ota_update_msg* msg, struct atte
 	advance_current_artifact(attempt);
 }
 
-static void store_pending_update(const struct spotflow_ota_update_msg* msg)
+static void start_rejected_attempt(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
+				   struct attempt_state* attempt)
+{
+	clear_attempt(attempt);
+	attempt->active = true;
+	attempt->attempt_id = attempt_id;
+	attempt->has_attempt_error = true;
+	attempt->attempt_error = error;
+	attempt->rejected_job_pending = true;
+}
+
+static void clear_pending_attempt(void)
+{
+	memset(&pending_update, 0, sizeof(pending_update));
+	has_pending_attempt = false;
+	pending_is_rejection = false;
+	pending_rejection_error = SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR;
+}
+
+static void store_pending_manifest(const struct spotflow_ota_update_msg* msg)
 {
 	pending_update = *msg;
-	has_pending_update = true;
+	pending_is_rejection = false;
+	has_pending_attempt = true;
+}
+
+static void store_pending_rejection(uint64_t attempt_id, enum spotflow_ota_attempt_error error)
+{
+	memset(&pending_update, 0, sizeof(pending_update));
+	pending_update.attempt_id = attempt_id;
+	pending_rejection_error = error;
+	pending_is_rejection = true;
+	has_pending_attempt = true;
+}
+
+static void apply_immediate_rejection(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
+				      struct spotflow_ota_state_action* action)
+{
+	start_rejected_attempt(attempt_id, error, &current_attempt);
+	clear_pending_attempt();
+	fill_action(action, attempt_id);
+	action->rejected_attempt = true;
+	action->wake_worker = true;
+}
+
+static void supersede_current_for_pending(struct spotflow_ota_state_action* action)
+{
+	current_attempt.actionable_cancellation = true;
+	cancel_pending_artifacts(&current_attempt);
+	fill_action(action, current_attempt.attempt_id);
+	action->superseded_current = true;
+	action->wake_worker = true;
+	action->can_promote_pending = attempt_has_terminal_results(&current_attempt);
 }
 
 static void copy_artifact_out(struct spotflow_ota_artifact* destination,

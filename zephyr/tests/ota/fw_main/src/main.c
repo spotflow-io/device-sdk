@@ -370,6 +370,30 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 	zassert_str_equal(installed_version, "1.0.0");
 }
 
+ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_identity_unavailable_reports_failure)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_probation probation;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	bool has_probation;
+
+	fill_build_id(build_id, 0x35);
+	setup_post_reboot_context(build_id, &probation);
+	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
+
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+	zassert_false(action.wake_worker);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_false(has_probation);
+}
+
 ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_mismatch_reports_rollback)
 {
 	struct spotflow_ota_state_action action;
@@ -418,6 +442,24 @@ ZTEST(spotflow_ota_fw_main, test_confirm_api_persists_success_and_wakes_worker)
 	spotflow_ota_state_get_snapshot(&snapshot);
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_idempotent_when_already_succeeded)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_main_firmware_state state;
+	struct spotflow_ota_probation probation;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+
+	fill_build_id(build_id, 0x55);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->image_confirmed = true;
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+
+	zassert_ok(spotflow_ota_fw_main_confirm_image(&state, &action));
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(platform_fake->confirm_count, 0);
 }
 
 ZTEST(spotflow_ota_fw_main, test_confirm_invalid_phase_returns_current_state)

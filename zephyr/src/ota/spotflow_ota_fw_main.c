@@ -213,8 +213,9 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 	    spotflow_ota_identity_compare_probation(probation->expected_build_id);
 
 	if (identity == SPOTFLOW_OTA_IDENTITY_UNAVAILABLE) {
-		LOG_WRN("Main firmware probation record present but running identity unavailable");
-		return 0;
+		LOG_WRN("Main firmware probation record present but running identity unavailable: "
+			"reporting failure");
+		return complete_main_firmware_rollback(probation, action);
 	}
 
 	if (identity == SPOTFLOW_OTA_IDENTITY_MISMATCH) {
@@ -255,8 +256,48 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 	memset(action, 0, sizeof(*action));
 
 	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt ||
+	if (!snapshot.has_current_attempt) {
+		if (out_state != NULL) {
+			*out_state = snapshot.main_firmware_state;
+		}
+
+		return -EINVAL;
+	}
+
+	if (snapshot.main_firmware_state.phase == SPOTFLOW_OTA_PHASE_NOT_RUNNING &&
+	    snapshot.main_firmware_state.result == SPOTFLOW_OTA_RESULT_SUCCEEDED &&
+	    spotflow_ota_platform_is_image_confirmed()) {
+		if (out_state != NULL) {
+			*out_state = snapshot.main_firmware_state;
+		}
+
+		return 0;
+	}
+
+	rc = spotflow_ota_persistence_load_probation(&probation, &has_probation);
+	if (rc < 0) {
+		return rc;
+	}
+
+	if (has_probation && probation.attempt_id == snapshot.current_attempt_id &&
+	    spotflow_ota_identity_compare_probation(probation.expected_build_id) ==
+		SPOTFLOW_OTA_IDENTITY_MATCH &&
+	    spotflow_ota_platform_is_image_confirmed() &&
 	    snapshot.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
+		rc = complete_main_firmware_success(&probation, action);
+		if (rc < 0) {
+			return rc;
+		}
+
+		if (out_state != NULL) {
+			spotflow_ota_state_get_snapshot(&snapshot);
+			*out_state = snapshot.main_firmware_state;
+		}
+
+		return 0;
+	}
+
+	if (snapshot.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
 		LOG_ERR("Main firmware confirmation rejected: has_attempt=%d phase=%d result=%d",
 			snapshot.has_current_attempt, snapshot.main_firmware_state.phase,
 			snapshot.main_firmware_state.result);
@@ -265,11 +306,6 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 		}
 
 		return -EINVAL;
-	}
-
-	rc = spotflow_ota_persistence_load_probation(&probation, &has_probation);
-	if (rc < 0) {
-		return rc;
 	}
 
 	if (!has_probation || probation.attempt_id != snapshot.current_attempt_id) {

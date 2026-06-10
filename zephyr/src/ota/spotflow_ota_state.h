@@ -48,6 +48,8 @@ struct spotflow_ota_state_snapshot {
 	bool actionable_cancellation;
 	bool has_pending_attempt;
 	uint64_t pending_attempt_id;
+	bool pending_is_rejection;
+	enum spotflow_ota_attempt_error pending_rejection_error;
 	bool has_attempt_error;
 	enum spotflow_ota_attempt_error attempt_error;
 	enum spotflow_ota_result artifact_results[CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS];

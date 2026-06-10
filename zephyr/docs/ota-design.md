@@ -85,6 +85,11 @@ can do so safely (for example between download chunks or before starting the nex
 artifact). Results for the superseded attempt are reported; processing continues with the
 promoted attempt.
 
+A malformed `UPDATE_ARTIFACTS` message with a trustworthy but different attempt ID
+follows the same supersession path: the rejection (`updateAttemptError`) is stored in the
+single pending slot and reported only after the superseded attempt reaches terminal
+results and is promoted.
+
 ## Main firmware
 
 **Pre-reboot (automatic handling)**
@@ -105,6 +110,7 @@ next boot with the attempt, artifact, slug, version, and expected build ID.
 | Match | No | Phase `UNCONFIRMED`; wait for `spotflow_confirm_main_firmware_image()` |
 | Match | Yes | Infer success; persist version/result; clear probation; queue D2C |
 | Mismatch | — | Infer rollback/failed swap; report main failed; cancel rest; clear probation |
+| Unavailable | — | Report main failed; cancel rest; clear probation |
 
 The main artifact result stays **pending** until confirmation or rollback inference so
 the cloud does not see success before the device has actually run the new image.

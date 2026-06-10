@@ -383,6 +383,60 @@ ZTEST(spotflow_ota_state, test_failed_artifact_cancels_remaining_artifacts)
 	zassert_false(spotflow_ota_state_get_worker_job(&job));
 }
 
+ZTEST(spotflow_ota_state, test_reject_unfinished_attempt_defers_rejection_until_promoted)
+{
+	struct spotflow_ota_update_msg first = make_update(9, 2);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&first, &action));
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.artifact_index, 0);
+
+	int rc = spotflow_ota_state_reject_update(
+	    10, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action);
+
+	zassert_ok(rc);
+	zassert_true(action.superseded_current);
+	zassert_false(action.rejected_attempt);
+	zassert_true(spotflow_ota_state_is_update_canceled());
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+
+	zassert_equal(snapshot.current_attempt_id, 9);
+	zassert_true(snapshot.has_pending_attempt);
+	zassert_equal(snapshot.pending_attempt_id, 10);
+	zassert_true(snapshot.pending_is_rejection);
+	zassert_equal(snapshot.pending_rejection_error,
+		      SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
+
+	zassert_ok(
+	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED, &action));
+
+	rc = spotflow_ota_state_promote_pending(&action);
+
+	zassert_ok(rc);
+	zassert_true(action.promoted_pending);
+	zassert_equal(action.attempt_id, 10);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+
+	zassert_equal(snapshot.current_attempt_id, 10);
+	zassert_false(snapshot.has_pending_attempt);
+	zassert_true(snapshot.has_attempt_error);
+	zassert_equal(snapshot.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_REJECTED_ATTEMPT);
+	zassert_equal(job.attempt_id, 10);
+	zassert_equal(job.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
+}
+
 ZTEST(spotflow_ota_state, test_supersede_unfinished_attempt_and_promote_pending)
 {
 	struct spotflow_ota_update_msg first = make_update(9, 2);
