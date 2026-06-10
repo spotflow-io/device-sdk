@@ -32,11 +32,14 @@ C2D payloads are decoded on the MQTT thread; all durable work is handed to the O
 
 ```
 MQTT thread     → decode C2D, enqueue worker jobs, poll pending D2C send
-OTA worker      → state transitions, downloads, flash, user firmware callbacks
+OTA worker      → state transitions, HTTP downloads, flash, user firmware callbacks
 sysworkq        → spotflow_on_update_canceled()
 App threads     → public API (pause/resume/fail/confirm/query)
-Download thread → HTTP read loop inside spotflow_download_artifact()
 ```
+
+`spotflow_download_artifact()` blocks its caller on the OTA worker thread. There is no
+separate download thread. Automatic main-firmware downloads and delegated firmware
+handlers (including typical `spotflow_download_artifact()` use) all run on the OTA worker.
 
 **Rules:**
 
