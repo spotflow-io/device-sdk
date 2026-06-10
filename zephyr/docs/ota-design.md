@@ -28,6 +28,38 @@ and the public headers (`spotflow/ota.h`, `spotflow/downloader.h`) instead.
 MQTT subscription and inbound routing live in `spotflow_mqtt.c` / `spotflow_processor.c`.
 C2D payloads are decoded on the MQTT thread; all durable work is handed to the OTA worker.
 
+## Initialization
+
+OTA uses a **defensive initialization** model: `spotflow_ota_init()` is idempotent,
+mutex-protected, and safe to call from more than one entry point.
+
+**Primary path (Spotflow processor)**
+
+1. `spotflow_mqtt_thread_entry()` calls `spotflow_ota_init()` once before the first
+   session metadata publish. This loads Settings, restores in-memory state, starts the OTA
+   worker, and (when automatic main-firmware handling is enabled) runs post-reboot
+   reconciliation.
+2. After MQTT connects, `spotflow_ota_init_session()` calls `spotflow_ota_init()` again
+   (no-op if already initialized) and registers the OTA C2D subscription.
+
+`spotflow_ota_init()` does not require MQTT to be connected.
+
+**Defensive path (application / public API)**
+
+Every public facade API in `spotflow/ota.h` that reads or changes OTA state calls
+`spotflow_ota_init()` first.
+
+User-implemented callbacks (`spotflow_on_handle_firmware_update`, and so on) are not
+included; the SDK invokes those after init has already run.
+
+This lets application and delegated-firmware code use the public API without calling
+internal init functions, even if it runs before the MQTT session is established (for
+example post-reboot confirmation in `main()`, or `spotflow_is_update_canceled()` inside a
+download handler after reboot).
+
+**Test hook:** `spotflow_ota_reset()` clears the initialized flag. It is intended for unit
+tests only.
+
 ## Threading and synchronization
 
 ```

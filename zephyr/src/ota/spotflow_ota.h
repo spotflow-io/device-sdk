@@ -10,14 +10,21 @@ extern "C" {
 /**
  * @brief Perform one-time OTA initialization.
  *
- * Loads persisted OTA records needed before the first session metadata publish.
+ * Loads persisted OTA records, restores in-memory state, starts the OTA worker, and runs
+ * main-firmware startup reconciliation when enabled. Idempotent and mutex-protected.
+ *
+ * Called by the Spotflow processor before session metadata and defensively from public
+ * facade APIs in `spotflow/ota.h` that read or change OTA state.
  *
  * @return 0 on success, negative errno on failure.
  */
 int spotflow_ota_init(void);
 
 /**
- * @brief Initialize an OTA session by subscribing to the OTA MQTT topic
+ * @brief Initialize an OTA session by subscribing to the OTA MQTT topic.
+ *
+ * Calls @ref spotflow_ota_init() and registers the inbound OTA C2D handler. Safe to call
+ * on every MQTT connect; init itself runs at most once per boot unless reset in tests.
  *
  * @return 0 on success, negative errno on failure
  *         -EINVAL: MQTT subscription request failed

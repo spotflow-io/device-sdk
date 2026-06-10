@@ -258,6 +258,10 @@ static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* ms
 
 bool spotflow_is_update_canceled(void)
 {
+	if (spotflow_ota_init() < 0) {
+		return false;
+	}
+
 	return spotflow_ota_state_is_update_canceled();
 }
 
@@ -267,12 +271,10 @@ int spotflow_get_main_firmware_update_state(struct spotflow_ota_main_firmware_st
 		return -EINVAL;
 	}
 
-#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	int rc = spotflow_ota_init();
 	if (rc < 0) {
 		return rc;
 	}
-#endif
 
 	struct spotflow_ota_state_snapshot snapshot;
 	spotflow_ota_state_get_snapshot(&snapshot);
@@ -284,6 +286,11 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info)
 {
 	if (info == NULL) {
 		return -EINVAL;
+	}
+
+	int rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
 	}
 
 	struct spotflow_download_request request;
