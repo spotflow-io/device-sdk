@@ -175,13 +175,15 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 			return rc;
 		}
 
-		rc = spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
-						      snapshot.artifact_results,
-						      snapshot.artifact_count);
-		if (rc < 0) {
-			LOG_ERR("Failed to queue OTA attempt %llu results for reporting: %d",
-				(unsigned long long)job->attempt_id, rc);
-			return rc;
+		if (!snapshot.has_pending_attempt) {
+			rc = spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
+							      snapshot.artifact_results,
+							      snapshot.artifact_count);
+			if (rc < 0) {
+				LOG_ERR("Failed to queue OTA attempt %llu results for reporting: %d",
+					(unsigned long long)job->attempt_id, rc);
+				return rc;
+			}
 		}
 	}
 
@@ -208,17 +210,20 @@ static bool persist_and_enqueue_terminal_attempt_if_needed(void)
 		return false;
 	}
 
-	if (spotflow_ota_net_prepare_results(snapshot.current_attempt_id, snapshot.artifact_results,
-					     snapshot.artifact_count) < 0) {
-		LOG_ERR(
-		    "Failed to queue terminal OTA attempt %llu for reporting during idle handling",
-		    (unsigned long long)snapshot.current_attempt_id);
+	if (!snapshot.has_pending_attempt) {
+		if (spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
+						     snapshot.artifact_results,
+						     snapshot.artifact_count) < 0) {
+			LOG_ERR("Failed to queue terminal OTA attempt %llu for reporting during "
+				"idle handling",
+				(unsigned long long)snapshot.current_attempt_id);
+			return false;
+		}
+
 		return false;
 	}
 
-	if (!snapshot.has_pending_attempt) {
-		return false;
-	}
+	spotflow_ota_net_discard_pending();
 
 	struct spotflow_ota_state_action action;
 	int rc = spotflow_ota_state_promote_pending(&action);

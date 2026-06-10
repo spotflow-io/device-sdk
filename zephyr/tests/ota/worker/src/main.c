@@ -120,13 +120,12 @@ ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_w
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 		SPOTFLOW_OTA_RESULT_CANCELED,
 	};
-	const struct spotflow_ota_cbor_update_results superseded_message = {
-		.attempt_id = 9,
+	const struct spotflow_ota_cbor_update_results promoted_message = {
+		.attempt_id = 10,
 		.succeeded_count = 1,
 		.succeeded = { 0 },
-		.canceled_count = 1,
-		.canceled = { 1 },
 	};
+	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
 
 	fake_callbacks->block_handle = true;
 	fake_callbacks->next_handle_result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
@@ -151,12 +150,15 @@ ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_w
 
 	spotflow_ota_test_wait_for_persisted_attempt(9, superseded_results,
 						     ARRAY_SIZE(superseded_results));
+	zassert_equal(fake_mqtt->publish_count, 0);
 	zassert_ok(spotflow_ota_net_send_pending_message());
-	spotflow_ota_test_expect_update_results_payload(&superseded_message);
+	zassert_equal(fake_mqtt->publish_count, 0);
 
 	k_sem_give(&fake_callbacks->handle_continue_sem);
 	spotflow_ota_test_wait_for_persisted_attempt(
 	    10, (const enum spotflow_ota_result[]){ SPOTFLOW_OTA_RESULT_SUCCEEDED }, 1);
+	zassert_ok(spotflow_ota_net_send_pending_message());
+	spotflow_ota_test_expect_update_results_payload(&promoted_message);
 }
 
 ZTEST(spotflow_ota_worker, test_deferred_rejection_persisted_and_reported_by_worker)

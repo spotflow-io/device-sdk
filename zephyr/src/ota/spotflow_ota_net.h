@@ -23,6 +23,8 @@ int spotflow_ota_net_prepare_attempt_error(uint64_t attempt_id,
 
 int spotflow_ota_net_send_pending_message(void);
 
+void spotflow_ota_net_discard_pending(void);
+
 #ifdef __cplusplus
 }
 #endif

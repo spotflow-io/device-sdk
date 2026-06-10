@@ -85,13 +85,13 @@ without holding `state_mutex`.
 
 When a newer manifest arrives mid-attempt, the worker stops the current artifact when it
 can do so safely (for example between download chunks or before starting the next
-artifact). Results for the superseded attempt are reported; processing continues with the
-promoted attempt.
+artifact). Terminal results for the superseded attempt are persisted locally but are **not**
+reported to the cloud; processing continues with the promoted attempt.
 
 A malformed `UPDATE_ARTIFACTS` message with a trustworthy but different attempt ID
 follows the same supersession path: the rejection (`updateAttemptError`) is stored in the
 single pending slot and reported only after the superseded attempt reaches terminal
-results and is promoted.
+results and is promoted. The superseded attempt's per-artifact results are not reported.
 
 ## Main firmware
 

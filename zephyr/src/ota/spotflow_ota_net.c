@@ -94,6 +94,13 @@ int spotflow_ota_net_prepare_attempt_error(uint64_t attempt_id,
 	return rc;
 }
 
+void spotflow_ota_net_discard_pending(void)
+{
+	k_mutex_lock(&pending_message_mutex, K_FOREVER);
+	clear_pending_message_locked();
+	k_mutex_unlock(&pending_message_mutex);
+}
+
 int spotflow_ota_net_send_pending_message(void)
 {
 	k_mutex_lock(&pending_message_mutex, K_FOREVER);
