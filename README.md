@@ -117,6 +117,12 @@ SDK ->> PM: Send reported configuration
 end
 ```
 
+#### OTA
+
+- [Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr) — integrator guide for the OTA device module
+- [OTA sample](zephyr/samples/ota) — end-to-end sample with MCUboot sysbuild
+- [OTA implementation design note](zephyr/docs/ota-design.md) — architecture summary for SDK contributors
+
 ### Build ID
 
 In order to match core dumps with symbol files, our Zephyr module provides a piece of information called build ID.
