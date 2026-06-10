@@ -17,11 +17,13 @@
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #define OTA_TLS_SEC_TAG 1
+#define OTA_RANGE_HEADER_MAX_LEN 48
 
 struct spotflow_ota_downloader_http_ctx {
 	struct spotflow_downloader* downloader;
 	spotflow_download_block_callback callback;
 	void* callback_ctx;
+	size_t range_start;
 	size_t offset;
 	int callback_err;
 	bool transient_failure;
@@ -51,16 +53,32 @@ int spotflow_ota_downloader_transport_download(
 		.downloader = request->downloader,
 		.callback = request->callback,
 		.callback_ctx = request->callback_ctx,
-		.offset = 0,
+		.range_start = request->range_start,
+		.offset = request->range_start,
 		.callback_err = 0,
 		.transient_failure = false,
 	};
 
 	static uint8_t recv_buf[CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE];
-	const char* optional_headers[] = {
-		request->authorization_header,
-		NULL,
-	};
+	char range_header[OTA_RANGE_HEADER_MAX_LEN];
+	const char* optional_headers[3];
+	size_t optional_header_count = 0;
+
+	optional_headers[optional_header_count++] = request->authorization_header;
+
+	if (request->range_start > 0) {
+		int written = snprintk(range_header, sizeof(range_header), "Range: bytes=%zu-\r\n",
+				       request->range_start);
+
+		if (written < 0 || (size_t)written >= sizeof(range_header)) {
+			zsock_close(sock);
+			return -ENOMEM;
+		}
+
+		optional_headers[optional_header_count++] = range_header;
+	}
+
+	optional_headers[optional_header_count] = NULL;
 
 	struct http_request req = {
 		.method = HTTP_GET,
@@ -78,15 +96,17 @@ int spotflow_ota_downloader_transport_download(
 	zsock_close(sock);
 
 	if (http_ctx.callback_err != 0) {
+		*request->bytes_downloaded = http_ctx.offset - request->range_start;
 		*request->transient_failure = http_ctx.transient_failure;
 		return http_ctx.callback_err;
 	}
 
 	if (rc < 0) {
+		*request->bytes_downloaded = http_ctx.offset - request->range_start;
 		return rc;
 	}
 
-	*request->bytes_downloaded = http_ctx.offset;
+	*request->bytes_downloaded = http_ctx.offset - request->range_start;
 	return 0;
 }
 
@@ -181,11 +201,16 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 		return -ECANCELED;
 	}
 
-	if (rsp->http_status_code != 0 && rsp->http_status_code != 200) {
-		LOG_ERR("Artifact download returned HTTP status %u", rsp->http_status_code);
-		ctx->callback_err = -EPROTO;
-		ctx->transient_failure = rsp->http_status_code >= 500;
-		return ctx->callback_err;
+	if (rsp->http_status_code != 0) {
+		const bool ok_status = ctx->range_start == 0 ? rsp->http_status_code == 200
+							     : rsp->http_status_code == 206;
+
+		if (!ok_status) {
+			LOG_ERR("Artifact download returned HTTP status %u", rsp->http_status_code);
+			ctx->callback_err = -EPROTO;
+			ctx->transient_failure = rsp->http_status_code >= 500;
+			return ctx->callback_err;
+		}
 	}
 
 	if (rsp->body_frag_len > 0) {

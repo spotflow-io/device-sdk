@@ -156,6 +156,8 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 
 	LOG_INF("Starting artifact download (TLS: %d, port: %u)", url.tls, url.port);
 
+	size_t total_bytes_downloaded = 0;
+
 	while (true) {
 		if (downloader_is_canceled(downloader)) {
 			downloader_finish(downloader);
@@ -168,7 +170,7 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 			return -ECANCELED;
 		}
 
-		size_t bytes_downloaded = 0;
+		size_t attempt_bytes = 0;
 		bool transient_failure = false;
 		struct spotflow_ota_downloader_transport_request transport_request = {
 			.url = &url,
@@ -176,13 +178,20 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 			.downloader = downloader,
 			.callback = callback,
 			.callback_ctx = callback_ctx,
-			.bytes_downloaded = &bytes_downloaded,
+			.range_start = total_bytes_downloaded,
+			.bytes_downloaded = &attempt_bytes,
 			.transient_failure = &transient_failure,
 		};
 
+		if (total_bytes_downloaded > 0) {
+			LOG_INF("Resuming artifact download from byte %zu", total_bytes_downloaded);
+		}
+
 		rc = spotflow_ota_downloader_transport_download(&transport_request);
+		total_bytes_downloaded += attempt_bytes;
+
 		if (rc == 0) {
-			LOG_INF("Artifact download finished (%zu bytes)", bytes_downloaded);
+			LOG_INF("Artifact download finished (%zu bytes)", total_bytes_downloaded);
 			downloader_finish(downloader);
 			return 0;
 		}
@@ -193,7 +202,8 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 			return rc;
 		}
 
-		LOG_WRN("Transient artifact download failure (%d), retrying", rc);
+		LOG_WRN("Transient artifact download failure (%d) after %zu bytes, retrying", rc,
+			total_bytes_downloaded);
 		k_sleep(K_MSEC(CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS));
 	}
 }

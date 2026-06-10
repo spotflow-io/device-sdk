@@ -19,8 +19,10 @@ struct spotflow_ota_downloader_transport_fake {
 	char last_authorization_header[96];
 	char last_host[128];
 	char last_path[128];
+	size_t last_range_start;
 	bool tls;
 	uint16_t port;
+	size_t partial_transient_fail_after_bytes;
 	bool block_until_cancel;
 	bool cancel_observed;
 	bool block_until_pause;

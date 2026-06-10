@@ -35,6 +35,57 @@ void spotflow_ota_downloader_transport_fake_set_results(
 	fake->next_result_index = 0;
 }
 
+static int deliver_payload(struct spotflow_ota_downloader_transport_request* request,
+			   struct spotflow_ota_downloader_transport_fake* fake, size_t offset)
+{
+	if (fake->payload == NULL || fake->payload_len == 0) {
+		if (request->bytes_downloaded != NULL) {
+			*request->bytes_downloaded = 0;
+		}
+
+		return 0;
+	}
+
+	if (offset >= fake->payload_len) {
+		if (request->bytes_downloaded != NULL) {
+			*request->bytes_downloaded = 0;
+		}
+
+		return 0;
+	}
+
+	size_t deliver_len = fake->payload_len - offset;
+
+	if (fake->partial_transient_fail_after_bytes > offset) {
+		deliver_len = MIN(deliver_len, fake->partial_transient_fail_after_bytes - offset);
+	}
+
+	struct spotflow_artifact_block block = {
+		.offset = offset,
+		.data = fake->payload + offset,
+		.data_len = deliver_len,
+		.is_last = offset + deliver_len == fake->payload_len,
+	};
+
+	request->callback(&block, request->downloader, request->callback_ctx);
+
+	if (request->bytes_downloaded != NULL) {
+		*request->bytes_downloaded = deliver_len;
+	}
+
+	if (fake->partial_transient_fail_after_bytes > 0 &&
+	    offset + deliver_len < fake->payload_len &&
+	    offset + deliver_len == fake->partial_transient_fail_after_bytes) {
+		if (request->transient_failure != NULL) {
+			*request->transient_failure = true;
+		}
+
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
 int spotflow_ota_downloader_transport_download(
     struct spotflow_ota_downloader_transport_request* request)
 {
@@ -47,6 +98,7 @@ int spotflow_ota_downloader_transport_download(
 		sizeof(fake->last_authorization_header) - 1);
 	strncpy(fake->last_host, request->url->host, sizeof(fake->last_host) - 1);
 	strncpy(fake->last_path, request->url->path, sizeof(fake->last_path) - 1);
+	fake->last_range_start = request->range_start;
 	fake->tls = request->url->tls;
 	fake->port = request->url->port;
 
@@ -55,9 +107,14 @@ int spotflow_ota_downloader_transport_download(
 	}
 
 	if (rc != 0) {
+		if (request->bytes_downloaded != NULL) {
+			*request->bytes_downloaded = 0;
+		}
+
 		if (request->transient_failure != NULL) {
 			*request->transient_failure = rc == -EAGAIN;
 		}
+
 		return rc;
 	}
 
@@ -67,6 +124,11 @@ int spotflow_ota_downloader_transport_download(
 		}
 
 		fake->cancel_observed = true;
+
+		if (request->bytes_downloaded != NULL) {
+			*request->bytes_downloaded = 0;
+		}
+
 		return -ECANCELED;
 	}
 
@@ -74,6 +136,11 @@ int spotflow_ota_downloader_transport_download(
 		while (request->downloader->state != SPOTFLOW_DOWNLOADER_STATE_PAUSED) {
 			if (request->downloader->cancel_requested) {
 				fake->cancel_observed = true;
+
+				if (request->bytes_downloaded != NULL) {
+					*request->bytes_downloaded = 0;
+				}
+
 				return -ECANCELED;
 			}
 
@@ -85,6 +152,11 @@ int spotflow_ota_downloader_transport_download(
 		while (request->downloader->state == SPOTFLOW_DOWNLOADER_STATE_PAUSED) {
 			if (request->downloader->cancel_requested) {
 				fake->cancel_observed = true;
+
+				if (request->bytes_downloaded != NULL) {
+					*request->bytes_downloaded = 0;
+				}
+
 				return -ECANCELED;
 			}
 
@@ -92,22 +164,5 @@ int spotflow_ota_downloader_transport_download(
 		}
 	}
 
-	if (fake->payload != NULL && fake->payload_len > 0) {
-		struct spotflow_artifact_block block = {
-			.offset = 0,
-			.data = fake->payload,
-			.data_len = fake->payload_len,
-			.is_last = true,
-		};
-
-		request->callback(&block, request->downloader, request->callback_ctx);
-
-		if (request->bytes_downloaded != NULL) {
-			*request->bytes_downloaded = fake->payload_len;
-		}
-	} else if (request->bytes_downloaded != NULL) {
-		*request->bytes_downloaded = 0;
-	}
-
-	return 0;
+	return deliver_payload(request, fake, request->range_start);
 }

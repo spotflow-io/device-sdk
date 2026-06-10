@@ -171,7 +171,8 @@ Delegated handlers should poll `spotflow_is_update_canceled()` and call
 
 ## v1 non-goals
 
-- Persisting download byte offset across reboot (retries restart the HTTP download).
+- Persisting download byte offset across reboot (in-process retries resume with HTTP
+  Range; a new `spotflow_download_artifact()` call starts from byte zero).
 - D2C QoS 1 (cloud uses `REPORT_UPDATE_RESULTS` for recovery).
 - Public API for ignored/late cancellation diagnostics.
 - Application-provided full-manifest handling (SDK owns manifest processing).

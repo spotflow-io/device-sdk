@@ -17,6 +17,9 @@ struct spotflow_ota_downloader_transport_request {
 	struct spotflow_downloader* downloader;
 	spotflow_download_block_callback callback;
 	void* callback_ctx;
+	/** Absolute byte offset in the artifact to start reading from. */
+	size_t range_start;
+	/** Bytes delivered during this transport attempt. */
 	size_t* bytes_downloaded;
 	bool* transient_failure;
 };
