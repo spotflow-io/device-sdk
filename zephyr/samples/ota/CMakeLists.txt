@@ -7,7 +7,7 @@ endif()
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(ota)
 
-# Verify that this sample is built through sysbuild to ensure MCUboot is used
+# This sample enables automatic main-firmware handling and requires MCUboot via sysbuild.
 test_sysbuild()
 
 add_subdirectory(../net-common ${CMAKE_CURRENT_BINARY_DIR}/net-common)
