@@ -655,4 +655,3 @@ static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected)
 {
 	return zcbor_uint32_pexpect(state, expected);
 }
-

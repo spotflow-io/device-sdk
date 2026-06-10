@@ -180,8 +180,9 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 							      snapshot.artifact_results,
 							      snapshot.artifact_count);
 			if (rc < 0) {
-				LOG_ERR("Failed to queue OTA attempt %llu results for reporting: %d",
-					(unsigned long long)job->attempt_id, rc);
+				LOG_ERR(
+				    "Failed to queue OTA attempt %llu results for reporting: %d",
+				    (unsigned long long)job->attempt_id, rc);
 				return rc;
 			}
 		}

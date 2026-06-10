@@ -35,8 +35,7 @@ static struct spotflow_ota_update_msg make_delegated_update(uint64_t attempt_id,
 		snprintk(artifact->url, sizeof(artifact->url), "https://example/%llu/%zu",
 			 attempt_id, i);
 		snprintk(artifact->secret, sizeof(artifact->secret), "secret-%zu", i);
-		snprintk(artifact->version, sizeof(artifact->version), "%llu.0.%zu", attempt_id,
-			 i);
+		snprintk(artifact->version, sizeof(artifact->version), "%llu.0.%zu", attempt_id, i);
 	}
 
 	return msg;
@@ -84,9 +83,7 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 	return fake_callbacks->next_handle_result;
 }
 
-void spotflow_on_update_canceled(void)
-{
-}
+void spotflow_on_update_canceled(void) {}
 
 bool spotflow_is_update_canceled(void)
 {

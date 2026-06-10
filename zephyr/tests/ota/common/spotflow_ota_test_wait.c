@@ -31,8 +31,8 @@ void spotflow_ota_test_wait_for_persisted_attempt(uint64_t attempt_id,
 	zassert_unreachable("Timed out waiting for persisted OTA attempt");
 }
 
-void spotflow_ota_test_wait_for_persisted_attempt_error(uint64_t attempt_id,
-							enum spotflow_ota_attempt_error attempt_error)
+void spotflow_ota_test_wait_for_persisted_attempt_error(
+    uint64_t attempt_id, enum spotflow_ota_attempt_error attempt_error)
 {
 	for (int i = 0; i < 100; i++) {
 		struct spotflow_ota_persisted_attempt attempt;
