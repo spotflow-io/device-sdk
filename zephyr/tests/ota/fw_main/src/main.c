@@ -502,6 +502,20 @@ static void fail_after_delay(void* arg1, void* arg2, void* arg3)
 	zassert_ok(spotflow_ota_fw_main_fail_update(NULL, &async_fail_action));
 }
 
+static void cloud_cancel_after_delay(void* arg1, void* arg2, void* arg3)
+{
+	struct spotflow_ota_state_action action;
+
+	ARG_UNUSED(arg1);
+	ARG_UNUSED(arg2);
+	ARG_UNUSED(arg3);
+
+	k_sleep(K_MSEC(20));
+	zassert_ok(spotflow_ota_state_accept_cancel(42, &action));
+	zassert_true(action.accepted_cancel);
+	spotflow_ota_fw_main_cancel_active_download();
+}
+
 ZTEST(spotflow_ota_fw_main, test_pause_valid_phase_sets_paused)
 {
 	struct spotflow_ota_main_firmware_state state;
@@ -635,6 +649,27 @@ ZTEST(spotflow_ota_fw_main, test_pause_and_resume_during_download)
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+}
+
+ZTEST(spotflow_ota_fw_main, test_cloud_cancel_during_download_cancels_immediately)
+{
+	struct k_thread cancel_thread;
+	k_thread_stack_t cancel_stack[1024];
+	enum spotflow_ota_result result;
+
+	transport_fake->block_until_cancel = true;
+	accept_two_artifact_update();
+
+	k_thread_create(&cancel_thread, cancel_stack, K_THREAD_STACK_SIZEOF(cancel_stack),
+			cloud_cancel_after_delay, NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0,
+			K_NO_WAIT);
+
+	result = spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact);
+	k_thread_join(&cancel_thread, K_FOREVER);
+
+	zassert_equal(result, SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_true(transport_fake->cancel_observed);
+	zassert_true(spotflow_ota_state_is_update_canceled());
 }
 
 ZTEST(spotflow_ota_fw_main, test_user_fail_during_download_reports_failed)

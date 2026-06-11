@@ -402,9 +402,15 @@ static void handle_state_action(const struct spotflow_ota_state_action* action)
 	if (action->accepted_cancel) {
 		spotflow_ota_fw_custom_notify_canceled();
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-		spotflow_ota_fw_main_wake_if_paused();
+		spotflow_ota_fw_main_cancel_active_download();
 #endif
 	}
+
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (action->superseded_current) {
+		spotflow_ota_fw_main_cancel_active_download();
+	}
+#endif
 
 	if (action->wake_worker) {
 		spotflow_ota_worker_wake();
