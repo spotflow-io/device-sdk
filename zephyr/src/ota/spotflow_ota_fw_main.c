@@ -30,7 +30,8 @@ struct main_firmware_flash_ctx {
 static void notify_main_firmware_phase(enum spotflow_ota_phase phase);
 static void notify_main_firmware_state(const struct spotflow_ota_main_firmware_state* state);
 static enum spotflow_ota_result fail_main_firmware(void);
-static bool main_firmware_phase_allows_user_control(enum spotflow_ota_phase phase);
+static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase);
+static bool main_firmware_phase_allows_fail(enum spotflow_ota_phase phase);
 static void fill_main_firmware_state_output(struct spotflow_ota_main_firmware_state* out_state);
 static void main_firmware_wake_paused_worker(void);
 static void main_firmware_drain_resume_sem(void);
@@ -362,7 +363,7 @@ int spotflow_ota_fw_main_pause_update(struct spotflow_ota_main_firmware_state* o
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	if (!snapshot.has_current_attempt ||
-	    !main_firmware_phase_allows_user_control(snapshot.main_firmware_state.phase)) {
+	    !main_firmware_phase_allows_pause(snapshot.main_firmware_state.phase)) {
 		fill_main_firmware_state_output(out_state);
 		return -EINVAL;
 	}
@@ -437,7 +438,7 @@ int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* ou
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	if (!snapshot.has_current_attempt ||
-	    !main_firmware_phase_allows_user_control(snapshot.main_firmware_state.phase)) {
+	    !main_firmware_phase_allows_fail(snapshot.main_firmware_state.phase)) {
 		fill_main_firmware_state_output(out_state);
 		return -EINVAL;
 	}
@@ -522,13 +523,25 @@ static enum spotflow_ota_result fail_main_firmware(void)
 	return SPOTFLOW_OTA_RESULT_FAILED;
 }
 
-static bool main_firmware_phase_allows_user_control(enum spotflow_ota_phase phase)
+static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase)
 {
 	switch (phase) {
 	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
 	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
 	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
 	case SPOTFLOW_OTA_PHASE_PENDING_REBOOT:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool main_firmware_phase_allows_fail(enum spotflow_ota_phase phase)
+{
+	switch (phase) {
+	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
+	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
+	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
 		return true;
 	default:
 		return false;

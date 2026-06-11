@@ -572,6 +572,27 @@ ZTEST(spotflow_ota_fw_main, test_resume_invalid_when_not_paused)
 	zassert_false(state.is_paused);
 }
 
+ZTEST(spotflow_ota_fw_main, test_pause_valid_pending_reboot_sets_paused)
+{
+	struct spotflow_ota_main_firmware_state state;
+
+	setup_pre_reboot_main_update(SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+	zassert_ok(spotflow_ota_fw_main_pause_update(&state));
+	zassert_true(state.is_paused);
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+}
+
+ZTEST(spotflow_ota_fw_main, test_fail_invalid_pending_reboot_returns_current_state)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_main_firmware_state state;
+
+	setup_pre_reboot_main_update(SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+	zassert_equal(spotflow_ota_fw_main_fail_update(&state, &action), -EINVAL);
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_PENDING);
+}
+
 ZTEST(spotflow_ota_fw_main, test_fail_valid_marks_failed_and_cancels_remaining)
 {
 	struct spotflow_ota_state_action action;

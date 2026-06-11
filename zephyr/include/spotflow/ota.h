@@ -221,8 +221,9 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
  *
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. Applies
  * only while the phase is @c SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD,
- * @c SPOTFLOW_OTA_PHASE_DOWNLOADING, @c SPOTFLOW_OTA_PHASE_PENDING_UPGRADE, or
- * @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT. Cannot fail an update in
+ * @c SPOTFLOW_OTA_PHASE_DOWNLOADING, or @c SPOTFLOW_OTA_PHASE_PENDING_UPGRADE.
+ * Cannot fail an update in @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT because the
+ * MCUboot test upgrade has already been requested, or in
  * @c SPOTFLOW_OTA_PHASE_UNCONFIRMED; use @ref spotflow_confirm_main_firmware_image
  * after reboot or allow rollback handling on the next boot.
  *
@@ -238,7 +239,8 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
  *
  * @retval 0 Failure accepted (completed now or asynchronously).
  * @retval -EINVAL No active main-firmware update, or phase is
- *         @c SPOTFLOW_OTA_PHASE_NOT_RUNNING or @c SPOTFLOW_OTA_PHASE_UNCONFIRMED.
+ *         @c SPOTFLOW_OTA_PHASE_NOT_RUNNING, @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT, or
+ *         @c SPOTFLOW_OTA_PHASE_UNCONFIRMED.
  * @retval -ENOTSUP Automatic main-firmware handling is disabled.
  * @retval <0 Negative errno when OTA initialization or persisting the failure
  *         result fails.
