@@ -12,14 +12,6 @@ menuconfig SPOTFLOW_OTA
 
 if SPOTFLOW_OTA
 
-config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_OTA
-	int "Additional heap size required by Spotflow OTA"
-	# TODO: Find adequate value (this is probably too much)
-	default 32768
-	help
-		Additional heap size required by Spotflow OTA.
-		Increase this value if you experience issues with OTA updates.
-
 config SPOTFLOW_OTA_MAX_ARTIFACTS
 	int "Maximum number of artifacts in an OTA update manifest"
 	default 4
