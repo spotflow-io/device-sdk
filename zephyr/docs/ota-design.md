@@ -64,14 +64,22 @@ tests only.
 
 ```
 MQTT thread     → decode C2D, enqueue worker jobs, poll pending D2C send
-OTA worker      → state transitions, HTTP downloads, flash, user firmware callbacks
+OTA worker      → state transitions, artifact handlers, spotflow_download_artifact()
+                  when invoked from the worker (main FW + delegated paths)
 sysworkq        → spotflow_on_update_canceled()
-App threads     → public API (pause/resume/fail/confirm/query)
+App threads     → public API (pause/resume/fail/confirm/query);
+                  spotflow_download_artifact() only if the app calls it directly
 ```
 
-`spotflow_download_artifact()` blocks its caller on the OTA worker thread. There is no
-separate download thread. Automatic main-firmware downloads and delegated firmware
-handlers (including typical `spotflow_download_artifact()` use) all run on the OTA worker.
+`spotflow_download_artifact()` is synchronous: it blocks its **caller** until the
+download finishes, is canceled, or fails. There is no separate download thread.
+
+- When the OTA worker calls it (automatic main firmware or a typical delegated handler
+  invoked from the worker), the download runs on the **OTA worker** thread.
+- When application code calls it directly on an app thread, the download runs on that
+  **application** thread instead.
+
+In normal Spotflow OTA flows, downloads run on the OTA worker.
 
 **Rules:**
 
@@ -190,7 +198,12 @@ remaining `CANCELED`; otherwise clear probation and wait for a new cloud attempt
 
 ## Cancellation (implementation)
 
-- Cancellation is **accepted** only while no artifact has yet succeeded in the attempt.
+- **`UPDATE_ARTIFACTS` with `isCanceled: true`:** The attempt is accepted with
+  `actionable_cancellation` set. All artifacts are marked `CANCELED` immediately; the
+  worker is not started for firmware handlers. Terminal results are persisted and reported
+  like any other finished attempt.
+- **`CANCEL_UPDATE`:** Cancellation is **accepted** only while no artifact has yet
+  succeeded in the attempt.
 - After acceptance, `spotflow_is_update_canceled()` is true until the running artifact
   returns a terminal result.
 - If the running artifact later returns `SUCCEEDED`, that success is kept; cancellation
