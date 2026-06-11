@@ -31,9 +31,6 @@ int spotflow_ota_parse_url(const char* url, struct ota_url* out)
 	if (schema_len == 5 && strncmp(url + schema_off, "https", 5) == 0) {
 		out->tls = true;
 		out->port = 443;
-	} else if (schema_len == 4 && strncmp(url + schema_off, "http", 4) == 0) {
-		out->tls = false;
-		out->port = 80;
 	} else {
 		LOG_ERR("Unsupported artifact URL scheme");
 		return -EINVAL;

@@ -54,15 +54,9 @@ static void before_each(void* fixture)
 	reset_test_state();
 }
 
-ZTEST(spotflow_ota_downloader, test_parse_http_and_https_urls)
+ZTEST(spotflow_ota_downloader, test_parse_https_url)
 {
 	struct ota_url parsed;
-
-	zassert_ok(spotflow_ota_parse_url("http://example.com/firmware.bin", &parsed));
-	zassert_false(parsed.tls);
-	zassert_equal(parsed.port, 80);
-	zassert_equal(strcmp(parsed.host, "example.com"), 0);
-	zassert_equal(strcmp(parsed.path, "/firmware.bin"), 0);
 
 	zassert_ok(spotflow_ota_parse_url("https://example.com:8443/custom/path?query=1", &parsed));
 	zassert_true(parsed.tls);
@@ -71,11 +65,32 @@ ZTEST(spotflow_ota_downloader, test_parse_http_and_https_urls)
 	zassert_equal(strcmp(parsed.path, "/custom/path?query=1"), 0);
 }
 
+ZTEST(spotflow_ota_downloader, test_reject_http_url)
+{
+	struct ota_url parsed;
+
+	zassert_equal(spotflow_ota_parse_url("http://example.com/firmware.bin", &parsed), -EINVAL);
+}
+
 ZTEST(spotflow_ota_downloader, test_reject_unsupported_url_scheme)
 {
 	struct ota_url parsed;
 
 	zassert_equal(spotflow_ota_parse_url("ftp://example.com/image.bin", &parsed), -EINVAL);
+}
+
+ZTEST(spotflow_ota_downloader, test_reject_http_download_request)
+{
+	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_download_request request = {
+		.url = "http://example.com/firmware.bin",
+		.secret = "secret",
+	};
+
+	zassert_equal(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL),
+		      -EINVAL);
+	zassert_equal(spotflow_get_downloader_state(&downloader),
+		      SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
 }
 
 ZTEST(spotflow_ota_downloader, test_authorization_header_contains_ota_secret)
