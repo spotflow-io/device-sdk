@@ -1,4 +1,4 @@
 {
   "SpacesAfterTabs": true,
-  "Exclude": [".*\\.[md|c|h]$"]
+  "Exclude": [".*\\.(md|c|h)$"]
 }
