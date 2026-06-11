@@ -28,23 +28,6 @@ typedef enum {
 } LogSeverity;
 
 /**
- * @brief Debugging Function not to be used in Production
- *
- * @param buf
- * @param len
- */
-// static void print_cbor_hex(const uint8_t* buf, size_t len)
-// {
-// 	SPOTFLOW_LOG("CBOR buffer (%zu bytes):\n", len);
-// 	for (size_t i = 0; i < len; i++) {
-// 		SPOTFLOW_LOG("%02X ", buf[i]); // print each byte as 2-digit hex
-// 		if ((i + 1) % 16 == 0) // 16 bytes per line
-// 			SPOTFLOW_LOG("\n");
-// 	}
-// 	SPOTFLOW_LOG("\n");
-// }
-
-/**
  * @brief To create the message format for logs in CBOR format
  *
  * @param body
@@ -73,8 +56,11 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, size_t* out_len
 		body[body_len - 1] = '\0';
 	}
 
+	int has_severity = metadata->severity != 0;
+	int has_source = metadata->source && metadata->source[0] != '\0';
+
 	cbor_encoder_init(&array_encoder, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 0);
-	cbor_encoder_create_map(&array_encoder, &map_encoder, 7); // {
+	cbor_encoder_create_map(&array_encoder, &map_encoder, 5 + has_severity + has_source); // {
 	// Get device uptime in milliseconds since boot
 	/* messageType: "LOG" */
 	cbor_encode_uint(&map_encoder, KEY_MESSAGE_TYPE);
@@ -83,8 +69,12 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, size_t* out_len
 	cbor_encode_uint(&map_encoder, KEY_BODY);
 	cbor_encode_text_stringz(&map_encoder, body);
 
-	cbor_encode_uint(&map_encoder, KEY_SEVERITY);
-	cbor_encode_uint(&map_encoder, metadata->severity);
+	if (has_severity) {
+		cbor_encode_uint(&map_encoder, KEY_SEVERITY);
+		cbor_encode_uint(&map_encoder, metadata->severity);
+	}else{
+		SPOTFLOW_DEBUG("Log severity is 0, skipping severity field in CBOR");
+	}
 
 	cbor_encode_uint(&map_encoder, KEY_BODY_TEMPLATE);
 	cbor_encode_text_stringz(&map_encoder, log_template);
@@ -96,25 +86,20 @@ uint8_t* spotflow_log_cbor(const char* log_template, char* body, size_t* out_len
 	cbor_encode_uint(&map_encoder, KEY_DEVICE_UPTIME_MS);
 	cbor_encode_uint(&map_encoder, metadata->uptime_ms);
 
-	// labels → nested map with one element
-	cbor_encode_uint(&map_encoder, KEY_LABELS);
-	cbor_encoder_create_map(&map_encoder, &labels_encoder, 1); // {
-	// // key: source (full string name inside labels map)
-	cbor_encode_text_stringz(&labels_encoder, "source");
-	if (metadata->source && metadata->source[0] != '\0') {
+	if (has_source) {
+		cbor_encode_uint(&map_encoder, KEY_LABELS);
+		cbor_encoder_create_map(&map_encoder, &labels_encoder, 1); // {
+		cbor_encode_text_stringz(&labels_encoder, "source");
 		cbor_encode_text_stringz(&labels_encoder, metadata->source);
-	} else {
-		SPOTFLOW_LOG("Source is missing or empty\n");
-		cbor_encode_text_stringz(&labels_encoder, "");
+		cbor_encoder_close_container(&map_encoder, &labels_encoder); // }
+	}else{
+		SPOTFLOW_DEBUG("Log source is empty, skipping source field in CBOR");
 	}
-
-	cbor_encoder_close_container(&map_encoder, &labels_encoder); // }
 
 	cbor_encoder_close_container(&array_encoder, &map_encoder); // }
 	// Allocate buffer for JSON string (adjust size as needed)
 
 	*out_len = cbor_encoder_get_buffer_size(&array_encoder, buf);
-	// print_cbor_hex(buf, *out_len);
 	return buf;
 }
 

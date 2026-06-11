@@ -7,7 +7,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 #include "coredump/spotflow_coredump.h"
 #include "coredump/spotflow_coredump_cbor.h"
 #include "coredump/spotflow_coredump_queue.h"
@@ -200,13 +200,13 @@ esp_err_t spotflow_coredump_backend(void)
 
 		if (coredump_info.size > 0) {
 			SPOTFLOW_LOG("Sent chunk %d: %zu/%zu bytes (%.1f%%)\n",
-				coredump_info.chunk_ordinal - 1, coredump_info.offset,
-				coredump_info.size,
-				(float)coredump_info.offset * 100.0f / coredump_info.size);
-		}
-		else {
-			SPOTFLOW_LOG("Sent chunk %d: 0/0 bytes (100%%) - Invalid coredump report sent\n",
-				coredump_info.chunk_ordinal - 1);
+				     coredump_info.chunk_ordinal - 1, coredump_info.offset,
+				     coredump_info.size,
+				     (float)coredump_info.offset * 100.0f / coredump_info.size);
+		} else {
+			SPOTFLOW_LOG(
+			    "Sent chunk %d: 0/0 bytes (100%%) - Invalid coredump report sent\n",
+			    coredump_info.chunk_ordinal - 1);
 		}
 	} while (coredump_info.offset < coredump_info.size);
 

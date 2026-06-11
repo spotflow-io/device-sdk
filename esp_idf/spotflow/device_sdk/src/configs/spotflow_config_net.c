@@ -1,6 +1,6 @@
 #include "configs/spotflow_config_net.h"
 #include "net/spotflow_mqtt.h"
-#include "logging/spotflow_log_backend.h"
+#include "spotflow.h"
 
 static uint8_t pending_message_buffer[SPOTFLOW_CONFIG_RESPONSE_MAX_LENGTH];
 static size_t pending_message_length = 0;

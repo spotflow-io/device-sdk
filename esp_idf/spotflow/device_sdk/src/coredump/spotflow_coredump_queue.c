@@ -8,7 +8,6 @@
 #include "esp_log.h"
 #include "esp_heap_caps.h"
 
-#include "logging/spotflow_log_backend.h"
 #include "coredump/spotflow_coredump_queue.h"
 #include "coredump/spotflow_coredump_cbor.h"
 #include "spotflow.h"
@@ -23,24 +22,20 @@ static SemaphoreHandle_t buffer_slot_semaphore = NULL; // New semaphore handle
 bool coredump_found = false;
 /**
  * @brief To Add a message in Queue
- * 
- * @param msg Log Message 
+ *
+ * @param msg Log Message
  */
 int8_t spotflow_queue_coredump_push(uint8_t* msg, size_t len)
 {
 	if (xSemaphoreTake(buffer_slot_semaphore, portMAX_DELAY) != pdPASS) {
-        return -1;
-    }
+		return -1;
+	}
 
 	queue_msg_t qmsg;
 	qmsg.len = len;
 
-	qmsg.ptr = heap_caps_malloc_prefer(
-        len, 
-        2,
-        MALLOC_CAP_32BIT | MALLOC_CAP_SPIRAM, 
-        MALLOC_CAP_32BIT | MALLOC_CAP_DEFAULT
-    );
+	qmsg.ptr = heap_caps_malloc_prefer(len, 2, MALLOC_CAP_32BIT | MALLOC_CAP_SPIRAM,
+					   MALLOC_CAP_32BIT | MALLOC_CAP_DEFAULT);
 
 	if (!qmsg.ptr) {
 		xSemaphoreGive(buffer_slot_semaphore);
@@ -60,7 +55,7 @@ int8_t spotflow_queue_coredump_push(uint8_t* msg, size_t len)
 
 /**
  * @brief Read next message from queue (non-blocking)
- * 
+ *
  * @param out Pointer to structure receiving ptr+len
  * @return true if a message was read, false if queue empty
  */
@@ -68,7 +63,7 @@ int8_t spotflow_queue_coredump_push(uint8_t* msg, size_t len)
 bool spotflow_queue_coredump_read(queue_msg_t* out)
 {
 	if (queue_handle == NULL || out == NULL) {
-	   return false;
+		return false;
 	}
 
 	if (xQueueReceive(queue_handle, out, 0) == pdPASS)
@@ -78,8 +73,8 @@ bool spotflow_queue_coredump_read(queue_msg_t* out)
 
 /**
  * @brief Free the queue message buffer
- * 
- * @param msg 
+ *
+ * @param msg
  */
 void spotflow_queue_coredump_free(queue_msg_t* msg)
 {
@@ -93,13 +88,14 @@ void spotflow_queue_coredump_free(queue_msg_t* msg)
 
 /**
  * @brief Initialize the Queue to save the messgaes
- * 
+ *
  */
 void spotflow_queue_coredump_init(void)
 {
 	coredump_found = true;
 	queue_handle = xQueueCreate(SPOTFLOW_MAX_BUFFER_SLOTS, sizeof(queue_msg_t));
-	buffer_slot_semaphore = xSemaphoreCreateCounting(SPOTFLOW_MAX_BUFFER_SLOTS, SPOTFLOW_MAX_BUFFER_SLOTS);
+	buffer_slot_semaphore =
+	    xSemaphoreCreateCounting(SPOTFLOW_MAX_BUFFER_SLOTS, SPOTFLOW_MAX_BUFFER_SLOTS);
 	if (queue_handle == NULL || buffer_slot_semaphore == NULL) {
 		SPOTFLOW_LOG("Failed to create queue or semaphore\n");
 	}

@@ -1,6 +1,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "spotflow.h"
 #include "logging/spotflow_log_backend.h"
 #include "logging/spotflow_log_cbor.h"
 #include "configs/spotflow_config.h"
