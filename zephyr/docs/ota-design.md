@@ -18,8 +18,9 @@ and the public headers (`spotflow/ota.h`, `spotflow/downloader.h`) instead.
 | `spotflow_ota_net.c` | Pending D2C merge and MQTT publish wrapper |
 | `spotflow_ota_persistence.c` | Zephyr Settings load/save for attempt, results, versions, probation |
 | `spotflow_ota_records_cbor.c` | CBOR encoding of persisted records |
-| `spotflow_ota_downloader.c` | Public downloader API; HTTP streaming, pause/resume/cancel |
-| `spotflow_ota_downloader_transport_socket.c` | Socket/TLS transport for downloads |
+| `spotflow_ota_downloader.c` | Public downloader API; in-process HTTP Range retry loop; pause/resume/cancel |
+| `spotflow_ota_downloader_transport_errors.c` | Transient download-error classification (`transient_failure` on transport attempts) |
+| `spotflow_ota_downloader_transport_socket.c` | Socket/TLS HTTP transport for downloads |
 | `spotflow_ota_platform.c` | MCUboot confirm, test upgrade, reboot, flash slot access |
 | `spotflow_ota_identity.c` | Running and downloaded image build ID reads |
 | `spotflow_ota_fw_main.c` | Automatic main firmware pre/post-reboot flow |
@@ -235,7 +236,8 @@ download plumbing.
 - Supersession and deferred promotion (pending attempt IDs, discarded superseded results).
 - Installed-version skip before invoking a delegated handler.
 - Main firmware phase transitions.
-- HTTP download start, resume offset, and byte counts (host/path are not logged).
+- HTTP download start, resume offset, byte counts, and connection-lost resume hints
+  (host/path are not logged).
 
 **WRN / ERR:** transient download retries; decode, persistence, platform, and worker
 failures. Include `attempt_id`, artifact slug, phase, or errno as appropriate.

@@ -2,6 +2,7 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
         spotflow_ota.c
         spotflow_ota_cbor.c
         spotflow_ota_downloader.c
+        spotflow_ota_downloader_transport_errors.c
         spotflow_ota_downloader_transport_socket.c
         spotflow_ota_fw_custom.c
         spotflow_ota_log.c

@@ -27,6 +27,10 @@ struct spotflow_ota_downloader_transport_request {
 int spotflow_ota_downloader_transport_download(
     struct spotflow_ota_downloader_transport_request* request);
 
+/** Sets *transient_failure when err is retryable for the given progress in this attempt. */
+void spotflow_ota_downloader_transport_note_error(
+    struct spotflow_ota_downloader_transport_request* request, size_t bytes_in_attempt, int err);
+
 #ifdef __cplusplus
 }
 #endif

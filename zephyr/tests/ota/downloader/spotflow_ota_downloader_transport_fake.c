@@ -78,10 +78,7 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 	    offset + deliver_len == fake->partial_transient_fail_after_bytes) {
 		const int err = fake->partial_fail_errno != 0 ? fake->partial_fail_errno : -EAGAIN;
 
-		if (request->transient_failure != NULL) {
-			*request->transient_failure = err == -EAGAIN;
-		}
-
+		spotflow_ota_downloader_transport_note_error(request, deliver_len, err);
 		return err;
 	}
 
@@ -96,6 +93,9 @@ int spotflow_ota_downloader_transport_download(
 	int rc = 0;
 
 	fake->call_count++;
+	*request->transient_failure = false;
+	*request->bytes_downloaded = 0;
+
 	strncpy(fake->last_authorization_header, request->authorization_header,
 		sizeof(fake->last_authorization_header) - 1);
 	strncpy(fake->last_host, request->url->host, sizeof(fake->last_host) - 1);
@@ -109,14 +109,7 @@ int spotflow_ota_downloader_transport_download(
 	}
 
 	if (rc != 0) {
-		if (request->bytes_downloaded != NULL) {
-			*request->bytes_downloaded = 0;
-		}
-
-		if (request->transient_failure != NULL) {
-			*request->transient_failure = rc == -EAGAIN;
-		}
-
+		spotflow_ota_downloader_transport_note_error(request, 0, rc);
 		return rc;
 	}
 

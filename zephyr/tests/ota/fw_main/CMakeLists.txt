@@ -34,6 +34,7 @@ target_sources(app PRIVATE
         ../downloader/spotflow_ota_downloader_transport_fake.c
         ../../../src/ota/spotflow_ota_cbor.c
         ../../../src/ota/spotflow_ota_downloader.c
+        ../../../src/ota/spotflow_ota_downloader_transport_errors.c
         ../../../src/ota/spotflow_ota_fw_custom.c
         ../../../src/ota/spotflow_ota_fw_main.c
         ../../../src/ota/spotflow_ota_log.c

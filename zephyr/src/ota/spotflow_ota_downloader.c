@@ -25,7 +25,6 @@ static void downloader_wake_waiters(struct spotflow_downloader* downloader);
 static void downloader_drain_resume_sem(struct spotflow_downloader* downloader);
 static void downloader_wait_if_paused(struct spotflow_downloader* downloader);
 static void downloader_finish(struct spotflow_downloader* downloader);
-static bool downloader_error_is_transient(int err, bool transient_failure, size_t bytes_downloaded);
 
 int spotflow_ota_downloader_build_authorization_header(const char* secret, char* out,
 						       size_t out_len)
@@ -196,8 +195,7 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 			return 0;
 		}
 
-		if (rc == -ECANCELED ||
-		    !downloader_error_is_transient(rc, transient_failure, total_bytes_downloaded)) {
+		if (rc == -ECANCELED || !transient_failure) {
 			LOG_ERR("Artifact download failed: %d", rc);
 			downloader_finish(downloader);
 			return rc;
@@ -257,36 +255,4 @@ static void downloader_wait_if_paused(struct spotflow_downloader* downloader)
 
 		k_sem_take(&downloader->resume_sem, K_FOREVER);
 	}
-}
-
-static bool downloader_error_is_transient(int err, bool transient_failure, size_t bytes_downloaded)
-{
-	if (transient_failure) {
-		return true;
-	}
-
-	switch (err) {
-	case -EHOSTUNREACH:
-	case -ECONNRESET:
-	case -ETIMEDOUT:
-	case -ECONNREFUSED:
-	case -ENOTCONN:
-	case -EAGAIN:
-		return true;
-	default:
-		break;
-	}
-
-	/* Connection or parser errors after partial body data can be resumed with HTTP Range. */
-	if (bytes_downloaded > 0) {
-		switch (err) {
-		case -EBADMSG:
-		case -ECONNABORTED:
-			return true;
-		default:
-			break;
-		}
-	}
-
-	return false;
 }
