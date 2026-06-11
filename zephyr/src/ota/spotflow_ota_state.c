@@ -15,6 +15,7 @@ struct attempt_state {
 	bool artifact_running;
 	size_t running_artifact_index;
 	bool actionable_cancellation;
+	bool stop_remaining_artifacts;
 	bool has_attempt_error;
 	enum spotflow_ota_attempt_error attempt_error;
 	bool rejected_job_pending;
@@ -275,8 +276,8 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 		return true;
 	}
 
-	if (!current_attempt.actionable_cancellation && !current_attempt.artifact_running &&
-	    !current_attempt.main_firmware_awaiting_reboot &&
+	if (!current_attempt.stop_remaining_artifacts && !current_attempt.actionable_cancellation &&
+	    !current_attempt.artifact_running && !current_attempt.main_firmware_awaiting_reboot &&
 	    current_attempt.current_artifact_index < current_attempt.update.artifact_count &&
 	    current_attempt.results[current_attempt.current_artifact_index] ==
 		SPOTFLOW_OTA_RESULT_PENDING) {
@@ -328,15 +329,16 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 		current_attempt.actionable_cancellation = false;
 	}
 
-	if (current_attempt.actionable_cancellation || result == SPOTFLOW_OTA_RESULT_FAILED ||
-	    result == SPOTFLOW_OTA_RESULT_CANCELED) {
-		current_attempt.actionable_cancellation = true;
+	if (result == SPOTFLOW_OTA_RESULT_FAILED || result == SPOTFLOW_OTA_RESULT_CANCELED) {
+		current_attempt.stop_remaining_artifacts = true;
+		cancel_pending_artifacts(&current_attempt);
+	} else if (current_attempt.actionable_cancellation) {
 		cancel_pending_artifacts(&current_attempt);
 	}
 
 	advance_current_artifact(&current_attempt);
 	action->wake_worker = !attempt_has_terminal_results(&current_attempt) &&
-	    !current_attempt.actionable_cancellation;
+	    !current_attempt.stop_remaining_artifacts && !current_attempt.actionable_cancellation;
 	action->can_promote_pending =
 	    has_pending_attempt && attempt_has_terminal_results(&current_attempt);
 
