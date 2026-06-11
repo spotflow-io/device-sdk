@@ -23,6 +23,8 @@ struct spotflow_ota_downloader_transport_fake {
 	bool tls;
 	uint16_t port;
 	size_t partial_transient_fail_after_bytes;
+	/** errno for partial fail; 0 keeps legacy -EAGAIN with transient_failure set. */
+	int partial_fail_errno;
 	bool block_until_cancel;
 	bool cancel_observed;
 	bool block_until_pause;

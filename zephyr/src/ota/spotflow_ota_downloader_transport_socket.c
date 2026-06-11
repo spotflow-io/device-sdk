@@ -33,6 +33,9 @@ static int connect_socket(const struct ota_url* url);
 static int http_response_cb(struct http_response* rsp, enum http_final_call final_data,
 			    void* user_data);
 static bool downloader_is_canceled(struct spotflow_downloader* downloader);
+static void
+transport_note_partial_failure(struct spotflow_ota_downloader_transport_request* request,
+			       size_t bytes_in_attempt, int err);
 
 int spotflow_ota_downloader_transport_download(
     struct spotflow_ota_downloader_transport_request* request)
@@ -98,16 +101,43 @@ int spotflow_ota_downloader_transport_download(
 	if (http_ctx.callback_err != 0) {
 		*request->bytes_downloaded = http_ctx.offset - request->range_start;
 		*request->transient_failure = http_ctx.transient_failure;
+		transport_note_partial_failure(request, *request->bytes_downloaded,
+					       http_ctx.callback_err);
 		return http_ctx.callback_err;
 	}
 
 	if (rc < 0) {
 		*request->bytes_downloaded = http_ctx.offset - request->range_start;
+		transport_note_partial_failure(request, *request->bytes_downloaded, rc);
 		return rc;
 	}
 
 	*request->bytes_downloaded = http_ctx.offset - request->range_start;
 	return 0;
+}
+
+static void
+transport_note_partial_failure(struct spotflow_ota_downloader_transport_request* request,
+			       size_t bytes_in_attempt, int err)
+{
+	if (request == NULL || request->transient_failure == NULL || bytes_in_attempt == 0) {
+		return;
+	}
+
+	switch (err) {
+	case -EBADMSG:
+	case -ECONNABORTED:
+	case -ECONNRESET:
+	case -ETIMEDOUT:
+	case -ENOTCONN:
+		*request->transient_failure = true;
+		LOG_DBG("Artifact download connection lost after %zu bytes in this request (%d), "
+			"will resume from byte %zu",
+			bytes_in_attempt, err, request->range_start + bytes_in_attempt);
+		break;
+	default:
+		break;
+	}
 }
 
 static bool downloader_is_canceled(struct spotflow_downloader* downloader)

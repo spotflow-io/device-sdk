@@ -25,7 +25,7 @@ static void downloader_wake_waiters(struct spotflow_downloader* downloader);
 static void downloader_drain_resume_sem(struct spotflow_downloader* downloader);
 static void downloader_wait_if_paused(struct spotflow_downloader* downloader);
 static void downloader_finish(struct spotflow_downloader* downloader);
-static bool downloader_error_is_transient(int err, bool transient_failure);
+static bool downloader_error_is_transient(int err, bool transient_failure, size_t bytes_downloaded);
 
 int spotflow_ota_downloader_build_authorization_header(const char* secret, char* out,
 						       size_t out_len)
@@ -196,14 +196,16 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 			return 0;
 		}
 
-		if (rc == -ECANCELED || !downloader_error_is_transient(rc, transient_failure)) {
+		if (rc == -ECANCELED ||
+		    !downloader_error_is_transient(rc, transient_failure, total_bytes_downloaded)) {
 			LOG_ERR("Artifact download failed: %d", rc);
 			downloader_finish(downloader);
 			return rc;
 		}
 
-		LOG_WRN("Transient artifact download failure (%d) after %zu bytes, retrying", rc,
-			total_bytes_downloaded);
+		LOG_WRN("Transient artifact download failure (%d) after %zu bytes, retrying with "
+			"Range",
+			rc, total_bytes_downloaded);
 		k_sleep(K_MSEC(CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS));
 	}
 }
@@ -257,7 +259,7 @@ static void downloader_wait_if_paused(struct spotflow_downloader* downloader)
 	}
 }
 
-static bool downloader_error_is_transient(int err, bool transient_failure)
+static bool downloader_error_is_transient(int err, bool transient_failure, size_t bytes_downloaded)
 {
 	if (transient_failure) {
 		return true;
@@ -272,6 +274,19 @@ static bool downloader_error_is_transient(int err, bool transient_failure)
 	case -EAGAIN:
 		return true;
 	default:
-		return false;
+		break;
 	}
+
+	/* Connection or parser errors after partial body data can be resumed with HTTP Range. */
+	if (bytes_downloaded > 0) {
+		switch (err) {
+		case -EBADMSG:
+		case -ECONNABORTED:
+			return true;
+		default:
+			break;
+		}
+	}
+
+	return false;
 }

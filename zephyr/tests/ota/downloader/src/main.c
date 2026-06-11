@@ -152,6 +152,69 @@ ZTEST(spotflow_ota_downloader, test_transient_failure_resumes_with_range)
 	zassert_true(received_last_block);
 }
 
+ZTEST(spotflow_ota_downloader, test_partial_ebadmsg_resumes_with_range)
+{
+	struct spotflow_ota_downloader_transport_fake* fake =
+	    spotflow_ota_downloader_transport_fake_get();
+	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_download_request request = {
+		.url = "https://example.com/firmware.bin",
+		.secret = "secret",
+	};
+
+	fake->payload = sample_payload;
+	fake->payload_len = sizeof(sample_payload);
+	fake->partial_transient_fail_after_bytes = 2;
+	fake->partial_fail_errno = -EBADMSG;
+
+	zassert_ok(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL));
+	zassert_equal(fake->call_count, 2);
+	zassert_equal(fake->last_range_start, 2U);
+	zassert_equal(received_bytes, sizeof(sample_payload));
+	zassert_true(received_last_block);
+}
+
+ZTEST(spotflow_ota_downloader, test_partial_econnreset_resumes_with_range)
+{
+	struct spotflow_ota_downloader_transport_fake* fake =
+	    spotflow_ota_downloader_transport_fake_get();
+	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_download_request request = {
+		.url = "https://example.com/firmware.bin",
+		.secret = "secret",
+	};
+
+	fake->payload = sample_payload;
+	fake->payload_len = sizeof(sample_payload);
+	fake->partial_transient_fail_after_bytes = 2;
+	fake->partial_fail_errno = -ECONNRESET;
+
+	zassert_ok(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL));
+	zassert_equal(fake->call_count, 2);
+	zassert_equal(fake->last_range_start, 2U);
+	zassert_equal(received_bytes, sizeof(sample_payload));
+	zassert_true(received_last_block);
+}
+
+ZTEST(spotflow_ota_downloader, test_ebadmsg_without_progress_is_fatal)
+{
+	struct spotflow_ota_downloader_transport_fake* fake =
+	    spotflow_ota_downloader_transport_fake_get();
+	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_download_request request = {
+		.url = "https://example.com/firmware.bin",
+		.secret = "secret",
+	};
+	const int results[] = { -EBADMSG };
+
+	spotflow_ota_downloader_transport_fake_set_results(fake, results, ARRAY_SIZE(results));
+
+	zassert_equal(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL),
+		      -EBADMSG);
+	zassert_equal(fake->call_count, 1);
+	zassert_equal(received_bytes, 0);
+}
+
 ZTEST(spotflow_ota_downloader, test_transient_errors_are_retried)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
