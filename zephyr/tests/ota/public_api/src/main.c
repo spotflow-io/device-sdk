@@ -1,12 +1,17 @@
 #include <errno.h>
 #include <stddef.h>
+#include <string.h>
 
 #include <zephyr/ztest.h>
 
 #include <spotflow/ota.h>
 
 #include "net/spotflow_mqtt.h"
+#include "ota/spotflow_ota.h"
+#include "ota/spotflow_ota_state.h"
+#include "ota/spotflow_ota_types.h"
 #include "spotflow_ota_test_fakes.h"
+#include "spotflow_ota_test_settings.h"
 
 ZTEST(spotflow_ota_public_api, test_public_headers_expose_expected_ota_types)
 {
@@ -83,17 +88,62 @@ int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
 ZTEST(spotflow_ota_public_api, test_public_ota_functions_are_linkable)
 {
 	struct spotflow_ota_main_firmware_state state;
+	struct spotflow_firmware_info info;
+	struct spotflow_download_request request;
 
 	zassert_false(spotflow_is_update_canceled());
 	zassert_ok(spotflow_get_main_firmware_update_state(&state));
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
-	zassert_equal(spotflow_get_main_firmware_update_info(NULL), -EINVAL);
-	struct spotflow_firmware_info info;
-	zassert_equal(spotflow_get_main_firmware_update_info(&info), -ENOENT);
+	zassert_equal(spotflow_get_main_firmware_update_info(NULL, &request), -EINVAL);
+	zassert_equal(spotflow_get_main_firmware_update_info(&info, NULL), -EINVAL);
+	zassert_equal(spotflow_get_main_firmware_update_info(&info, &request), -ENOENT);
 	zassert_equal(spotflow_pause_main_firmware_update(&state), -ENOTSUP);
 	zassert_equal(spotflow_resume_main_firmware_update(&state), -ENOTSUP);
 	zassert_equal(spotflow_fail_main_firmware_update(&state), -ENOTSUP);
 	zassert_equal(spotflow_confirm_main_firmware_image(&state), -ENOTSUP);
 }
 
-ZTEST_SUITE(spotflow_ota_public_api, NULL, NULL, NULL, NULL, NULL);
+static void before_each(void* fixture)
+{
+	ARG_UNUSED(fixture);
+
+	spotflow_ota_test_settings_reset();
+	spotflow_ota_test_fakes_reset();
+	spotflow_ota_state_reset();
+	zassert_ok(spotflow_ota_init());
+}
+
+ZTEST(spotflow_ota_public_api, test_get_main_firmware_update_info_request_outlives_call)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_update_msg update = {
+		.attempt_id = 42,
+		.artifact_count = 1,
+	};
+	struct spotflow_ota_artifact main_artifact = {
+		.is_main = true,
+		.slug = "main",
+		.url = "https://example.com/main.bin",
+		.secret = "ota-secret",
+		.version = "1.2.3",
+	};
+	struct spotflow_firmware_info info;
+	struct spotflow_download_request request;
+
+	update.artifacts[0] = main_artifact;
+
+	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
+	zassert_ok(spotflow_ota_state_store_main_firmware_artifact(42, 0, &main_artifact));
+
+	zassert_ok(spotflow_get_main_firmware_update_info(&info, &request));
+
+	zassert_equal(info.download_request, &request);
+	zassert_equal(info.attempt_id, 42);
+	zassert_true(info.is_main);
+	zassert_str_equal(info.slug, "main");
+	zassert_str_equal(info.version, "1.2.3");
+	zassert_str_equal(info.download_request->url, "https://example.com/main.bin");
+	zassert_str_equal(info.download_request->secret, "ota-secret");
+}
+
+ZTEST_SUITE(spotflow_ota_public_api, NULL, NULL, before_each, NULL, NULL);

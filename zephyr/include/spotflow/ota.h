@@ -152,20 +152,23 @@ int spotflow_get_main_firmware_update_state(struct spotflow_ota_main_firmware_st
  * attempt. Manifest details are not persisted across reboot; after reboot,
  * query @ref spotflow_get_main_firmware_update_state instead.
  *
- * On success, @p info->download_request points to SDK-owned storage that remains
- * valid only until the current attempt ends or its in-memory manifest is
- * replaced.
+ * On success, @p info->download_request points to @p request. The @p request
+ * struct is caller-owned and remains valid after the call returns. Its @c url
+ * and @c secret fields point to SDK-owned strings that remain valid only until
+ * the current attempt ends or its in-memory manifest is replaced.
  *
  * Initializes OTA defensively before reading state.
  *
  * @param info Out parameter for artifact metadata. Must not be NULL.
+ * @param request Out parameter for download credentials. Must not be NULL.
  *
  * @retval 0 Metadata written successfully.
- * @retval -EINVAL @p info is NULL.
+ * @retval -EINVAL @p info or @p request is NULL.
  * @retval -ENOENT No active attempt or no main-firmware artifact in the manifest.
  * @retval <0 Negative errno when OTA initialization fails.
  */
-int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info);
+int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
+					   struct spotflow_download_request* request);
 
 /**
  * @brief Pause the automatic main-firmware update.
