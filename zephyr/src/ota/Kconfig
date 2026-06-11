@@ -29,7 +29,7 @@ config SPOTFLOW_OTA_MAX_ARTIFACTS
 
 config SPOTFLOW_OTA_THREAD_STACK_SIZE
 	int "Stack size for the OTA worker thread"
-	default 4096
+	default 4608
 	help
 	  Stack size in bytes for the OTA worker thread. Artifact downloads run
 	  synchronously on this thread, so increase this value if you observe stack
