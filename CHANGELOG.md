@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 * Added Metrics in ESP IDF
+* Added initial Zephyr BLE sample exposing Spotflow GATT metadata and streaming a minimal CBOR log over notifications.
 
 ### Fixed
 * Fixed ESP-IDF Spotflow log backend parsing for Log V1 prefixes and corrected `va_list` handling in the `esp_log_set_vprintf()` hook.
