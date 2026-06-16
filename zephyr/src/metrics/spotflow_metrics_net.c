@@ -1,5 +1,5 @@
 #include "spotflow_metrics_net.h"
-#include "../net/spotflow_mqtt.h"
+#include "../net/spotflow_transport.h"
 
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 #include "spotflow_metrics_heartbeat.h"
@@ -11,7 +11,7 @@
 LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 /* Message queue for metrics transmission */
-K_MSGQ_DEFINE(g_spotflow_metrics_msgq, sizeof(struct spotflow_mqtt_metrics_msg*),
+K_MSGQ_DEFINE(g_spotflow_metrics_msgq, sizeof(struct spotflow_metric_msg*),
 	      CONFIG_SPOTFLOW_METRICS_QUEUE_SIZE, sizeof(void*));
 
 void spotflow_metrics_net_init(void)
@@ -21,7 +21,11 @@ void spotflow_metrics_net_init(void)
 
 int spotflow_poll_and_process_enqueued_metrics(void)
 {
-	struct spotflow_mqtt_metrics_msg* msg;
+	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_METRICS)) {
+		return 0;
+	}
+
+	struct spotflow_metric_msg* msg;
 	int rc;
 
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
@@ -38,14 +42,14 @@ int spotflow_poll_and_process_enqueued_metrics(void)
 	}
 
 	/* Publish while message is still safely in queue */
-	rc = spotflow_mqtt_publish_ingest_cbor_msg(msg->payload, msg->len);
+	rc = spotflow_transport_send_ingest_cbor(msg->payload, msg->len);
 	if (rc == -EAGAIN) {
 		/* Temporary, retry later without aborting connection */
 		return rc;
 	}
 	if (rc < 0) {
 		LOG_WRN("Failed to publish metric: %d, aborting connection", rc);
-		spotflow_mqtt_abort_mqtt();
+		spotflow_transport_abort();
 		return rc; /* Message stays in queue for retry */
 	}
 

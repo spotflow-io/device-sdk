@@ -233,6 +233,69 @@ ACK/NACK messages are not implemented.
 
 The log queue item must be removed only after all fragments are sent successfully.
 
+## Production Threading Model
+
+The BLE transport must not rely on unsynchronized globals shared between Bluetooth callbacks and
+Spotflow queue processing. Treat these contexts as concurrent:
+
+- Bluetooth connection callbacks
+- GATT CCC callbacks
+- Advertising restart work
+- Spotflow processor thread calling `spotflow_transport_send_ingest_cbor()`
+
+BLE transport state should be owned by one internal module, for example `spotflow_ble_transport.c`:
+
+```c
+struct spotflow_ble_transport_state {
+    struct k_mutex lock;
+    struct bt_conn *conn;
+    bool tx_notifications_enabled;
+    uint8_t telemetry_sequence;
+    struct k_work_delayable restart_advertising_work;
+};
+```
+
+State access rules:
+
+- Hold `lock` whenever reading or writing `conn`, `tx_notifications_enabled`, or
+  `telemetry_sequence`.
+- Callback handlers may update state and schedule work, but should not perform long sends.
+- `spotflow_transport_send_ingest_cbor()` should take a local `bt_conn_ref()` while holding the
+  lock, then release the lock before calling `bt_gatt_notify()`.
+- Always `bt_conn_unref()` the local reference after all fragments are sent or after the first
+  error.
+- Return `-EAGAIN` for disconnected, unsubscribed, controller-buffer pressure, or other transient
+  BLE send failures.
+- Do not remove the log queue item until every fragment for that CBOR payload was accepted by
+  `bt_gatt_notify()`.
+
+The preferred send path is synchronous from the Spotflow processor thread:
+
+```text
+spotflow_poll_and_process_enqueued_logs()
+-> spotflow_transport_send_ingest_cbor()
+-> lock, copy/ref connection state, increment sequence
+-> unlock
+-> fragment and bt_gatt_notify()
+-> unref connection
+```
+
+This keeps backpressure simple: if BLE is not ready or cannot currently accept notifications, the
+existing log queue keeps the item and the processor retries later. A dedicated BLE send thread can be
+added later for ACK/NACK windows, but it is not necessary for the first production logs transport.
+
+Connection lifecycle rules:
+
+- On connect, replace any previous connection reference under the lock.
+- On disconnect, clear notification state and connection under the lock, then schedule advertising
+  restart via delayable work.
+- Advertising restart work should check connection state under the lock before calling
+  `bt_le_adv_start()`.
+- CCC changes should only update the notification flag under the lock.
+
+The standalone BLE sample should mirror these rules, but the SDK implementation should keep the
+logic in a reusable BLE transport module instead of in application `main.c`.
+
 ## Processing Thread
 
 For MQTT transport, preserve current behavior:

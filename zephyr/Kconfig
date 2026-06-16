@@ -3,48 +3,12 @@ menuconfig SPOTFLOW
 	default n
 	select HWINFO
 	select ZCBOR
-	select MBEDTLS
-	select MBEDTLS_TLS_LIBRARY if NRF_SECURITY
-	select MQTT_LIB
-	select MQTT_LIB_TLS
-	select MBEDTLS_SSL_SERVER_NAME_INDICATION
-	select MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED if !NRF_SECURITY
-	select MBEDTLS_ECP_DP_SECP256R1_ENABLED
-	select MBEDTLS_ECP_DP_SECP384R1_ENABLED if NRF_SECURITY
-	select MBEDTLS_ECDH_C
-	select MBEDTLS_ECP_C
-	select MBEDTLS_RSA_C if NRF_SECURITY
-	select MBEDTLS_DHM_C if NRF_SECURITY
-	select MBEDTLS_GCM_C if NRF_SECURITY
-	select NET_SOCKETS
-	select NET_SOCKETS_POLL
-	select NET_TCP
-	select NET_MGMT
-	select NET_MGMT_EVENT
-	select NET_MGMT_EVENT_INFO
-	select NET_CONNECTION_MANAGER
-	select DNS_RESOLVER
-	# PSA is required since Zephyr 4.4
-	select MBEDTLS_PSA_CRYPTO_C if !NRF_SECURITY
-	select MBEDTLS_PSA_CRYPTO_CLIENT if !NRF_SECURITY
-	select MBEDTLS_SSL_PROTO_TLS1_2 if !NRF_SECURITY
-	select MBEDTLS_X509_CRT_PARSE_C if !NRF_SECURITY
-	select PSA_WANT_ALG_ECDH if !NRF_SECURITY
-	select PSA_WANT_ALG_GCM if !NRF_SECURITY
-	select PSA_WANT_ALG_HMAC if !NRF_SECURITY
-	select PSA_WANT_ALG_RSA_PKCS1V15_SIGN if !NRF_SECURITY
-	select PSA_WANT_ALG_SHA_384 if !NRF_SECURITY
-	select PSA_WANT_ALG_TLS12_PRF if !NRF_SECURITY
-	select PSA_WANT_ECC_SECP_R1_256 if !NRF_SECURITY
-	select PSA_WANT_KEY_TYPE_AES if !NRF_SECURITY
-	select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_EXPORT if !NRF_SECURITY
-	select PSA_WANT_KEY_TYPE_ECC_KEY_PAIR_GENERATE if !NRF_SECURITY
-	select PSA_WANT_KEY_TYPE_RSA_KEY_PAIR_IMPORT if !NRF_SECURITY
-	imply NET_SOCKETS_SOCKOPT_TLS
 	help
 		Enables Zephyr integration with Spotflow observability platform.
 
 if SPOTFLOW
+
+rsource "src/net/Kconfig"
 
 rsource "src/logging/KConfig"
 rsource "src/coredumps/KConfig"
@@ -87,16 +51,6 @@ configdefault MBEDTLS_HEAP_SIZE
 	default 36864
 endif # MBEDTLS_ENABLE_HEAP
 
-config SPOTFLOW_SERVER_HOSTNAME
-	string "Hostname of Spotflow observability platform"
-	depends on SPOTFLOW
-	default "mqtt.spotflow.io"
-
-config SPOTFLOW_SERVER_PORT
-	int "Port of Spotflow observability platform"
-	depends on SPOTFLOW
-	default 8883
-
 config SPOTFLOW_DEVICE_ID
 	string "Device ID device will use to connect to Spotflow observability platform"
 	help
@@ -104,13 +58,6 @@ config SPOTFLOW_DEVICE_ID
 		platform. If empty, the hexadecimal representation of the result of
 		hwinfo_get_device_id(...) will be used. You can provide the device ID
 		in the code by defining the function char* spotflow_override_device_id().
-
-config SPOTFLOW_INGEST_KEY
-	string "Password device will use to connect to Spotflow observability platform"
-	help
-		Ingest key is a secret key used to authenticate your device
-		It can be found in Spotflow observability platform
-
 config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	int "Spotflow SDK backend level"
 	default 2
@@ -126,21 +73,21 @@ config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 		- 3 INFO, write LOG_INF in addition to previous level
 		- 4 DEBUG, write LOG_DBG in addition to previous level
 
-config SPOTFLOW_MQTT_THREAD_CUSTOM_PRIORITY
-	bool "Use custom priority for MQTT log thread"
+config SPOTFLOW_PROCESSING_THREAD_CUSTOM_PRIORITY
+	bool "Use custom priority for Spotflow processing thread"
 	default n
 	help
-		Enable this option to use custom priority for the thread used to send logs to Spotflow server.
-		Same priority is also used for thread preparing coredumps.
+		Enable this option to use a custom priority for the Spotflow processing thread.
+		The same priority is also used for the thread preparing coredumps.
 		If disabled, the thread will use default K_LOWEST_APPLICATION_THREAD_PRIO.
 
-config SPOTFLOW_MQTT_THREAD_PRIORITY
-	int "MQTT log thread priority"
+config SPOTFLOW_PROCESSING_THREAD_PRIORITY
+	int "Spotflow processing thread priority"
 	default 14
-	depends on SPOTFLOW_MQTT_THREAD_CUSTOM_PRIORITY
+	depends on SPOTFLOW_PROCESSING_THREAD_CUSTOM_PRIORITY
 	help
-		Priority of the thread used to send logs to Spotflow server.
-		To take effect, you need to enable SPOTFLOW_MQTT_THREAD_CUSTOM_PRIORITY.
+		Priority of the Spotflow processing thread.
+		To take effect, you need to enable SPOTFLOW_PROCESSING_THREAD_CUSTOM_PRIORITY.
 		Increase this value if you experience issues with logs being sent.
 
 config SPOTFLOW_PROCESSING_THREAD_STACK_SIZE

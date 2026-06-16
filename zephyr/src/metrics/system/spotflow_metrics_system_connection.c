@@ -39,5 +39,5 @@ void spotflow_metrics_system_connection_report(bool connected)
 		return;
 	}
 
-	LOG_DBG("MQTT connection state: %s", connected ? "connected" : "disconnected");
+	LOG_DBG("Transport connection state: %s", connected ? "connected" : "disconnected");
 }

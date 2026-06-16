@@ -1,22 +1,29 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #include <zephyr/net/conn_mgr_connectivity.h>
 #include <zephyr/net/socket.h>
+#endif
 
 #include "config/spotflow_config.h"
 #include "config/spotflow_config_net.h"
-#include "net/spotflow_processor.h"
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #include "net/spotflow_mqtt.h"
 #include "net/spotflow_connection_helper.h"
 #include "net/spotflow_session_metadata.h"
 #include "net/spotflow_tls.h"
+#endif
+
+#include "net/spotflow_processor.h"
+#include "net/spotflow_transport.h"
 
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 #include "coredumps/spotflow_coredumps_net.h"
 #endif /* CONFIG_SPOTFLOW_COREDUMPS */
 
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
-#include "logging/spotflow_log_net.h"
+#include "logging/spotflow_log_processor.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 
 #ifdef CONFIG_SPOTFLOW_METRICS
@@ -35,23 +42,29 @@
 
 LOG_MODULE_REGISTER(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-static void spotflow_mqtt_thread_entry(void);
+static void spotflow_processing_thread_entry(void);
+static int process_config_coredumps_metrics_or_logs(void);
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 static void process_mqtt();
+#else
+static void process_transport_loop(void);
+#endif
 
-K_THREAD_DEFINE(spotflow_mqtt_thread, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE,
-		spotflow_mqtt_thread_entry, NULL, NULL, NULL, SPOTFLOW_MQTT_THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(spotflow_processing_thread, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE,
+		spotflow_processing_thread_entry, NULL, NULL, NULL, SPOTFLOW_THREAD_PRIORITY, 0, 0);
 
-void spotflow_start_mqtt(void)
+void spotflow_start_processing(void)
 {
-	k_thread_start(spotflow_mqtt_thread);
-	LOG_DBG("Thread started with priority %d and stack size %d", SPOTFLOW_MQTT_THREAD_PRIORITY,
+	k_thread_start(spotflow_processing_thread);
+	LOG_DBG("Thread started with priority %d and stack size %d", SPOTFLOW_THREAD_PRIORITY,
 		CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE);
 }
 
-static void spotflow_mqtt_thread_entry(void)
+static void spotflow_processing_thread_entry(void)
 {
 	LOG_DBG("Starting Spotflow processing thread");
 
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #ifdef CONFIG_SPOTFLOW_METRICS
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
 	/* Initialize system metrics early so they start collecting at boot,
@@ -62,7 +75,15 @@ static void spotflow_mqtt_thread_entry(void)
 	}
 #endif
 #endif
+#endif
 
+	int rc = spotflow_transport_start();
+	if (rc < 0) {
+		LOG_ERR("Failed to start Spotflow transport: %d", rc);
+		return;
+	}
+
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 	wait_for_network();
 
 	spotflow_tls_init();
@@ -81,9 +102,14 @@ static void spotflow_mqtt_thread_entry(void)
 
 		process_mqtt();
 	}
+#else
+	while (true) {
+		process_transport_loop();
+	}
+#endif
 }
 
-static int process_config_coredumps_or_logs()
+static int process_config_coredumps_metrics_or_logs(void)
 {
 	int rc = spotflow_config_send_pending_message();
 	if (rc < 0) {
@@ -123,6 +149,7 @@ static int process_config_coredumps_or_logs()
 	return rc;
 }
 
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 static void process_mqtt()
 {
 	int rc;
@@ -146,7 +173,7 @@ static void process_mqtt()
 			break; /* break out of the inner loop; outer loop will reconnect */
 		}
 
-		rc = process_config_coredumps_or_logs();
+		rc = process_config_coredumps_metrics_or_logs();
 		if (rc == -EAGAIN) {
 			/* Transient: MQTT busy, retry on next iteration */
 			continue;
@@ -165,3 +192,19 @@ static void process_mqtt()
 		}
 	}
 }
+#else
+static void process_transport_loop(void)
+{
+	int rc = process_config_coredumps_metrics_or_logs();
+
+	if (rc == 0 || rc == -EAGAIN) {
+		k_sleep(K_MSEC(100));
+		return;
+	}
+
+	if (rc < 0) {
+		LOG_DBG("Failed to process transport loop: %d", rc);
+		k_sleep(K_MSEC(100));
+	}
+}
+#endif

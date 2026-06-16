@@ -1,6 +1,6 @@
 #include "spotflow_metrics_heartbeat.h"
 #include "spotflow_metrics_cbor.h"
-#include "../net/spotflow_mqtt.h"
+#include "../net/spotflow_transport.h"
 
 #include <inttypes.h>
 #include <string.h>
@@ -10,7 +10,7 @@
 LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
 /* Single-slot buffer for pending heartbeat (size 1, silent overwrite) */
-static struct spotflow_mqtt_metrics_msg g_pending_heartbeat;
+static struct spotflow_metric_msg g_pending_heartbeat;
 static uint8_t g_pending_heartbeat_payload[SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN];
 static bool g_pending_heartbeat_valid;
 static struct k_mutex g_heartbeat_mutex;
@@ -24,6 +24,10 @@ static struct k_work_delayable g_heartbeat_work;
 static void heartbeat_work_handler(struct k_work* work)
 {
 	ARG_UNUSED(work);
+
+	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_METRICS)) {
+		goto reschedule;
+	}
 
 	int64_t uptime_ms = k_uptime_get();
 
@@ -69,7 +73,11 @@ void spotflow_metrics_heartbeat_init(void)
 
 int spotflow_poll_and_process_heartbeat(void)
 {
-	struct spotflow_mqtt_metrics_msg msg;
+	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_METRICS)) {
+		return 0;
+	}
+
+	struct spotflow_metric_msg msg;
 	uint8_t payload_copy[SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN];
 	bool has_pending = false;
 
@@ -94,14 +102,14 @@ int spotflow_poll_and_process_heartbeat(void)
 	int retry = 0;
 
 	do {
-		rc = spotflow_mqtt_publish_ingest_cbor_msg(msg.payload, msg.len);
+		rc = spotflow_transport_send_ingest_cbor(msg.payload, msg.len);
 		if (rc == -EAGAIN) {
 			if (retry >= ARRAY_SIZE(retry_delays_ms)) {
 				LOG_WRN("Heartbeat publish failed after %d retries, skipping",
 					retry);
 				break;
 			}
-			LOG_DBG("MQTT busy, retrying heartbeat in %d ms...",
+			LOG_DBG("Transport busy, retrying heartbeat in %d ms...",
 				retry_delays_ms[retry]);
 			k_sleep(K_MSEC(retry_delays_ms[retry]));
 			retry++;

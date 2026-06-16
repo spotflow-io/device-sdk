@@ -3,6 +3,7 @@
 #include "spotflow_build_id.h"
 #include "coredumps/spotflow_coredumps_cbor.h"
 #include "net/spotflow_processor.h"
+#include "net/spotflow_transport.h"
 #include "zephyr/random/random.h"
 
 #include <zephyr/kernel.h>
@@ -11,13 +12,13 @@
 
 LOG_MODULE_REGISTER(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL);
 
-K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_mqtt_coredumps_msg*),
+K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_coredump_msg*),
 	      CONFIG_SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE, 1);
 
 /*expected stack size should be under 200B, therefore 1024 should be safe*/
 #define STACK_SIZE 1024
 /*same priority as mqtt processing thread*/
-#define THREAD_PRIO SPOTFLOW_MQTT_THREAD_PRIORITY
+#define THREAD_PRIO SPOTFLOW_THREAD_PRIORITY
 
 static void spotflow_coredumps_thread_entry(void);
 
@@ -43,7 +44,7 @@ struct coredump_info {
 static struct coredump_info coredump_info;
 
 /* blocks forever until space is available */
-static int enqueue_log_msg(const struct spotflow_mqtt_coredumps_msg* msg)
+static int enqueue_log_msg(const struct spotflow_coredump_msg* msg)
 {
 	int rc = k_msgq_put(&g_spotflow_core_dumps_msgq, &msg, K_FOREVER);
 	return rc;
@@ -51,6 +52,11 @@ static int enqueue_log_msg(const struct spotflow_mqtt_coredumps_msg* msg)
 
 static void spotflow_coredumps_thread_entry(void)
 {
+	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_COREDUMPS)) {
+		LOG_INF("Coredump transport inactive, skipping coredump upload processing");
+		return;
+	}
+
 	/* Check if there is a dump */
 	int rc = coredump_query(COREDUMP_QUERY_HAS_STORED_DUMP, NULL);
 	if (rc < 0) {
@@ -143,8 +149,7 @@ static void spotflow_coredumps_thread_entry(void)
 		}
 
 		/* Fill the queue with a full chunk */
-		struct spotflow_mqtt_coredumps_msg* msg =
-		    k_malloc(sizeof(struct spotflow_mqtt_coredumps_msg));
+		struct spotflow_coredump_msg* msg = k_malloc(sizeof(struct spotflow_coredump_msg));
 		if (!msg) {
 			LOG_DBG("Failed to allocate memory for message");
 			k_free(cbor_data);

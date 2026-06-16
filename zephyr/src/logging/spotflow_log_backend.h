@@ -8,7 +8,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-struct spotflow_mqtt_logs_msg {
+struct spotflow_log_msg {
 	uint8_t* payload;
 	size_t len;
 };
