@@ -62,7 +62,7 @@ config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 	select REBOOT
 	select BINDESC_READ if SPOTFLOW_GENERATE_BUILD_ID
 	select BINDESC_READ_FLASH if SPOTFLOW_GENERATE_BUILD_ID && (ARCH_SUPPORTS_ROM_START || ARCH_POSIX)
-	default n
+	default y
 	help
 	  When enabled, the Spotflow OTA SDK downloads main firmware artifacts,
 	  requests an MCUboot test upgrade, and reconciles probation state after
