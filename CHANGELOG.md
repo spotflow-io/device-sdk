@@ -14,7 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed ESP-IDF log CBOR encoding to omit unknown severity and missing source labels instead of emitting empty fallback metadata.
 * Fixed ESP-IDF coredump example Wi-Fi retry logic to clean up Wi-Fi state before reconnect attempts, preventing duplicate-netif assertion failures.
 * Added `LOG_VERSION_1` dependency for the ESP-IDF Spotflow log backend.
-
+* Added more buffer size for TLS to reduce handshake failures and enabled Server Name Indication (SNI).
 
 ## [0.8.0] - 2026-05-07
 
