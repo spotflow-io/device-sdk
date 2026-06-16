@@ -7,6 +7,7 @@ menuconfig SPOTFLOW
 	select MBEDTLS_TLS_LIBRARY if NRF_SECURITY
 	select MQTT_LIB
 	select MQTT_LIB_TLS
+	select MBEDTLS_SSL_SERVER_NAME_INDICATION
 	select MBEDTLS_KEY_EXCHANGE_ECDHE_RSA_ENABLED if !NRF_SECURITY
 	select MBEDTLS_ECP_DP_SECP256R1_ENABLED
 	select MBEDTLS_ECP_DP_SECP384R1_ENABLED if NRF_SECURITY
@@ -62,7 +63,7 @@ config SPOTFLOW_GENERATE_BUILD_ID
 		Build ID allows to match core dumps with the original .elf file.
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
-	default 4096 if SPOTFLOW
+	default 4608 if SPOTFLOW
 
 if NRF_SECURITY
 configdefault MBEDTLS_MPI_MAX_SIZE
@@ -81,10 +82,9 @@ configdefault MBEDTLS_ENABLE_HEAP
 	default y if SPOTFLOW && !NRF_SECURITY
 
 if MBEDTLS_ENABLE_HEAP
-# recommended size for mbedtls heap is 32kB
-# to be able to verify whole Lets Encrypt certificate chain
+# Needed to be able to verify the whole Let's Encrypt certificate chain
 configdefault MBEDTLS_HEAP_SIZE
-	default 32768
+	default 36864
 endif # MBEDTLS_ENABLE_HEAP
 
 config SPOTFLOW_SERVER_HOSTNAME
