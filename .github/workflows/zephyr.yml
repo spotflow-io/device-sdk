@@ -29,6 +29,38 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  unit-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Create Python virtual environment
+        run: python -m venv .venv
+
+      - name: Activate Python virtual environment
+        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
+      - name: Install West
+        run: pip install west
+
+      - name: Create workspace
+        run: |
+          west init \
+            --manifest-url ${{ github.server_url }}/${{ github.repository }} \
+            --clone-opt=--revision=${{ github.sha }} \
+            --manifest-file zephyr/manifests/west-zephyr.yml \
+            .
+          west update --fetch-opt=--depth=1 --narrow
+
+      - name: Install Python packages
+        run: west packages pip --install --ignore-venv-check
+
+      - name: Run Twister unit tests
+        working-directory: zephyr
+        run: ./ci/run_twister.sh
+
   generate-matrix:
     runs-on: ubuntu-latest
     outputs:
@@ -49,7 +81,9 @@ jobs:
           ${{ github.event.inputs.build_logs_all_boards && '--build-logs-for-all-boards' || '' }}
 
   build:
-    needs: generate-matrix
+    needs:
+      - unit-tests
+      - generate-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
