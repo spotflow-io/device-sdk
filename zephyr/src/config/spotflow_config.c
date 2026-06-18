@@ -5,20 +5,16 @@
 
 #include "logging/spotflow_log_cbor.h"
 #include "config/spotflow_config.h"
-#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #include "config/spotflow_config_cbor.h"
 #include "config/spotflow_config_net.h"
-#endif
 #include "config/spotflow_config_options.h"
 #include "config/spotflow_config_persistence.h"
 #include "net/spotflow_transport.h"
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 static void add_log_severity_to_reported_msg(struct spotflow_config_reported_msg* reported_msg);
 static void handle_desired_msg(uint8_t* payload, size_t len);
-#endif
 
 void spotflow_config_init()
 {
@@ -40,7 +36,6 @@ int spotflow_config_init_session()
 		return 0;
 	}
 
-#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 	struct spotflow_config_reported_msg reported_msg = {
 		.contains_acked_desired_config_version = false,
 	};
@@ -59,12 +54,8 @@ int spotflow_config_init_session()
 	}
 
 	return 0;
-#else
-	return 0;
-#endif
 }
 
-#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 static void add_log_severity_to_reported_msg(struct spotflow_config_reported_msg* reported_msg)
 {
 	uint8_t sent_log_level = spotflow_config_get_sent_log_level();
@@ -114,4 +105,3 @@ static void handle_desired_msg(uint8_t* payload, size_t len)
 		return;
 	}
 }
-#endif

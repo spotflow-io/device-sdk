@@ -1,0 +1,6 @@
+tests:
+  spotflow.ble_framing.tx:
+    tags:
+      - spotflow
+      - bluetooth
+      - unit

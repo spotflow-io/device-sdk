@@ -17,6 +17,8 @@ endif()
 
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_BLE
         spotflow_ble_transport.c
+        spotflow_ble_gatt.c
+        spotflow_ble_framing.c
 )
 
 if (CONFIG_SPOTFLOW_LOG_BACKEND AND CONFIG_SPOTFLOW_TRANSPORT_MQTT)
