@@ -21,6 +21,48 @@ The OTA implementation is split by responsibility under `spotflow/zephyr/src/ota
 | `firmware/` | Automatic main-firmware lifecycle and delegated firmware callback dispatch |
 | `platform/` | Zephyr/MCUboot/build-ID wrappers that are faked in tests |
 
+Dependencies between folders:
+
+```mermaid
+flowchart TD
+    facade["Top-level facade:\nspotflow_ota.c"]
+    core["core:\nstate, worker, types, log"]
+    protocol["protocol:\nCBOR, D2C results"]
+    persistence["persistence:\nSettings, records"]
+    downloader["downloader:\nHTTP(S), URL, retry"]
+    firmware["firmware:\nmain + delegated updates"]
+    platform["platform:\nMCUboot, flash, build ID"]
+    public["public headers:\nspotflow/ota.h\nspotflow/downloader.h"]
+    zephyr["Zephyr + network stack"]
+
+    facade --> core
+    facade --> protocol
+    facade --> persistence
+    facade --> firmware
+
+    core --> protocol
+    core --> persistence
+    core --> firmware
+
+    firmware --> downloader
+    firmware --> platform
+    firmware --> protocol
+    firmware --> persistence
+    firmware --> core
+
+    downloader --> zephyr
+    platform --> zephyr
+    protocol --> zephyr
+    persistence --> zephyr
+
+    public -.-> facade
+    public -.-> downloader
+```
+
+The diagram shows code dependencies, not thread ownership.
+`core/spotflow_ota_worker.c` orchestrates most runtime work and intentionally calls into several folders; lower-level folders should avoid calling back into the facade.
+The dotted lines show implementations of public headers.
+
 Important files:
 
 | Module | Responsibility |
