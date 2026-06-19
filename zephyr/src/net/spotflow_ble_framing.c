@@ -256,7 +256,7 @@ int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* se
 		return -EMSGSIZE;
 	}
 
-	struct spotflow_ble_encoded_frame frames[32];
+	struct spotflow_ble_encoded_frame frames[SPOTFLOW_BLE_MAX_ENCODED_FRAMES];
 	size_t frame_count = 0;
 	int rc = spotflow_ble_transport_encode_frames(
 	    message_type, sequence, payload, len,

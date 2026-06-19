@@ -1,7 +1,6 @@
 #include "net/spotflow_ble_transport.h"
 #include "net/spotflow_ble_transport_internal.h"
 
-
 struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
 
 int spotflow_ble_transport_start(void)
@@ -22,7 +21,8 @@ bool spotflow_ble_transport_is_ready(void)
 bool spotflow_ble_transport_supports_feature(enum spotflow_transport_feature feature)
 {
 	return feature == SPOTFLOW_TRANSPORT_FEATURE_LOGS ||
-	    feature == SPOTFLOW_TRANSPORT_FEATURE_CONFIG;
+	    feature == SPOTFLOW_TRANSPORT_FEATURE_CONFIG ||
+	    feature == SPOTFLOW_TRANSPORT_FEATURE_METRICS;
 }
 
 int spotflow_ble_transport_send_ingest_cbor(uint8_t* payload, size_t len)

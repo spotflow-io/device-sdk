@@ -12,6 +12,9 @@
 #include <zephyr/logging/log.h>
 
 #include "config/spotflow_config.h"
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+#include "../metrics/system/spotflow_metrics_system.h"
+#endif
 #include "net/spotflow_device_id.h"
 #include "net/spotflow_session_metadata.h"
 
@@ -31,17 +34,17 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 	BT_UUID_128_ENCODE(0x26530006, 0x81E5, 0x4861, 0x82AE, 0x2C92E6887922)
 
 static const struct bt_uuid_128 spotflow_service_uuid =
-	BT_UUID_INIT_128(SPOTFLOW_SERVICE_UUID_ENCODED);
+    BT_UUID_INIT_128(SPOTFLOW_SERVICE_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_capabilities_uuid =
-	BT_UUID_INIT_128(SPOTFLOW_CAPABILITIES_UUID_ENCODED);
+    BT_UUID_INIT_128(SPOTFLOW_CAPABILITIES_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_device_id_uuid =
-	BT_UUID_INIT_128(SPOTFLOW_DEVICE_ID_UUID_ENCODED);
+    BT_UUID_INIT_128(SPOTFLOW_DEVICE_ID_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_session_metadata_uuid =
-	BT_UUID_INIT_128(SPOTFLOW_SESSION_METADATA_UUID_ENCODED);
+    BT_UUID_INIT_128(SPOTFLOW_SESSION_METADATA_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_tx_stream_uuid =
-	BT_UUID_INIT_128(SPOTFLOW_TX_STREAM_UUID_ENCODED);
+    BT_UUID_INIT_128(SPOTFLOW_TX_STREAM_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_rx_stream_uuid =
-	BT_UUID_INIT_128(SPOTFLOW_RX_STREAM_UUID_ENCODED);
+    BT_UUID_INIT_128(SPOTFLOW_RX_STREAM_UUID_ENCODED);
 
 static const uint8_t capabilities[] = {
 	SPOTFLOW_PROTOCOL_VERSION_MAJOR,
@@ -68,6 +71,7 @@ static ssize_t read_session_metadata(struct bt_conn* conn, const struct bt_gatt_
 static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* attr,
 			       const void* buf, uint16_t len, uint16_t offset, uint8_t flags);
 static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value);
+static bool tx_session_active_locked(void);
 static int start_advertising(void);
 static void restart_advertising_work_handler(struct k_work* work);
 static void connected(struct bt_conn* conn, uint8_t err);
@@ -179,12 +183,29 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 
 	LOG_INF("BLE TX Stream notifications %s", enabled ? "enabled" : "disabled");
 
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+	if (!was_enabled && enabled) {
+		spotflow_metrics_system_report_connection_state(true);
+	} else if (was_enabled && !enabled) {
+		spotflow_metrics_system_report_connection_state(false);
+	}
+#endif
+
 	if (!was_enabled && enabled) {
 		int rc = spotflow_config_init_session();
 		if (rc < 0) {
 			LOG_WRN("Failed to initialize configuration updating: %d", rc);
 		}
 	}
+}
+
+/* A BLE transport session starts only after TX notifications are enabled. A
+ * plain GAP connection without TX subscription is not counted as
+ * transport-connected for config/session metrics.
+ */
+static bool tx_session_active_locked(void)
+{
+	return g_spotflow_ble_transport_state.tx.notifications_enabled;
 }
 
 static int start_advertising(void)
@@ -242,8 +263,10 @@ static void connected(struct bt_conn* conn, uint8_t err)
 static void disconnected(struct bt_conn* conn, uint8_t reason)
 {
 	ARG_UNUSED(conn);
+	bool had_session;
 
 	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
+	had_session = tx_session_active_locked();
 	if (g_spotflow_ble_transport_state.tx.conn != NULL) {
 		bt_conn_unref(g_spotflow_ble_transport_state.tx.conn);
 		g_spotflow_ble_transport_state.tx.conn = NULL;
@@ -253,6 +276,13 @@ static void disconnected(struct bt_conn* conn, uint8_t reason)
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
 	LOG_INF("BLE central disconnected: 0x%02x", reason);
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+	if (had_session) {
+		spotflow_metrics_system_report_connection_state(false);
+	}
+#endif
+
 	(void)k_work_reschedule(&g_spotflow_ble_transport_state.restart_advertising_work,
 				K_MSEC(500));
 }

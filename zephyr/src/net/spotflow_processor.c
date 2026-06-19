@@ -64,16 +64,14 @@ static void spotflow_processing_thread_entry(void)
 {
 	LOG_DBG("Starting Spotflow processing thread");
 
-#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #ifdef CONFIG_SPOTFLOW_METRICS
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
 	/* Initialize system metrics early so they start collecting at boot,
-	 * before network connection is established */
+	 * before transport connection is established. */
 	int rc_sys_metrics = spotflow_metrics_system_init();
 	if (rc_sys_metrics < 0) {
 		LOG_ERR("Failed to initialize system metrics: %d", rc_sys_metrics);
 	}
-#endif
 #endif
 #endif
 
@@ -83,18 +81,19 @@ static void spotflow_processing_thread_entry(void)
 		return;
 	}
 
-#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
-	wait_for_network();
-
-	spotflow_tls_init();
-
-	LOG_DBG("Spotflow registered TLS credentials");
 #ifdef CONFIG_SPOTFLOW_METRICS
 	spotflow_metrics_net_init();
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 	spotflow_metrics_heartbeat_init();
 #endif
 #endif
+
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
+	wait_for_network();
+
+	spotflow_tls_init();
+
+	LOG_DBG("Spotflow registered TLS credentials");
 
 	/* 1) OUTER LOOP: keep trying until mqtt_connected == true, reconnect if connection failed */
 	while (true) {
