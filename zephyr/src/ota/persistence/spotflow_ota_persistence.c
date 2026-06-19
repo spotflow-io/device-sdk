@@ -4,7 +4,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
 
-#include "ota/spotflow_ota_persistence.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
 
 LOG_MODULE_DECLARE(spotflow_ota);
 

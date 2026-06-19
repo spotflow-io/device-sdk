@@ -6,14 +6,14 @@
 
 #include <spotflow/downloader.h>
 
-#include "ota/spotflow_ota_fw_custom.h"
-#include "ota/spotflow_ota_fw_main.h"
-#include "ota/spotflow_ota_identity.h"
-#include "ota/spotflow_ota_log.h"
-#include "ota/spotflow_ota_net.h"
-#include "ota/spotflow_ota_persistence.h"
-#include "ota/spotflow_ota_platform.h"
-#include "ota/spotflow_ota_state.h"
+#include "ota/firmware/spotflow_ota_fw_custom.h"
+#include "ota/firmware/spotflow_ota_fw_main.h"
+#include "ota/platform/spotflow_ota_identity.h"
+#include "ota/core/spotflow_ota_log.h"
+#include "ota/protocol/spotflow_ota_net.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/platform/spotflow_ota_platform.h"
+#include "ota/core/spotflow_ota_state.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 

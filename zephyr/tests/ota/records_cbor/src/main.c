@@ -4,7 +4,7 @@
 #include <zephyr/ztest.h>
 
 #include "spotflow_build_id.h"
-#include "ota/spotflow_ota_records_cbor.h"
+#include "ota/persistence/spotflow_ota_records_cbor.h"
 
 LOG_MODULE_REGISTER(spotflow_ota);
 

@@ -8,8 +8,8 @@
 
 #include "net/spotflow_mqtt.h"
 #include "ota/spotflow_ota.h"
-#include "ota/spotflow_ota_state.h"
-#include "ota/spotflow_ota_types.h"
+#include "ota/core/spotflow_ota_state.h"
+#include "ota/core/spotflow_ota_types.h"
 #include "spotflow_ota_test_fakes.h"
 #include "spotflow_ota_test_settings.h"
 

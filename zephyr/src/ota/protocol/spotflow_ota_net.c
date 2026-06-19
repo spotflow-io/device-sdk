@@ -4,8 +4,8 @@
 #include <zephyr/kernel.h>
 
 #include "net/spotflow_mqtt.h"
-#include "ota/spotflow_ota_cbor.h"
-#include "ota/spotflow_ota_net.h"
+#include "ota/protocol/spotflow_ota_cbor.h"
+#include "ota/protocol/spotflow_ota_net.h"
 
 #define SPOTFLOW_OTA_NET_MAX_CBOR_SIZE 128
 

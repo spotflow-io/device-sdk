@@ -24,12 +24,12 @@ target_sources(app PRIVATE
         ../common/spotflow_ota_test_wait.c
         ../../../src/net/spotflow_session_metadata.c
         ../../../src/ota/spotflow_ota.c
-        ../../../src/ota/spotflow_ota_cbor.c
-        ../../../src/ota/spotflow_ota_fw_custom.c
-        ../../../src/ota/spotflow_ota_log.c
-        ../../../src/ota/spotflow_ota_net.c
-        ../../../src/ota/spotflow_ota_persistence.c
-        ../../../src/ota/spotflow_ota_records_cbor.c
-        ../../../src/ota/spotflow_ota_state.c
-        ../../../src/ota/spotflow_ota_worker.c
+        ../../../src/ota/protocol/spotflow_ota_cbor.c
+        ../../../src/ota/firmware/spotflow_ota_fw_custom.c
+        ../../../src/ota/core/spotflow_ota_log.c
+        ../../../src/ota/protocol/spotflow_ota_net.c
+        ../../../src/ota/persistence/spotflow_ota_persistence.c
+        ../../../src/ota/persistence/spotflow_ota_records_cbor.c
+        ../../../src/ota/core/spotflow_ota_state.c
+        ../../../src/ota/core/spotflow_ota_worker.c
 )

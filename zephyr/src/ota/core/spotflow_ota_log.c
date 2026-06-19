@@ -2,7 +2,7 @@
 
 #include <zephyr/logging/log.h>
 
-#include "ota/spotflow_ota_log.h"
+#include "ota/core/spotflow_ota_log.h"
 
 LOG_MODULE_DECLARE(spotflow_ota);
 

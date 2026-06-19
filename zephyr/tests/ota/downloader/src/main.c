@@ -7,8 +7,8 @@
 
 #include <spotflow/downloader.h>
 
-#include "ota/spotflow_ota_downloader.h"
-#include "ota/spotflow_ota_url.h"
+#include "ota/downloader/spotflow_ota_downloader.h"
+#include "ota/downloader/spotflow_ota_url.h"
 
 #include "spotflow_ota_downloader_transport_fake.h"
 

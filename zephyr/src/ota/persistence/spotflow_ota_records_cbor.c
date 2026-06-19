@@ -7,7 +7,7 @@
 #include <zcbor_decode.h>
 #include <zcbor_encode.h>
 
-#include "ota/spotflow_ota_records_cbor.h"
+#include "ota/persistence/spotflow_ota_records_cbor.h"
 
 LOG_MODULE_DECLARE(spotflow_ota);
 

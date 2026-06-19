@@ -8,7 +8,7 @@
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/reboot.h>
 
-#include "ota/spotflow_ota_platform.h"
+#include "ota/platform/spotflow_ota_platform.h"
 
 static struct flash_img_context upload_ctx;
 

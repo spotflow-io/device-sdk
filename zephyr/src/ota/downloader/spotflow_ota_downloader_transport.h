@@ -5,7 +5,7 @@
 
 #include <spotflow/downloader.h>
 
-#include "ota/spotflow_ota_url.h"
+#include "ota/downloader/spotflow_ota_url.h"
 
 #ifdef __cplusplus
 extern "C" {

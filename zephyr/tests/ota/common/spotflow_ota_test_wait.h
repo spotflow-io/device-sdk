@@ -6,7 +6,7 @@
 
 #include <spotflow/ota.h>
 
-#include "ota/spotflow_ota_cbor.h"
+#include "ota/protocol/spotflow_ota_cbor.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -3,7 +3,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
-#include "ota/spotflow_ota_cbor.h"
+#include "ota/protocol/spotflow_ota_cbor.h"
 
 LOG_MODULE_REGISTER(spotflow_ota);
 

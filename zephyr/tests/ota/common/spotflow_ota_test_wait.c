@@ -3,8 +3,8 @@
 #include <zephyr/kernel.h>
 #include <zephyr/ztest.h>
 
-#include "ota/spotflow_ota_cbor.h"
-#include "ota/spotflow_ota_persistence.h"
+#include "ota/protocol/spotflow_ota_cbor.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
 
 #include "spotflow_ota_test_fakes.h"
 #include "spotflow_ota_test_wait.h"

@@ -8,9 +8,9 @@
 
 #include <spotflow/downloader.h>
 
-#include "ota/spotflow_ota_downloader.h"
-#include "ota/spotflow_ota_downloader_transport.h"
-#include "ota/spotflow_ota_url.h"
+#include "ota/downloader/spotflow_ota_downloader.h"
+#include "ota/downloader/spotflow_ota_downloader_transport.h"
+#include "ota/downloader/spotflow_ota_url.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 

@@ -7,8 +7,8 @@
 #include <zephyr/logging/log.h>
 
 #include "spotflow_build_id.h"
-#include "ota/spotflow_ota_identity.h"
-#include "ota/spotflow_ota_platform.h"
+#include "ota/platform/spotflow_ota_identity.h"
+#include "ota/platform/spotflow_ota_platform.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 

@@ -18,6 +18,6 @@ target_compile_definitions(app PRIVATE
 target_sources(app PRIVATE
         src/main.c
         ../common/spotflow_ota_test_fakes.c
-        ../../../src/ota/spotflow_ota_cbor.c
-        ../../../src/ota/spotflow_ota_net.c
+        ../../../src/ota/protocol/spotflow_ota_cbor.c
+        ../../../src/ota/protocol/spotflow_ota_net.c
 )

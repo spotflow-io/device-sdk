@@ -14,7 +14,7 @@
 #include "net/spotflow_tls.h"
 
 #ifdef CONFIG_SPOTFLOW_OTA
-#include "ota/spotflow_ota_cbor.h"
+#include "ota/protocol/spotflow_ota_cbor.h"
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION

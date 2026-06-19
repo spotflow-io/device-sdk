@@ -22,8 +22,8 @@ target_compile_definitions(app PRIVATE
 target_sources(app PRIVATE
         src/main.c
         spotflow_ota_downloader_transport_fake.c
-        ../../../src/ota/spotflow_ota_downloader.c
-        ../../../src/ota/spotflow_ota_downloader_transport_errors.c
-        ../../../src/ota/spotflow_ota_url.c
+        ../../../src/ota/downloader/spotflow_ota_downloader.c
+        ../../../src/ota/downloader/spotflow_ota_downloader_transport_errors.c
+        ../../../src/ota/downloader/spotflow_ota_url.c
         ${ZEPHYR_BASE}/subsys/net/lib/http/http_parser_url.c
 )

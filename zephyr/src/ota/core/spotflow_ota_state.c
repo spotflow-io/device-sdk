@@ -3,8 +3,8 @@
 
 #include <zephyr/kernel.h>
 
-#include "ota/spotflow_ota_records_cbor.h"
-#include "ota/spotflow_ota_state.h"
+#include "ota/persistence/spotflow_ota_records_cbor.h"
+#include "ota/core/spotflow_ota_state.h"
 
 struct attempt_state {
 	bool active;

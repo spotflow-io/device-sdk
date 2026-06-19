@@ -8,10 +8,10 @@ LOG_MODULE_REGISTER(spotflow_ota);
 
 #include <spotflow/ota.h>
 
-#include "ota/spotflow_ota_net.h"
-#include "ota/spotflow_ota_persistence.h"
-#include "ota/spotflow_ota_state.h"
-#include "ota/spotflow_ota_worker.h"
+#include "ota/protocol/spotflow_ota_net.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/core/spotflow_ota_state.h"
+#include "ota/core/spotflow_ota_worker.h"
 
 #include "spotflow_ota_test_fakes.h"
 #include "spotflow_ota_test_settings.h"

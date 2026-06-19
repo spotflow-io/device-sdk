@@ -4,8 +4,8 @@
 #include <zephyr/ztest.h>
 
 #include "spotflow_build_id.h"
-#include "ota/spotflow_ota_identity.h"
-#include "ota/spotflow_ota_platform.h"
+#include "ota/platform/spotflow_ota_identity.h"
+#include "ota/platform/spotflow_ota_platform.h"
 #include "spotflow_ota_bindesc_test_util.h"
 #include "spotflow_ota_build_id_fake.h"
 #include "spotflow_ota_platform_fake.h"

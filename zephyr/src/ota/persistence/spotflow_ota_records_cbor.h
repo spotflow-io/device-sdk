@@ -8,7 +8,7 @@
 #include <spotflow/ota.h>
 
 #include "spotflow_build_id.h"
-#include "ota/spotflow_ota_types.h"
+#include "ota/core/spotflow_ota_types.h"
 
 #ifdef __cplusplus
 extern "C" {

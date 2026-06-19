@@ -5,8 +5,8 @@
 
 #include <spotflow/ota.h>
 
-#include "ota/spotflow_ota_persistence.h"
-#include "ota/spotflow_ota_types.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/core/spotflow_ota_types.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -5,7 +5,7 @@
 #include <stddef.h>
 #include <stdint.h>
 
-#include "ota/spotflow_ota_types.h"
+#include "ota/core/spotflow_ota_types.h"
 
 #ifdef __cplusplus
 extern "C" {

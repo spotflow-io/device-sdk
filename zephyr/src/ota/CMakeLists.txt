@@ -1,21 +1,21 @@
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
         spotflow_ota.c
-        spotflow_ota_cbor.c
-        spotflow_ota_downloader.c
-        spotflow_ota_downloader_transport_errors.c
-        spotflow_ota_downloader_transport_socket.c
-        spotflow_ota_fw_custom.c
-        spotflow_ota_log.c
-        spotflow_ota_net.c
-        spotflow_ota_persistence.c
-        spotflow_ota_records_cbor.c
-        spotflow_ota_state.c
-        spotflow_ota_url.c
-        spotflow_ota_worker.c
+        protocol/spotflow_ota_cbor.c
+        downloader/spotflow_ota_downloader.c
+        downloader/spotflow_ota_downloader_transport_errors.c
+        downloader/spotflow_ota_downloader_transport_socket.c
+        firmware/spotflow_ota_fw_custom.c
+        core/spotflow_ota_log.c
+        protocol/spotflow_ota_net.c
+        persistence/spotflow_ota_persistence.c
+        persistence/spotflow_ota_records_cbor.c
+        core/spotflow_ota_state.c
+        downloader/spotflow_ota_url.c
+        core/spotflow_ota_worker.c
 )
 
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
-        spotflow_ota_fw_main.c
-        spotflow_ota_identity.c
-        spotflow_ota_platform.c
+        firmware/spotflow_ota_fw_main.c
+        platform/spotflow_ota_identity.c
+        platform/spotflow_ota_platform.c
 )

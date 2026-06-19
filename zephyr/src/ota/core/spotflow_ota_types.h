@@ -7,7 +7,7 @@
 
 #include <spotflow/ota.h>
 
-#include "ota/spotflow_ota_limits.h"
+#include "ota/core/spotflow_ota_limits.h"
 
 #ifdef __cplusplus
 extern "C" {

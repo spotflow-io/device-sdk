@@ -6,10 +6,10 @@
 
 #include <spotflow/ota.h>
 
-#include "ota/spotflow_ota_fw_main.h"
-#include "ota/spotflow_ota_net.h"
-#include "ota/spotflow_ota_persistence.h"
-#include "ota/spotflow_ota_state.h"
+#include "ota/firmware/spotflow_ota_fw_main.h"
+#include "ota/protocol/spotflow_ota_net.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/core/spotflow_ota_state.h"
 #include "spotflow_build_id.h"
 #include "spotflow_ota_bindesc_test_util.h"
 #include "spotflow_ota_build_id_fake.h"

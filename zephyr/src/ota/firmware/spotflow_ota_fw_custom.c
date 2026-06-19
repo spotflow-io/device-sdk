@@ -2,8 +2,8 @@
 
 #include <zephyr/kernel.h>
 
-#include "ota/spotflow_ota_fw_custom.h"
-#include "ota/spotflow_ota_state.h"
+#include "ota/firmware/spotflow_ota_fw_custom.h"
+#include "ota/core/spotflow_ota_state.h"
 
 static void canceled_work_handler(struct k_work* work);
 

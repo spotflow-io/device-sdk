@@ -3,7 +3,7 @@
 
 #include <zephyr/logging/log.h>
 
-#include "ota/spotflow_ota_downloader_transport.h"
+#include "ota/downloader/spotflow_ota_downloader_transport.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 

@@ -5,7 +5,7 @@
 #include <zephyr/net/http/parser_url.h>
 #include <zephyr/sys/util.h>
 
-#include "ota/spotflow_ota_url.h"
+#include "ota/downloader/spotflow_ota_url.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 

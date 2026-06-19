@@ -16,5 +16,5 @@ target_compile_definitions(app PRIVATE
 
 target_sources(app PRIVATE
         src/main.c
-        ../../../src/ota/spotflow_ota_records_cbor.c
+        ../../../src/ota/persistence/spotflow_ota_records_cbor.c
 )

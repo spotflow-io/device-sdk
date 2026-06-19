@@ -2,7 +2,7 @@
 
 #include <zephyr/ztest.h>
 
-#include "ota/spotflow_ota_state.h"
+#include "ota/core/spotflow_ota_state.h"
 
 static void before_each(void* fixture)
 {

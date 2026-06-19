@@ -4,8 +4,8 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
-#include "ota/spotflow_ota_cbor.h"
-#include "ota/spotflow_ota_net.h"
+#include "ota/protocol/spotflow_ota_cbor.h"
+#include "ota/protocol/spotflow_ota_net.h"
 
 #include "spotflow_ota_test_fakes.h"
 

@@ -9,22 +9,36 @@ and the public headers (`spotflow/ota.h`, `spotflow/downloader.h`) instead.
 
 ## Module map
 
+The OTA implementation is split by responsibility under `spotflow/zephyr/src/ota`:
+
+| Folder | Responsibility |
+|---|---|
+| `.` | Public facade (`spotflow_ota.c` / `.h`), Kconfig, and OTA source list |
+| `core/` | In-memory attempt/artifact state, worker orchestration, internal shared types, limits, logging |
+| `protocol/` | OTA MQTT protocol encode/decode and pending D2C result publishing |
+| `persistence/` | Zephyr Settings load/save and CBOR encoding of persisted records |
+| `downloader/` | Public downloader API, URL parsing, HTTP transport, retry, pause/resume/cancel |
+| `firmware/` | Automatic main-firmware lifecycle and delegated firmware callback dispatch |
+| `platform/` | Zephyr/MCUboot/build-ID wrappers that are faked in tests |
+
+Important files:
+
 | Module | Responsibility |
 |---|---|
 | `spotflow_ota.c` | Public facade; delegates to internal modules; idempotent init |
-| `spotflow_ota_state.c` | In-memory attempt/artifact state; mutex-protected transitions |
-| `spotflow_ota_worker.c` | Dedicated worker thread; artifact sequencing and job dispatch |
-| `spotflow_ota_cbor.c` | C2D decode / D2C encode; protocol limits and attempt errors |
-| `spotflow_ota_net.c` | Pending D2C merge and MQTT publish wrapper |
-| `spotflow_ota_persistence.c` | Zephyr Settings load/save for attempt, results, versions, probation |
-| `spotflow_ota_records_cbor.c` | CBOR encoding of persisted records |
-| `spotflow_ota_downloader.c` | Public downloader API; in-process HTTP Range retry loop; pause/resume/cancel |
-| `spotflow_ota_downloader_transport_errors.c` | Transient download-error classification (`transient_failure` on transport attempts) |
-| `spotflow_ota_downloader_transport_socket.c` | Socket/TLS HTTP transport for downloads |
-| `spotflow_ota_platform.c` | MCUboot confirm, test upgrade, reboot, flash slot access |
-| `spotflow_ota_identity.c` | Running and downloaded image build ID reads |
-| `spotflow_ota_fw_main.c` | Automatic main firmware pre/post-reboot flow |
-| `spotflow_ota_fw_custom.c` | Delegated firmware dispatch; weak default callbacks; cancel work item |
+| `core/spotflow_ota_state.c` | In-memory attempt/artifact state; mutex-protected transitions |
+| `core/spotflow_ota_worker.c` | Dedicated worker thread; artifact sequencing and job dispatch |
+| `protocol/spotflow_ota_cbor.c` | C2D decode / D2C encode; protocol limits and attempt errors |
+| `protocol/spotflow_ota_net.c` | Pending D2C merge and MQTT publish wrapper |
+| `persistence/spotflow_ota_persistence.c` | Zephyr Settings load/save for attempt, results, versions, probation |
+| `persistence/spotflow_ota_records_cbor.c` | CBOR encoding of persisted records |
+| `downloader/spotflow_ota_downloader.c` | Public downloader API; in-process HTTP Range retry loop; pause/resume/cancel |
+| `downloader/spotflow_ota_downloader_transport_errors.c` | Transient download-error classification (`transient_failure` on transport attempts) |
+| `downloader/spotflow_ota_downloader_transport_socket.c` | Socket/TLS HTTP transport for downloads |
+| `platform/spotflow_ota_platform.c` | MCUboot confirm, test upgrade, reboot, flash slot access |
+| `platform/spotflow_ota_identity.c` | Running and downloaded image build ID reads |
+| `firmware/spotflow_ota_fw_main.c` | Automatic main firmware pre/post-reboot flow |
+| `firmware/spotflow_ota_fw_custom.c` | Delegated firmware dispatch; weak default callbacks; cancel work item |
 
 MQTT subscription and inbound routing live in `spotflow_mqtt.c` / `spotflow_processor.c`.
 C2D payloads are decoded on the MQTT thread; all durable work is handed to the OTA worker.

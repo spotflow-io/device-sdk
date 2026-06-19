@@ -6,16 +6,16 @@
 #include <spotflow/ota.h>
 
 #include "ota/spotflow_ota.h"
-#include "ota/spotflow_ota_cbor.h"
-#include "ota/spotflow_ota_fw_custom.h"
-#include "ota/spotflow_ota_log.h"
+#include "ota/protocol/spotflow_ota_cbor.h"
+#include "ota/firmware/spotflow_ota_fw_custom.h"
+#include "ota/core/spotflow_ota_log.h"
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-#include "ota/spotflow_ota_fw_main.h"
+#include "ota/firmware/spotflow_ota_fw_main.h"
 #endif
-#include "ota/spotflow_ota_net.h"
-#include "ota/spotflow_ota_persistence.h"
-#include "ota/spotflow_ota_state.h"
-#include "ota/spotflow_ota_worker.h"
+#include "ota/protocol/spotflow_ota_net.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/core/spotflow_ota_state.h"
+#include "ota/core/spotflow_ota_worker.h"
 #include "net/spotflow_mqtt.h"
 
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
