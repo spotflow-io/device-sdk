@@ -2,3 +2,25 @@ config SPOTFLOW_TRANSPORT_BLE
 	bool "BLE gateway transport"
 	select BT
 	select BT_PERIPHERAL
+
+if SPOTFLOW_TRANSPORT_BLE
+
+config SPOTFLOW_BLE_ATT_MTU
+	int "Maximum supported BLE ATT MTU"
+	default 247
+	range 23 247
+	help
+		Maximum ATT MTU this device supports for the Spotflow BLE transport.
+		The negotiated ATT MTU for a connection may still be lower, depending on
+		the central capabilities and whether the central initiates MTU exchange.
+
+configdefault BT_L2CAP_TX_MTU
+	default SPOTFLOW_BLE_ATT_MTU
+
+configdefault BT_BUF_ACL_TX_SIZE
+	default 251
+
+configdefault BT_BUF_ACL_RX_SIZE
+	default 251
+
+endif # SPOTFLOW_TRANSPORT_BLE
