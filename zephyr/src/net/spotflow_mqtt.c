@@ -215,7 +215,7 @@ static int client_init(struct mqtt_client* client)
 
 	const char* device_id = spotflow_get_device_id();
 	spotflow_mqtt_config.username =
-	    (struct mqtt_utf8){ .utf8 = device_id, .size = strlen(device_id) };
+		(struct mqtt_utf8){ .utf8 = device_id, .size = strlen(device_id) };
 
 	/* MQTT client configuration (client ID is assigned by the broker) */
 	client->broker = &mqtt_client_toolset.broker;
@@ -261,8 +261,8 @@ int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback)
 
 	struct mqtt_topic topics[] = {
 		{
-		    .topic = spotflow_mqtt_config.config_c2d_topic,
-		    .qos = MQTT_QOS_0_AT_MOST_ONCE,
+			.topic = spotflow_mqtt_config.config_c2d_topic,
+			.qos = MQTT_QOS_0_AT_MOST_ONCE,
 		},
 	};
 
@@ -352,7 +352,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		}
 		LOG_DBG("PUBREC packet id: %u", evt->param.pubrec.message_id);
 		const struct mqtt_pubrel_param rel_param = { .message_id =
-								 evt->param.pubrec.message_id };
+								     evt->param.pubrec.message_id };
 		ret = mqtt_publish_qos2_release(client, &rel_param);
 		if (ret < 0) {
 			LOG_ERR("Failed to send MQTT PUBREL: %d", ret);

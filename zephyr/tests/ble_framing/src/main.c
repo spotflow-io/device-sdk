@@ -35,7 +35,7 @@ ZTEST(spotflow_ble_framing, test_encode_single_frame)
 ZTEST(spotflow_ble_framing, test_encode_multiple_frames)
 {
 	static const uint8_t payload[] =
-	    "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+		"abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 	struct spotflow_ble_encoded_frame frames[8];
 	size_t frame_count = 0;
 	uint8_t reassembled[sizeof(payload) - 1];

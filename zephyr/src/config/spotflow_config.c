@@ -62,11 +62,11 @@ static void add_log_severity_to_reported_msg(struct spotflow_config_reported_msg
 
 	reported_msg->contains_minimal_log_severity = true;
 	reported_msg->minimal_log_severity =
-	    spotflow_cbor_convert_log_level_to_severity(sent_log_level);
+		spotflow_cbor_convert_log_level_to_severity(sent_log_level);
 
 	reported_msg->contains_compiled_minimal_log_severity = true;
 	reported_msg->compiled_minimal_log_severity =
-	    spotflow_cbor_convert_log_level_to_severity(CONFIG_LOG_MAX_LEVEL);
+		spotflow_cbor_convert_log_level_to_severity(CONFIG_LOG_MAX_LEVEL);
 }
 
 static void handle_desired_msg(uint8_t* payload, size_t len)
@@ -86,8 +86,8 @@ static void handle_desired_msg(uint8_t* payload, size_t len)
 	struct spotflow_config_persisted_settings settings_to_persist = { 0 };
 
 	if (desired_msg.contains_minimal_log_severity) {
-		uint8_t new_sent_log_level =
-		    spotflow_cbor_convert_severity_to_log_level(desired_msg.minimal_log_severity);
+		uint8_t new_sent_log_level = spotflow_cbor_convert_severity_to_log_level(
+			desired_msg.minimal_log_severity);
 
 		spotflow_config_set_sent_log_level(new_sent_log_level);
 

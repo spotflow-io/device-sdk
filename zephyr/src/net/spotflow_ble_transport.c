@@ -12,7 +12,7 @@ bool spotflow_ble_transport_is_ready(void)
 {
 	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
 	bool ready = g_spotflow_ble_transport_state.tx.conn != NULL &&
-	    g_spotflow_ble_transport_state.tx.notifications_enabled;
+		g_spotflow_ble_transport_state.tx.notifications_enabled;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
 	return ready;
@@ -21,22 +21,22 @@ bool spotflow_ble_transport_is_ready(void)
 bool spotflow_ble_transport_supports_feature(enum spotflow_transport_feature feature)
 {
 	return feature == SPOTFLOW_TRANSPORT_FEATURE_LOGS ||
-	    feature == SPOTFLOW_TRANSPORT_FEATURE_CONFIG ||
-	    feature == SPOTFLOW_TRANSPORT_FEATURE_METRICS;
+		feature == SPOTFLOW_TRANSPORT_FEATURE_CONFIG ||
+		feature == SPOTFLOW_TRANSPORT_FEATURE_METRICS;
 }
 
 int spotflow_ble_transport_send_ingest_cbor(uint8_t* payload, size_t len)
 {
 	return spotflow_ble_transport_send_framed_message(
-	    SPOTFLOW_MSG_TELEMETRY, &g_spotflow_ble_transport_state.tx.telemetry_sequence, payload,
-	    len);
+		SPOTFLOW_MSG_TELEMETRY, &g_spotflow_ble_transport_state.tx.telemetry_sequence,
+		payload, len);
 }
 
 int spotflow_ble_transport_send_config_cbor(uint8_t* payload, size_t len)
 {
 	return spotflow_ble_transport_send_framed_message(
-	    SPOTFLOW_MSG_REPORTED_CONFIGURATION,
-	    &g_spotflow_ble_transport_state.tx.reported_config_sequence, payload, len);
+		SPOTFLOW_MSG_REPORTED_CONFIGURATION,
+		&g_spotflow_ble_transport_state.tx.reported_config_sequence, payload, len);
 }
 
 int spotflow_ble_transport_subscribe_config(spotflow_transport_message_cb callback)

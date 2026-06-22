@@ -263,7 +263,7 @@ static void aggregation_timer_handler(struct k_work* work)
 {
 	struct k_work_delayable* dwork = k_work_delayable_from_work(work);
 	struct metric_aggregator_context* ctx =
-	    CONTAINER_OF(dwork, struct metric_aggregator_context, aggregation_work);
+		CONTAINER_OF(dwork, struct metric_aggregator_context, aggregation_work);
 
 	struct spotflow_metric_base* metric = ctx->metric;
 

@@ -110,10 +110,10 @@ int spotflow_metrics_system_init(void)
 
 	atomic_set(&g_system_metrics_init_state, 2);
 
-	LOG_INF(
-	    "System metrics initialized: %d metrics registered, collection=%ds, aggregation=%ds",
-	    registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL,
-	    CONFIG_SPOTFLOW_METRICS_SYSTEM_AGGREGATION_INTERVAL);
+	LOG_INF("System metrics initialized: %d metrics registered, collection=%ds, "
+		"aggregation=%ds",
+		registered_count, CONFIG_SPOTFLOW_METRICS_SYSTEM_COLLECTION_INTERVAL,
+		CONFIG_SPOTFLOW_METRICS_SYSTEM_AGGREGATION_INTERVAL);
 
 	return 0;
 }

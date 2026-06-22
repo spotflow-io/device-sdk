@@ -108,7 +108,7 @@ int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len
 		}
 
 		memcpy(&g_spotflow_ble_transport_state.config_rx
-			    .buffer[g_spotflow_ble_transport_state.config_rx.received_len],
+				.buffer[g_spotflow_ble_transport_state.config_rx.received_len],
 		       &frame[3], fragment_len);
 		g_spotflow_ble_transport_state.config_rx.received_len += fragment_len;
 
@@ -259,9 +259,9 @@ int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* se
 	struct spotflow_ble_encoded_frame frames[SPOTFLOW_BLE_MAX_ENCODED_FRAMES];
 	size_t frame_count = 0;
 	int rc = spotflow_ble_transport_encode_frames(
-	    message_type, sequence, payload, len,
-	    MIN(notify_payload_max, SPOTFLOW_TX_FRAME_BUFFER_SIZE), frames, ARRAY_SIZE(frames),
-	    &frame_count);
+		message_type, sequence, payload, len,
+		MIN(notify_payload_max, SPOTFLOW_TX_FRAME_BUFFER_SIZE), frames, ARRAY_SIZE(frames),
+		&frame_count);
 	if (rc < 0) {
 		bt_conn_unref(conn);
 		return rc;
