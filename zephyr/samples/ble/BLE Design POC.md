@@ -123,7 +123,7 @@ The sender must:
     1. Read `Device Id`
     2. Read `Session Metadata`
 4. Establish a new MQTT Connection with the obtained device id and gateway-provided ingest-key
-    1. Connect to `ingest-cbor` , `config-cbor-d2c` for writes and `config-cbor-c2d` for reads
+    1. Subscribe to `config-cbor-c2d`
     2. Publish session metadata into `ingest-cbor`
 5. CCCD Write: Enable notify on `TX stream`
 
