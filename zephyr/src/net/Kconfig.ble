@@ -16,11 +16,23 @@ config SPOTFLOW_BLE_ATT_MTU
 
 configdefault BT_L2CAP_TX_MTU
 	default SPOTFLOW_BLE_ATT_MTU
+	help
+		Match the Bluetooth L2CAP TX MTU to the maximum ATT MTU advertised by
+		the Spotflow BLE transport so larger Spotflow frames do not get limited
+		by a smaller host-side L2CAP payload configuration.
 
 configdefault BT_BUF_ACL_TX_SIZE
 	default 251
+	help
+		Use a full data-length ACL TX buffer so common 247-byte ATT MTU
+		notifications fit into a single BLE data packet without extra
+		fragmentation in the controller/host path.
 
 configdefault BT_BUF_ACL_RX_SIZE
 	default 251
+	help
+		Keep the ACL RX buffer aligned with the TX side and with the common
+		247-byte ATT MTU case so incoming Spotflow control/config traffic is not
+		artificially constrained by smaller host receive buffers.
 
 endif # SPOTFLOW_TRANSPORT_BLE
