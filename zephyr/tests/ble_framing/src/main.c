@@ -9,6 +9,11 @@ LOG_MODULE_REGISTER(spotflow_net, LOG_LEVEL_INF);
 struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
 const struct bt_gatt_service_static spotflow_svc = { 0 };
 
+const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void)
+{
+	return NULL;
+}
+
 ZTEST_SUITE(spotflow_ble_framing, NULL, NULL, NULL, NULL, NULL);
 
 ZTEST(spotflow_ble_framing, test_encode_single_frame)
@@ -82,4 +87,29 @@ ZTEST(spotflow_ble_framing, test_encode_rejects_too_small_capacity)
 						      ARRAY_SIZE(frames), &frame_count);
 
 	zassert_equal(rc, -EMSGSIZE, "unexpected rc %d", rc);
+}
+
+ZTEST(spotflow_ble_framing, test_encode_rejects_oversize_frame_capacity)
+{
+	static const uint8_t payload[] = { 0x01 };
+	struct spotflow_ble_encoded_frame frames[1];
+	size_t frame_count = 0;
+
+	int rc = spotflow_ble_transport_encode_frames(
+		SPOTFLOW_MSG_TELEMETRY, 0x01, payload, sizeof(payload),
+		SPOTFLOW_TX_FRAME_BUFFER_SIZE + 1, frames, ARRAY_SIZE(frames), &frame_count);
+
+	zassert_equal(rc, -EMSGSIZE, "unexpected rc %d", rc);
+}
+
+ZTEST(spotflow_ble_framing, test_encode_rejects_zero_length_payload)
+{
+	static const uint8_t payload[] = { 0x01 };
+	struct spotflow_ble_encoded_frame frames[1];
+	size_t frame_count = 0;
+
+	int rc = spotflow_ble_transport_encode_frames(SPOTFLOW_MSG_TELEMETRY, 0x01, payload, 0,
+					      20, frames, ARRAY_SIZE(frames), &frame_count);
+
+	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 }

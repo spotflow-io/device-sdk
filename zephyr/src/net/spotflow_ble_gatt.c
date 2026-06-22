@@ -120,6 +120,15 @@ int spotflow_ble_transport_start_impl(void)
 	return start_advertising();
 }
 
+const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void)
+{
+	/* Attribute 8 is the TX Stream characteristic value in spotflow_svc. Keep
+	 * the index lookup local to the GATT service definition instead of exposing
+	 * it to framing/sender code.
+	 */
+	return &spotflow_svc.attrs[8];
+}
+
 static ssize_t read_capabilities(struct bt_conn* conn, const struct bt_gatt_attr* attr, void* buf,
 				 uint16_t len, uint16_t offset)
 {
@@ -272,7 +281,11 @@ static void disconnected(struct bt_conn* conn, uint8_t reason)
 		g_spotflow_ble_transport_state.tx.conn = NULL;
 	}
 	g_spotflow_ble_transport_state.tx.notifications_enabled = false;
-	spotflow_ble_transport_reset_config_rx_state();
+	/* A disconnect terminates any partially reassembled RX config message. */
+	g_spotflow_ble_transport_state.config_rx.active = false;
+	g_spotflow_ble_transport_state.config_rx.sequence = 0;
+	g_spotflow_ble_transport_state.config_rx.total_len = 0;
+	g_spotflow_ble_transport_state.config_rx.received_len = 0;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
 	LOG_INF("BLE central disconnected: 0x%02x", reason);

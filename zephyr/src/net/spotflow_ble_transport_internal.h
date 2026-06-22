@@ -96,6 +96,7 @@ struct spotflow_ble_transport_state {
 extern struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
 
 int spotflow_ble_transport_start_impl(void);
+const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void);
 int spotflow_ble_transport_encode_frames(uint8_t message_type, uint8_t sequence,
 					 const uint8_t* payload, size_t len,
 					 size_t frame_payload_max,
@@ -104,6 +105,5 @@ int spotflow_ble_transport_encode_frames(uint8_t message_type, uint8_t sequence,
 int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* sequence_counter,
 					       uint8_t* payload, size_t len);
 int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len, uint8_t flags);
-void spotflow_ble_transport_reset_config_rx_state(void);
 
 #endif /* SPOTFLOW_BLE_TRANSPORT_INTERNAL_H */
