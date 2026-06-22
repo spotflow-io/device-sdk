@@ -108,8 +108,8 @@ ZTEST(spotflow_ble_framing, test_encode_rejects_zero_length_payload)
 	struct spotflow_ble_encoded_frame frames[1];
 	size_t frame_count = 0;
 
-	int rc = spotflow_ble_transport_encode_frames(SPOTFLOW_MSG_TELEMETRY, 0x01, payload, 0,
-					      20, frames, ARRAY_SIZE(frames), &frame_count);
+	int rc = spotflow_ble_transport_encode_frames(SPOTFLOW_MSG_TELEMETRY, 0x01, payload, 0, 20,
+						      frames, ARRAY_SIZE(frames), &frame_count);
 
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 }
