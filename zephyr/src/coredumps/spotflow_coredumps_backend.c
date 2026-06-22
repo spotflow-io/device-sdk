@@ -44,7 +44,7 @@ struct coredump_info {
 static struct coredump_info coredump_info;
 
 /* blocks forever until space is available */
-static int enqueue_log_msg(const struct spotflow_coredump_msg* msg)
+static int enqueue_coredump_msg(const struct spotflow_coredump_msg* msg)
 {
 	int rc = k_msgq_put(&g_spotflow_core_dumps_msgq, &msg, K_FOREVER);
 	return rc;
@@ -161,7 +161,7 @@ static void spotflow_coredumps_thread_entry(void)
 		msg->len = cbor_data_len;
 		msg->coredump_last_chunk = is_last_chunk;
 
-		rc = enqueue_log_msg(msg);
+		rc = enqueue_coredump_msg(msg);
 		if (rc < 0) {
 			LOG_ERR("Failed to enqueue coredump chunk: %d", rc);
 			k_free(cbor_data);
