@@ -56,10 +56,17 @@ title: Main log flow
 flowchart LR
     A[User Code] --> B[Zephyr RTOS]
     B --> C[Spotflow Logging Backend]
-    C -- QoS 0 --> D[Spotflow Mqtt Broker]
-    D --> E[Spotflow Observability Platform]
+    C --> D[Encode CBOR]
+    D --> E[Spotflow Backend Processor]
+    E --> F[Spotflow Transport]
+    F --> G[MQTT transport]
+    F --> H[BLE transport]
+    G -- QoS 0 --> I[Spotflow MQTT Broker]
+    H --> J[BLE gateway]
+    J --> I
+    I --> K[Spotflow Observability Platform]
 ```
-Currently, the Spotflow backend uses MQTT QoS 0 only.
+The MQTT transport uses MQTT QoS 0. The BLE transport sends the same CBOR payloads over a Spotflow GATT service for a gateway to relay to Spotflow.
 
 ```mermaid
 ---
@@ -67,19 +74,36 @@ title: Spotflow Data Flow
 ---
 flowchart LR
     processor[Spotflow Backend Processor]
+    transport[spotflow transport]
 
     A[Zephyr logging] --> B[Spotflow Logging Backend]
-    B --> D[Encode CBOR]
-    D --> E[Log message Queue]
+    B --> C[Encode CBOR]
+    C --> D[Log message queue]
+    D --> processor
 
-    O[Extract Coredump] --> P[Coredumps Backend]
-    P[Coredumps Backend] --> Q[Encode CBOR]
-    Q --> R[Coredumps message Queue]
-    R --> processor
+    E[Application metrics] --> F[Spotflow Metrics Backend]
+    F --> G[Encode CBOR]
+    G --> H[Metrics message queue]
+    H --> processor
 
-    E --> processor
-    processor --> G[Send to MQTT]
+    I[Cloud configuration] --> J[Spotflow Config Backend]
+    J --> processor
+
+    K[Extract coredump] --> L[Coredumps Backend]
+    L --> M[Encode CBOR]
+    M --> N[Coredumps message queue]
+    N --> processor
+
+    processor --> transport
+    transport --> O[MQTT transport]
+    transport --> P[BLE transport]
+    O --> Q[Spotflow MQTT Broker]
+    P --> R[GATT TX and RX streams]
+    R --> S[BLE gateway]
+    S --> Q
 ```
+
+BLE currently supports logs, metrics, and cloud configuration. Coredumps are currently sent only over MQTT.
 
 #### Configuration
 
@@ -90,7 +114,7 @@ Currently, there is only one such property:
 
 - **Minimal severity of sent log messages** (the *level* of sent log messages)
 
-The configuration process uses the mechanism of *desired* and *reported* values that are stored for each device in the Spotflow platform and are synchronized using the MQTT protocol.
+The configuration process uses the mechanism of *desired* and *reported* values that are stored for each device in the Spotflow platform and are synchronized either directly over MQTT or through a BLE gateway.
 If Zephyr Settings subsystem is enabled, the device SDK uses it to persist the last active configuration.
 
 ```mermaid
@@ -100,22 +124,38 @@ title: Configuration from the Spotflow Platform
 sequenceDiagram
 participant ZS as Zephyr Settings
 participant SDK as Device SDK
+participant GW as BLE gateway
 participant PM as Spotflow Platform
 
 Note left of SDK: On startup
 SDK ->> ZS: Try load initial configuration
 ZS ->> SDK: Configuration loaded / defaults used
 
-Note right of SDK: On MQTT connection activation
-SDK ->> PM: Send reported configuration
-SDK ->> PM: Subscribe to desired configuration
+alt Direct MQTT transport
+    Note right of SDK: On MQTT connection activation
+    SDK ->> PM: Send reported configuration
+    SDK ->> PM: Subscribe to desired configuration
 
-loop When desired configuration changes
-PM ->> SDK: Send desired configuration
-SDK ->> ZS: Persist configuration
-SDK ->> PM: Send reported configuration
+    loop When desired configuration changes
+        PM ->> SDK: Send desired configuration
+        SDK ->> ZS: Persist configuration
+        SDK ->> PM: Send reported configuration
+    end
+else BLE gateway transport
+    Note right of SDK: On BLE session activation
+    SDK ->> GW: Send reported configuration via TX stream
+
+    loop When desired configuration changes
+        PM ->> GW: Deliver desired configuration
+        GW ->> SDK: Write desired configuration via RX stream
+        SDK ->> ZS: Persist configuration
+        SDK ->> GW: Send reported configuration via TX stream
+        GW ->> PM: Relay reported configuration
+    end
 end
 ```
+
+For BLE transport, the device exposes session metadata as a readable GATT characteristic and exchanges configuration data through framed TX and RX stream messages.
 
 ### Build ID
 
