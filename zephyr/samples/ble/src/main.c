@@ -8,10 +8,10 @@
 LOG_MODULE_REGISTER(spotflow_ble_sample, LOG_LEVEL_INF);
 
 static const char* const long_warning_message =
-	"framing-test payload: abcdefghijklmnopqrstuvwxyz 0123456789 "
-	"abcdefghijklmnopqrstuvwxyz 0123456789 abcdefghijklmnopqrstuvwxyz 0123456789 "
-	"abcdefghijklmnopqrstuvwxyz 0123456789 abcdefghijklmnopqrstuvwxyz 0123456789 "
-	"abcdefghijklmnopqrstuvwxyz 0123456789 abcdefghijklmnopqrstuvwxyz 0123456789";
+    "framing-test payload: abcdefghijklmnopqrstuvwxyz 0123456789 "
+    "abcdefghijklmnopqrstuvwxyz 0123456789 abcdefghijklmnopqrstuvwxyz 0123456789 "
+    "abcdefghijklmnopqrstuvwxyz 0123456789 abcdefghijklmnopqrstuvwxyz 0123456789 "
+    "abcdefghijklmnopqrstuvwxyz 0123456789 abcdefghijklmnopqrstuvwxyz 0123456789";
 
 static struct spotflow_metric_int* sample_counter_metric;
 
