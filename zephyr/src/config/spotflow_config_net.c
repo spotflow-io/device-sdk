@@ -33,10 +33,6 @@ int spotflow_config_prepare_pending_message(struct spotflow_config_reported_msg*
 
 int spotflow_config_send_pending_message()
 {
-	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_CONFIG)) {
-		return 0;
-	}
-
 	if (!is_message_pending) {
 		return 0;
 	}

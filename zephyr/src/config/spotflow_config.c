@@ -32,10 +32,6 @@ void spotflow_config_init()
 
 int spotflow_config_init_session()
 {
-	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_CONFIG)) {
-		return 0;
-	}
-
 	struct spotflow_config_reported_msg reported_msg = {
 		.contains_acked_desired_config_version = false,
 	};

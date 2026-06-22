@@ -494,12 +494,6 @@ static int enqueue_metric_message(uint8_t* payload, size_t len)
 		return -EINVAL;
 	}
 
-	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_METRICS)) {
-		k_free(payload);
-		LOG_DBG("Metrics transport inactive, dropping encoded metric message");
-		return 0;
-	}
-
 	/* Allocate message structure */
 	struct spotflow_metric_msg* msg = k_malloc(sizeof(*msg));
 	if (!msg) {

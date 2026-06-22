@@ -21,10 +21,6 @@ void spotflow_metrics_net_init(void)
 
 int spotflow_poll_and_process_enqueued_metrics(void)
 {
-	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_METRICS)) {
-		return 0;
-	}
-
 	struct spotflow_metric_msg* msg;
 	int rc;
 

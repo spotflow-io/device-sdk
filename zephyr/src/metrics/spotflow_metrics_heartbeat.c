@@ -25,10 +25,6 @@ static void heartbeat_work_handler(struct k_work* work)
 {
 	ARG_UNUSED(work);
 
-	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_METRICS)) {
-		goto reschedule;
-	}
-
 	int64_t uptime_ms = k_uptime_get();
 
 	/* Encode heartbeat message */
@@ -73,10 +69,6 @@ void spotflow_metrics_heartbeat_init(void)
 
 int spotflow_poll_and_process_heartbeat(void)
 {
-	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_METRICS)) {
-		return 0;
-	}
-
 	struct spotflow_metric_msg msg;
 	uint8_t payload_copy[SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN];
 	bool has_pending = false;
