@@ -18,12 +18,6 @@ bool spotflow_ble_transport_is_ready(void)
 	return ready;
 }
 
-bool spotflow_ble_transport_supports_feature(enum spotflow_transport_feature feature)
-{
-	return feature == SPOTFLOW_TRANSPORT_FEATURE_LOGS ||
-		feature == SPOTFLOW_TRANSPORT_FEATURE_CONFIG ||
-		feature == SPOTFLOW_TRANSPORT_FEATURE_METRICS;
-}
 
 int spotflow_ble_transport_send_ingest_cbor(uint8_t* payload, size_t len)
 {

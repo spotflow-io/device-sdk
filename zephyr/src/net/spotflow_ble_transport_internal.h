@@ -7,6 +7,10 @@
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/kernel.h>
 
+#ifdef CONFIG_SPOTFLOW_COREDUMPS
+#include "coredumps/spotflow_coredumps_cbor.h"
+#endif
+
 #include "net/spotflow_transport.h"
 
 #define SPOTFLOW_BLE_DEVICE_NAME CONFIG_BT_DEVICE_NAME
@@ -31,36 +35,9 @@
 #define SPOTFLOW_BLE_FIRST_FRAGMENT_DATA_CAPACITY (SPOTFLOW_BLE_MIN_NOTIFY_PAYLOAD_MAX - 5)
 #define SPOTFLOW_BLE_CONT_FRAGMENT_DATA_CAPACITY (SPOTFLOW_BLE_MIN_NOTIFY_PAYLOAD_MAX - 3)
 
-#ifdef CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN
-#define SPOTFLOW_BLE_MAX_LOG_PAYLOAD_LEN CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN
-#else
-#define SPOTFLOW_BLE_MAX_LOG_PAYLOAD_LEN 0
-#endif
-
-#ifdef CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE
-#define SPOTFLOW_BLE_MAX_METRIC_PAYLOAD_LEN CONFIG_SPOTFLOW_METRICS_CBOR_BUFFER_SIZE
-#else
-#define SPOTFLOW_BLE_MAX_METRIC_PAYLOAD_LEN 0
-#endif
-
-#if SPOTFLOW_BLE_MAX_METRIC_PAYLOAD_LEN > SPOTFLOW_BLE_MAX_LOG_PAYLOAD_LEN
-#define SPOTFLOW_BLE_MAX_INGEST_PAYLOAD_LEN SPOTFLOW_BLE_MAX_METRIC_PAYLOAD_LEN
-#else
-#define SPOTFLOW_BLE_MAX_INGEST_PAYLOAD_LEN SPOTFLOW_BLE_MAX_LOG_PAYLOAD_LEN
-#endif
-
-#if SPOTFLOW_BLE_MAX_INGEST_PAYLOAD_LEN <= SPOTFLOW_BLE_FIRST_FRAGMENT_DATA_CAPACITY
-#define SPOTFLOW_BLE_MAX_ENCODED_FRAMES 1
-#else
-/* With the minimum ATT MTU of 23, the first fragment carries 15 bytes and each
- * continuation fragment carries 17 bytes. Size the temporary frame array to the
- * worst-case number of fragments needed for the largest configured ingest payload.
- */
-#define SPOTFLOW_BLE_MAX_ENCODED_FRAMES                                                      \
-	(1 +                                                                                 \
-	 ((SPOTFLOW_BLE_MAX_INGEST_PAYLOAD_LEN - SPOTFLOW_BLE_FIRST_FRAGMENT_DATA_CAPACITY + \
-	   SPOTFLOW_BLE_CONT_FRAGMENT_DATA_CAPACITY - 1) /                                   \
-	  SPOTFLOW_BLE_CONT_FRAGMENT_DATA_CAPACITY))
+#ifdef CONFIG_SPOTFLOW_COREDUMPS
+BUILD_ASSERT(CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE + SPOTFLOW_COREDUMPS_CBOR_OVERHEAD <= UINT16_MAX,
+	     "BLE framing supports coredump payloads up to 65535 bytes including CBOR overhead");
 #endif
 
 struct spotflow_ble_encoded_frame {
@@ -96,11 +73,12 @@ struct spotflow_ble_transport_state {
 extern struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
 
 int spotflow_ble_transport_start_impl(void);
-int spotflow_ble_transport_encode_frames(uint8_t message_type, uint8_t sequence,
-					 const uint8_t* payload, size_t len,
-					 size_t frame_payload_max,
-					 struct spotflow_ble_encoded_frame* frames,
-					 size_t max_frames, size_t* frame_count);
+const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void);
+int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t sequence,
+					     const uint8_t* payload, size_t len,
+					     size_t frame_payload_max, size_t offset,
+					     struct spotflow_ble_encoded_frame* frame,
+					     size_t* next_offset);
 int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* sequence_counter,
 					       uint8_t* payload, size_t len);
 int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len, uint8_t flags);

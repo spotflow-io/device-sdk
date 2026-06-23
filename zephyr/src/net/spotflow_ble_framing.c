@@ -158,13 +158,13 @@ int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len
  * BIT(0): first fragment
  * BIT(1): last fragment
  */
-int spotflow_ble_transport_encode_frames(uint8_t message_type, uint8_t sequence,
-					 const uint8_t* payload, size_t len,
-					 size_t frame_payload_max,
-					 struct spotflow_ble_encoded_frame* frames,
-					 size_t max_frames, size_t* frame_count)
+int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t sequence,
+					     const uint8_t* payload, size_t len,
+					     size_t frame_payload_max, size_t offset,
+					     struct spotflow_ble_encoded_frame* frame,
+					     size_t* next_offset)
 {
-	if (payload == NULL || frames == NULL || frame_count == NULL) {
+	if (payload == NULL || len == 0 || frame == NULL || next_offset == NULL) {
 		return -EINVAL;
 	}
 
@@ -176,52 +176,41 @@ int spotflow_ble_transport_encode_frames(uint8_t message_type, uint8_t sequence,
 		return -EMSGSIZE;
 	}
 
-	size_t offset = 0;
-	size_t encoded_frame_count = 0;
-	bool first = true;
-
-	while (offset < len) {
-		size_t header_len = first ? 5 : 3;
-		size_t fragment_capacity = frame_payload_max - header_len;
-		size_t remaining = len - offset;
-		size_t fragment_len = MIN(fragment_capacity, remaining);
-		bool last = (offset + fragment_len) == len;
-		uint8_t flags = 0;
-
-		if (encoded_frame_count >= max_frames) {
-			return -ENOSPC;
-		}
-
-		if (fragment_capacity == 0U) {
-			return -EMSGSIZE;
-		}
-
-		if (first) {
-			flags |= SPOTFLOW_FRAME_IS_FIRST;
-		}
-		if (last) {
-			flags |= SPOTFLOW_FRAME_IS_LAST;
-		}
-
-		frames[encoded_frame_count].data[0] = message_type;
-		frames[encoded_frame_count].data[1] = flags;
-		frames[encoded_frame_count].data[2] = sequence;
-		if (first) {
-			sys_put_le16(len, &frames[encoded_frame_count].data[3]);
-			memcpy(&frames[encoded_frame_count].data[5], &payload[offset],
-			       fragment_len);
-		} else {
-			memcpy(&frames[encoded_frame_count].data[3], &payload[offset],
-			       fragment_len);
-		}
-
-		frames[encoded_frame_count].len = header_len + fragment_len;
-		encoded_frame_count++;
-		offset += fragment_len;
-		first = false;
+	if (offset >= len) {
+		return -EINVAL;
 	}
 
-	*frame_count = encoded_frame_count;
+	bool first = offset == 0;
+	size_t header_len = first ? 5 : 3;
+	size_t fragment_capacity = frame_payload_max - header_len;
+	size_t remaining = len - offset;
+	size_t fragment_len = MIN(fragment_capacity, remaining);
+	bool last = (offset + fragment_len) == len;
+	uint8_t flags = 0;
+
+	if (fragment_capacity == 0U) {
+		return -EMSGSIZE;
+	}
+
+	if (first) {
+		flags |= SPOTFLOW_FRAME_IS_FIRST;
+	}
+	if (last) {
+		flags |= SPOTFLOW_FRAME_IS_LAST;
+	}
+
+	frame->data[0] = message_type;
+	frame->data[1] = flags;
+	frame->data[2] = sequence;
+	if (first) {
+		sys_put_le16(len, &frame->data[3]);
+		memcpy(&frame->data[5], &payload[offset], fragment_len);
+	} else {
+		memcpy(&frame->data[3], &payload[offset], fragment_len);
+	}
+
+	frame->len = header_len + fragment_len;
+	*next_offset = offset + fragment_len;
 	return 0;
 }
 
@@ -256,23 +245,28 @@ int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* se
 		return -EMSGSIZE;
 	}
 
-	struct spotflow_ble_encoded_frame frames[SPOTFLOW_BLE_MAX_ENCODED_FRAMES];
-	size_t frame_count = 0;
-	int rc = spotflow_ble_transport_encode_frames(
-		message_type, sequence, payload, len,
-		MIN(notify_payload_max, SPOTFLOW_TX_FRAME_BUFFER_SIZE), frames, ARRAY_SIZE(frames),
-		&frame_count);
-	if (rc < 0) {
-		bt_conn_unref(conn);
-		return rc;
-	}
+	struct spotflow_ble_encoded_frame frame;
+	size_t offset = 0;
+	size_t next_offset = 0;
+	int rc;
 
-	for (size_t i = 0; i < frame_count; i++) {
-		rc = notify_frame(conn, frames[i].data, frames[i].len);
+	while (offset < len) {
+		rc = spotflow_ble_transport_encode_next_frame(
+			message_type, sequence, payload, len,
+			MIN(notify_payload_max, SPOTFLOW_TX_FRAME_BUFFER_SIZE), offset, &frame,
+			&next_offset);
+		if (rc < 0) {
+			bt_conn_unref(conn);
+			return rc;
+		}
+
+		rc = notify_frame(conn, frame.data, frame.len);
 		if (rc < 0) {
 			bt_conn_unref(conn);
 			return map_notify_error(rc);
 		}
+
+		offset = next_offset;
 	}
 
 	bt_conn_unref(conn);
