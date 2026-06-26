@@ -1,4 +1,4 @@
-#include "net/spotflow_ble_transport_internal.h"
+#include "spotflow_ble_transport_internal.h"
 
 #include <errno.h>
 #include <stddef.h>

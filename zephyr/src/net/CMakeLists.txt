@@ -7,18 +7,19 @@
 
 if(CONFIG_SPOTFLOW_LOG_BACKEND AND CONFIG_SPOTFLOW_TRANSPORT_MQTT)
     zephyr_library_sources(
-        spotflow_connection_helper.c
-        spotflow_mqtt.c
-        spotflow_tls.c
+        transport/mqtt/spotflow_connection_helper.c
+        transport/mqtt/spotflow_mqtt.c
+        transport/mqtt/spotflow_mqtt_session.c
+        transport/mqtt/spotflow_tls.c
     )
 
     zephyr_library_link_libraries(mbedTLS)
 endif()
 
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_BLE
-        spotflow_ble_transport.c
-        spotflow_ble_gatt.c
-        spotflow_ble_framing.c
+        transport/ble/spotflow_ble_transport.c
+        transport/ble/spotflow_ble_gatt.c
+        transport/ble/spotflow_ble_framing.c
 )
 
 if (CONFIG_SPOTFLOW_LOG_BACKEND AND CONFIG_SPOTFLOW_TRANSPORT_MQTT)

@@ -7,13 +7,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "net/spotflow_mqtt.h"
-#include "net/spotflow_connection_helper.h"
+#include "spotflow_connection_helper.h"
+#include "spotflow_mqtt.h"
 #include "net/spotflow_device_id.h"
-#include "net/spotflow_tls.h"
+#include "spotflow_tls.h"
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-#include "../metrics/system/spotflow_metrics_system.h"
+#include "metrics/system/spotflow_metrics_system.h"
 #endif
 
 /* 80 bytes is just password itself */

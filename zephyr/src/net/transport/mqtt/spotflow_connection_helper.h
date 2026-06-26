@@ -2,6 +2,7 @@
 #define SPOTFLOW_CONNECTION_HELPER_H
 
 #include <zephyr/net/mqtt.h>
+#include <zephyr/net/socket.h>
 
 #ifdef __cplusplus
 extern "C" {

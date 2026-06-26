@@ -1,5 +1,5 @@
-#include "net/spotflow_ble_transport.h"
-#include "net/spotflow_ble_transport_internal.h"
+#include "spotflow_ble_transport.h"
+#include "spotflow_ble_transport_internal.h"
 
 struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
 

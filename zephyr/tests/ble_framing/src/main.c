@@ -2,7 +2,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
-#include "net/spotflow_ble_transport_internal.h"
+#include "net/transport/ble/spotflow_ble_transport_internal.h"
 
 LOG_MODULE_REGISTER(spotflow_net, LOG_LEVEL_INF);
 

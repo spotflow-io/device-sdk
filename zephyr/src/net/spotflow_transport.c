@@ -1,11 +1,11 @@
 #include "net/spotflow_transport.h"
 
 #if CONFIG_SPOTFLOW_TRANSPORT_BLE
-#include "net/spotflow_ble_transport.h"
+#include "net/transport/ble/spotflow_ble_transport.h"
 #endif
 
 #if CONFIG_SPOTFLOW_TRANSPORT_MQTT
-#include "net/spotflow_mqtt.h"
+#include "net/transport/mqtt/spotflow_mqtt.h"
 #endif
 
 int spotflow_transport_start(void)

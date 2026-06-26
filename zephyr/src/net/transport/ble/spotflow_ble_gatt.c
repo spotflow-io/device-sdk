@@ -1,4 +1,4 @@
-#include "net/spotflow_ble_transport_internal.h"
+#include "spotflow_ble_transport_internal.h"
 
 #include <errno.h>
 #include <stddef.h>
@@ -13,7 +13,7 @@
 
 #include "config/spotflow_config.h"
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-#include "../metrics/system/spotflow_metrics_system.h"
+#include "metrics/system/spotflow_metrics_system.h"
 #endif
 #include "net/spotflow_device_id.h"
 #include "net/spotflow_session_metadata.h"
