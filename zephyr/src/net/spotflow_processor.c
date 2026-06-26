@@ -21,10 +21,10 @@
 #ifdef CONFIG_SPOTFLOW_METRICS
 #include "metrics/spotflow_metrics_net.h"
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
-#include "../metrics/system/spotflow_metrics_system.h"
+#include "metrics/system/spotflow_metrics_system.h"
 #endif
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
-#include "../metrics/spotflow_metrics_heartbeat.h"
+#include "metrics/spotflow_metrics_heartbeat.h"
 #endif
 #endif /* CONFIG_SPOTFLOW_METRICS */
 
