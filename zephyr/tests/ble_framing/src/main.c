@@ -53,11 +53,11 @@ ZTEST(spotflow_ble_framing, test_encode_single_frame)
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
 	zassert_equal(next_offset, sizeof(payload), "unexpected next offset %u", next_offset);
 	zassert_equal(frame.len, 9, "unexpected frame len %u", frame.len);
-	zassert_equal(frame.data[0], SPOTFLOW_MSG_TELEMETRY, NULL);
-	zassert_equal(frame.data[1], SPOTFLOW_FRAME_IS_FIRST | SPOTFLOW_FRAME_IS_LAST, NULL);
-	zassert_equal(frame.data[2], 0x7A, NULL);
-	zassert_equal(frame.data[3], sizeof(payload), NULL);
-	zassert_equal(frame.data[4], 0x00, NULL);
+	zassert_equal(frame.data[0], SPOTFLOW_MSG_TELEMETRY);
+	zassert_equal(frame.data[1], SPOTFLOW_FRAME_IS_FIRST | SPOTFLOW_FRAME_IS_LAST);
+	zassert_equal(frame.data[2], 0x7A);
+	zassert_equal(frame.data[3], sizeof(payload));
+	zassert_equal(frame.data[4], 0x00);
 	zassert_mem_equal(&frame.data[5], payload, sizeof(payload), NULL);
 }
 
@@ -78,12 +78,12 @@ ZTEST(spotflow_ble_framing, test_encode_multiple_frames)
 			offset, &frame, &next_offset);
 
 		zassert_equal(rc, 0, "unexpected rc %d", rc);
-		zassert_equal(frame.data[0], SPOTFLOW_MSG_REPORTED_CONFIGURATION, NULL);
-		zassert_equal(frame.data[2], 0x13, NULL);
+		zassert_equal(frame.data[0], SPOTFLOW_MSG_REPORTED_CONFIGURATION);
+		zassert_equal(frame.data[2], 0x13);
 
 		if (offset == 0) {
 			zassert_true((frame.data[1] & SPOTFLOW_FRAME_IS_FIRST) != 0, NULL);
-			zassert_equal(sys_get_le16(&frame.data[3]), sizeof(payload) - 1, NULL);
+			zassert_equal(sys_get_le16(&frame.data[3]), sizeof(payload) - 1);
 			memcpy(&reassembled[reassembled_len], &frame.data[5], frame.len - 5);
 			reassembled_len += frame.len - 5;
 		} else {
@@ -98,7 +98,7 @@ ZTEST(spotflow_ble_framing, test_encode_multiple_frames)
 
 	zassert_true(frame_count > 1, "expected fragmentation");
 	zassert_true((frame.data[1] & SPOTFLOW_FRAME_IS_LAST) != 0, NULL);
-	zassert_equal(reassembled_len, sizeof(payload) - 1, NULL);
+	zassert_equal(reassembled_len, sizeof(payload) - 1);
 	zassert_mem_equal(reassembled, payload, sizeof(payload) - 1, NULL);
 }
 
@@ -156,8 +156,8 @@ ZTEST(spotflow_ble_framing, test_decode_single_frame_desired_config)
 								BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
-	zassert_equal(callback_count, 1, NULL);
-	zassert_equal(callback_payload_len, sizeof(payload), NULL);
+	zassert_equal(callback_count, 1);
+	zassert_equal(callback_payload_len, sizeof(payload));
 	zassert_mem_equal(callback_payload, payload, sizeof(payload), NULL);
 	zassert_false(g_spotflow_ble_transport_state.config_rx.active, NULL);
 }
@@ -186,8 +186,8 @@ ZTEST(spotflow_ble_framing, test_decode_multiple_frames_from_encoder)
 		offset = next_offset;
 	}
 
-	zassert_equal(callback_count, 1, NULL);
-	zassert_equal(callback_payload_len, sizeof(payload) - 1, NULL);
+	zassert_equal(callback_count, 1);
+	zassert_equal(callback_payload_len, sizeof(payload) - 1);
 	zassert_mem_equal(callback_payload, payload, sizeof(payload) - 1, NULL);
 	zassert_false(g_spotflow_ble_transport_state.config_rx.active, NULL);
 }
@@ -207,7 +207,7 @@ ZTEST(spotflow_ble_framing, test_decode_rejects_continuation_without_first)
 								BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
-	zassert_equal(callback_count, 0, NULL);
+	zassert_equal(callback_count, 0);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_sequence_mismatch_resets_state)
@@ -236,7 +236,7 @@ ZTEST(spotflow_ble_framing, test_decode_sequence_mismatch_resets_state)
 		wrong_sequence_fragment, sizeof(wrong_sequence_fragment), BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
-	zassert_equal(callback_count, 0, NULL);
+	zassert_equal(callback_count, 0);
 	zassert_false(g_spotflow_ble_transport_state.config_rx.active, NULL);
 }
 
@@ -269,7 +269,7 @@ ZTEST(spotflow_ble_framing, test_decode_rejects_invalid_first_fragment_lengths)
 							    sizeof(fragment_longer_than_total),
 							    BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
-	zassert_equal(callback_count, 0, NULL);
+	zassert_equal(callback_count, 0);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_rejects_incomplete_last_fragment)
@@ -293,7 +293,7 @@ ZTEST(spotflow_ble_framing, test_decode_rejects_incomplete_last_fragment)
 	rc = spotflow_ble_transport_process_config_rx_frame(
 		incomplete_last_fragment, sizeof(incomplete_last_fragment), BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
-	zassert_equal(callback_count, 0, NULL);
+	zassert_equal(callback_count, 0);
 	zassert_false(g_spotflow_ble_transport_state.config_rx.active, NULL);
 }
 
@@ -314,5 +314,5 @@ ZTEST(spotflow_ble_framing, test_decode_ignores_other_message_types)
 								BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
-	zassert_equal(callback_count, 0, NULL);
+	zassert_equal(callback_count, 0);
 }

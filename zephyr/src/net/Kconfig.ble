@@ -5,28 +5,20 @@ config SPOTFLOW_TRANSPORT_BLE
 
 if SPOTFLOW_TRANSPORT_BLE
 
-config SPOTFLOW_BLE_ATT_MTU
-	int "Maximum supported BLE ATT MTU"
-	default 247
-	range 23 247
-	help
-		Maximum ATT MTU this device supports for the Spotflow BLE transport.
-		The negotiated ATT MTU for a connection may still be lower, depending on
-		the central capabilities and whether the central initiates MTU exchange.
-
 configdefault BT_L2CAP_TX_MTU
-	default SPOTFLOW_BLE_ATT_MTU
+	default 247
 	help
-		Match the Bluetooth L2CAP TX MTU to the maximum ATT MTU advertised by
-		the Spotflow BLE transport so larger Spotflow frames do not get limited
-		by a smaller host-side L2CAP payload configuration.
+		Use the common high-throughput BLE 4.2+ ATT MTU value. With the 3-byte
+		ATT notification header this leaves 244 bytes for application payload,
+		and together with the 4-byte L2CAP header it fits in a 251-byte ACL data
+		packet.
 
 configdefault BT_BUF_ACL_TX_SIZE
 	default 251
 	help
-		Use a full data-length ACL TX buffer so common 247-byte ATT MTU
-		notifications fit into a single BLE data packet without extra
-		fragmentation in the controller/host path.
+		Use a full data-length ACL TX buffer. This matches the common BLE Data
+		Length Extension maximum and lets a 247-byte ATT MTU plus the 4-byte
+		L2CAP header fit into one ACL data packet.
 
 configdefault BT_BUF_ACL_RX_SIZE
 	default 251
