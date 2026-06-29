@@ -85,7 +85,6 @@ int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len
 	return 0;
 }
 
-
 /*
  * Spotflow BLE frames wrap opaque payload bytes sent on TX/RX stream characteristics.
  *
@@ -130,7 +129,8 @@ int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t seque
 	}
 
 	bool first = offset == 0;
-	size_t header_len = first ? 5 : 3;
+	size_t header_len = first ? SPOTFLOW_BLE_FIRST_FRAGMENT_HEADER_LEN
+				  : SPOTFLOW_BLE_CONT_FRAGMENT_HEADER_LEN;
 
 	if (frame_payload_max <= header_len) {
 		return -EMSGSIZE;
@@ -158,9 +158,11 @@ int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t seque
 	frame->data[2] = sequence;
 	if (first) {
 		sys_put_le16(len, &frame->data[3]);
-		memcpy(&frame->data[5], &payload[offset], fragment_len);
+		memcpy(&frame->data[SPOTFLOW_BLE_FIRST_FRAGMENT_HEADER_LEN], &payload[offset],
+		       fragment_len);
 	} else {
-		memcpy(&frame->data[3], &payload[offset], fragment_len);
+		memcpy(&frame->data[SPOTFLOW_BLE_CONT_FRAGMENT_HEADER_LEN], &payload[offset],
+		       fragment_len);
 	}
 
 	frame->len = header_len + fragment_len;
@@ -192,9 +194,11 @@ int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* se
 	}
 
 	uint16_t mtu = bt_gatt_get_mtu(conn);
-	size_t notify_payload_max = mtu > 3 ? mtu - 3 : 0;
+	size_t notify_payload_max = mtu > SPOTFLOW_BLE_ATT_NOTIFY_HEADER_LEN
+		? mtu - SPOTFLOW_BLE_ATT_NOTIFY_HEADER_LEN
+		: 0;
 
-	if (notify_payload_max <= 5) {
+	if (notify_payload_max <= SPOTFLOW_BLE_FIRST_FRAGMENT_HEADER_LEN) {
 		bt_conn_unref(conn);
 		return -EMSGSIZE;
 	}
@@ -227,11 +231,11 @@ int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* se
 	return 0;
 }
 
-
 static int parse_config_rx_frame(const void* buf, uint16_t len, uint8_t flags,
 				 struct config_rx_frame* parsed_frame)
 {
-	if ((flags & BT_GATT_WRITE_FLAG_CMD) == 0 || buf == NULL || len < 3) {
+	if ((flags & BT_GATT_WRITE_FLAG_CMD) == 0 || buf == NULL ||
+	    len < SPOTFLOW_BLE_CONT_FRAGMENT_HEADER_LEN) {
 		return -EINVAL;
 	}
 
@@ -244,7 +248,8 @@ static int parse_config_rx_frame(const void* buf, uint16_t len, uint8_t flags,
 
 	uint8_t fragment_flags = frame[1];
 	bool is_first = (fragment_flags & SPOTFLOW_FRAME_IS_FIRST) != 0;
-	size_t header_len = is_first ? 5 : 3;
+	size_t header_len = is_first ? SPOTFLOW_BLE_FIRST_FRAGMENT_HEADER_LEN
+				     : SPOTFLOW_BLE_CONT_FRAGMENT_HEADER_LEN;
 
 	if (len < header_len) {
 		return -EINVAL;
