@@ -6,4 +6,4 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(spotflow_ble_framing_tests)
 
 target_sources(app PRIVATE src/main.c)
-target_sources(app PRIVATE ../../src/net/spotflow_ble_framing.c)
+target_sources(app PRIVATE ../../src/net/transport/ble/spotflow_ble_framing.c)

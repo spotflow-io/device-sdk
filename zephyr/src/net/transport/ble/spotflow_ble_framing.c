@@ -13,19 +13,35 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static int notify_frame(struct bt_conn* conn, const uint8_t* frame, size_t frame_len);
 static int map_notify_error(int rc);
+
+struct config_rx_frame {
+	bool ignored;
+	bool is_first;
+	bool is_last;
+	uint8_t sequence;
+	size_t total_len;
+	const uint8_t* fragment;
+	size_t fragment_len;
+};
+
+static int parse_config_rx_frame(const void* buf, uint16_t len, uint8_t flags,
+				 struct config_rx_frame* parsed_frame);
+static int process_config_rx_first_fragment_locked(const struct config_rx_frame* frame,
+						   uint8_t* callback_buffer, size_t* callback_len,
+						   bool* invoke_callback);
+static int process_config_rx_continuation_fragment_locked(const struct config_rx_frame* frame,
+							  uint8_t* callback_buffer,
+							  size_t* callback_len,
+							  bool* invoke_callback);
+static int complete_config_rx_if_last_locked(const struct config_rx_frame* frame,
+					     uint8_t* callback_buffer, size_t* callback_len,
+					     bool* invoke_callback);
+
 /* Drop any partially reassembled desired-configuration message after malformed
  * RX frames so the next valid first fragment starts a fresh message.
  * Caller must hold g_spotflow_ble_transport_state.lock.
  */
 static void reset_config_rx_state_locked(void);
-
-static void reset_config_rx_state_locked(void)
-{
-	g_spotflow_ble_transport_state.config_rx.active = false;
-	g_spotflow_ble_transport_state.config_rx.sequence = 0;
-	g_spotflow_ble_transport_state.config_rx.total_len = 0;
-	g_spotflow_ble_transport_state.config_rx.received_len = 0;
-}
 
 int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len, uint8_t flags)
 {
@@ -33,21 +49,12 @@ int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len
 	uint8_t callback_buffer[SPOTFLOW_CONFIG_RX_BUFFER_SIZE];
 	size_t callback_len = 0;
 	bool invoke_callback = false;
+	struct config_rx_frame frame;
 
-	if ((flags & BT_GATT_WRITE_FLAG_CMD) == 0 || len < 3) {
-		return -EINVAL;
+	int rc = parse_config_rx_frame(buf, len, flags, &frame);
+	if (rc < 0 || frame.ignored) {
+		return rc;
 	}
-
-	const uint8_t* frame = buf;
-	if (frame[0] != SPOTFLOW_MSG_DESIRED_CONFIGURATION) {
-		LOG_DBG("Ignored BLE RX stream write with message type 0x%02x", frame[0]);
-		return 0;
-	}
-
-	uint8_t fragment_flags = frame[1];
-	bool is_first = (fragment_flags & SPOTFLOW_FRAME_IS_FIRST) != 0;
-	bool is_last = (fragment_flags & SPOTFLOW_FRAME_IS_LAST) != 0;
-	uint8_t sequence = frame[2];
 
 	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
 	config_callback = g_spotflow_ble_transport_state.config_rx.callback;
@@ -57,81 +64,19 @@ int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len
 		return 0;
 	}
 
-	if (is_first) {
-		if (len < 5) {
-			reset_config_rx_state_locked();
-			k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
-			return -EINVAL;
-		}
-
-		size_t total_len = sys_get_le16(&frame[3]);
-		size_t fragment_len = len - 5;
-
-		if (total_len == 0 ||
-		    total_len > sizeof(g_spotflow_ble_transport_state.config_rx.buffer) ||
-		    fragment_len > total_len) {
-			reset_config_rx_state_locked();
-			k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
-			return -EINVAL;
-		}
-
-		memcpy(g_spotflow_ble_transport_state.config_rx.buffer, &frame[5], fragment_len);
-		g_spotflow_ble_transport_state.config_rx.active = !is_last;
-		g_spotflow_ble_transport_state.config_rx.sequence = sequence;
-		g_spotflow_ble_transport_state.config_rx.total_len = total_len;
-		g_spotflow_ble_transport_state.config_rx.received_len = fragment_len;
-
-		if (is_last) {
-			if (fragment_len != total_len) {
-				reset_config_rx_state_locked();
-				k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
-				return -EINVAL;
-			}
-
-			memcpy(callback_buffer, g_spotflow_ble_transport_state.config_rx.buffer,
-			       total_len);
-			callback_len = total_len;
-			invoke_callback = true;
-			reset_config_rx_state_locked();
-		}
+	if (frame.is_first) {
+		rc = process_config_rx_first_fragment_locked(&frame, callback_buffer, &callback_len,
+							     &invoke_callback);
 	} else {
-		if (!g_spotflow_ble_transport_state.config_rx.active ||
-		    g_spotflow_ble_transport_state.config_rx.sequence != sequence) {
-			reset_config_rx_state_locked();
-			k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
-			return -EINVAL;
-		}
-
-		size_t fragment_len = len - 3;
-		if ((g_spotflow_ble_transport_state.config_rx.received_len + fragment_len) >
-		    g_spotflow_ble_transport_state.config_rx.total_len) {
-			reset_config_rx_state_locked();
-			k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
-			return -EINVAL;
-		}
-
-		memcpy(&g_spotflow_ble_transport_state.config_rx
-				.buffer[g_spotflow_ble_transport_state.config_rx.received_len],
-		       &frame[3], fragment_len);
-		g_spotflow_ble_transport_state.config_rx.received_len += fragment_len;
-
-		if (is_last) {
-			if (g_spotflow_ble_transport_state.config_rx.received_len !=
-			    g_spotflow_ble_transport_state.config_rx.total_len) {
-				reset_config_rx_state_locked();
-				k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
-				return -EINVAL;
-			}
-
-			memcpy(callback_buffer, g_spotflow_ble_transport_state.config_rx.buffer,
-			       g_spotflow_ble_transport_state.config_rx.total_len);
-			callback_len = g_spotflow_ble_transport_state.config_rx.total_len;
-			invoke_callback = true;
-			reset_config_rx_state_locked();
-		}
+		rc = process_config_rx_continuation_fragment_locked(
+			&frame, callback_buffer, &callback_len, &invoke_callback);
 	}
 
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+
+	if (rc < 0) {
+		return rc;
+	}
 
 	if (invoke_callback) {
 		config_callback(callback_buffer, callback_len);
@@ -139,6 +84,7 @@ int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len
 
 	return 0;
 }
+
 
 /*
  * Spotflow BLE frames wrap opaque payload bytes sent on TX/RX stream characteristics.
@@ -179,16 +125,17 @@ int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t seque
 		return -EMSGSIZE;
 	}
 
-	if (frame_payload_max <= 5) {
-		return -EMSGSIZE;
-	}
-
 	if (offset >= len) {
 		return -EINVAL;
 	}
 
 	bool first = offset == 0;
 	size_t header_len = first ? 5 : 3;
+
+	if (frame_payload_max <= header_len) {
+		return -EMSGSIZE;
+	}
+
 	size_t fragment_capacity = frame_payload_max - header_len;
 	size_t remaining = len - offset;
 	size_t fragment_len = MIN(fragment_capacity, remaining);
@@ -280,6 +227,112 @@ int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* se
 	return 0;
 }
 
+
+static int parse_config_rx_frame(const void* buf, uint16_t len, uint8_t flags,
+				 struct config_rx_frame* parsed_frame)
+{
+	if ((flags & BT_GATT_WRITE_FLAG_CMD) == 0 || buf == NULL || len < 3) {
+		return -EINVAL;
+	}
+
+	const uint8_t* frame = buf;
+	if (frame[0] != SPOTFLOW_MSG_DESIRED_CONFIGURATION) {
+		LOG_DBG("Ignored BLE RX stream write with message type 0x%02x", frame[0]);
+		*parsed_frame = (struct config_rx_frame){ .ignored = true };
+		return 0;
+	}
+
+	uint8_t fragment_flags = frame[1];
+	bool is_first = (fragment_flags & SPOTFLOW_FRAME_IS_FIRST) != 0;
+	size_t header_len = is_first ? 5 : 3;
+
+	if (len < header_len) {
+		return -EINVAL;
+	}
+
+	*parsed_frame = (struct config_rx_frame){
+		.is_first = is_first,
+		.is_last = (fragment_flags & SPOTFLOW_FRAME_IS_LAST) != 0,
+		.sequence = frame[2],
+		.total_len = is_first ? sys_get_le16(&frame[3]) : 0,
+		.fragment = &frame[header_len],
+		.fragment_len = len - header_len,
+	};
+
+	return 0;
+}
+
+static int process_config_rx_first_fragment_locked(const struct config_rx_frame* frame,
+						   uint8_t* callback_buffer, size_t* callback_len,
+						   bool* invoke_callback)
+{
+	if (frame->total_len == 0 ||
+	    frame->total_len > sizeof(g_spotflow_ble_transport_state.config_rx.buffer) ||
+	    frame->fragment_len > frame->total_len) {
+		reset_config_rx_state_locked();
+		return -EINVAL;
+	}
+
+	memcpy(g_spotflow_ble_transport_state.config_rx.buffer, frame->fragment,
+	       frame->fragment_len);
+	g_spotflow_ble_transport_state.config_rx.active = !frame->is_last;
+	g_spotflow_ble_transport_state.config_rx.sequence = frame->sequence;
+	g_spotflow_ble_transport_state.config_rx.total_len = frame->total_len;
+	g_spotflow_ble_transport_state.config_rx.received_len = frame->fragment_len;
+
+	return complete_config_rx_if_last_locked(frame, callback_buffer, callback_len,
+						 invoke_callback);
+}
+
+static int process_config_rx_continuation_fragment_locked(const struct config_rx_frame* frame,
+							  uint8_t* callback_buffer,
+							  size_t* callback_len,
+							  bool* invoke_callback)
+{
+	if (!g_spotflow_ble_transport_state.config_rx.active ||
+	    g_spotflow_ble_transport_state.config_rx.sequence != frame->sequence) {
+		reset_config_rx_state_locked();
+		return -EINVAL;
+	}
+
+	if ((g_spotflow_ble_transport_state.config_rx.received_len + frame->fragment_len) >
+	    g_spotflow_ble_transport_state.config_rx.total_len) {
+		reset_config_rx_state_locked();
+		return -EINVAL;
+	}
+
+	memcpy(&g_spotflow_ble_transport_state.config_rx
+			.buffer[g_spotflow_ble_transport_state.config_rx.received_len],
+	       frame->fragment, frame->fragment_len);
+	g_spotflow_ble_transport_state.config_rx.received_len += frame->fragment_len;
+
+	return complete_config_rx_if_last_locked(frame, callback_buffer, callback_len,
+						 invoke_callback);
+}
+
+static int complete_config_rx_if_last_locked(const struct config_rx_frame* frame,
+					     uint8_t* callback_buffer, size_t* callback_len,
+					     bool* invoke_callback)
+{
+	if (!frame->is_last) {
+		return 0;
+	}
+
+	if (g_spotflow_ble_transport_state.config_rx.received_len !=
+	    g_spotflow_ble_transport_state.config_rx.total_len) {
+		reset_config_rx_state_locked();
+		return -EINVAL;
+	}
+
+	memcpy(callback_buffer, g_spotflow_ble_transport_state.config_rx.buffer,
+	       g_spotflow_ble_transport_state.config_rx.total_len);
+	*callback_len = g_spotflow_ble_transport_state.config_rx.total_len;
+	*invoke_callback = true;
+	reset_config_rx_state_locked();
+
+	return 0;
+}
+
 static int notify_frame(struct bt_conn* conn, const uint8_t* frame, size_t frame_len)
 {
 	return bt_gatt_notify(conn, spotflow_ble_tx_stream_attr_get(), frame, frame_len);
@@ -292,4 +345,12 @@ static int map_notify_error(int rc)
 	}
 
 	return rc;
+}
+
+static void reset_config_rx_state_locked(void)
+{
+	g_spotflow_ble_transport_state.config_rx.active = false;
+	g_spotflow_ble_transport_state.config_rx.sequence = 0;
+	g_spotflow_ble_transport_state.config_rx.total_len = 0;
+	g_spotflow_ble_transport_state.config_rx.received_len = 0;
 }
