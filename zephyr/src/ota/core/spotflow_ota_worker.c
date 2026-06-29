@@ -290,7 +290,7 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 	}
 
 	if (has_installed_version && strcmp(installed_version, job->artifact.version) == 0) {
-		LOG_DBG("OTA attempt %llu: artifact '%s' already at version %s, skipping handler",
+		LOG_INF("OTA attempt %llu: artifact '%s' already at version %s, skipping handler",
 			(unsigned long long)job->attempt_id, job->artifact.slug,
 			job->artifact.version);
 		*result = SPOTFLOW_OTA_RESULT_SUCCEEDED;

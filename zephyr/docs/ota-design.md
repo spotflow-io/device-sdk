@@ -264,14 +264,14 @@ Use **DBG** during manual E2E validation; use **INF** or higher in production.
 - Artifact processing started and finished (`succeeded`, `failed`, `canceled`), including slug
   and version.
 - Main firmware lifecycle outcomes (rollback detected, update succeeded after confirmation).
+- Installed-version skip before invoking a delegated handler.
+- Main firmware phase transitions.
 
 **DBG (diagnostics):** details useful when validating persistence, supersession, and
 download plumbing.
 
 - OTA init and loaded persistence (latest attempt, probation, last received attempt ID).
 - Supersession and deferred promotion (pending attempt IDs, discarded superseded results).
-- Installed-version skip before invoking a delegated handler.
-- Main firmware phase transitions.
 - HTTP download start, resume offset, byte counts, and connection-lost resume hints
   (host/path are not logged).
 

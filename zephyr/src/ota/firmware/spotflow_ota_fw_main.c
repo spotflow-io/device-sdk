@@ -498,7 +498,7 @@ static void notify_main_firmware_phase(enum spotflow_ota_phase phase)
 		return;
 	}
 
-	LOG_DBG("Main firmware phase -> %s", spotflow_ota_log_phase_name(phase));
+	LOG_INF("Main firmware phase -> %s", spotflow_ota_log_phase_name(phase));
 
 	notify_main_firmware_state(&state);
 }
