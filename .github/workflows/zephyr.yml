@@ -166,7 +166,7 @@ jobs:
         run: |
           west build --board ${{ matrix.board }} ${{ matrix.build_extra_args }}
 
-  ota-tests:
+  unit-tests:
     runs-on: ubuntu-latest
 
     steps:
@@ -185,7 +185,7 @@ jobs:
           key: >-
             zephyr-workspace-west-zephyr-native-sim.yml
             ${{ hashFiles('temp-manifest/zephyr/manifests/west-zephyr-native-sim.yml') }}
-            ota-tests-${{ runner.os }}
+            unit-tests-${{ runner.os }}
 
       - name: Create Python virtual environment
         if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
@@ -226,7 +226,7 @@ jobs:
           key: >-
             zephyr-workspace-west-zephyr-native-sim.yml
             ${{ hashFiles('temp-manifest/zephyr/manifests/west-zephyr-native-sim.yml') }}
-            ota-tests-${{ runner.os }}
+            unit-tests-${{ runner.os }}
 
       - name: Cache Zephyr SDK
         id: cache-sdk
@@ -246,5 +246,5 @@ jobs:
       - name: Install native simulator dependencies
         run: sudo apt-get update && sudo apt-get install --no-install-recommends -y gcc-multilib g++-multilib
 
-      - name: Run OTA native simulator tests
-        run: west twister -T modules/lib/spotflow/zephyr/tests/ota -p native_sim --inline-logs
+      - name: Run unit tests in native simulator
+        run: west twister -T modules/lib/spotflow/zephyr/tests -p native_sim --inline-logs
