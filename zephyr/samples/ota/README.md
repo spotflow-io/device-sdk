@@ -33,12 +33,10 @@ in the sample.
 - NXP FRDM-RW612 (Wi-Fi) — other MCUboot-capable boards may work with board overlays.
 - Network connectivity (Wi-Fi by default; set `CONFIG_SPOTFLOW_USE_ETH=y` for Ethernet).
 - Zephyr workspace with the Spotflow module and Python `.venv` activated.
-- Spotflow device credentials and Wi-Fi credentials in `credentials.conf`.
 
 ## Build and flash
 
 ```bash
-source .venv/bin/activate
 west build --sysbuild -b frdm_rw612 spotflow/zephyr/samples/ota --pristine
 west flash
 ```
@@ -50,13 +48,14 @@ cp credentials-sample.conf credentials.conf
 ```
 
 Edit `credentials.conf` with your Wi-Fi SSID/password and Spotflow device ID / ingest key.
-This file is merged automatically by CMake and must not be committed.
+This file is merged automatically by CMake and included in `.gitignore`.
 
 ## Try an OTA update
 
 1. Build and flash the sample.
 2. Wait for the device to connect (watch serial logs for network and MQTT readiness).
-3. In the [Spotflow portal](https://app.spotflow.io), upload a firmware image and
+3. Modify the sample (such as by addding `LOG_INF("Hello, OTA updates!")`)and rebuild the sample.
+3. In the [Spotflow portal](https://app.spotflow.io), upload the new firmware image (`build/ota/zephyr/zephyr.signed.bin`) and
    [create a deployment](https://docs.spotflow.io/guides/ota) targeting this device.
 4. Observe serial logs during download and reboot. You should see main-firmware progress
    lines such as `phase=DOWNLOADING` and `phase=PENDING_REBOOT`.
@@ -71,7 +70,7 @@ This file is merged automatically by CMake and must not be committed.
    are received.
 
 Do not log or share artifact URLs or OTA secrets from serial output. See the
-[Zephyr OTA guide](https://docs.spotflow.io/guides/zephyr/ota-zephyr#security-and-logging)
+[Zephyr OTA guide](https://docs.spotflow.io/guides/zephyr/ota-zephyr#security)
 for logging guidance.
 
 ## Sample files

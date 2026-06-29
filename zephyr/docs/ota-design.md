@@ -1,15 +1,11 @@
-# Zephyr OTA — implementation design note
+# Zephyr OTA updates— implementation design notes
 
-This document summarizes important design choices in the Spotflow Zephyr OTA device module.
-It is written for **SDK contributors** working on the implementation.
-
-Integrators should use the public product documentation
-([Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr))
-and the public headers (`spotflow/ota.h`, `spotflow/downloader.h`) instead.
+This document summarizes important design decisions on the implementation of over-the-air updates.
 
 ## Module map
 
-The OTA implementation is split by responsibility under `spotflow/zephyr/src/ota`:
+The repository [README](../../README.md#ota-updates) provides a high-level overview of the OTA implementation while the text below describes the individual folders and files.
+The relevant source files are split by responsibility under `spotflow/zephyr/src/ota`:
 
 | Folder | Responsibility |
 |---|---|
@@ -114,29 +110,18 @@ internal init functions, even if it runs before the MQTT session is established 
 example post-reboot confirmation in `main()`, or `spotflow_is_update_canceled()` inside a
 download handler after reboot).
 
-**Test hook:** `spotflow_ota_reset()` clears the initialized flag. It is intended for unit
-tests only.
-
 ## Threading and synchronization
 
 ```
 MQTT thread     → decode C2D, enqueue worker jobs, poll pending D2C send
 OTA worker      → state transitions, artifact handlers, spotflow_download_artifact()
-                  when invoked from the worker (main FW + delegated paths)
 sysworkq        → spotflow_on_update_canceled()
-App threads     → public API (pause/resume/fail/confirm/query);
-                  spotflow_download_artifact() only if the app calls it directly
+App threads     → public API (pause/resume/fail/confirm/query)
 ```
 
-`spotflow_download_artifact()` is synchronous: it blocks its **caller** until the
-download finishes, is canceled, or fails. There is no separate download thread.
-
-- When the OTA worker calls it (automatic main firmware or a typical delegated handler
-  invoked from the worker), the download runs on the **OTA worker** thread.
-- When application code calls it directly on an app thread, the download runs on that
-  **application** thread instead.
-
-In normal Spotflow OTA flows, downloads run on the OTA worker.
+`spotflow_download_artifact()` is synchronous: it blocks its caller until the download finishes, is canceled, or fails.
+When the main firmware is handled automatically, its download always runs on the OTA worker thread.
+When the user code implements a custom firmware handler, the download will run on the OTA worker thread, too, unless it is explicitly delegated to a different thread.
 
 **Rules:**
 
@@ -165,8 +150,6 @@ without holding `state_mutex`.
 - Processed strictly in manifest order.
 - Each artifact has a terminal result: `SUCCEEDED`, `FAILED`, or `CANCELED`, or is still
   in progress.
-- A whole-attempt **`updateAttemptError`** (reject before processing) is terminal for the
-  entire attempt and does not merge with per-artifact result arrays.
 
 **Inbound message handling**
 
@@ -174,9 +157,9 @@ without holding `state_mutex`.
 |---|---|
 | Duplicate same `updateAttemptId` | Ignored |
 | New attempt while current is terminal | Accept and start |
-| New attempt while current is unfinished | Supersede when safe; stash one pending newer attempt |
-| Malformed message, untrusted attempt ID | Logged and ignored |
-| Malformed message, trusted attempt ID | Rejected with `updateAttemptError` |
+| New attempt while current is unfinished | Stash one pending newer attempt; supersede the current one when safe (after finishing the current artifact or rebooting) |
+| Malformed message, unable to parse attempt ID | Logged and ignored |
+| Malformed message, able to parse attempt ID | Rejected with `updateAttemptError` |
 
 **Supersession**
 
@@ -217,18 +200,17 @@ the cloud does not see success before the device has actually run the new image.
 
 **Identity**
 
-Build ID from Zephyr binary descriptors (`CONFIG_SPOTFLOW_GENERATE_BUILD_ID`) is used to
-compare running and downloaded images. Downloaded-image read failure is treated as a main
-firmware failure input.
+Build ID from Zephyr binary descriptors (`CONFIG_SPOTFLOW_GENERATE_BUILD_ID`) is used to compare running and downloaded images.
+Downloaded-image read failure results into the failure of the update attempt.
 
 ## Persistence
 
 Settings keys (namespace `spotflow/ota/`):
 
-- **Attempt** — latest received attempt ID, terminal artifact results, actionable
+- **Attempt** - latest received attempt ID, terminal artifact results, actionable
   cancellation, whole-attempt errors.
-- **Probation** — main firmware in-flight context across reboot.
-- **Version / &lt;slug&gt;** — last installed version per firmware slug.
+- **Probation** - main firmware in-flight context across reboot.
+- **Version / &lt;slug&gt;** - last installed version per firmware slug.
 
 **Write ordering**
 
@@ -238,9 +220,7 @@ reduces the window where a power loss leaves the cloud and device inconsistent.
 
 **Corruption**
 
-Corrupt records start from a safe empty view. The SDK must not report success for an
-unknown image. When probation context is still trustworthy, report main `FAILED` and
-remaining `CANCELED`; otherwise clear probation and wait for a new cloud attempt.
+Corrupt records loaded from Settings are ignored.
 
 ## Networking and results
 
@@ -255,12 +235,12 @@ remaining `CANCELED`; otherwise clear probation and wait for a new cloud attempt
 
 ## Cancellation (implementation)
 
-- **`UPDATE_ARTIFACTS` with `isCanceled: true`:** The attempt is accepted with
+- **`UPDATE_ARTIFACTS` with `isCanceled: true` with an unseen attempt ID:** The attempt is accepted with
   `actionable_cancellation` set. All artifacts are marked `CANCELED` immediately; the
   worker is not started for firmware handlers. Terminal results are persisted and reported
   like any other finished attempt.
-- **`CANCEL_UPDATE`:** Cancellation is **accepted** only while no artifact has yet
-  succeeded in the attempt.
+- **`CANCEL_UPDATE` or `UPDATE_ARTIFACTS` with `isCanceled: true` with the current attempt ID:**
+  Cancellation is **accepted** only while no artifact has yet succeeded in the attempt.
 - After acceptance, `spotflow_is_update_canceled()` is true until the running artifact
   returns a terminal result.
 - If the running artifact later returns `SUCCEEDED`, that success is kept; cancellation
@@ -327,5 +307,3 @@ west twister -T spotflow/zephyr/tests/ota -p native_sim --inline-logs
 | Downloader | `downloader/` | Transport |
 | Platform / identity | `platform/` | MCUboot, build ID |
 | Main firmware | `fw_main/` | Downloader, platform, persistence, net |
-
-Hardware validation uses `spotflow/zephyr/samples/ota` with sysbuild and MCUboot.
