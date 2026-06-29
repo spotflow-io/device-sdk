@@ -2,8 +2,10 @@
 
 #include <zephyr/logging/log.h>
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config.h"
 #include "config/spotflow_config_net.h"
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 #include "net/spotflow_session_metadata.h"
 #include "spotflow_connection_helper.h"
 #include "spotflow_mqtt.h"
@@ -23,10 +25,12 @@ static void process_mqtt_session(spotflow_mqtt_process_fn process_fn)
 		return;
 	}
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	rc = spotflow_config_init_session();
 	if (rc < 0) {
 		LOG_WRN("Failed to initialize configuration updating: %d", rc);
 	}
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 
 	/* INNER LOOP: perform normal MQTT I/O until an error occurs. */
 	while (spotflow_mqtt_is_connected()) {

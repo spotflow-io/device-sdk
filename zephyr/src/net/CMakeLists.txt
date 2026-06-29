@@ -1,11 +1,11 @@
-﻿zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_LOG_BACKEND
+﻿zephyr_library_sources_ifdef(CONFIG_SPOTFLOW
         spotflow_processor.c
         spotflow_device_id.c
         spotflow_session_metadata.c
         spotflow_transport.c
 )
 
-if(CONFIG_SPOTFLOW_LOG_BACKEND AND CONFIG_SPOTFLOW_TRANSPORT_MQTT)
+if(CONFIG_SPOTFLOW_TRANSPORT_MQTT)
     zephyr_library_sources(
         transport/mqtt/spotflow_connection_helper.c
         transport/mqtt/spotflow_mqtt.c
@@ -22,9 +22,8 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_BLE
         transport/ble/spotflow_ble_framing.c
 )
 
-if (CONFIG_SPOTFLOW_LOG_BACKEND AND CONFIG_SPOTFLOW_TRANSPORT_MQTT)
+if(CONFIG_SPOTFLOW_TRANSPORT_MQTT)
     if (NOT CONFIG_SPOTFLOW_INGEST_KEY)
-        message(FATAL_ERROR  "CONFIG_SPOTFLOW_INGEST_KEY
-                              must be specified if CONFIG_SPOTFLOW_LOG_BACKEND enabled")
+        message(FATAL_ERROR "CONFIG_SPOTFLOW_INGEST_KEY must be specified when CONFIG_SPOTFLOW_TRANSPORT_MQTT is enabled")
     endif()
 endif()

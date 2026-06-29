@@ -1,8 +1,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config.h"
 #include "config/spotflow_config_net.h"
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 #if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #include "net/transport/mqtt/spotflow_mqtt_session.h"
 #endif
@@ -85,18 +87,22 @@ static void spotflow_processing_thread_entry(void)
 
 static int process_config_coredumps_metrics_or_logs(void)
 {
-	int rc = spotflow_config_send_pending_message();
+	int rc = 0;
+
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+	rc = spotflow_config_send_pending_message();
 	if (rc < 0) {
 		LOG_DBG("Failed to send pending configuration message: %d", rc);
 		return rc;
 	}
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 	rc = spotflow_poll_and_process_enqueued_coredump_chunks();
 	if (rc < 0) {
 		LOG_DBG("Failed to process coredumps: %d", rc);
 		return rc;
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_COREDUMPS */
 #ifdef CONFIG_SPOTFLOW_METRICS
 	/* Process metrics after coredumps, before logs */
 	if (rc == 0) {
@@ -106,7 +112,7 @@ static int process_config_coredumps_metrics_or_logs(void)
 			return rc;
 		}
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_METRICS */
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	/* rc > 0 means core dumps or metrics were sent
 	 *	-> doing mqtt routine and continue with core dumps/metrics sending

@@ -52,11 +52,6 @@ static int enqueue_coredump_msg(const struct spotflow_coredump_msg* msg)
 
 static void spotflow_coredumps_thread_entry(void)
 {
-	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_COREDUMPS)) {
-		LOG_INF("Coredump transport inactive, skipping coredump upload processing");
-		return;
-	}
-
 	/* Check if there is a dump */
 	int rc = coredump_query(COREDUMP_QUERY_HAS_STORED_DUMP, NULL);
 	if (rc < 0) {

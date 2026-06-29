@@ -26,13 +26,6 @@ bool spotflow_transport_is_ready(void)
 #endif
 }
 
-/* implementation placeholder */
-bool spotflow_transport_supports_feature(enum spotflow_transport_feature feature)
-{
-	(void)feature;
-	return true;
-}
-
 int spotflow_transport_send_ingest_cbor(uint8_t* payload, size_t len)
 {
 #if CONFIG_SPOTFLOW_TRANSPORT_BLE

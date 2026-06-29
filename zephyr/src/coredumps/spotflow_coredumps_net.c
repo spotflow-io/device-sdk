@@ -14,10 +14,6 @@ LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_L
  */
 int spotflow_poll_and_process_enqueued_coredump_chunks(void)
 {
-	if (!spotflow_transport_supports_feature(SPOTFLOW_TRANSPORT_FEATURE_COREDUMPS)) {
-		return 0;
-	}
-
 	struct spotflow_coredump_msg* msg_ptr;
 
 	/* Peek without removing - returns non-zero if queue empty */

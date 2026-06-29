@@ -60,7 +60,7 @@ config SPOTFLOW_DEVICE_ID
 		in the code by defining the function char* spotflow_override_device_id().
 config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	int "Spotflow SDK backend level"
-	default 2
+	default LOG_DEFAULT_LEVEL
 	range 0 4
 	help
 		Sets default log level for all Spotflow components.

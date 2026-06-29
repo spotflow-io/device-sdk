@@ -11,7 +11,9 @@
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/logging/log.h>
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config.h"
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
 #include "metrics/system/spotflow_metrics_system.h"
 #endif
@@ -200,12 +202,14 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 	}
 #endif
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	if (!was_enabled && enabled) {
 		int rc = spotflow_config_init_session();
 		if (rc < 0) {
 			LOG_WRN("Failed to initialize configuration updating: %d", rc);
 		}
 	}
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 }
 
 /* A BLE transport session starts only after TX notifications are enabled. A
