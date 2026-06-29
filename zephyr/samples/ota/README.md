@@ -55,18 +55,18 @@ This file is merged automatically by CMake and included in `.gitignore`.
 1. Build and flash the sample.
 2. Wait for the device to connect (watch serial logs for network and MQTT readiness).
 3. Modify the sample (such as by addding `LOG_INF("Hello, OTA updates!")`)and rebuild the sample.
-3. In the [Spotflow portal](https://app.spotflow.io), upload the new firmware image (`build/ota/zephyr/zephyr.signed.bin`) and
+4. In the [Spotflow portal](https://app.spotflow.io), upload the new firmware image (`build/ota/zephyr/zephyr.signed.bin`) and
    [create a deployment](https://docs.spotflow.io/guides/ota) targeting this device.
-4. Observe serial logs during download and reboot. You should see main-firmware progress
+5. Observe serial logs during download and reboot. You should see main-firmware progress
    lines such as `phase=DOWNLOADING` and `phase=PENDING_REBOOT`.
-5. After reboot into the new image, the sample confirms automatically:
+6. After reboot into the new image, the sample confirms automatically:
 
    ```
    Unconfirmed main firmware detected (phase=UNCONFIRMED), confirming via Spotflow OTA
    Main firmware confirmed successfully (phase=NOT_RUNNING result=1)
    ```
 
-6. In the portal deployment view, the device should move to **Succeeded** once results
+7. In the portal deployment view, the device should move to **Succeeded** once results
    are received.
 
 Do not log or share artifact URLs or OTA secrets from serial output. See the
