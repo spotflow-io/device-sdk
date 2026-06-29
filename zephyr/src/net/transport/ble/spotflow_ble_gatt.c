@@ -10,6 +10,9 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/logging/log.h>
+#if IS_ENABLED(CONFIG_BT_SETTINGS)
+#include <zephyr/settings/settings.h>
+#endif
 
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config.h"
@@ -34,6 +37,9 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 	BT_UUID_128_ENCODE(0x26530005, 0x81E5, 0x4861, 0x82AE, 0x2C92E6887922)
 #define SPOTFLOW_RX_STREAM_UUID_ENCODED \
 	BT_UUID_128_ENCODE(0x26530006, 0x81E5, 0x4861, 0x82AE, 0x2C92E6887922)
+
+#define SPOTFLOW_BLE_ENABLE_RETRY_COUNT 3
+#define SPOTFLOW_BLE_ENABLE_RETRY_DELAY K_MSEC(200)
 
 static const struct bt_uuid_128 spotflow_service_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_SERVICE_UUID_ENCODED);
@@ -74,6 +80,7 @@ static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* 
 			       const void* buf, uint16_t len, uint16_t offset, uint8_t flags);
 static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value);
 static bool tx_session_active_locked(void);
+static int enable_bluetooth(void);
 static int start_advertising(void);
 static void restart_advertising_work_handler(struct k_work* work);
 static void connected(struct bt_conn* conn, uint8_t err);
@@ -109,14 +116,10 @@ int spotflow_ble_transport_start_impl(void)
 	}
 
 	if (!g_spotflow_ble_transport_state.bluetooth_enabled) {
-		int rc = bt_enable(NULL);
-		if (rc != 0 && rc != -EALREADY) {
-			LOG_ERR("Failed to enable Bluetooth: %d", rc);
+		int rc = enable_bluetooth();
+		if (rc != 0) {
 			return rc;
 		}
-
-		g_spotflow_ble_transport_state.bluetooth_enabled = true;
-		LOG_INF("Bluetooth enabled for Spotflow BLE transport");
 	}
 
 	return start_advertising();
@@ -219,6 +222,41 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 static bool tx_session_active_locked(void)
 {
 	return g_spotflow_ble_transport_state.tx.notifications_enabled;
+}
+
+static int enable_bluetooth(void)
+{
+	int rc;
+
+	for (int attempt = 0; attempt <= SPOTFLOW_BLE_ENABLE_RETRY_COUNT; attempt++) {
+		rc = bt_enable(NULL);
+		if (rc != -ENODEV) {
+			break;
+		}
+
+		if (attempt < SPOTFLOW_BLE_ENABLE_RETRY_COUNT) {
+			LOG_WRN("Bluetooth HCI device not ready, retrying: %d", rc);
+			k_sleep(SPOTFLOW_BLE_ENABLE_RETRY_DELAY);
+		}
+	}
+
+	if (rc != 0 && rc != -EALREADY) {
+		LOG_ERR("Failed to enable Bluetooth: %d", rc);
+		return rc;
+	}
+
+#if IS_ENABLED(CONFIG_BT_SETTINGS)
+	rc = settings_load_subtree("bt");
+	if (rc != 0) {
+		LOG_ERR("Failed to load Bluetooth settings: %d", rc);
+		return rc;
+	}
+#endif
+
+	g_spotflow_ble_transport_state.bluetooth_enabled = true;
+	LOG_INF("Bluetooth enabled for Spotflow BLE transport");
+
+	return 0;
 }
 
 static int start_advertising(void)
