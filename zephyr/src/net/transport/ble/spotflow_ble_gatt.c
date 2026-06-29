@@ -82,6 +82,7 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value);
 static bool tx_session_active_locked(void);
 static int enable_bluetooth(void);
 static int start_advertising(void);
+static void schedule_advertising_retry(void);
 static void restart_advertising_work_handler(struct k_work* work);
 static void connected(struct bt_conn* conn, uint8_t err);
 static void disconnected(struct bt_conn* conn, uint8_t reason);
@@ -122,7 +123,13 @@ int spotflow_ble_transport_start_impl(void)
 		}
 	}
 
-	return start_advertising();
+	int rc = start_advertising();
+	if (rc != 0) {
+		LOG_WRN("Failed to start BLE advertising: %d", rc);
+		schedule_advertising_retry();
+	}
+
+	return 0;
 }
 
 const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void)
@@ -274,6 +281,12 @@ static int start_advertising(void)
 	return rc;
 }
 
+static void schedule_advertising_retry(void)
+{
+	(void)k_work_reschedule(&g_spotflow_ble_transport_state.restart_advertising_work,
+				K_SECONDS(1));
+}
+
 static void restart_advertising_work_handler(struct k_work* work)
 {
 	ARG_UNUSED(work);
@@ -289,8 +302,7 @@ static void restart_advertising_work_handler(struct k_work* work)
 	int rc = start_advertising();
 	if (rc != 0) {
 		LOG_WRN("Failed to restart BLE advertising: %d", rc);
-		(void)k_work_reschedule(&g_spotflow_ble_transport_state.restart_advertising_work,
-					K_SECONDS(1));
+		schedule_advertising_retry();
 	}
 }
 
