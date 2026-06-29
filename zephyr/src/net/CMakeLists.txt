@@ -24,6 +24,7 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_BLE
 
 if(CONFIG_SPOTFLOW_TRANSPORT_MQTT)
     if (NOT CONFIG_SPOTFLOW_INGEST_KEY)
-        message(FATAL_ERROR "CONFIG_SPOTFLOW_INGEST_KEY must be specified when CONFIG_SPOTFLOW_TRANSPORT_MQTT is enabled")
+        message(FATAL_ERROR "CONFIG_SPOTFLOW_INGEST_KEY must be specified "
+        "when CONFIG_SPOTFLOW_TRANSPORT_MQTT is enabled")
     endif()
 endif()

@@ -18,7 +18,6 @@ bool spotflow_ble_transport_is_ready(void)
 	return ready;
 }
 
-
 int spotflow_ble_transport_send_ingest_cbor(uint8_t* payload, size_t len)
 {
 	return spotflow_ble_transport_send_framed_message(
