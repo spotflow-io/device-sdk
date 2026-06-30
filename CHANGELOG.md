@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added Metrics in ESP IDF
 * Added initial Zephyr BLE transport with a Spotflow GATT service for session metadata, telemetry notifications, and desired/reported configuration exchange. Current BLE support covers logs, metrics, and configuration framing
 * Added Zephyr BLE transport support for coredump telemetry chunks.
+* Added coredump support for siwx917
+* Added coredump support for saving coredump to memory
 
 
 ### Fixed

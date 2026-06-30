@@ -11,6 +11,10 @@ FUNC_NORETURN void k_sys_fatal_error_handler(unsigned int reason, const struct a
 	ARG_UNUSED(esf);
 	LOG_PANIC();
 	LOG_ERR("Halting system");
+#ifdef CONFIG_DEBUG_COREDUMP_BACKEND_IN_MEMORY
+	sys_reboot(SYS_REBOOT_WARM);
+#else
 	sys_reboot(SYS_REBOOT_COLD);
+#endif
 	CODE_UNREACHABLE;
 }

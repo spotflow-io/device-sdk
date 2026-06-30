@@ -104,11 +104,17 @@ static void spotflow_coredumps_thread_entry(void)
 			LOG_ERR("Failed to copy dump (%d)", copied);
 			return;
 		}
+
+		/* different behavior for in-memory debugging then documented for COREDUMP_CMD_COPY_STORED_DUMP */
+#ifdef CONFIG_DEBUG_COREDUMP_BACKEND_IN_MEMORY
+		copied = chunk_length;
+#else
 		if (copied != chunk_length) {
-			LOG_ERR("Incorrect chunk size copied: expected %d, got %d", chunk_length,
+			LOG_ERR("Incorrect chunk size copied: expected %zu, got %d", chunk_length,
 				copied);
 			return;
 		}
+#endif
 
 		bool is_last_chunk = (coredump_info.offset + copied) >= coredump_info.size;
 		if (is_last_chunk) {
