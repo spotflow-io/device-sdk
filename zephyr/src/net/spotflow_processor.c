@@ -2,7 +2,6 @@
 #include <zephyr/logging/log.h>
 
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
-#include "config/spotflow_config.h"
 #include "config/spotflow_config_net.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 #if CONFIG_SPOTFLOW_TRANSPORT_MQTT

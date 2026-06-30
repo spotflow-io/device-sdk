@@ -1,6 +1,5 @@
 #include "spotflow_ble_transport_internal.h"
 
-#include <errno.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>

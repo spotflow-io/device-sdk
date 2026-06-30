@@ -1,7 +1,6 @@
 #ifndef SPOTFLOW_CONFIG_H
 #define SPOTFLOW_CONFIG_H
 
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

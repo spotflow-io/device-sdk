@@ -2,6 +2,7 @@
 #define SPOTFLOW_CONFIG_CBOR_H
 
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 #define SPOTFLOW_CONFIG_RESPONSE_MAX_LENGTH 32
