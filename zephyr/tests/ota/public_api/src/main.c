@@ -99,7 +99,7 @@ ZTEST(spotflow_ota_public_api, test_public_ota_functions_are_linkable)
 	zassert_equal(spotflow_get_main_firmware_update_info(&info, &request), -ENOENT);
 	zassert_equal(spotflow_pause_main_firmware_update(&state), -ENOTSUP);
 	zassert_equal(spotflow_resume_main_firmware_update(&state), -ENOTSUP);
-	zassert_equal(spotflow_fail_main_firmware_update(&state), -ENOTSUP);
+	zassert_equal(spotflow_abort_main_firmware_update(&state), -ENOTSUP);
 	zassert_equal(spotflow_confirm_main_firmware_image(&state), -ENOTSUP);
 }
 

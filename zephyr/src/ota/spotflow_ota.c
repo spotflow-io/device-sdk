@@ -337,7 +337,7 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
 #endif
 }
 
-int spotflow_fail_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
+int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
 {
 #if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	if (state != NULL) {

@@ -123,7 +123,7 @@ bool spotflow_is_update_canceled(void);
  * as download completion or entering the unconfirmed phase. Not invoked for
  * changes caused directly by @ref spotflow_pause_main_firmware_update,
  * @ref spotflow_resume_main_firmware_update, or
- * @ref spotflow_fail_main_firmware_update.
+ * @ref spotflow_abort_main_firmware_update.
  *
  * The default (weak) implementation is a no-op.
  *
@@ -217,18 +217,19 @@ int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state*
 int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state* state);
 
 /**
- * @brief Request failure of the automatic main-firmware update.
+ * @brief Abort the automatic main-firmware update.
  *
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. Applies
  * only while the phase is @c SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD,
  * @c SPOTFLOW_OTA_PHASE_DOWNLOADING, or @c SPOTFLOW_OTA_PHASE_PENDING_UPGRADE.
- * Cannot fail an update in @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT because the
+ * Cannot abort an update in @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT because the
  * MCUboot test upgrade has already been requested, or in
  * @c SPOTFLOW_OTA_PHASE_UNCONFIRMED; use @ref spotflow_confirm_main_firmware_image
  * after reboot or allow rollback handling on the next boot.
  *
  * When a download is active or the update is paused between phases, the call
- * returns @c 0 immediately and the failure completes asynchronously.
+ * returns @c 0 immediately and the aborted update completes asynchronously with
+ * a failed result.
  *
  * When @p state is not NULL, the current main-firmware state is written on
  * return, including after errors.
@@ -237,15 +238,15 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
  *
  * @param state Optional out parameter for the resulting snapshot.
  *
- * @retval 0 Failure accepted (completed now or asynchronously).
+ * @retval 0 Abort accepted (completed now or asynchronously).
  * @retval -EINVAL No active main-firmware update, or phase is
  *         @c SPOTFLOW_OTA_PHASE_NOT_RUNNING, @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT, or
  *         @c SPOTFLOW_OTA_PHASE_UNCONFIRMED.
  * @retval -ENOTSUP Automatic main-firmware handling is disabled.
- * @retval <0 Negative errno when OTA initialization or persisting the failure
+ * @retval <0 Negative errno when OTA initialization or persisting the failed
  *         result fails.
  */
-int spotflow_fail_main_firmware_update(struct spotflow_ota_main_firmware_state* state);
+int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state* state);
 
 /**
  * @brief Confirm the running main-firmware image after a test upgrade.
