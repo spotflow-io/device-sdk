@@ -19,7 +19,7 @@
 #endif
 
 /* System metric names */
-#define SPOTFLOW_METRIC_NAME_CONNECTION "connection_mqtt_connected"
+#define SPOTFLOW_METRIC_NAME_CONNECTION "connection_transport_connected"
 #define SPOTFLOW_METRIC_NAME_HEAP_FREE "heap_free_bytes"
 #define SPOTFLOW_METRIC_NAME_HEAP_ALLOCATED "heap_allocated_bytes"
 #define SPOTFLOW_METRIC_NAME_CPU "cpu_utilization_percent"
@@ -47,9 +47,9 @@ extern "C" {
 int spotflow_metrics_system_init(void);
 
 /**
- * @brief Report MQTT connection state change
+ * @brief Report transport connection state change
  *
- * Called by MQTT layer when connection state changes.
+ * Called by transport-specific code when connection state changes.
  * Immediately reports connection state as event metric.
  *
  * @param connected True if connected, false if disconnected

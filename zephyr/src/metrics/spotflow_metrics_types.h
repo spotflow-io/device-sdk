@@ -136,9 +136,9 @@ struct metric_aggregator_context {
 };
 
 /**
- * @brief MQTT message structure (internal use)
+ * @brief Queued metric message (internal use)
  */
-struct spotflow_mqtt_metrics_msg {
+struct spotflow_metric_msg {
 	uint8_t* payload; /* CBOR-encoded message */
 	size_t len; /* Payload length */
 };

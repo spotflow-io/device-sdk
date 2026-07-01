@@ -3,6 +3,7 @@
 #include "spotflow_build_id.h"
 #include "coredumps/spotflow_coredumps_cbor.h"
 #include "net/spotflow_processor.h"
+#include "net/spotflow_transport.h"
 #include "zephyr/random/random.h"
 
 #include <zephyr/kernel.h>
@@ -11,13 +12,13 @@
 
 LOG_MODULE_REGISTER(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL);
 
-K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_mqtt_coredumps_msg*),
+K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_coredump_msg*),
 	      CONFIG_SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE, 1);
 
 /*expected stack size should be under 200B, therefore 1024 should be safe*/
 #define STACK_SIZE 1024
 /*same priority as mqtt processing thread*/
-#define THREAD_PRIO SPOTFLOW_MQTT_THREAD_PRIORITY
+#define THREAD_PRIO SPOTFLOW_THREAD_PRIORITY
 
 static void spotflow_coredumps_thread_entry(void);
 
@@ -43,7 +44,7 @@ struct coredump_info {
 static struct coredump_info coredump_info;
 
 /* blocks forever until space is available */
-static int enqueue_log_msg(const struct spotflow_mqtt_coredumps_msg* msg)
+static int enqueue_coredump_msg(const struct spotflow_coredump_msg* msg)
 {
 	int rc = k_msgq_put(&g_spotflow_core_dumps_msgq, &msg, K_FOREVER);
 	return rc;
@@ -103,11 +104,17 @@ static void spotflow_coredumps_thread_entry(void)
 			LOG_ERR("Failed to copy dump (%d)", copied);
 			return;
 		}
+
+		/* different behavior for in-memory debugging then documented for COREDUMP_CMD_COPY_STORED_DUMP */
+#ifdef CONFIG_DEBUG_COREDUMP_BACKEND_IN_MEMORY
+		copied = chunk_length;
+#else
 		if (copied != chunk_length) {
-			LOG_ERR("Incorrect chunk size copied: expected %d, got %d", chunk_length,
+			LOG_ERR("Incorrect chunk size copied: expected %zu, got %d", chunk_length,
 				copied);
 			return;
 		}
+#endif
 
 		bool is_last_chunk = (coredump_info.offset + copied) >= coredump_info.size;
 		if (is_last_chunk) {
@@ -133,9 +140,9 @@ static void spotflow_coredumps_thread_entry(void)
 		int64_t device_uptime_ms = k_uptime_get();
 
 		rc = spotflow_cbor_encode_coredump(
-		    coredump_info.buffer, copied, coredump_info.chunk_ordinal,
-		    coredump_info.coredump_id, is_last_chunk, build_id, build_id_len,
-		    device_uptime_ms, &cbor_data, &cbor_data_len);
+			coredump_info.buffer, copied, coredump_info.chunk_ordinal,
+			coredump_info.coredump_id, is_last_chunk, build_id, build_id_len,
+			device_uptime_ms, &cbor_data, &cbor_data_len);
 
 		if (rc < 0) {
 			LOG_DBG("Failed to encode core dump message: %d", rc);
@@ -143,8 +150,7 @@ static void spotflow_coredumps_thread_entry(void)
 		}
 
 		/* Fill the queue with a full chunk */
-		struct spotflow_mqtt_coredumps_msg* msg =
-		    k_malloc(sizeof(struct spotflow_mqtt_coredumps_msg));
+		struct spotflow_coredump_msg* msg = k_malloc(sizeof(struct spotflow_coredump_msg));
 		if (!msg) {
 			LOG_DBG("Failed to allocate memory for message");
 			k_free(cbor_data);
@@ -156,7 +162,7 @@ static void spotflow_coredumps_thread_entry(void)
 		msg->len = cbor_data_len;
 		msg->coredump_last_chunk = is_last_chunk;
 
-		rc = enqueue_log_msg(msg);
+		rc = enqueue_coredump_msg(msg);
 		if (rc < 0) {
 			LOG_ERR("Failed to enqueue coredump chunk: %d", rc);
 			k_free(cbor_data);

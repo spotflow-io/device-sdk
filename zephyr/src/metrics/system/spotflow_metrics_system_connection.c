@@ -12,9 +12,9 @@ static struct spotflow_metric_int* g_connection_state_metric;
 
 int spotflow_metrics_system_connection_init(void)
 {
-	int rc =
-	    spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_CONNECTION,
-					 SPOTFLOW_AGG_INTERVAL_NONE, &g_connection_state_metric);
+	int rc = spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_CONNECTION,
+					      SPOTFLOW_AGG_INTERVAL_NONE,
+					      &g_connection_state_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register connection state metric: %d", rc);
 		return rc;
@@ -39,5 +39,5 @@ void spotflow_metrics_system_connection_report(bool connected)
 		return;
 	}
 
-	LOG_DBG("MQTT connection state: %s", connected ? "connected" : "disconnected");
+	LOG_DBG("Transport connection state: %s", connected ? "connected" : "disconnected");
 }

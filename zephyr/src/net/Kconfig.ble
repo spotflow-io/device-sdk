@@ -1,0 +1,30 @@
+config SPOTFLOW_TRANSPORT_BLE
+	bool "BLE gateway transport"
+	select BT
+	select BT_PERIPHERAL
+
+if SPOTFLOW_TRANSPORT_BLE
+
+configdefault BT_L2CAP_TX_MTU
+	default 247
+	help
+		Use the common high-throughput BLE 4.2+ ATT MTU value. With the 3-byte
+		ATT notification header this leaves 244 bytes for application payload,
+		and together with the 4-byte L2CAP header it fits in a 251-byte ACL data
+		packet.
+
+configdefault BT_BUF_ACL_TX_SIZE
+	default 251
+	help
+		Use a full data-length ACL TX buffer. This matches the common BLE Data
+		Length Extension maximum and lets a 247-byte ATT MTU plus the 4-byte
+		L2CAP header fit into one ACL data packet.
+
+configdefault BT_BUF_ACL_RX_SIZE
+	default 251
+	help
+		Keep the ACL RX buffer aligned with the TX side and with the common
+		247-byte ATT MTU case so incoming Spotflow control/config traffic is not
+		artificially constrained by smaller host receive buffers.
+
+endif # SPOTFLOW_TRANSPORT_BLE

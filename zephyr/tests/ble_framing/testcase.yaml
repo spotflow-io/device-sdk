@@ -1,0 +1,10 @@
+tests:
+  spotflow.ble_framing.tx:
+    integration_platforms:
+      - native_sim
+    platform_allow:
+      - native_sim
+    tags:
+      - spotflow
+      - bluetooth
+      - unit

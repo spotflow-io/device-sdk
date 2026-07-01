@@ -21,16 +21,16 @@ int spotflow_metrics_system_network_init(void)
 	int rc;
 
 	rc = spotflow_register_metric_int_with_labels(
-	    SPOTFLOW_METRIC_NAME_NETWORK_TX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
-	    CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_tx_metric);
+		SPOTFLOW_METRIC_NAME_NETWORK_TX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+		CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_tx_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register network TX metric: %d", rc);
 		return rc;
 	}
 
 	rc = spotflow_register_metric_int_with_labels(
-	    SPOTFLOW_METRIC_NAME_NETWORK_RX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
-	    CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_rx_metric);
+		SPOTFLOW_METRIC_NAME_NETWORK_RX, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+		CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK_MAX_INTERFACES, 1, &g_network_rx_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register network RX metric: %d", rc);
 		return rc;
@@ -81,14 +81,14 @@ static void report_network_interface_metrics(struct net_if* iface, void* user_da
 
 	struct spotflow_label labels[] = { { .key = "interface", .value = if_name } };
 
-	int rc =
-	    spotflow_report_metric_int_with_labels(g_network_tx_metric, tx_bytes_capped, labels, 1);
+	int rc = spotflow_report_metric_int_with_labels(g_network_tx_metric, tx_bytes_capped,
+							labels, 1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report network TX for %s: %d", if_name, rc);
 	}
 
-	rc =
-	    spotflow_report_metric_int_with_labels(g_network_rx_metric, rx_bytes_capped, labels, 1);
+	rc = spotflow_report_metric_int_with_labels(g_network_rx_metric, rx_bytes_capped, labels,
+						    1);
 	if (rc < 0) {
 		LOG_ERR("Failed to report network RX for %s: %d", if_name, rc);
 	}

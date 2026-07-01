@@ -1,61 +1,60 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-#include <zephyr/net/conn_mgr_connectivity.h>
-#include <zephyr/net/socket.h>
 
-#include "config/spotflow_config.h"
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config_net.h"
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
+#include "net/transport/mqtt/spotflow_mqtt_session.h"
+#endif
+
 #include "net/spotflow_processor.h"
-#include "net/spotflow_mqtt.h"
-#include "net/spotflow_connection_helper.h"
-#include "net/spotflow_session_metadata.h"
-#include "net/spotflow_tls.h"
+#include "net/spotflow_transport.h"
 
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 #include "coredumps/spotflow_coredumps_net.h"
 #endif /* CONFIG_SPOTFLOW_COREDUMPS */
 
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
-#include "logging/spotflow_log_net.h"
+#include "logging/spotflow_log_processor.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 
 #ifdef CONFIG_SPOTFLOW_METRICS
 #include "metrics/spotflow_metrics_net.h"
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
-#include "../metrics/system/spotflow_metrics_system.h"
+#include "metrics/system/spotflow_metrics_system.h"
 #endif
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
-#include "../metrics/spotflow_metrics_heartbeat.h"
+#include "metrics/spotflow_metrics_heartbeat.h"
 #endif
 #endif /* CONFIG_SPOTFLOW_METRICS */
 
-#define APP_CONNECT_TIMEOUT_MS 10000
-
-#define LOG_DBG_PRINT_RESULT(func, rc) LOG_DBG("%s: %d <%s>", (func), rc, RC_STR(rc))
-
 LOG_MODULE_REGISTER(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-static void spotflow_mqtt_thread_entry(void);
-static void process_mqtt();
+static void spotflow_processing_thread_entry(void);
+static int process_config_coredumps_metrics_or_logs(void);
+#if !CONFIG_SPOTFLOW_TRANSPORT_MQTT
+static void process_transport_loop(void);
+#endif
 
-K_THREAD_DEFINE(spotflow_mqtt_thread, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE,
-		spotflow_mqtt_thread_entry, NULL, NULL, NULL, SPOTFLOW_MQTT_THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(spotflow_processing_thread, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE,
+		spotflow_processing_thread_entry, NULL, NULL, NULL, SPOTFLOW_THREAD_PRIORITY, 0, 0);
 
-void spotflow_start_mqtt(void)
+void spotflow_start_processing(void)
 {
-	k_thread_start(spotflow_mqtt_thread);
-	LOG_DBG("Thread started with priority %d and stack size %d", SPOTFLOW_MQTT_THREAD_PRIORITY,
+	k_thread_start(spotflow_processing_thread);
+	LOG_DBG("Thread started with priority %d and stack size %d", SPOTFLOW_THREAD_PRIORITY,
 		CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE);
 }
 
-static void spotflow_mqtt_thread_entry(void)
+static void spotflow_processing_thread_entry(void)
 {
 	LOG_DBG("Starting Spotflow processing thread");
 
 #ifdef CONFIG_SPOTFLOW_METRICS
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
 	/* Initialize system metrics early so they start collecting at boot,
-	 * before network connection is established */
+	 * before transport connection is established. */
 	int rc_sys_metrics = spotflow_metrics_system_init();
 	if (rc_sys_metrics < 0) {
 		LOG_ERR("Failed to initialize system metrics: %d", rc_sys_metrics);
@@ -63,11 +62,12 @@ static void spotflow_mqtt_thread_entry(void)
 #endif
 #endif
 
-	wait_for_network();
+	int rc = spotflow_transport_start();
+	if (rc < 0) {
+		LOG_ERR("Failed to start Spotflow transport: %d", rc);
+		return;
+	}
 
-	spotflow_tls_init();
-
-	LOG_DBG("Spotflow registered TLS credentials");
 #ifdef CONFIG_SPOTFLOW_METRICS
 	spotflow_metrics_net_init();
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
@@ -75,28 +75,33 @@ static void spotflow_mqtt_thread_entry(void)
 #endif
 #endif
 
-	/* 1) OUTER LOOP: keep trying until mqtt_connected == true, reconnect if connection failed */
+#if CONFIG_SPOTFLOW_TRANSPORT_MQTT
+	spotflow_mqtt_session_loop(process_config_coredumps_metrics_or_logs);
+#else
 	while (true) {
-		spotflow_mqtt_establish_mqtt();
-
-		process_mqtt();
+		process_transport_loop();
 	}
+#endif
 }
 
-static int process_config_coredumps_or_logs()
+static int process_config_coredumps_metrics_or_logs(void)
 {
-	int rc = spotflow_config_send_pending_message();
+	int rc = 0;
+
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+	rc = spotflow_config_send_pending_message();
 	if (rc < 0) {
 		LOG_DBG("Failed to send pending configuration message: %d", rc);
 		return rc;
 	}
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 	rc = spotflow_poll_and_process_enqueued_coredump_chunks();
 	if (rc < 0) {
 		LOG_DBG("Failed to process coredumps: %d", rc);
 		return rc;
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_COREDUMPS */
 #ifdef CONFIG_SPOTFLOW_METRICS
 	/* Process metrics after coredumps, before logs */
 	if (rc == 0) {
@@ -106,7 +111,7 @@ static int process_config_coredumps_or_logs()
 			return rc;
 		}
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_METRICS */
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	/* rc > 0 means core dumps or metrics were sent
 	 *	-> doing mqtt routine and continue with core dumps/metrics sending
@@ -123,45 +128,19 @@ static int process_config_coredumps_or_logs()
 	return rc;
 }
 
-static void process_mqtt()
+#if !CONFIG_SPOTFLOW_TRANSPORT_MQTT
+static void process_transport_loop(void)
 {
-	int rc;
-	rc = spotflow_session_metadata_send();
-	if (rc < 0) {
-		LOG_WRN("Failed to send session metadata, aborting MQTT: %d", rc);
-		spotflow_mqtt_abort_mqtt();
+	int rc = process_config_coredumps_metrics_or_logs();
+
+	if (rc == 0 || rc == -EAGAIN) {
+		k_sleep(K_MSEC(100));
 		return;
 	}
 
-	rc = spotflow_config_init_session();
 	if (rc < 0) {
-		LOG_WRN("Failed to initialize configuration updating: %d", rc);
-	}
-
-	/*  INNER LOOP: perform normal MQTT I/O until an error occurs. */
-	while (spotflow_mqtt_is_connected()) {
-		rc = spotflow_mqtt_poll();
-		if (rc < 0) {
-			spotflow_mqtt_abort_mqtt();
-			break; /* break out of the inner loop; outer loop will reconnect */
-		}
-
-		rc = process_config_coredumps_or_logs();
-		if (rc == -EAGAIN) {
-			/* Transient: MQTT busy, retry on next iteration */
-			continue;
-		}
-		if (rc < 0) {
-			/* Problem in sending/mqtt_publish, reestablishing MQTT Connection*/
-			break;
-		}
-
-		/* -- Let the MQTT library do any keep‐alive or retry logic. */
-		rc = spotflow_mqtt_send_live();
-		if (rc < 0) {
-			LOG_DBG("mqtt_live() returned error %d → reconnecting", rc);
-			spotflow_mqtt_abort_mqtt();
-			break;
-		}
+		LOG_DBG("Failed to process transport loop: %d", rc);
+		k_sleep(K_MSEC(100));
 	}
 }
+#endif

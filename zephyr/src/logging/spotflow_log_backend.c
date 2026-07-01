@@ -17,7 +17,7 @@ LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL)
 /* https://docs.zephyrproject.org/apidoc/latest/group__msgq__apis.html
  * Alignment of the message queue's ring buffer is not necessary,
  * setting q_align to 1 is sufficient.*/
-K_MSGQ_DEFINE(g_spotflow_logs_msgq, sizeof(struct spotflow_mqtt_logs_msg*),
+K_MSGQ_DEFINE(g_spotflow_logs_msgq, sizeof(struct spotflow_log_msg*),
 	      CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE, 1);
 
 struct spotflow_log_context {
@@ -50,8 +50,7 @@ LOG_BACKEND_DEFINE(log_backend_spotflow, log_backend_spotflow_api, true /* autos
 		   &spotflow_log_ctx);
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 
-static int enqueue_log_msg(const struct spotflow_mqtt_logs_msg* msg,
-			   struct spotflow_log_context* ctx);
+static int enqueue_log_msg(const struct spotflow_log_msg* msg, struct spotflow_log_context* ctx);
 
 static void process_single_message_stats_update(struct spotflow_log_context* context, bool dropped);
 
@@ -84,7 +83,7 @@ static void init(const struct log_backend* const backend)
 
 	spotflow_config_init();
 
-	spotflow_start_mqtt();
+	spotflow_start_processing();
 
 	LOG_INF("Spotflow logging backend initialized.");
 }
@@ -114,8 +113,8 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 	}
 
 	/* Allocate memory for the message structure */
-	struct spotflow_mqtt_logs_msg* mqtt_msg = k_malloc(sizeof(struct spotflow_mqtt_logs_msg));
-	if (!mqtt_msg) {
+	struct spotflow_log_msg* queued_msg = k_malloc(sizeof(struct spotflow_log_msg));
+	if (!queued_msg) {
 		LOG_DBG("Failed to allocate memory for message");
 		k_free(cbor_data);
 		process_single_message_stats_update(ctx, true /* dropped */);
@@ -123,14 +122,14 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 	}
 
 	/* Set up the message */
-	mqtt_msg->payload = cbor_data;
-	mqtt_msg->len = cbor_data_len;
+	queued_msg->payload = cbor_data;
+	queued_msg->len = cbor_data_len;
 
 	/* Enqueue the message (passing pointer) */
-	if (enqueue_log_msg(mqtt_msg, ctx) < 0) {
+	if (enqueue_log_msg(queued_msg, ctx) < 0) {
 		LOG_DBG("Unable to put message in queue, dropping");
-		k_free(mqtt_msg->payload);
-		k_free(mqtt_msg);
+		k_free(queued_msg->payload);
+		k_free(queued_msg);
 		process_single_message_stats_update(ctx, true /* dropped */);
 	} else {
 		process_single_message_stats_update(ctx, false /* dropped */);
@@ -153,8 +152,7 @@ static void dropped(const struct log_backend* const backend, uint32_t cnt)
 static int drop_log_msg_from_queue(struct spotflow_log_context* ctx);
 
 /* Helper that will drop & free the oldest if queue is full */
-static int enqueue_log_msg(const struct spotflow_mqtt_logs_msg* msg,
-			   struct spotflow_log_context* ctx)
+static int enqueue_log_msg(const struct spotflow_log_msg* msg, struct spotflow_log_context* ctx)
 {
 	int rc = k_msgq_put(&g_spotflow_logs_msgq, &msg, K_NO_WAIT);
 	if (rc == -ENOMSG) {
@@ -175,7 +173,7 @@ static int drop_log_msg_from_queue(struct spotflow_log_context* ctx)
 	char* old;
 	int rc = k_msgq_get(&g_spotflow_logs_msgq, &old, K_NO_WAIT);
 	if (rc == 0) {
-		struct spotflow_mqtt_logs_msg* old_msg = (struct spotflow_mqtt_logs_msg*)old;
+		struct spotflow_log_msg* old_msg = (struct spotflow_log_msg*)old;
 		k_free(old_msg->payload);
 		k_free(old_msg);
 

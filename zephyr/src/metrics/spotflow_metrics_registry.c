@@ -319,9 +319,9 @@ static int register_metric_common(const char* name, enum spotflow_metric_type ty
 
 	LOG_INF("Registered metric '%s' (type=%s, agg=%d, max_ts=%u, max_labels=%u)",
 		normalized_name,
-		(type == SPOTFLOW_METRIC_TYPE_INT)	   ? "int"
-		    : (type == SPOTFLOW_METRIC_TYPE_FLOAT) ? "float"
-							   : "unknown",
+		(type == SPOTFLOW_METRIC_TYPE_INT)	       ? "int"
+			: (type == SPOTFLOW_METRIC_TYPE_FLOAT) ? "float"
+							       : "unknown",
 		metric->agg_interval, max_timeseries, max_labels);
 
 	*metric_out = metric;

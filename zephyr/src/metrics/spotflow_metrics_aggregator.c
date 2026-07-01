@@ -1,5 +1,6 @@
 #include "spotflow_metrics_aggregator.h"
 #include "spotflow_metrics_cbor.h"
+#include "net/spotflow_transport.h"
 
 #include <inttypes.h>
 #include <zephyr/kernel.h>
@@ -262,7 +263,7 @@ static void aggregation_timer_handler(struct k_work* work)
 {
 	struct k_work_delayable* dwork = k_work_delayable_from_work(work);
 	struct metric_aggregator_context* ctx =
-	    CONTAINER_OF(dwork, struct metric_aggregator_context, aggregation_work);
+		CONTAINER_OF(dwork, struct metric_aggregator_context, aggregation_work);
 
 	struct spotflow_metric_base* metric = ctx->metric;
 
@@ -494,7 +495,7 @@ static int enqueue_metric_message(uint8_t* payload, size_t len)
 	}
 
 	/* Allocate message structure */
-	struct spotflow_mqtt_metrics_msg* msg = k_malloc(sizeof(*msg));
+	struct spotflow_metric_msg* msg = k_malloc(sizeof(*msg));
 	if (!msg) {
 		return -ENOMEM;
 	}

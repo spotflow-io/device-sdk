@@ -46,9 +46,9 @@ void spotflow_config_persistence_try_save(struct spotflow_config_persisted_setti
 {
 	if (settings->contains_sent_log_level) {
 		/* This function writes the value only if it has changed */
-		int rc =
-		    settings_save_one(SPOTFLOW_SETTINGS_PATH_SENT_LOG_LEVEL,
-				      &settings->sent_log_level, sizeof(settings->sent_log_level));
+		int rc = settings_save_one(SPOTFLOW_SETTINGS_PATH_SENT_LOG_LEVEL,
+					   &settings->sent_log_level,
+					   sizeof(settings->sent_log_level));
 		if (rc < 0) {
 			LOG_ERR("Failed to persist sent log level setting: %d", rc);
 		} else {
@@ -68,8 +68,8 @@ static int settings_direct_load_callback(const char* key, size_t len, settings_r
 			return -EINVAL;
 		}
 
-		int ret =
-		    read_cb(cb_arg, &settings->sent_log_level, sizeof(settings->sent_log_level));
+		int ret = read_cb(cb_arg, &settings->sent_log_level,
+				  sizeof(settings->sent_log_level));
 		if (ret < 0) {
 			LOG_ERR("Failed to read sent log level setting: %d", ret);
 		} else {

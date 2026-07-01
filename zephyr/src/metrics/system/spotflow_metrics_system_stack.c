@@ -34,8 +34,8 @@ int spotflow_metrics_system_stack_init(void)
 	}
 
 	rc = spotflow_register_metric_float_with_labels(
-	    SPOTFLOW_METRIC_NAME_STACK_USED_PERCENT, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
-	    max_threads, 1, &g_stack_used_percent_metric);
+		SPOTFLOW_METRIC_NAME_STACK_USED_PERCENT, SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+		max_threads, 1, &g_stack_used_percent_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register stack used percent metric: %d", rc);
 		return rc;
@@ -152,7 +152,7 @@ static void report_thread_stack(const struct k_thread* thread, void* user_data)
 
 	// TODO: Replace with spotflow_report_metric_uint64 when available
 	int64_t unused_bytes_capped =
-	    (unused_bytes > INT64_MAX) ? INT64_MAX : (int64_t)unused_bytes;
+		(unused_bytes > INT64_MAX) ? INT64_MAX : (int64_t)unused_bytes;
 
 	rc = spotflow_report_metric_int_with_labels(g_stack_free_metric, unused_bytes_capped,
 						    labels, 1);
