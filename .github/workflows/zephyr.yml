@@ -29,89 +29,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  unit-tests:
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout manifest
-        uses: actions/checkout@v6
-        with:
-          path: temp-manifest
-          sparse-checkout: zephyr/manifests/west-zephyr-native-sim.yml
-          sparse-checkout-cone-mode: false
-
-      - name: Restore workspace dependencies
-        id: cache-restore-workspace
-        uses: actions/cache/restore@v4
-        with:
-          path: .
-          key: >-
-            zephyr-workspace-west-zephyr-native-sim.yml
-            ${{ hashFiles('temp-manifest/zephyr/manifests/west-zephyr-native-sim.yml') }}
-            unit-tests-${{ runner.os }}
-
-      - name: Create Python virtual environment
-        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
-        run: python -m venv .venv
-
-      - name: Activate Python virtual environment
-        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
-
-      - name: Install West
-        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
-        run: pip install west
-
-      - name: Create workspace
-        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
-        run: |
-          west init \
-            --manifest-url ${{ github.server_url }}/${{ github.repository }} \
-            --clone-opt=--revision=${{ github.sha }} \
-            --manifest-file zephyr/manifests/west-zephyr-native-sim.yml \
-            .
-          west update --fetch-opt=--depth=1 --narrow
-
-      - name: Checkout Spotflow module
-        if: steps.cache-restore-workspace.outputs.cache-hit == 'true'
-        uses: actions/checkout@v6
-        with:
-          path: modules/lib/spotflow
-
-      - name: Install Python packages
-        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
-        run: west packages pip --install --ignore-venv-check
-
-      - name: Cache workspace dependencies
-        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: .
-          key: >-
-            zephyr-workspace-west-zephyr-native-sim.yml
-            ${{ hashFiles('temp-manifest/zephyr/manifests/west-zephyr-native-sim.yml') }}
-            unit-tests-${{ runner.os }}
-
-      - name: Cache Zephyr SDK
-        id: cache-sdk
-        uses: actions/cache@v4
-        with:
-          path: ~/zephyr-sdk-1.0.1
-          key: zephyr-sdk-1.0.1-native-sim-${{ runner.os }}
-
-      - name: Install SDK
-        if: steps.cache-sdk.outputs.cache-hit != 'true'
-        run: |
-          west sdk install \
-            --version 1.0.1 \
-            --toolchains x86_64-zephyr-elf \
-            --personal-access-token ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Install native simulator dependencies
-        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y gcc-multilib g++-multilib
-
-      - name: Run unit tests in native simulator
-        run: west twister -T modules/lib/spotflow/zephyr/tests -p native_sim --inline-logs
-
   generate-matrix:
     runs-on: ubuntu-latest
     outputs:
@@ -133,8 +50,7 @@ jobs:
 
   build:
     needs:
-      # - unit-tests
-      - generate-matrix
+        - generate-matrix
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -250,3 +166,84 @@ jobs:
         working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/${{ matrix.sample }}
         run: |
           west build --board ${{ matrix.board }} ${{ matrix.build_extra_args }}
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout manifest
+        uses: actions/checkout@v6
+        with:
+          path: temp-manifest
+          sparse-checkout: zephyr/manifests/west-zephyr-native-sim.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Restore workspace dependencies
+        id: cache-restore-workspace
+        uses: actions/cache/restore@v4
+        with:
+          path: .
+          key: >-
+            zephyr-workspace-west-zephyr-native-sim.yml
+            ${{ hashFiles('temp-manifest/zephyr/manifests/west-zephyr-native-sim.yml') }}
+            unit-tests-${{ runner.os }}
+
+      - name: Create Python virtual environment
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        run: python -m venv .venv
+
+      - name: Activate Python virtual environment
+        run: echo "$GITHUB_WORKSPACE/.venv/bin" >> $GITHUB_PATH
+
+      - name: Install West
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        run: pip install west
+
+      - name: Create workspace
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        run: |
+          west init \
+            --manifest-url ${{ github.server_url }}/${{ github.repository }} \
+            --clone-opt=--revision=${{ github.sha }} \
+            --manifest-file zephyr/manifests/west-zephyr-native-sim.yml \
+            .
+          west update --fetch-opt=--depth=1 --narrow
+
+      - name: Checkout Spotflow module
+        if: steps.cache-restore-workspace.outputs.cache-hit == 'true'
+        uses: actions/checkout@v6
+        with:
+          path: modules/lib/spotflow
+
+      - name: Install Python packages
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        run: west packages pip --install --ignore-venv-check
+
+      - name: Cache workspace dependencies
+        if: steps.cache-restore-workspace.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: .
+          key: >-
+            zephyr-workspace-west-zephyr-native-sim.yml
+            ${{ hashFiles('temp-manifest/zephyr/manifests/west-zephyr-native-sim.yml') }}
+            unit-tests-${{ runner.os }}
+
+      - name: Cache Zephyr SDK
+        id: cache-sdk
+        uses: actions/cache@v4
+        with:
+          path: ~/zephyr-sdk-1.0.1
+          key: zephyr-sdk-1.0.1-native-sim-${{ runner.os }}
+
+      - name: Install SDK
+        if: steps.cache-sdk.outputs.cache-hit != 'true'
+        run: |
+          west sdk install \
+            --version 1.0.1 \
+            --toolchains x86_64-zephyr-elf \
+            --personal-access-token ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install native simulator dependencies
+        run: sudo apt-get update && sudo apt-get install --no-install-recommends -y gcc-multilib g++-multilib
+
+      - name: Run unit tests in native simulator
+        run: west twister -T modules/lib/spotflow/zephyr/tests -p native_sim --inline-logs

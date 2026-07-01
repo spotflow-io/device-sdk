@@ -58,7 +58,7 @@ ZTEST(spotflow_ble_framing, test_encode_single_frame)
 	zassert_equal(frame.data[2], 0x7A);
 	zassert_equal(frame.data[3], sizeof(payload));
 	zassert_equal(frame.data[4], 0x00);
-	zassert_mem_equal(&frame.data[5], payload, sizeof(payload), NULL);
+	zassert_mem_equal(&frame.data[5], payload, sizeof(payload));
 }
 
 ZTEST(spotflow_ble_framing, test_encode_multiple_frames)
@@ -82,12 +82,12 @@ ZTEST(spotflow_ble_framing, test_encode_multiple_frames)
 		zassert_equal(frame.data[2], 0x13);
 
 		if (offset == 0) {
-			zassert_true((frame.data[1] & SPOTFLOW_FRAME_IS_FIRST) != 0, NULL);
+			zassert_true((frame.data[1] & SPOTFLOW_FRAME_IS_FIRST) != 0);
 			zassert_equal(sys_get_le16(&frame.data[3]), sizeof(payload) - 1);
 			memcpy(&reassembled[reassembled_len], &frame.data[5], frame.len - 5);
 			reassembled_len += frame.len - 5;
 		} else {
-			zassert_true((frame.data[1] & SPOTFLOW_FRAME_IS_FIRST) == 0, NULL);
+			zassert_true((frame.data[1] & SPOTFLOW_FRAME_IS_FIRST) == 0);
 			memcpy(&reassembled[reassembled_len], &frame.data[3], frame.len - 3);
 			reassembled_len += frame.len - 3;
 		}
@@ -97,9 +97,9 @@ ZTEST(spotflow_ble_framing, test_encode_multiple_frames)
 	}
 
 	zassert_true(frame_count > 1, "expected fragmentation");
-	zassert_true((frame.data[1] & SPOTFLOW_FRAME_IS_LAST) != 0, NULL);
+	zassert_true((frame.data[1] & SPOTFLOW_FRAME_IS_LAST) != 0);
 	zassert_equal(reassembled_len, sizeof(payload) - 1);
-	zassert_mem_equal(reassembled, payload, sizeof(payload) - 1, NULL);
+	zassert_mem_equal(reassembled, payload, sizeof(payload) - 1);
 }
 
 ZTEST(spotflow_ble_framing, test_encode_rejects_too_small_capacity)
@@ -158,8 +158,8 @@ ZTEST(spotflow_ble_framing, test_decode_single_frame_desired_config)
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 1);
 	zassert_equal(callback_payload_len, sizeof(payload));
-	zassert_mem_equal(callback_payload, payload, sizeof(payload), NULL);
-	zassert_false(g_spotflow_ble_transport_state.config_rx.active, NULL);
+	zassert_mem_equal(callback_payload, payload, sizeof(payload));
+	zassert_false(g_spotflow_ble_transport_state.config_rx.active);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_multiple_frames_from_encoder)
@@ -188,8 +188,8 @@ ZTEST(spotflow_ble_framing, test_decode_multiple_frames_from_encoder)
 
 	zassert_equal(callback_count, 1);
 	zassert_equal(callback_payload_len, sizeof(payload) - 1);
-	zassert_mem_equal(callback_payload, payload, sizeof(payload) - 1, NULL);
-	zassert_false(g_spotflow_ble_transport_state.config_rx.active, NULL);
+	zassert_mem_equal(callback_payload, payload, sizeof(payload) - 1);
+	zassert_false(g_spotflow_ble_transport_state.config_rx.active);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_rejects_continuation_without_first)
@@ -230,14 +230,14 @@ ZTEST(spotflow_ble_framing, test_decode_sequence_mismatch_resets_state)
 	int rc = spotflow_ble_transport_process_config_rx_frame(
 		first_fragment, sizeof(first_fragment), BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
-	zassert_true(g_spotflow_ble_transport_state.config_rx.active, NULL);
+	zassert_true(g_spotflow_ble_transport_state.config_rx.active);
 
 	rc = spotflow_ble_transport_process_config_rx_frame(
 		wrong_sequence_fragment, sizeof(wrong_sequence_fragment), BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 0);
-	zassert_false(g_spotflow_ble_transport_state.config_rx.active, NULL);
+	zassert_false(g_spotflow_ble_transport_state.config_rx.active);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_rejects_invalid_first_fragment_lengths)
@@ -294,7 +294,7 @@ ZTEST(spotflow_ble_framing, test_decode_rejects_incomplete_last_fragment)
 		incomplete_last_fragment, sizeof(incomplete_last_fragment), BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 0);
-	zassert_false(g_spotflow_ble_transport_state.config_rx.active, NULL);
+	zassert_false(g_spotflow_ble_transport_state.config_rx.active);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_ignores_other_message_types)

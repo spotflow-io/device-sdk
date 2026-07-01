@@ -11,13 +11,6 @@ extern "C" {
 
 typedef void (*spotflow_transport_message_cb)(uint8_t* payload, size_t len);
 
-enum spotflow_transport_feature {
-	SPOTFLOW_TRANSPORT_FEATURE_LOGS,
-	SPOTFLOW_TRANSPORT_FEATURE_CONFIG,
-	SPOTFLOW_TRANSPORT_FEATURE_METRICS,
-	SPOTFLOW_TRANSPORT_FEATURE_COREDUMPS,
-};
-
 int spotflow_transport_start(void);
 bool spotflow_transport_is_ready(void);
 int spotflow_transport_send_ingest_cbor(uint8_t* payload, size_t len);
