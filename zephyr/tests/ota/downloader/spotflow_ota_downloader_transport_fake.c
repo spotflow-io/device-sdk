@@ -110,8 +110,7 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 		offset += deliver_len;
 		delivered += deliver_len;
 
-		if (fake->partial_transient_fail_after_bytes > 0 &&
-		    offset < fake->payload_len &&
+		if (fake->partial_transient_fail_after_bytes > 0 && offset < fake->payload_len &&
 		    offset == fake->partial_transient_fail_after_bytes) {
 			const int err =
 			    fake->partial_fail_errno != 0 ? fake->partial_fail_errno : -EAGAIN;
