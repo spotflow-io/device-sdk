@@ -1,4 +1,4 @@
-name: Build Zephyr Project
+name: Build and Unit Test Zephyr Project
 
 on:
   push:
