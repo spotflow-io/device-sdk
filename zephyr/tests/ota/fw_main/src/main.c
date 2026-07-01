@@ -261,6 +261,27 @@ ZTEST(spotflow_ota_fw_main, test_flash_write_failure_fails_safely)
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
 }
 
+ZTEST(spotflow_ota_fw_main, test_flash_write_failure_cancels_download_early)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+
+	transport_fake->chunk_size = 32;
+	transport_fake->payload_len = sizeof(download_payload);
+	platform_fake->write_result = -ENOMEM;
+	platform_fake->write_fail_after_bytes = 64;
+	accept_two_artifact_update();
+	apply_main_result(spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact));
+
+	zassert_equal(platform_fake->upload_image_size, 64);
+	zassert_equal(transport_fake->bytes_delivered, 96);
+	zassert_true(transport_fake->cancel_observed);
+	zassert_true(transport_fake->bytes_delivered < sizeof(download_payload));
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+}
+
 ZTEST(spotflow_ota_fw_main, test_upgrade_request_failure_fails_safely)
 {
 	struct spotflow_ota_state_snapshot snapshot;

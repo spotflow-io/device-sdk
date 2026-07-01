@@ -25,6 +25,10 @@ struct spotflow_ota_downloader_transport_fake {
 	size_t partial_transient_fail_after_bytes;
 	/** errno for partial fail; 0 keeps legacy -EAGAIN with transient_failure set. */
 	int partial_fail_errno;
+	/** When non-zero, deliver payload in chunks of this size (for cancel tests). */
+	size_t chunk_size;
+	/** Bytes delivered in the last transport_download call. */
+	size_t bytes_delivered;
 	bool block_until_cancel;
 	bool cancel_observed;
 	bool block_until_pause;

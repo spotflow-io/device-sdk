@@ -111,15 +111,15 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 
 	rc = spotflow_download_artifact(&main_firmware_downloader, &request, download_block_cb,
 					&flash_ctx);
+	if (flash_ctx.write_err != 0) {
+		LOG_ERR("Main firmware flash write failed: %d", flash_ctx.write_err);
+		return fail_main_firmware();
+	}
 	if (rc == -ECANCELED) {
 		return user_fail_requested ? fail_main_firmware() : SPOTFLOW_OTA_RESULT_CANCELED;
 	}
 	if (rc < 0) {
 		LOG_ERR("Main firmware download failed: %d", rc);
-		return fail_main_firmware();
-	}
-	if (flash_ctx.write_err != 0) {
-		LOG_ERR("Main firmware flash write failed: %d", flash_ctx.write_err);
 		return fail_main_firmware();
 	}
 
@@ -639,8 +639,6 @@ static int complete_user_fail(struct spotflow_ota_state_action* action,
 static void download_block_cb(const struct spotflow_artifact_block* block,
 			      struct spotflow_downloader* downloader, void* callback_ctx)
 {
-	ARG_UNUSED(downloader);
-
 	struct main_firmware_flash_ctx* ctx = callback_ctx;
 
 	if (ctx->write_err != 0) {
@@ -653,6 +651,9 @@ static void download_block_cb(const struct spotflow_artifact_block* block,
 
 	ctx->write_err =
 	    spotflow_ota_platform_write_image_block(block->data, block->data_len, block->is_last);
+	if (ctx->write_err != 0) {
+		(void)spotflow_cancel_download(downloader);
+	}
 }
 
 static int persist_prereboot_attempt(uint64_t attempt_id)

@@ -132,7 +132,12 @@ int spotflow_ota_platform_write_image_block(const uint8_t* data, size_t len, boo
 
 	ARG_UNUSED(is_last);
 
-	if (fake->write_result != 0) {
+	if (fake->write_fail_after_bytes > 0 &&
+	    fake->upload_image_size >= fake->write_fail_after_bytes) {
+		return fake->write_result != 0 ? fake->write_result : -ENOMEM;
+	}
+
+	if (fake->write_result != 0 && fake->write_fail_after_bytes == 0) {
 		return fake->write_result;
 	}
 

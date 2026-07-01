@@ -43,6 +43,8 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 			*request->bytes_downloaded = 0;
 		}
 
+		fake->bytes_delivered = 0;
+
 		return 0;
 	}
 
@@ -51,36 +53,85 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 			*request->bytes_downloaded = 0;
 		}
 
+		fake->bytes_delivered = 0;
+
 		return 0;
 	}
 
-	size_t deliver_len = fake->payload_len - offset;
+	const size_t chunk_size =
+	    fake->chunk_size > 0 ? fake->chunk_size : fake->payload_len - offset;
+	size_t delivered = 0;
 
-	if (fake->partial_transient_fail_after_bytes > offset) {
-		deliver_len = MIN(deliver_len, fake->partial_transient_fail_after_bytes - offset);
+	while (offset < fake->payload_len) {
+		if (request->downloader->cancel_requested) {
+			fake->cancel_observed = true;
+
+			if (request->bytes_downloaded != NULL) {
+				*request->bytes_downloaded = delivered;
+			}
+
+			fake->bytes_delivered = delivered;
+
+			return -ECANCELED;
+		}
+
+		size_t deliver_len = fake->payload_len - offset;
+
+		if (deliver_len > chunk_size) {
+			deliver_len = chunk_size;
+		}
+
+		if (fake->partial_transient_fail_after_bytes > offset) {
+			deliver_len =
+			    MIN(deliver_len, fake->partial_transient_fail_after_bytes - offset);
+		}
+
+		struct spotflow_artifact_block block = {
+			.offset = offset,
+			.data = fake->payload + offset,
+			.data_len = deliver_len,
+			.is_last = offset + deliver_len == fake->payload_len,
+		};
+
+		request->callback(&block, request->downloader, request->callback_ctx);
+
+		if (request->downloader->cancel_requested) {
+			fake->cancel_observed = true;
+
+			if (request->bytes_downloaded != NULL) {
+				*request->bytes_downloaded = delivered + deliver_len;
+			}
+
+			fake->bytes_delivered = delivered + deliver_len;
+
+			return -ECANCELED;
+		}
+
+		offset += deliver_len;
+		delivered += deliver_len;
+
+		if (fake->partial_transient_fail_after_bytes > 0 &&
+		    offset < fake->payload_len &&
+		    offset == fake->partial_transient_fail_after_bytes) {
+			const int err =
+			    fake->partial_fail_errno != 0 ? fake->partial_fail_errno : -EAGAIN;
+
+			if (request->bytes_downloaded != NULL) {
+				*request->bytes_downloaded = delivered;
+			}
+
+			fake->bytes_delivered = delivered;
+			spotflow_ota_downloader_transport_note_error(request, delivered, err);
+
+			return err;
+		}
 	}
-
-	struct spotflow_artifact_block block = {
-		.offset = offset,
-		.data = fake->payload + offset,
-		.data_len = deliver_len,
-		.is_last = offset + deliver_len == fake->payload_len,
-	};
-
-	request->callback(&block, request->downloader, request->callback_ctx);
 
 	if (request->bytes_downloaded != NULL) {
-		*request->bytes_downloaded = deliver_len;
+		*request->bytes_downloaded = delivered;
 	}
 
-	if (fake->partial_transient_fail_after_bytes > 0 &&
-	    offset + deliver_len < fake->payload_len &&
-	    offset + deliver_len == fake->partial_transient_fail_after_bytes) {
-		const int err = fake->partial_fail_errno != 0 ? fake->partial_fail_errno : -EAGAIN;
-
-		spotflow_ota_downloader_transport_note_error(request, deliver_len, err);
-		return err;
-	}
+	fake->bytes_delivered = delivered;
 
 	return 0;
 }

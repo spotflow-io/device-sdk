@@ -22,6 +22,8 @@ struct spotflow_ota_platform_fake {
 	int image_info_result;
 	int begin_write_result;
 	int write_result;
+	/** Fail writes once this many bytes have been written successfully. */
+	size_t write_fail_after_bytes;
 	size_t upload_image_start;
 	size_t upload_image_size;
 	uint8_t upload_slot[SPOTFLOW_OTA_PLATFORM_FAKE_UPLOAD_SLOT_SIZE];
