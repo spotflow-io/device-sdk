@@ -155,7 +155,8 @@ without holding `state_mutex`.
 
 | Condition | Behavior |
 |---|---|
-| Duplicate same `updateAttemptId` | Ignored |
+| Duplicate same `updateAttemptId`, no artifact results yet | Ignored; processing continues |
+| Duplicate same `updateAttemptId`, at least one artifact result (or whole-attempt error) | Manifest ignored; stored results re-sent; processing continues if the attempt is unfinished |
 | New attempt while current is terminal | Accept and start |
 | New attempt while current is unfinished | Stash one pending newer attempt; supersede the current one when safe (after finishing the current artifact or rebooting) |
 | Malformed message, unable to parse attempt ID | Logged and ignored |
@@ -232,6 +233,10 @@ Corrupt records loaded from Settings are ignored.
 - If publish returns `-EAGAIN`, the pending message is retained and retried on the next
   poll.
 - `REPORT_UPDATE_RESULTS` triggers re-send from persisted terminal state.
+- A duplicate `UPDATE_ARTIFACTS` for the current attempt also triggers re-send when at
+  least one artifact result (or a whole-attempt error) is already stored, because the
+  cloud may resend the manifest until it receives results (for example after MQTT
+  resubscribe or a lost QoS 0 `UPDATE_RESULTS` publish).
 
 ## Cancellation (implementation)
 

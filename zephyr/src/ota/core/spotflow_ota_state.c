@@ -51,6 +51,7 @@ static void supersede_current_for_pending(struct spotflow_ota_state_action* acti
 static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 			      const struct spotflow_ota_artifact* source);
 static bool attempt_has_terminal_results(const struct attempt_state* attempt);
+static bool attempt_has_reportable_results(const struct attempt_state* attempt);
 static bool attempt_has_succeeded_artifact(const struct attempt_state* attempt);
 static void cancel_pending_artifacts(struct attempt_state* attempt);
 static void advance_current_artifact(struct attempt_state* attempt);
@@ -146,6 +147,9 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 	if (current_attempt.attempt_id == msg->attempt_id) {
 		fill_action(action, msg->attempt_id);
 		action->ignored_duplicate_update = true;
+		if (attempt_has_reportable_results(&current_attempt)) {
+			action->report_requested = true;
+		}
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
@@ -722,6 +726,25 @@ static bool attempt_has_terminal_results(const struct attempt_state* attempt)
 	}
 
 	return true;
+}
+
+static bool attempt_has_reportable_results(const struct attempt_state* attempt)
+{
+	if (!attempt->active) {
+		return false;
+	}
+
+	if (attempt->has_attempt_error) {
+		return true;
+	}
+
+	for (size_t i = 0; i < attempt->update.artifact_count; i++) {
+		if (attempt->results[i] != SPOTFLOW_OTA_RESULT_PENDING) {
+			return true;
+		}
+	}
+
+	return false;
 }
 
 static bool attempt_has_succeeded_artifact(const struct attempt_state* attempt)
