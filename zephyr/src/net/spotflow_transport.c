@@ -1,5 +1,7 @@
 #include "net/spotflow_transport.h"
 
+#include <zephyr/sys/util.h>
+
 #if CONFIG_SPOTFLOW_TRANSPORT_BLE
 #include "net/transport/ble/spotflow_ble_transport.h"
 #endif
