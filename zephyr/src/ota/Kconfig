@@ -1,6 +1,7 @@
 menuconfig SPOTFLOW_OTA
 	bool "Enable Spotflow over-the-air (OTA) updates"
 	depends on SPOTFLOW
+	depends on SPOTFLOW_TRANSPORT_MQTT
 	select SETTINGS
 	select HTTP_CLIENT
 	default n
@@ -9,6 +10,9 @@ menuconfig SPOTFLOW_OTA
 	  artifact downloader, and delegated firmware callbacks. MCUboot and
 	  image-management options are selected only when automatic main-firmware
 	  handling is enabled.
+
+	  OTA requires the MQTT transport. BLE transport does not support OTA
+	  updates.
 
 if SPOTFLOW_OTA
 

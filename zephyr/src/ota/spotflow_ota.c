@@ -3,6 +3,10 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA) && IS_ENABLED(CONFIG_SPOTFLOW_TRANSPORT_BLE)
+#error "Spotflow OTA requires MQTT transport; BLE does not support OTA updates"
+#endif
+
 #include <spotflow/ota.h>
 
 #include "ota/spotflow_ota.h"
