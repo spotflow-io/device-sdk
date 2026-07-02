@@ -95,7 +95,7 @@ int spotflow_config_cbor_encode_reported(struct spotflow_config_reported_msg* ms
 
 	if (msg->contains_acked_desired_config_version) {
 		success = success &&
-		    zcbor_uint32_put(state, KEY_ACKNOWLEDGED_DESIRED_CONFIGURATION_VERSION);
+			zcbor_uint32_put(state, KEY_ACKNOWLEDGED_DESIRED_CONFIGURATION_VERSION);
 		success = success && zcbor_uint64_put(state, msg->acked_desired_config_version);
 	}
 

@@ -7,7 +7,7 @@
 #include "config/spotflow_config_net.h"
 #include "config/spotflow_config_cbor.h"
 #include "config/spotflow_config_options.h"
-#include "net/spotflow_mqtt.h"
+#include "net/spotflow_transport.h"
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -49,7 +49,7 @@ int spotflow_config_send_pending_message()
 		return 0;
 	}
 
-	rc = spotflow_mqtt_publish_config_cbor_msg(pending_message_buffer, pending_message_length);
+	rc = spotflow_transport_send_config_cbor(pending_message_buffer, pending_message_length);
 	if (rc == -EAGAIN) {
 		/* Temporary, retry later without aborting connection */
 		k_mutex_unlock(&pending_message_mutex);
@@ -57,7 +57,7 @@ int spotflow_config_send_pending_message()
 	}
 	if (rc < 0) {
 		LOG_ERR("Failed to publish config message: %d, aborting connection", rc);
-		spotflow_mqtt_abort_mqtt();
+		spotflow_transport_abort();
 	}
 
 	is_message_pending = false;

@@ -1,8 +1,9 @@
 ﻿#ifndef SPOTFLOW_MQTT_H
 #define SPOTFLOW_MQTT_H
 
+#include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
-#include "net/spotflow_processor.h"
 
 #ifdef __cplusplus
 extern "C" {

@@ -116,3 +116,34 @@ CONFIG_SPOTFLOW_INGEST_KEY="<Your Spotflow Ingest Key>"
 ```
 
 The first two placeholders are only needed if the board supports Wi-Fi.
+
+## Unit Tests
+
+Transport-level unit tests use Zephyr's `ztest` and are intended to be run with
+Twister. They complement, rather than replace, the explicit sample builds.
+
+Current unit test suites:
+
+- `tests/ble_framing` - TX framing unit tests for the BLE transport
+
+Run the BLE framing tests from the module directory:
+
+```powershell
+ci\run_twister.ps1
+```
+
+```bash
+./ci/run_twister.sh
+```
+
+Equivalent direct Twister invocation:
+
+```powershell
+..\..\..\..\.venv\Scripts\Activate.ps1; `
+..\..\..\..\zephyr\scripts\twister --platform native_sim --testsuite-root tests/ble_framing
+```
+
+CI should keep the concerns split:
+
+- Twister for `ztest` unit suites under `tests/`
+- Explicit `west build` steps for sample applications under `samples/`

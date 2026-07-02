@@ -1,4 +1,6 @@
 
+#include "coredumps/spotflow_coredumps_cbor.h"
+
 #include "zcbor_common.h"
 #include "zcbor_encode.h"
 #include "zephyr/kernel.h"
@@ -23,10 +25,7 @@ LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_L
 #define CORE_DUMP_CHUNK_MESSAGE_TYPE 2
 #define ZEPHYR_OS_VALUE 1
 
-/* Should be approximately 57 bytes (including build ID), putting 64 to be safe */
-#define ZCBOR_COREDUMPS_OVERHEAD 64
-
-uint8_t buffer[CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE + ZCBOR_COREDUMPS_OVERHEAD];
+uint8_t buffer[CONFIG_SPOTFLOW_COREDUMPS_CHUNK_SIZE + SPOTFLOW_COREDUMPS_CBOR_OVERHEAD];
 
 int spotflow_cbor_encode_coredump(const uint8_t* coredump_data, size_t coredump_data_len,
 				  int chunk_ordinal, uint32_t core_dump_id, bool last_chunk,

@@ -10,7 +10,7 @@ extern "C" {
 /**
  * @brief Initialize connection metrics
  *
- * Registers connection_mqtt_connected metric.
+ * Registers connection_transport_connected metric.
  *
  * @return Number of metrics registered on success, negative errno on failure
  */

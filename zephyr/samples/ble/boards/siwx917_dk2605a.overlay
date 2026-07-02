@@ -1,0 +1,16 @@
+/* Reserve the last 1 MiB of the OTA swap area for Zephyr coredumps. */
+
+&ota_swap_partition {
+	reg = <0x400000 0x2cf000>;
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+
+		coredump_partition: partition@6cf000 {
+			label = "coredump-partition";
+			reg = <0x6cf000 0x100000>;
+		};
+	};
+};

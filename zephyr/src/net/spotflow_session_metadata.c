@@ -4,7 +4,7 @@
 
 #include "spotflow_build_id.h"
 #include "net/spotflow_session_metadata.h"
-#include "net/spotflow_mqtt.h"
+#include "net/spotflow_transport.h"
 
 #include <zephyr/random/random.h>
 
@@ -29,6 +29,19 @@ static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t bui
 
 int spotflow_session_metadata_send(void)
 {
+	uint8_t buffer[MAX_CBOR_SIZE];
+	size_t cbor_data_len = 0;
+	int rc = spotflow_session_metadata_encode(buffer, sizeof(buffer), &cbor_data_len);
+
+	if (rc < 0) {
+		return rc;
+	}
+
+	return spotflow_transport_send_ingest_cbor(buffer, cbor_data_len);
+}
+
+int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t* cbor_data_len)
+{
 	const uint8_t* build_id = NULL;
 	uint16_t build_id_len = 0;
 
@@ -49,17 +62,13 @@ int spotflow_session_metadata_send(void)
 	}
 #endif
 
-	uint8_t buffer[MAX_CBOR_SIZE];
-	size_t cbor_data_len = 0;
-
-	rc = cbor_encode_session_metadata(build_id, build_id_len, device_run_id, buffer,
-					  sizeof(buffer), &cbor_data_len);
+	rc = cbor_encode_session_metadata(build_id, build_id_len, device_run_id, buffer, buffer_len,
+					  cbor_data_len);
 	if (rc < 0) {
 		LOG_DBG("Failed to encode session metadata: %d", rc);
-		return rc;
 	}
 
-	return spotflow_mqtt_publish_ingest_cbor_msg(buffer, cbor_data_len);
+	return rc;
 }
 
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
@@ -67,9 +76,10 @@ static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t bui
 					size_t* cbor_data_len)
 {
 	ZCBOR_STATE_E(state, 1, buffer, buffer_len, 1);
+	size_t key_count = build_id_data != NULL ? MAX_KEY_COUNT : MAX_KEY_COUNT - 1;
 
 	bool succ;
-	succ = zcbor_map_start_encode(state, MAX_KEY_COUNT);
+	succ = zcbor_map_start_encode(state, key_count);
 
 	succ = succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
 	succ = succ && zcbor_uint32_put(state, SESSION_METADATA_MESSAGE_TYPE);
@@ -82,7 +92,7 @@ static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t bui
 		succ = succ && zcbor_bstr_encode_ptr(state, build_id_data, build_id_data_len);
 	}
 
-	succ = succ && zcbor_map_end_encode(state, MAX_KEY_COUNT);
+	succ = succ && zcbor_map_end_encode(state, key_count);
 	if (succ != true) {
 		LOG_DBG("Failed to encode session metadata: %d", zcbor_peek_error(state));
 		return -EINVAL;

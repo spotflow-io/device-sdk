@@ -8,7 +8,7 @@ extern "C" {
 #include <stddef.h>
 #include <stdint.h>
 
-struct spotflow_mqtt_coredumps_msg {
+struct spotflow_coredump_msg {
 	uint8_t* payload;
 	size_t len;
 	bool coredump_last_chunk;

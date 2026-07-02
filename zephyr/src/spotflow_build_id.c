@@ -40,9 +40,9 @@ int spotflow_build_id_get(const uint8_t** build_id, uint16_t* build_id_len)
 #else
 
 	const uint8_t* id_bytes =
-	    bindesc_entry_spotflow_build_id + SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER_SIZE;
-	const uint16_t id_len =
-	    sizeof(bindesc_entry_spotflow_build_id) - SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER_SIZE;
+		bindesc_entry_spotflow_build_id + SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER_SIZE;
+	const uint16_t id_len = sizeof(bindesc_entry_spotflow_build_id) -
+		SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER_SIZE;
 
 #endif
 
