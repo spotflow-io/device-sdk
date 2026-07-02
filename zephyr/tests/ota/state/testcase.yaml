@@ -1,0 +1,10 @@
+common:
+  tags:
+    - spotflow
+    - ota
+tests:
+  spotflow.ota.state:
+    platform_allow:
+      - native_sim
+    integration_platforms:
+      - native_sim

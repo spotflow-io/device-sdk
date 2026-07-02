@@ -1,0 +1,73 @@
+menuconfig SPOTFLOW_OTA
+	bool "Enable Spotflow over-the-air (OTA) updates"
+	depends on SPOTFLOW
+	select SETTINGS
+	select HTTP_CLIENT
+	default n
+	help
+	  Enable Spotflow OTA protocol handling, persistence, worker thread,
+	  artifact downloader, and delegated firmware callbacks. MCUboot and
+	  image-management options are selected only when automatic main-firmware
+	  handling is enabled.
+
+if SPOTFLOW_OTA
+
+config SPOTFLOW_OTA_MAX_ARTIFACTS
+	int "Maximum number of artifacts in an OTA update manifest"
+	default 4
+	range 1 32
+	help
+	  Maximum number of firmware artifacts accepted in one OTA update manifest.
+
+config SPOTFLOW_OTA_THREAD_STACK_SIZE
+	int "Stack size for the OTA worker thread"
+	default 6144
+	help
+	  Stack size in bytes for the OTA worker thread. Artifact downloads run
+	  synchronously on this thread, so increase this value if you observe stack
+	  overflows during TLS or HTTP operations.
+
+config SPOTFLOW_OTA_HTTP_TIMEOUT_MS
+	int "HTTP timeout for artifact downloads in milliseconds"
+	default 120000
+	help
+	  Maximum time allowed for a single artifact download HTTP request.
+
+config SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE
+	int "Receive buffer size for artifact downloads in bytes"
+	default IMG_BLOCK_BUF_SIZE if IMG_MANAGER
+	default 512
+	help
+	  Size of the HTTP response receive buffer used while streaming artifacts.
+	  When main-firmware image management is enabled, defaults to the image
+	  writer buffer size so download and flash paths can share the same block size.
+
+config SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS
+	int "Delay between transient artifact download retries in milliseconds"
+	default 5000
+	help
+	  Delay before retrying an artifact download after a transient failure.
+
+config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+	bool "Automatically handle main firmware OTA updates"
+	depends on SPOTFLOW_OTA
+	depends on BOOTLOADER_MCUBOOT
+	depends on ARCH_SUPPORTS_ROM_START || ARCH_POSIX
+	depends on SPOTFLOW_GENERATE_BUILD_ID
+	select FLASH
+	select FLASH_MAP
+	select STREAM_FLASH
+	select IMG_MANAGER
+	select IMG_ERASE_PROGRESSIVELY
+	select REBOOT
+	select BINDESC_READ if SPOTFLOW_GENERATE_BUILD_ID
+	select BINDESC_READ_FLASH if SPOTFLOW_GENERATE_BUILD_ID && (ARCH_SUPPORTS_ROM_START || ARCH_POSIX)
+	default y
+	help
+	  When enabled, the Spotflow OTA SDK downloads main firmware artifacts,
+	  requests an MCUboot test upgrade, and reconciles probation state after
+	  reboot. Requires MCUboot (typically via sysbuild), flash partition
+	  layout with a secondary slot, and binary descriptor support for
+	  downloaded-image build ID extraction.
+
+endif # SPOTFLOW_OTA

@@ -46,11 +46,12 @@ menuconfig SPOTFLOW
 
 if SPOTFLOW
 
+rsource "src/config/Kconfig"
 rsource "src/logging/KConfig"
 rsource "src/coredumps/KConfig"
 rsource "src/metrics/Kconfig"
 rsource "src/metrics/system/Kconfig"
-
+rsource "src/ota/Kconfig"
 
 config SPOTFLOW_GENERATE_BUILD_ID
 	bool "Generate build ID"
@@ -63,7 +64,8 @@ config SPOTFLOW_GENERATE_BUILD_ID
 		Build ID allows to match core dumps with the original .elf file.
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
-	default 4608 if SPOTFLOW
+	default 16384 if SPOTFLOW_OTA
+	default 4608
 
 if NRF_SECURITY
 configdefault MBEDTLS_MPI_MAX_SIZE
@@ -84,8 +86,14 @@ configdefault MBEDTLS_ENABLE_HEAP
 if MBEDTLS_ENABLE_HEAP
 # Needed to be able to verify the whole Let's Encrypt certificate chain
 configdefault MBEDTLS_HEAP_SIZE
+	default 98304 if SPOTFLOW_OTA
 	default 36864
 endif # MBEDTLS_ENABLE_HEAP
+
+if SPOTFLOW_OTA
+configdefault NET_SOCKETS_TLS_MAX_CONTEXTS
+	default 2
+endif # SPOTFLOW_OTA
 
 config SPOTFLOW_SERVER_HOSTNAME
 	string "Hostname of Spotflow observability platform"

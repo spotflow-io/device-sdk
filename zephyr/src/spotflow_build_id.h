@@ -7,6 +7,8 @@
 extern "C" {
 #endif
 
+#define SPOTFLOW_BUILD_ID_LENGTH 20
+
 int spotflow_build_id_get(const uint8_t** build_id, uint16_t* build_id_len);
 
 #ifdef __cplusplus
