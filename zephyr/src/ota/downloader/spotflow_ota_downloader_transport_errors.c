@@ -36,7 +36,7 @@ static bool transport_error_is_transient(int err, size_t bytes_downloaded)
 }
 
 void spotflow_ota_downloader_transport_note_error(
-    struct spotflow_ota_downloader_transport_request* request, size_t bytes_in_attempt, int err)
+	struct spotflow_ota_downloader_transport_request* request, size_t bytes_in_attempt, int err)
 {
 	if (request == NULL || request->transient_failure == NULL || *request->transient_failure) {
 		return;

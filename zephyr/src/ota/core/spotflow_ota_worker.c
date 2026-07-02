@@ -43,8 +43,8 @@ int spotflow_ota_worker_init(void)
 	}
 
 	ota_worker_tid = k_thread_create(
-	    &ota_worker_thread, ota_worker_stack, K_THREAD_STACK_SIZEOF(ota_worker_stack),
-	    ota_worker_entry, NULL, NULL, NULL, K_LOWEST_APPLICATION_THREAD_PRIO, 0, K_NO_WAIT);
+		&ota_worker_thread, ota_worker_stack, K_THREAD_STACK_SIZEOF(ota_worker_stack),
+		ota_worker_entry, NULL, NULL, NULL, K_LOWEST_APPLICATION_THREAD_PRIO, 0, K_NO_WAIT);
 	k_thread_name_set(ota_worker_tid, "spotflow_ota");
 	return 0;
 }
@@ -189,9 +189,9 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 							      snapshot.artifact_results,
 							      snapshot.artifact_count);
 			if (rc < 0) {
-				LOG_ERR(
-				    "Failed to queue OTA attempt %llu results for reporting: %d",
-				    (unsigned long long)job->attempt_id, rc);
+				LOG_ERR("Failed to queue OTA attempt %llu results for reporting: "
+					"%d",
+					(unsigned long long)job->attempt_id, rc);
 				return rc;
 			}
 		}
@@ -283,8 +283,8 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 	char installed_version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
 	bool has_installed_version = false;
 	int rc = spotflow_ota_persistence_load_installed_version(
-	    job->artifact.slug, installed_version, sizeof(installed_version),
-	    &has_installed_version);
+		job->artifact.slug, installed_version, sizeof(installed_version),
+		&has_installed_version);
 	if (rc < 0) {
 		return rc;
 	}
@@ -304,7 +304,7 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 		 * cancellation paths return to the worker.
 		 */
 		*result = spotflow_ota_fw_main_process_artifact(
-		    job->attempt_id, job->artifact_index, &job->artifact);
+			job->attempt_id, job->artifact_index, &job->artifact);
 		return 0;
 	}
 #endif

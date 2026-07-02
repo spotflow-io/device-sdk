@@ -100,7 +100,7 @@ int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* inf
 int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_action* action);
 
 int spotflow_ota_state_enter_main_firmware_unconfirmed(
-    struct spotflow_ota_main_firmware_state* out_state);
+	struct spotflow_ota_main_firmware_state* out_state);
 
 int spotflow_ota_state_set_main_firmware_paused(bool paused,
 						struct spotflow_ota_main_firmware_state* out_state);

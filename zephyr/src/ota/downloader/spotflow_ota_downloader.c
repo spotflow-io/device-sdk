@@ -34,9 +34,9 @@ int spotflow_ota_downloader_build_authorization_header(const char* secret, char*
 		return -EINVAL;
 	}
 
-	int written =
-	    snprintk(out, out_len,
-		     OTA_AUTHORIZATION_HEADER_PREFIX "%s" OTA_AUTHORIZATION_HEADER_SUFFIX, secret);
+	int written = snprintk(out, out_len,
+			       OTA_AUTHORIZATION_HEADER_PREFIX "%s" OTA_AUTHORIZATION_HEADER_SUFFIX,
+			       secret);
 
 	if (written < 0 || (size_t)written >= out_len) {
 		return -ENOMEM;
@@ -136,7 +136,7 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 	char authorization_header[OTA_AUTHORIZATION_HEADER_MAX_LEN];
 
 	rc = spotflow_ota_downloader_build_authorization_header(
-	    request->secret, authorization_header, sizeof(authorization_header));
+		request->secret, authorization_header, sizeof(authorization_header));
 	if (rc < 0) {
 		return rc;
 	}

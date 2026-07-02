@@ -58,7 +58,7 @@ static void confirm_unconfirmed_main_firmware(void)
 }
 
 void spotflow_on_main_firmware_update_progressed(
-    const struct spotflow_ota_main_firmware_state* state)
+	const struct spotflow_ota_main_firmware_state* state)
 {
 	if (state == NULL) {
 		return;

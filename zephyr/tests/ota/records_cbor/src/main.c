@@ -48,8 +48,8 @@ ZTEST(spotflow_ota_records_cbor, test_round_trip_attempt_record)
 	size_t encoded_len;
 	struct spotflow_ota_persisted_attempt decoded;
 
-	zassert_ok(
-	    spotflow_ota_records_cbor_encode_attempt(&input, buffer, sizeof(buffer), &encoded_len));
+	zassert_ok(spotflow_ota_records_cbor_encode_attempt(&input, buffer, sizeof(buffer),
+							    &encoded_len));
 	zassert_ok(spotflow_ota_records_cbor_decode_attempt(buffer, encoded_len, &decoded));
 
 	expect_attempt_equal(&decoded, &input);
@@ -66,8 +66,8 @@ ZTEST(spotflow_ota_records_cbor, test_round_trip_attempt_error_record)
 	size_t encoded_len;
 	struct spotflow_ota_persisted_attempt decoded;
 
-	zassert_ok(
-	    spotflow_ota_records_cbor_encode_attempt(&input, buffer, sizeof(buffer), &encoded_len));
+	zassert_ok(spotflow_ota_records_cbor_encode_attempt(&input, buffer, sizeof(buffer),
+							    &encoded_len));
 	zassert_ok(spotflow_ota_records_cbor_decode_attempt(buffer, encoded_len, &decoded));
 
 	expect_attempt_equal(&decoded, &input);

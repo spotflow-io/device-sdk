@@ -35,7 +35,7 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 static bool downloader_is_canceled(struct spotflow_downloader* downloader);
 
 int spotflow_ota_downloader_transport_download(
-    struct spotflow_ota_downloader_transport_request* request)
+	struct spotflow_ota_downloader_transport_request* request)
 {
 	if (request == NULL || request->url == NULL || request->authorization_header == NULL ||
 	    request->downloader == NULL || request->callback == NULL ||
@@ -173,8 +173,8 @@ static int connect_socket(const struct ota_url* url)
 			return -errno;
 		}
 
-		rc =
-		    zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, url->host, strlen(url->host) + 1);
+		rc = zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, url->host,
+				      strlen(url->host) + 1);
 		if (rc < 0) {
 			LOG_ERR("Failed to set TLS hostname: %d", errno);
 			zsock_close(sock);

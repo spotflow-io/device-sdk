@@ -24,7 +24,7 @@ static void before_each(void* fixture)
 static void write_bindesc_build_id(size_t offset, const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
 	size_t end = spotflow_ota_test_bindesc_write_build_id(
-	    fake->upload_slot, sizeof(fake->upload_slot), offset, build_id);
+		fake->upload_slot, sizeof(fake->upload_slot), offset, build_id);
 
 	zassert_true(end > 0);
 	fake->upload_image_start = 0;

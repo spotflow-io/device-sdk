@@ -75,7 +75,7 @@ ZTEST(spotflow_ota_state, test_reject_first_attempt_with_attempt_error)
 	struct spotflow_ota_worker_job job;
 
 	int rc = spotflow_ota_state_reject_update(
-	    7, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action);
+		7, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action);
 
 	zassert_ok(rc);
 	zassert_true(action.rejected_attempt);
@@ -101,7 +101,7 @@ ZTEST(spotflow_ota_state, test_duplicate_update_after_rejected_attempt_requests_
 	struct spotflow_ota_state_action action;
 
 	zassert_ok(spotflow_ota_state_reject_update(
-	    7, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action));
+		7, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action));
 
 	int rc = spotflow_ota_state_accept_update(&msg, &action);
 
@@ -143,8 +143,8 @@ ZTEST(spotflow_ota_state, test_ignore_cancel_after_success)
 	struct spotflow_ota_state_snapshot snapshot;
 
 	zassert_ok(spotflow_ota_state_accept_update(&msg, &action));
-	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED, &action));
+	zassert_ok(spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED,
+							    &action));
 
 	int rc = spotflow_ota_state_accept_cancel(3, &action);
 
@@ -181,8 +181,8 @@ ZTEST(spotflow_ota_state, test_running_artifact_result_is_preserved_after_cancel
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_true(snapshot.actionable_cancellation);
 
-	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED, &action));
+	zassert_ok(spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED,
+							    &action));
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 
@@ -211,7 +211,7 @@ ZTEST(spotflow_ota_state, test_running_artifact_failure_after_cancel_cancels_rem
 	zassert_false(action.wake_worker);
 
 	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
+		spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
 	zassert_false(action.wake_worker);
 	zassert_true(spotflow_ota_state_is_update_canceled());
 
@@ -284,8 +284,8 @@ ZTEST(spotflow_ota_state, test_canceled_update_after_finished_attempt_wakes_work
 	struct spotflow_ota_worker_job job;
 
 	zassert_ok(spotflow_ota_state_accept_update(&finished, &action));
-	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED, &action));
+	zassert_ok(spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED,
+							    &action));
 
 	canceled.is_canceled = true;
 
@@ -335,7 +335,7 @@ ZTEST(spotflow_ota_state, test_ignore_duplicate_update_after_terminal_failure)
 
 	zassert_ok(spotflow_ota_state_accept_update(&msg, &action));
 	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
+		spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
 
 	rc = spotflow_ota_state_accept_update(&msg, &action);
 
@@ -364,8 +364,8 @@ ZTEST(spotflow_ota_state, test_duplicate_update_with_partial_results_requests_re
 	int rc;
 
 	zassert_ok(spotflow_ota_state_accept_update(&msg, &action));
-	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED, &action));
+	zassert_ok(spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED,
+							    &action));
 
 	rc = spotflow_ota_state_accept_update(&msg, &action);
 
@@ -395,7 +395,7 @@ ZTEST(spotflow_ota_state, test_accept_new_update_after_terminal_failure)
 
 	zassert_ok(spotflow_ota_state_accept_update(&first, &action));
 	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
+		spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
 
 	int rc = spotflow_ota_state_accept_update(&second, &action);
 
@@ -447,7 +447,7 @@ ZTEST(spotflow_ota_state, test_handler_canceled_without_cloud_cancel_does_not_ac
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
 
 	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_CANCELED, &action));
+		spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_CANCELED, &action));
 	zassert_false(action.wake_worker);
 	zassert_false(spotflow_ota_state_is_update_canceled());
 
@@ -471,7 +471,7 @@ ZTEST(spotflow_ota_state, test_reject_unfinished_attempt_defers_rejection_until_
 	zassert_equal(job.artifact_index, 0);
 
 	int rc = spotflow_ota_state_reject_update(
-	    10, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action);
+		10, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action);
 
 	zassert_ok(rc);
 	zassert_true(action.superseded_current);
@@ -490,8 +490,8 @@ ZTEST(spotflow_ota_state, test_reject_unfinished_attempt_defers_rejection_until_
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
 	zassert_false(spotflow_ota_state_get_worker_job(&job));
 
-	zassert_ok(
-	    spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED, &action));
+	zassert_ok(spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_SUCCEEDED,
+							    &action));
 
 	rc = spotflow_ota_state_promote_pending(&action);
 

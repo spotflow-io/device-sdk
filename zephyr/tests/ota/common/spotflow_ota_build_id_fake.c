@@ -18,7 +18,7 @@ void spotflow_ota_build_id_fake_reset(struct spotflow_ota_build_id_fake* fake)
 }
 
 void spotflow_ota_build_id_fake_set_running_build_id(
-    const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+	const uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
 	struct spotflow_ota_build_id_fake* fake = spotflow_ota_build_id_fake_get();
 

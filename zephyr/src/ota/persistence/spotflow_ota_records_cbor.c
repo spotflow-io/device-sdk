@@ -67,7 +67,7 @@ int spotflow_ota_records_cbor_encode_attempt(const struct spotflow_ota_persisted
 
 		for (size_t i = 0; success && i < attempt->artifact_count; i++) {
 			success = success &&
-			    zcbor_uint32_put(state, (uint32_t)attempt->artifact_results[i]);
+				zcbor_uint32_put(state, (uint32_t)attempt->artifact_results[i]);
 		}
 
 		success = success && zcbor_list_end_encode(state, attempt->artifact_count);
@@ -185,13 +185,14 @@ int spotflow_ota_records_cbor_encode_probation(const struct spotflow_ota_probati
 	success = success && zcbor_uint32_put(state, probation->artifact_index);
 	success = success && zcbor_uint32_put(state, KEY_PROBATION_SLUG);
 	success =
-	    success && zcbor_tstr_put_term(state, probation->slug, sizeof(probation->slug) - 1);
+		success && zcbor_tstr_put_term(state, probation->slug, sizeof(probation->slug) - 1);
 	success = success && zcbor_uint32_put(state, KEY_PROBATION_VERSION);
 	success = success &&
-	    zcbor_tstr_put_term(state, probation->version, sizeof(probation->version) - 1);
+		zcbor_tstr_put_term(state, probation->version, sizeof(probation->version) - 1);
 	success = success && zcbor_uint32_put(state, KEY_PROBATION_EXPECTED_BUILD_ID);
 	success = success &&
-	    zcbor_bstr_encode_ptr(state, probation->expected_build_id, SPOTFLOW_BUILD_ID_LENGTH);
+		zcbor_bstr_encode_ptr(state, probation->expected_build_id,
+				      SPOTFLOW_BUILD_ID_LENGTH);
 	success = success && zcbor_map_end_encode(state, PROBATION_RECORD_MAP_ENTRIES);
 
 	if (!success) {
@@ -226,12 +227,12 @@ int spotflow_ota_records_cbor_decode_probation(const uint8_t* payload, size_t le
 	success = success && zcbor_uint32_decode(state, &probation->artifact_index);
 	success = success && decode_expected_uint32_key(state, KEY_PROBATION_SLUG);
 	success = success &&
-	    copy_tstr(state, probation->slug, sizeof(probation->slug),
-		      SPOTFLOW_OTA_ARTIFACT_SLUG_MAX_LENGTH);
+		copy_tstr(state, probation->slug, sizeof(probation->slug),
+			  SPOTFLOW_OTA_ARTIFACT_SLUG_MAX_LENGTH);
 	success = success && decode_expected_uint32_key(state, KEY_PROBATION_VERSION);
 	success = success &&
-	    copy_tstr(state, probation->version, sizeof(probation->version),
-		      SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH);
+		copy_tstr(state, probation->version, sizeof(probation->version),
+			  SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH);
 	success = success && decode_expected_uint32_key(state, KEY_PROBATION_EXPECTED_BUILD_ID);
 	success = success && zcbor_bstr_decode(state, &build_id);
 

@@ -311,8 +311,8 @@ int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
 
 	struct mqtt_topic topics[] = {
 		{
-		    .topic = spotflow_mqtt_config.ota_c2d_topic,
-		    .qos = MQTT_QOS_1_AT_LEAST_ONCE,
+			.topic = spotflow_mqtt_config.ota_c2d_topic,
+			.qos = MQTT_QOS_1_AT_LEAST_ONCE,
 		},
 	};
 

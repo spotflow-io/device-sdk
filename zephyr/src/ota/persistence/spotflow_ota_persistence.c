@@ -95,8 +95,8 @@ int spotflow_ota_persistence_save_attempt(const struct spotflow_ota_persisted_at
 
 	uint8_t buffer[SPOTFLOW_OTA_MAX_RECORD_SIZE];
 	size_t encoded_len;
-	int rc =
-	    spotflow_ota_records_cbor_encode_attempt(attempt, buffer, sizeof(buffer), &encoded_len);
+	int rc = spotflow_ota_records_cbor_encode_attempt(attempt, buffer, sizeof(buffer),
+							  &encoded_len);
 
 	if (rc < 0) {
 		return rc;
@@ -209,8 +209,8 @@ int spotflow_ota_persistence_save_installed_version(const char* slug, const char
 	}
 
 	char path[SETTINGS_FULL_NAME_LEN];
-	int path_len =
-	    snprintk(path, sizeof(path), "%s/%s", SPOTFLOW_OTA_SETTINGS_PATH_VERSION_ROOT, slug);
+	int path_len = snprintk(path, sizeof(path), "%s/%s",
+				SPOTFLOW_OTA_SETTINGS_PATH_VERSION_ROOT, slug);
 
 	if (path_len <= 0 || path_len >= sizeof(path)) {
 		return -EINVAL;

@@ -17,13 +17,13 @@ struct spotflow_ota_downloader_transport_fake* spotflow_ota_downloader_transport
 }
 
 void spotflow_ota_downloader_transport_fake_reset(
-    struct spotflow_ota_downloader_transport_fake* fake)
+	struct spotflow_ota_downloader_transport_fake* fake)
 {
 	memset(fake, 0, sizeof(*fake));
 }
 
 void spotflow_ota_downloader_transport_fake_set_results(
-    struct spotflow_ota_downloader_transport_fake* fake, const int* results, size_t count)
+	struct spotflow_ota_downloader_transport_fake* fake, const int* results, size_t count)
 {
 	fake->next_result_count = 0;
 
@@ -59,7 +59,7 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 	}
 
 	const size_t chunk_size =
-	    fake->chunk_size > 0 ? fake->chunk_size : fake->payload_len - offset;
+		fake->chunk_size > 0 ? fake->chunk_size : fake->payload_len - offset;
 	size_t delivered = 0;
 
 	while (offset < fake->payload_len) {
@@ -83,7 +83,7 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 
 		if (fake->partial_transient_fail_after_bytes > offset) {
 			deliver_len =
-			    MIN(deliver_len, fake->partial_transient_fail_after_bytes - offset);
+				MIN(deliver_len, fake->partial_transient_fail_after_bytes - offset);
 		}
 
 		struct spotflow_artifact_block block = {
@@ -113,7 +113,7 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 		if (fake->partial_transient_fail_after_bytes > 0 && offset < fake->payload_len &&
 		    offset == fake->partial_transient_fail_after_bytes) {
 			const int err =
-			    fake->partial_fail_errno != 0 ? fake->partial_fail_errno : -EAGAIN;
+				fake->partial_fail_errno != 0 ? fake->partial_fail_errno : -EAGAIN;
 
 			if (request->bytes_downloaded != NULL) {
 				*request->bytes_downloaded = delivered;
@@ -136,10 +136,10 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 }
 
 int spotflow_ota_downloader_transport_download(
-    struct spotflow_ota_downloader_transport_request* request)
+	struct spotflow_ota_downloader_transport_request* request)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
-	    spotflow_ota_downloader_transport_fake_get();
+		spotflow_ota_downloader_transport_fake_get();
 	int rc = 0;
 
 	fake->call_count++;

@@ -139,11 +139,12 @@ int spotflow_ota_cbor_encode_update_results(const struct spotflow_ota_cbor_updat
 		success = success && zcbor_uint32_put(state, msg->attempt_error);
 	} else {
 		success = success &&
-		    encode_index_array(state, KEY_SUCCEEDED, msg->succeeded, msg->succeeded_count);
+			encode_index_array(state, KEY_SUCCEEDED, msg->succeeded,
+					   msg->succeeded_count);
 		success = success &&
-		    encode_index_array(state, KEY_FAILED, msg->failed, msg->failed_count);
+			encode_index_array(state, KEY_FAILED, msg->failed, msg->failed_count);
 		success = success &&
-		    encode_index_array(state, KEY_CANCELED, msg->canceled, msg->canceled_count);
+			encode_index_array(state, KEY_CANCELED, msg->canceled, msg->canceled_count);
 	}
 
 	success = success && zcbor_map_end_encode(state, map_entries);
@@ -187,7 +188,7 @@ static int decode_update_artifacts(zcbor_state_t* state, struct spotflow_ota_cbo
 		}
 
 		struct spotflow_ota_artifact* artifact =
-		    &msg->payload.update.artifacts[msg->payload.update.artifact_count];
+			&msg->payload.update.artifacts[msg->payload.update.artifact_count];
 		enum spotflow_ota_attempt_error artifact_error;
 		int rc = decode_artifact(state, artifact, &artifact_error);
 

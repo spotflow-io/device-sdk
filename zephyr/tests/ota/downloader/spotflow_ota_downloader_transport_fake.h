@@ -36,10 +36,10 @@ struct spotflow_ota_downloader_transport_fake {
 };
 
 void spotflow_ota_downloader_transport_fake_reset(
-    struct spotflow_ota_downloader_transport_fake* fake);
+	struct spotflow_ota_downloader_transport_fake* fake);
 
 void spotflow_ota_downloader_transport_fake_set_results(
-    struct spotflow_ota_downloader_transport_fake* fake, const int* results, size_t count);
+	struct spotflow_ota_downloader_transport_fake* fake, const int* results, size_t count);
 
 struct spotflow_ota_downloader_transport_fake* spotflow_ota_downloader_transport_fake_get(void);
 

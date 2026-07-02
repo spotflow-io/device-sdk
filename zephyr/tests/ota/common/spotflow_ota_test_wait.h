@@ -17,10 +17,10 @@ void spotflow_ota_test_wait_for_persisted_attempt(uint64_t attempt_id,
 						  size_t artifact_count);
 
 void spotflow_ota_test_wait_for_persisted_attempt_error(
-    uint64_t attempt_id, enum spotflow_ota_attempt_error attempt_error);
+	uint64_t attempt_id, enum spotflow_ota_attempt_error attempt_error);
 
 void spotflow_ota_test_expect_update_results_payload(
-    const struct spotflow_ota_cbor_update_results* expected_message);
+	const struct spotflow_ota_cbor_update_results* expected_message);
 
 #ifdef __cplusplus
 }

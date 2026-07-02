@@ -218,7 +218,7 @@ ZTEST(spotflow_ota_cbor, test_encode_update_results)
 	};
 
 	int rc =
-	    spotflow_ota_cbor_encode_update_results(&msg, buffer, sizeof(buffer), &encoded_len);
+		spotflow_ota_cbor_encode_update_results(&msg, buffer, sizeof(buffer), &encoded_len);
 
 	zassert_ok(rc);
 	zassert_equal(encoded_len, sizeof(update_results_payload));
@@ -238,7 +238,7 @@ ZTEST(spotflow_ota_cbor, test_encode_update_results_with_attempt_error)
 	};
 
 	int rc =
-	    spotflow_ota_cbor_encode_update_results(&msg, buffer, sizeof(buffer), &encoded_len);
+		spotflow_ota_cbor_encode_update_results(&msg, buffer, sizeof(buffer), &encoded_len);
 
 	zassert_ok(rc);
 	zassert_equal(encoded_len, sizeof(update_results_error_payload));

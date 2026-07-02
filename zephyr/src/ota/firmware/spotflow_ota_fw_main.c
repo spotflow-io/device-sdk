@@ -219,7 +219,7 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 	}
 
 	enum spotflow_ota_identity_cmp identity =
-	    spotflow_ota_identity_compare_probation(probation->expected_build_id);
+		spotflow_ota_identity_compare_probation(probation->expected_build_id);
 
 	if (identity == SPOTFLOW_OTA_IDENTITY_UNAVAILABLE) {
 		LOG_WRN("Main firmware probation record present but running identity unavailable: "
@@ -294,7 +294,7 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 
 	if (has_probation && probation.attempt_id == snapshot.current_attempt_id &&
 	    spotflow_ota_identity_compare_probation(probation.expected_build_id) ==
-		SPOTFLOW_OTA_IDENTITY_MATCH &&
+		    SPOTFLOW_OTA_IDENTITY_MATCH &&
 	    spotflow_ota_platform_is_image_confirmed() &&
 	    snapshot.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
 		rc = complete_main_firmware_success(&probation, action);
@@ -480,7 +480,7 @@ void spotflow_ota_fw_main_wake_if_paused(void)
 void spotflow_ota_fw_main_cancel_active_download(void)
 {
 	enum spotflow_downloader_state downloader_state =
-	    spotflow_get_downloader_state(&main_firmware_downloader);
+		spotflow_get_downloader_state(&main_firmware_downloader);
 
 	if (downloader_state == SPOTFLOW_DOWNLOADER_STATE_DOWNLOADING ||
 	    downloader_state == SPOTFLOW_DOWNLOADER_STATE_PAUSED) {
@@ -649,8 +649,8 @@ static void download_block_cb(const struct spotflow_artifact_block* block,
 		return;
 	}
 
-	ctx->write_err =
-	    spotflow_ota_platform_write_image_block(block->data, block->data_len, block->is_last);
+	ctx->write_err = spotflow_ota_platform_write_image_block(block->data, block->data_len,
+								 block->is_last);
 	if (ctx->write_err != 0) {
 		(void)spotflow_cancel_download(downloader);
 	}

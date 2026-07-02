@@ -61,9 +61,9 @@ int spotflow_ota_parse_url(const char* url, struct ota_url* out)
 		uint16_t copy_len = parsed.field_data[UF_PATH].len;
 
 		if (parsed.field_set & BIT(UF_QUERY)) {
-			copy_len =
-			    (parsed.field_data[UF_QUERY].off + parsed.field_data[UF_QUERY].len) -
-			    path_off;
+			copy_len = (parsed.field_data[UF_QUERY].off +
+				    parsed.field_data[UF_QUERY].len) -
+				path_off;
 		}
 
 		if (copy_len >= sizeof(out->path)) {
