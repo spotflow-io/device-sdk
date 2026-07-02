@@ -58,10 +58,8 @@ int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t*
 		LOG_INF("Generated device run ID: %" PRIu64, device_run_id);
 	}
 
-	int rc;
-
 #ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
-	rc = spotflow_build_id_get(&build_id, &build_id_len);
+	int rc = spotflow_build_id_get(&build_id, &build_id_len);
 	if (rc != 0) {
 		LOG_DBG("Failed to get build ID for session metadata: %d", rc);
 	}
