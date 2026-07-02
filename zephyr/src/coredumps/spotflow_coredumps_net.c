@@ -1,6 +1,6 @@
 #include "zephyr/kernel.h"
 #include "coredumps/spotflow_coredumps_backend.h"
-#include "net/spotflow_mqtt.h"
+#include "net/spotflow_transport.h"
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL);
@@ -14,7 +14,7 @@ LOG_MODULE_DECLARE(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_L
  */
 int spotflow_poll_and_process_enqueued_coredump_chunks(void)
 {
-	struct spotflow_mqtt_coredumps_msg* msg_ptr;
+	struct spotflow_coredump_msg* msg_ptr;
 
 	/* Peek without removing - returns non-zero if queue empty */
 	if (k_msgq_peek(&g_spotflow_core_dumps_msgq, &msg_ptr) != 0) {
@@ -22,14 +22,14 @@ int spotflow_poll_and_process_enqueued_coredump_chunks(void)
 	}
 
 	/* Publish while message is still safely in queue */
-	int rc = spotflow_mqtt_publish_ingest_cbor_msg(msg_ptr->payload, msg_ptr->len);
+	int rc = spotflow_transport_send_ingest_cbor(msg_ptr->payload, msg_ptr->len);
 	if (rc == -EAGAIN) {
 		/* Temporary, retry later without aborting connection */
 		return rc;
 	}
 	if (rc < 0) {
 		LOG_DBG("Failed to publish coredump: %d, aborting connection", rc);
-		spotflow_mqtt_abort_mqtt();
+		spotflow_transport_abort();
 		return rc;
 	}
 

@@ -145,10 +145,11 @@ int spotflow_metrics_cbor_encode_no_aggregation(struct spotflow_metric_base* met
 
 		for (uint8_t i = 0; i < label_count && succ; i++) {
 			succ = succ &&
-			    zcbor_tstr_put_term(state, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN);
+				zcbor_tstr_put_term(state, labels[i].key,
+						    SPOTFLOW_MAX_LABEL_KEY_LEN);
 			succ = succ &&
-			    zcbor_tstr_put_term(state, labels[i].value,
-						SPOTFLOW_MAX_LABEL_VALUE_LEN);
+				zcbor_tstr_put_term(state, labels[i].value,
+						    SPOTFLOW_MAX_LABEL_VALUE_LEN);
 		}
 
 		succ = succ && zcbor_map_end_encode(state, label_count);
@@ -240,10 +241,10 @@ static bool encode_labels(zcbor_state_t* state, const struct metric_label_storag
 	succ = succ && zcbor_map_start_encode(state, label_count);
 
 	for (uint8_t i = 0; i < label_count && succ; i++) {
-		succ =
-		    succ && zcbor_tstr_put_term(state, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN);
 		succ = succ &&
-		    zcbor_tstr_put_term(state, labels[i].value, SPOTFLOW_MAX_LABEL_VALUE_LEN);
+			zcbor_tstr_put_term(state, labels[i].key, SPOTFLOW_MAX_LABEL_KEY_LEN);
+		succ = succ &&
+			zcbor_tstr_put_term(state, labels[i].value, SPOTFLOW_MAX_LABEL_VALUE_LEN);
 	}
 
 	succ = succ && zcbor_map_end_encode(state, label_count);

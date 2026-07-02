@@ -1,5 +1,5 @@
-#ifndef SPOTFLOW_LOG_NET_H
-#define SPOTFLOW_LOG_NET_H
+#ifndef SPOTFLOW_LOG_PROCESSOR_H
+#define SPOTFLOW_LOG_PROCESSOR_H
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,4 +11,4 @@ int spotflow_poll_and_process_enqueued_logs(void);
 }
 #endif
 
-#endif //SPOTFLOW_LOG_NET_H
+#endif /* SPOTFLOW_LOG_PROCESSOR_H */

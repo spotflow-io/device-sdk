@@ -18,9 +18,9 @@ int spotflow_metrics_system_heap_init(void)
 {
 	int rc;
 
-	rc =
-	    spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_HEAP_FREE,
-					 SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL, &g_heap_free_metric);
+	rc = spotflow_register_metric_int(SPOTFLOW_METRIC_NAME_HEAP_FREE,
+					  SPOTFLOW_METRICS_SYSTEM_AGG_INTERVAL,
+					  &g_heap_free_metric);
 	if (rc < 0) {
 		LOG_ERR("Failed to register heap free metric: %d", rc);
 		return rc;
@@ -54,10 +54,10 @@ void spotflow_metrics_system_heap_collect(void)
 
 	/* TODO: Replace with spotflow_report_metric_uint64 when available */
 	int64_t free_bytes_capped =
-	    (heap_stats.free_bytes > INT64_MAX) ? INT64_MAX : (int64_t)heap_stats.free_bytes;
+		(heap_stats.free_bytes > INT64_MAX) ? INT64_MAX : (int64_t)heap_stats.free_bytes;
 	int64_t allocated_bytes_capped = (heap_stats.allocated_bytes > INT64_MAX)
-	    ? INT64_MAX
-	    : (int64_t)heap_stats.allocated_bytes;
+		? INT64_MAX
+		: (int64_t)heap_stats.allocated_bytes;
 
 	int rc = spotflow_report_metric_int(g_heap_free_metric, free_bytes_capped);
 	if (rc < 0) {

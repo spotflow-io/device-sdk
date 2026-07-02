@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 ### Added
 * Added Metrics in ESP IDF
+* Added initial Zephyr BLE transport with a Spotflow GATT service for session metadata, telemetry notifications, and desired/reported configuration exchange. Current BLE support covers logs, metrics, and configuration framing
+* Added Zephyr BLE transport support for coredump telemetry chunks.
+* Added coredump support for siwx917
+* Added coredump support for saving coredump to memory
+
 
 ### Fixed
 * Fixed ESP-IDF Spotflow log backend parsing for Log V1 prefixes and corrected `va_list` handling in the `esp_log_set_vprintf()` hook.
@@ -15,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Fixed ESP-IDF coredump example Wi-Fi retry logic to clean up Wi-Fi state before reconnect attempts, preventing duplicate-netif assertion failures.
 * Added `LOG_VERSION_1` dependency for the ESP-IDF Spotflow log backend.
 * Added more buffer size for TLS to reduce handshake failures and enabled Server Name Indication (SNI).
+* Fixed Zephyr BLE framing validation and RX reassembly state handling for malformed fragments, zero-length payload rejection, and safer TX characteristic access.
 
 ## [0.8.0] - 2026-05-07
 

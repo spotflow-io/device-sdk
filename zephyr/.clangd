@@ -1,0 +1,9 @@
+CompileFlags:
+  Remove:
+    - -fno-printf-return-value
+    - -mfp16-format=*
+    - -fno-reorder-functions
+    - --param=*
+    - -fno-defer-pop
+    - -mtp=*
+    - -specs=*

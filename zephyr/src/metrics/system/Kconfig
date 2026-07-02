@@ -20,6 +20,7 @@ config SPOTFLOW_METRICS_SYSTEM_NETWORK
 	bool "Enable network metrics"
 	depends on NETWORKING
 	select NET_STATISTICS
+	default n if SPOTFLOW_TRANSPORT_BLE
 	default y
 	help
 	  Collect network traffic statistics (TX/RX bytes).

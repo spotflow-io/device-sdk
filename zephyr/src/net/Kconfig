@@ -1,0 +1,8 @@
+choice SPOTFLOW_TRANSPORT
+	prompt "Spotflow transport"
+	default SPOTFLOW_TRANSPORT_MQTT
+
+rsource "Kconfig.mqtt"
+rsource "Kconfig.ble"
+
+endchoice

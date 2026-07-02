@@ -4,14 +4,12 @@
 
 #include "spotflow_build_id.h"
 #include "net/spotflow_session_metadata.h"
-#include "net/spotflow_mqtt.h"
+#include "net/spotflow_transport.h"
 #ifdef CONFIG_SPOTFLOW_OTA
 #include "ota/spotflow_ota.h"
 #endif
 
 #include <zephyr/random/random.h>
-
-#define MAX_KEY_COUNT 4
 
 #define KEY_MESSAGE_TYPE 0x00
 #define KEY_BUILD_ID 0x0E
@@ -33,6 +31,19 @@ static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t bui
 					size_t buffer_len, size_t* cbor_data_len);
 
 int spotflow_session_metadata_send(void)
+{
+	uint8_t buffer[MAX_CBOR_SIZE];
+	size_t cbor_data_len = 0;
+	int rc = spotflow_session_metadata_encode(buffer, sizeof(buffer), &cbor_data_len);
+
+	if (rc < 0) {
+		return rc;
+	}
+
+	return spotflow_transport_send_ingest_cbor(buffer, cbor_data_len);
+}
+
+int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t* cbor_data_len)
 {
 	const uint8_t* build_id = NULL;
 	uint16_t build_id_len = 0;
@@ -61,18 +72,9 @@ int spotflow_session_metadata_send(void)
 	last_update_attempt_id = spotflow_ota_get_last_received_attempt_id();
 #endif
 
-	uint8_t buffer[MAX_CBOR_SIZE];
-	size_t cbor_data_len = 0;
-
-	rc = cbor_encode_session_metadata(build_id, build_id_len, device_run_id,
-					  include_last_update_attempt_id, last_update_attempt_id,
-					  buffer, sizeof(buffer), &cbor_data_len);
-	if (rc < 0) {
-		LOG_DBG("Failed to encode session metadata: %d", rc);
-		return rc;
-	}
-
-	return spotflow_mqtt_publish_ingest_cbor_msg(buffer, cbor_data_len);
+	return cbor_encode_session_metadata(build_id, build_id_len, device_run_id,
+					    include_last_update_attempt_id, last_update_attempt_id,
+					    buffer, buffer_len, cbor_data_len);
 }
 
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
@@ -81,9 +83,17 @@ static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t bui
 					size_t buffer_len, size_t* cbor_data_len)
 {
 	ZCBOR_STATE_E(state, 1, buffer, buffer_len, 1);
+	size_t key_count = 2;
+
+	if (build_id_data != NULL) {
+		key_count++;
+	}
+	if (include_last_update_attempt_id) {
+		key_count++;
+	}
 
 	bool succ;
-	succ = zcbor_map_start_encode(state, MAX_KEY_COUNT);
+	succ = zcbor_map_start_encode(state, key_count);
 
 	succ = succ && zcbor_uint32_put(state, KEY_MESSAGE_TYPE);
 	succ = succ && zcbor_uint32_put(state, SESSION_METADATA_MESSAGE_TYPE);
@@ -101,7 +111,7 @@ static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t bui
 		succ = succ && zcbor_uint64_put(state, last_update_attempt_id);
 	}
 
-	succ = succ && zcbor_map_end_encode(state, MAX_KEY_COUNT);
+	succ = succ && zcbor_map_end_encode(state, key_count);
 	if (succ != true) {
 		LOG_DBG("Failed to encode session metadata: %d", zcbor_peek_error(state));
 		return -EINVAL;
