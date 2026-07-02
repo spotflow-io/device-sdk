@@ -130,7 +130,7 @@ bool spotflow_is_update_canceled(void);
  * @param state Current main-firmware state snapshot.
  */
 void spotflow_on_main_firmware_update_progressed(
-    const struct spotflow_ota_main_firmware_state* state);
+	const struct spotflow_ota_main_firmware_state* state);
 
 /**
  * @brief Read the current automatic main-firmware update state.
