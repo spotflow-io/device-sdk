@@ -17,8 +17,6 @@ LOG_MODULE_REGISTER(spotflow_ota);
 #include "spotflow_ota_test_settings.h"
 #include "spotflow_ota_test_wait.h"
 
-static uint8_t published_payload[128];
-
 static struct spotflow_ota_update_msg make_delegated_update(uint64_t attempt_id,
 							    size_t artifact_count)
 {
@@ -65,7 +63,7 @@ enum spotflow_ota_result
 spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-	    spotflow_ota_test_fake_callbacks_get();
+		spotflow_ota_test_fake_callbacks_get();
 
 	fake_callbacks->handle_call_count++;
 	fake_callbacks->handle_thread = k_current_get();
@@ -90,25 +88,10 @@ bool spotflow_is_update_canceled(void)
 	return spotflow_ota_state_is_update_canceled();
 }
 
-int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
-{
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
-
-	if (len > sizeof(published_payload)) {
-		return -ENOMEM;
-	}
-
-	fake_mqtt->publish_count++;
-	fake_mqtt->last_payload = published_payload;
-	fake_mqtt->last_payload_len = len;
-	memcpy(published_payload, payload, len);
-	return fake_mqtt->publish_result;
-}
-
 ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_worker)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-	    spotflow_ota_test_fake_callbacks_get();
+		spotflow_ota_test_fake_callbacks_get();
 	struct spotflow_ota_update_msg first = make_delegated_update(9, 2);
 	struct spotflow_ota_update_msg second = make_delegated_update(10, 1);
 	struct spotflow_ota_state_action action;
@@ -122,7 +105,8 @@ ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_w
 		.succeeded_count = 1,
 		.succeeded = { 0 },
 	};
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	struct spotflow_ota_test_fake_transport* fake_transport =
+		spotflow_ota_test_fake_transport_get();
 
 	fake_callbacks->block_handle = true;
 	fake_callbacks->next_handle_result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
@@ -147,13 +131,13 @@ ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_w
 
 	spotflow_ota_test_wait_for_persisted_attempt(9, superseded_results,
 						     ARRAY_SIZE(superseded_results));
-	zassert_equal(fake_mqtt->publish_count, 0);
+	zassert_equal(fake_transport->publish_count, 0);
 	zassert_ok(spotflow_ota_net_send_pending_message());
-	zassert_equal(fake_mqtt->publish_count, 0);
+	zassert_equal(fake_transport->publish_count, 0);
 
 	k_sem_give(&fake_callbacks->handle_continue_sem);
 	spotflow_ota_test_wait_for_persisted_attempt(
-	    10, (const enum spotflow_ota_result[]){ SPOTFLOW_OTA_RESULT_SUCCEEDED }, 1);
+		10, (const enum spotflow_ota_result[]){ SPOTFLOW_OTA_RESULT_SUCCEEDED }, 1);
 	zassert_ok(spotflow_ota_net_send_pending_message());
 	spotflow_ota_test_expect_update_results_payload(&promoted_message);
 }
@@ -161,7 +145,7 @@ ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_w
 ZTEST(spotflow_ota_worker, test_deferred_rejection_persisted_and_reported_by_worker)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-	    spotflow_ota_test_fake_callbacks_get();
+		spotflow_ota_test_fake_callbacks_get();
 	struct spotflow_ota_update_msg first = make_delegated_update(9, 2);
 	struct spotflow_ota_state_action action;
 	const struct spotflow_ota_cbor_update_results rejected_message = {
@@ -178,12 +162,12 @@ ZTEST(spotflow_ota_worker, test_deferred_rejection_persisted_and_reported_by_wor
 	zassert_ok(k_sem_take(&fake_callbacks->handle_called_sem, K_SECONDS(1)));
 
 	zassert_ok(spotflow_ota_state_reject_update(
-	    10, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action));
+		10, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action));
 	wake_worker_from_action(&action);
 
 	k_sem_give(&fake_callbacks->handle_continue_sem);
 	spotflow_ota_test_wait_for_persisted_attempt_error(
-	    10, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+		10, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 	zassert_equal(fake_callbacks->handle_call_count, 1);
 
 	zassert_ok(spotflow_ota_net_send_pending_message());
@@ -193,7 +177,7 @@ ZTEST(spotflow_ota_worker, test_deferred_rejection_persisted_and_reported_by_wor
 ZTEST(spotflow_ota_worker, test_multi_artifact_success_processed_in_order)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
-	    spotflow_ota_test_fake_callbacks_get();
+		spotflow_ota_test_fake_callbacks_get();
 	struct spotflow_ota_update_msg update = make_delegated_update(1, 2);
 	struct spotflow_ota_state_action action;
 	const enum spotflow_ota_result expected_results[] = {

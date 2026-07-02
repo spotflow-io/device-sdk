@@ -6,7 +6,6 @@
 
 #include <spotflow/ota.h>
 
-#include "net/spotflow_mqtt.h"
 #include "ota/spotflow_ota.h"
 #include "ota/core/spotflow_ota_state.h"
 #include "ota/core/spotflow_ota_types.h"
@@ -56,33 +55,20 @@ ZTEST(spotflow_ota_public_api, test_public_headers_expose_expected_downloader_ty
 
 ZTEST(spotflow_ota_public_api, test_test_fakes_are_available_to_ota_suites)
 {
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt;
+	struct spotflow_ota_test_fake_transport* fake_transport;
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks;
 
 	spotflow_ota_test_fakes_reset();
-	fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	fake_transport = spotflow_ota_test_fake_transport_get();
 	fake_callbacks = spotflow_ota_test_fake_callbacks_get();
 
-	zassert_not_null(fake_mqtt);
+	zassert_not_null(fake_transport);
 	zassert_not_null(fake_callbacks);
-	zassert_equal(fake_mqtt->publish_count, 0);
-	zassert_equal(fake_mqtt->last_payload, NULL);
-	zassert_equal(fake_mqtt->last_payload_len, 0);
-	zassert_equal(fake_mqtt->publish_result, 0);
+	zassert_equal(fake_transport->publish_count, 0);
+	zassert_equal(fake_transport->last_payload, NULL);
+	zassert_equal(fake_transport->last_payload_len, 0);
+	zassert_equal(fake_transport->publish_result, 0);
 	zassert_equal(fake_callbacks->next_handle_result, SPOTFLOW_OTA_RESULT_SUCCEEDED);
-}
-
-int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
-{
-	ARG_UNUSED(payload);
-	ARG_UNUSED(len);
-	return 0;
-}
-
-int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
-{
-	ARG_UNUSED(callback);
-	return 0;
 }
 
 ZTEST(spotflow_ota_public_api, test_public_ota_functions_are_linkable)

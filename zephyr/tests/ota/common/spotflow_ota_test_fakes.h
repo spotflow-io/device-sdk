@@ -12,11 +12,18 @@
 extern "C" {
 #endif
 
-struct spotflow_ota_test_fake_mqtt {
+#define SPOTFLOW_OTA_TEST_TRANSPORT_MAX_PAYLOAD 128
+
+struct spotflow_ota_test_fake_transport {
 	uint32_t publish_count;
+	uint8_t payload[SPOTFLOW_OTA_TEST_TRANSPORT_MAX_PAYLOAD];
 	const uint8_t* last_payload;
 	size_t last_payload_len;
 	int publish_result;
+	uint32_t ota_subscribe_count;
+	void (*ota_callback)(uint8_t* payload, size_t len);
+	uint8_t ingest_payload[SPOTFLOW_OTA_TEST_TRANSPORT_MAX_PAYLOAD];
+	size_t ingest_payload_len;
 };
 
 struct spotflow_ota_test_fake_callbacks {
@@ -41,7 +48,7 @@ struct spotflow_ota_test_fake_callbacks {
 
 void spotflow_ota_test_fakes_reset(void);
 
-struct spotflow_ota_test_fake_mqtt* spotflow_ota_test_fake_mqtt_get(void);
+struct spotflow_ota_test_fake_transport* spotflow_ota_test_fake_transport_get(void);
 
 struct spotflow_ota_test_fake_callbacks* spotflow_ota_test_fake_callbacks_get(void);
 

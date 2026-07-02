@@ -11,24 +11,6 @@
 
 LOG_MODULE_REGISTER(spotflow_ota);
 
-static uint8_t published_payload[128];
-
-int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
-{
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
-
-	if (len > sizeof(published_payload)) {
-		return -ENOMEM;
-	}
-
-	fake_mqtt->publish_count++;
-	memcpy(published_payload, payload, len);
-	fake_mqtt->last_payload = published_payload;
-	fake_mqtt->last_payload_len = len;
-
-	return fake_mqtt->publish_result;
-}
-
 static void before_each(void* fixture)
 {
 	ARG_UNUSED(fixture);
@@ -39,15 +21,16 @@ static void before_each(void* fixture)
 
 static void expect_payload(const struct spotflow_ota_cbor_update_results* expected_message)
 {
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	struct spotflow_ota_test_fake_transport* fake_transport =
+		spotflow_ota_test_fake_transport_get();
 	uint8_t expected_payload[128];
 	size_t expected_len;
 
 	zassert_ok(spotflow_ota_cbor_encode_update_results(
-	    expected_message, expected_payload, sizeof(expected_payload), &expected_len));
+		expected_message, expected_payload, sizeof(expected_payload), &expected_len));
 
-	zassert_equal(fake_mqtt->last_payload_len, expected_len);
-	zassert_mem_equal(fake_mqtt->last_payload, expected_payload, expected_len);
+	zassert_equal(fake_transport->last_payload_len, expected_len);
+	zassert_mem_equal(fake_transport->last_payload, expected_payload, expected_len);
 }
 
 ZTEST(spotflow_ota_net, test_merge_succeeded_failed_and_canceled_arrays)
@@ -67,7 +50,7 @@ ZTEST(spotflow_ota_net, test_merge_succeeded_failed_and_canceled_arrays)
 
 	zassert_ok(spotflow_ota_net_prepare_results(11, first_results, ARRAY_SIZE(first_results)));
 	zassert_ok(
-	    spotflow_ota_net_prepare_results(11, second_results, ARRAY_SIZE(second_results)));
+		spotflow_ota_net_prepare_results(11, second_results, ARRAY_SIZE(second_results)));
 	zassert_ok(spotflow_ota_net_send_pending_message());
 
 	const struct spotflow_ota_cbor_update_results expected_message = {
@@ -86,7 +69,7 @@ ZTEST(spotflow_ota_net, test_merge_succeeded_failed_and_canceled_arrays)
 ZTEST(spotflow_ota_net, test_encode_and_send_pending_attempt_error)
 {
 	zassert_ok(spotflow_ota_net_prepare_attempt_error(
-	    12, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE));
+		12, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE));
 	zassert_ok(spotflow_ota_net_send_pending_message());
 
 	const struct spotflow_ota_cbor_update_results expected_message = {
@@ -100,7 +83,8 @@ ZTEST(spotflow_ota_net, test_encode_and_send_pending_attempt_error)
 
 ZTEST(spotflow_ota_net, test_preserve_pending_message_after_eagain)
 {
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	struct spotflow_ota_test_fake_transport* fake_transport =
+		spotflow_ota_test_fake_transport_get();
 	const enum spotflow_ota_result results[] = {
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 		SPOTFLOW_OTA_RESULT_PENDING,
@@ -109,19 +93,20 @@ ZTEST(spotflow_ota_net, test_preserve_pending_message_after_eagain)
 	};
 
 	zassert_ok(spotflow_ota_net_prepare_results(13, results, ARRAY_SIZE(results)));
-	fake_mqtt->publish_result = -EAGAIN;
+	fake_transport->publish_result = -EAGAIN;
 
 	zassert_equal(spotflow_ota_net_send_pending_message(), -EAGAIN);
-	zassert_equal(fake_mqtt->publish_count, 1);
+	zassert_equal(fake_transport->publish_count, 1);
 
-	fake_mqtt->publish_result = 0;
+	fake_transport->publish_result = 0;
 	zassert_ok(spotflow_ota_net_send_pending_message());
-	zassert_equal(fake_mqtt->publish_count, 2);
+	zassert_equal(fake_transport->publish_count, 2);
 }
 
 ZTEST(spotflow_ota_net, test_clear_pending_message_after_publish_success)
 {
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	struct spotflow_ota_test_fake_transport* fake_transport =
+		spotflow_ota_test_fake_transport_get();
 	const enum spotflow_ota_result results[] = {
 		SPOTFLOW_OTA_RESULT_PENDING,
 		SPOTFLOW_OTA_RESULT_FAILED,
@@ -129,10 +114,10 @@ ZTEST(spotflow_ota_net, test_clear_pending_message_after_publish_success)
 
 	zassert_ok(spotflow_ota_net_prepare_results(14, results, ARRAY_SIZE(results)));
 	zassert_ok(spotflow_ota_net_send_pending_message());
-	zassert_equal(fake_mqtt->publish_count, 1);
+	zassert_equal(fake_transport->publish_count, 1);
 
 	zassert_ok(spotflow_ota_net_send_pending_message());
-	zassert_equal(fake_mqtt->publish_count, 1);
+	zassert_equal(fake_transport->publish_count, 1);
 }
 
 ZTEST(spotflow_ota_net, test_replace_pending_data_for_new_attempt)

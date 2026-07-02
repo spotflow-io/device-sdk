@@ -32,7 +32,7 @@ void spotflow_ota_test_wait_for_persisted_attempt(uint64_t attempt_id,
 }
 
 void spotflow_ota_test_wait_for_persisted_attempt_error(
-    uint64_t attempt_id, enum spotflow_ota_attempt_error attempt_error)
+	uint64_t attempt_id, enum spotflow_ota_attempt_error attempt_error)
 {
 	for (int i = 0; i < 100; i++) {
 		struct spotflow_ota_persisted_attempt attempt;
@@ -51,14 +51,15 @@ void spotflow_ota_test_wait_for_persisted_attempt_error(
 }
 
 void spotflow_ota_test_expect_update_results_payload(
-    const struct spotflow_ota_cbor_update_results* expected_message)
+	const struct spotflow_ota_cbor_update_results* expected_message)
 {
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
+	struct spotflow_ota_test_fake_transport* fake_transport =
+		spotflow_ota_test_fake_transport_get();
 	uint8_t expected_payload[128];
 	size_t expected_len;
 
 	zassert_ok(spotflow_ota_cbor_encode_update_results(
-	    expected_message, expected_payload, sizeof(expected_payload), &expected_len));
-	zassert_equal(fake_mqtt->last_payload_len, expected_len);
-	zassert_mem_equal(fake_mqtt->last_payload, expected_payload, expected_len);
+		expected_message, expected_payload, sizeof(expected_payload), &expected_len));
+	zassert_equal(fake_transport->last_payload_len, expected_len);
+	zassert_mem_equal(fake_transport->last_payload, expected_payload, expected_len);
 }

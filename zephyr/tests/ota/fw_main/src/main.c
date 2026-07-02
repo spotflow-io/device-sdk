@@ -108,7 +108,7 @@ static void apply_main_result(enum spotflow_ota_result result)
 }
 
 void spotflow_on_main_firmware_update_progressed(
-    const struct spotflow_ota_main_firmware_state* state)
+	const struct spotflow_ota_main_firmware_state* state)
 {
 	if (state != NULL && progress_phase_count < ARRAY_SIZE(progress_phases)) {
 		progress_phases[progress_phase_count++] = state->phase;
@@ -118,17 +118,6 @@ void spotflow_on_main_firmware_update_progressed(
 bool spotflow_is_update_canceled(void)
 {
 	return spotflow_ota_state_is_update_canceled();
-}
-
-int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
-{
-	struct spotflow_ota_test_fake_mqtt* fake_mqtt = spotflow_ota_test_fake_mqtt_get();
-
-	fake_mqtt->publish_count++;
-	fake_mqtt->last_payload = payload;
-	fake_mqtt->last_payload_len = len;
-
-	return fake_mqtt->publish_result;
 }
 
 static void fill_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH], uint8_t seed)
@@ -386,7 +375,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
 	zassert_false(has_probation);
 	zassert_ok(spotflow_ota_persistence_load_installed_version(
-	    "main", installed_version, sizeof(installed_version), &has_version));
+		"main", installed_version, sizeof(installed_version), &has_version));
 	zassert_true(has_version);
 	zassert_str_equal(installed_version, "1.0.0");
 }
@@ -744,7 +733,7 @@ ZTEST(spotflow_ota_fw_main, test_confirm_rejects_non_unconfirmed_phase)
 
 	accept_two_artifact_update();
 	zassert_ok(
-	    spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_DOWNLOADING, &state));
+		spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_DOWNLOADING, &state));
 
 	zassert_equal(spotflow_ota_fw_main_confirm_image(&state, &action), -EINVAL);
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_DOWNLOADING);

@@ -21,6 +21,7 @@ target_sources(app PRIVATE
         src/main.c
         ../common/spotflow_ota_test_settings.c
         ../common/spotflow_ota_test_fakes.c
+        ../common/spotflow_ota_test_transport_stubs.c
         ../common/spotflow_ota_test_wait.c
         ../../../src/ota/protocol/spotflow_ota_cbor.c
         ../../../src/ota/firmware/spotflow_ota_fw_custom.c

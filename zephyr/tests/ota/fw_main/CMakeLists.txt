@@ -30,6 +30,7 @@ target_sources(app PRIVATE
         ../common/spotflow_ota_build_id_fake.c
         ../common/spotflow_ota_platform_fake.c
         ../common/spotflow_ota_test_fakes.c
+        ../common/spotflow_ota_test_transport_stubs.c
         ../common/spotflow_ota_test_settings.c
         ../downloader/spotflow_ota_downloader_transport_fake.c
         ../../../src/ota/protocol/spotflow_ota_cbor.c
