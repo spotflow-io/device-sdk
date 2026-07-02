@@ -16,7 +16,7 @@
 #include "ota/persistence/spotflow_ota_persistence.h"
 #include "ota/core/spotflow_ota_state.h"
 #include "ota/core/spotflow_ota_worker.h"
-#include "net/spotflow_mqtt.h"
+#include "net/spotflow_transport.h"
 
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -106,7 +106,7 @@ int spotflow_ota_init_session(void)
 		return rc;
 	}
 
-	rc = spotflow_mqtt_request_ota_subscription(handle_ota_c2d_msg);
+	rc = spotflow_transport_subscribe_ota(handle_ota_c2d_msg);
 	if (rc < 0) {
 		LOG_ERR("Failed to request subscription to OTA topic: %d", rc);
 		return rc;

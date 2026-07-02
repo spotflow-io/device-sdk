@@ -3,7 +3,7 @@
 
 #include <zephyr/kernel.h>
 
-#include "net/spotflow_mqtt.h"
+#include "net/spotflow_transport.h"
 #include "ota/protocol/spotflow_ota_cbor.h"
 #include "ota/protocol/spotflow_ota_net.h"
 
@@ -110,8 +110,8 @@ int spotflow_ota_net_send_pending_message(void)
 		return 0;
 	}
 
-	int rc =
-	    spotflow_mqtt_publish_ota_cbor_msg(pending_message.buffer, pending_message.encoded_len);
+	int rc = spotflow_transport_send_ota_cbor(pending_message.buffer,
+						  pending_message.encoded_len);
 
 	if (rc == 0) {
 		clear_pending_message_locked();

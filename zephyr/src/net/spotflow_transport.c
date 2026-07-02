@@ -8,6 +8,8 @@
 #include "net/transport/mqtt/spotflow_mqtt.h"
 #endif
 
+#include <errno.h>
+
 int spotflow_transport_start(void)
 {
 #if CONFIG_SPOTFLOW_TRANSPORT_BLE
@@ -44,12 +46,33 @@ int spotflow_transport_send_config_cbor(uint8_t* payload, size_t len)
 #endif
 }
 
+int spotflow_transport_send_ota_cbor(uint8_t* payload, size_t len)
+{
+#if CONFIG_SPOTFLOW_TRANSPORT_BLE
+	ARG_UNUSED(payload);
+	ARG_UNUSED(len);
+	return -ENOTSUP;
+#else
+	return spotflow_mqtt_publish_ota_cbor_msg(payload, len);
+#endif
+}
+
 int spotflow_transport_subscribe_config(spotflow_transport_message_cb callback)
 {
 #if CONFIG_SPOTFLOW_TRANSPORT_BLE
 	return spotflow_ble_transport_subscribe_config(callback);
 #else
 	return spotflow_mqtt_request_config_subscription(callback);
+#endif
+}
+
+int spotflow_transport_subscribe_ota(spotflow_transport_message_cb callback)
+{
+#if CONFIG_SPOTFLOW_TRANSPORT_BLE
+	ARG_UNUSED(callback);
+	return -ENOTSUP;
+#else
+	return spotflow_mqtt_request_ota_subscription(callback);
 #endif
 }
 
