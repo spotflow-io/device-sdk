@@ -30,18 +30,32 @@ in the sample.
 
 ## Requirements
 
-- NXP FRDM-RW612 (Wi-Fi) — other MCUboot-capable boards may work with board overlays.
+- Board with [partitions needed for MCUboot](https://docs.mcuboot.com/readme-zephyr.html). Tested with FRDM-RW612 and FRDM-MCXN947 from NXP.
 - Network connectivity (Wi-Fi by default; set `CONFIG_SPOTFLOW_USE_ETH=y` for Ethernet).
-- Zephyr workspace with the Spotflow module and Python `.venv` activated.
 
-## Build and flash
+## Set up workspace
+
+The sample can be compiled only within a Zephyr workspace with the Spotflow module.
+The easiest way to set up the workspace in a new directory is to follow the second step of our [Zephyr quickstart guide](https://docs.spotflow.io/quickstart/zephyr).
+
+If the virtual environment is not activated, activate it:
 
 ```bash
-west build --sysbuild -b frdm_rw612 spotflow/zephyr/samples/ota --pristine
-west flash
+# .venv/Scripts/Activate.ps1 in PowerShell
+source .venv/bin/activate
 ```
 
+Navigate to the sample directory:
+
+```bash
+cd modules/lib/spotflow/zephyr/samples/ota
+```
+
+> **Note:** If the directory doesn't exist, use `cd spotflow/zephyr/samples/ota` instead.
+
 ### Credentials
+
+Create a new credentials file from the template:
 
 ```bash
 cp credentials-sample.conf credentials.conf
@@ -50,16 +64,27 @@ cp credentials-sample.conf credentials.conf
 Edit `credentials.conf` with your Wi-Fi SSID/password and Spotflow device ID / ingest key.
 This file is merged automatically by CMake and included in `.gitignore`.
 
+## Build and flash
+
+With the Python virtual environment activated, run the following commands in the sample directory:
+
+```bash
+west build --sysbuild --board frdm_rw612 --pristine
+west flash
+```
+
 ## Try an OTA update
 
-1. Build and flash the sample.
-2. Wait for the device to connect (watch serial logs for network and MQTT readiness).
-3. Modify the sample (such as by addding `LOG_INF("Hello, OTA updates!")`)and rebuild the sample.
-4. In the [Spotflow portal](https://app.spotflow.io), upload the new firmware image (`build/ota/zephyr/zephyr.signed.bin`) and
-   [create a deployment](https://docs.spotflow.io/guides/ota) targeting this device.
-5. Observe serial logs during download and reboot. You should see main-firmware progress
+After you flash the sample to the board, follow these steps:
+
+1. Wait for the device to connect (watch serial logs for network and MQTT readiness).
+2. Modify the sample (such as by addding `LOG_INF("Hello, OTA updates!")`) and rebuild the sample.
+3. Follow the instructions in the [OTA update deployment guide](https://docs.spotflow.io/guides/ota) to upload the new firmware image to the [portal](https://app.spotflow.io/) and create a deployment targeting this device.
+   Use the firmware image `build/ota/zephyr/zephyr.signed.bin`, which is signed by the default signing key (suitable for testing only).
+   When creating the deployment, keep the *Main firmware* toggle selected so that the update is handled automatically by the device module.
+4. Observe serial logs during download and reboot. You should see main-firmware progress
    lines such as `phase=DOWNLOADING` and `phase=PENDING_REBOOT`.
-6. After reboot into the new image, the sample confirms automatically:
+5. After reboot into the new image, the sample confirms automatically:
 
    ```
    Unconfirmed main firmware detected (phase=UNCONFIRMED), confirming via Spotflow OTA
