@@ -62,7 +62,7 @@ cd spotflow-ws
 python -m venv .venv
 
 # .venv/Scripts/Activate.ps1 in PowerShell
-.venv/bin/activate
+source .venv/bin/activate
 
 pip install west
 ```
