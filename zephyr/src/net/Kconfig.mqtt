@@ -40,6 +40,33 @@ config SPOTFLOW_TRANSPORT_MQTT
 
 if SPOTFLOW_TRANSPORT_MQTT
 
+
+configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
+	default 4608 if SPOTFLOW
+
+if NRF_SECURITY
+configdefault MBEDTLS_MPI_MAX_SIZE
+	int
+	default 512 if SPOTFLOW
+endif #NRF_SECURITY
+
+configdefault ZVFS_OPEN_MAX
+	default 32 if SPOTFLOW
+
+# It's generally better to use a separate heap for mbedtls so that
+# there is a dedicated heap for TLS operations without fragmentation.
+# Skipped when nRF Security is used, as the default of MBEDTLS_HEAP_SIZE
+# doesn't propagate correctly, leading to TLS handshake failures.
+configdefault MBEDTLS_ENABLE_HEAP
+	default y if SPOTFLOW && !NRF_SECURITY
+
+if MBEDTLS_ENABLE_HEAP
+# Needed to be able to verify the whole Let's Encrypt certificate chain
+configdefault MBEDTLS_HEAP_SIZE
+	default 36864
+endif # MBEDTLS_ENABLE_HEAP
+
+
 config SPOTFLOW_SERVER_HOSTNAME
 	string "Hostname of Spotflow observability platform"
 	default "mqtt.spotflow.io"
