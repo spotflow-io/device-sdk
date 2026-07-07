@@ -267,7 +267,15 @@ static int enable_bluetooth(void)
 
 static int start_advertising(void)
 {
-	int rc = bt_le_adv_start(BT_LE_ADV_CONN_FAST_1, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+	const struct bt_le_adv_param* conn_mode =
+#ifdef BT_LE_ADV_CONN_FAST_1
+		BT_LE_ADV_CONN_FAST_1;
+#else
+/* to provide backward compatibility fro zephyr 3.7.0 */
+		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_FAST_INT_MIN_1,
+				BT_GAP_ADV_FAST_INT_MAX_1, NULL);
+#endif
+	int rc = bt_le_adv_start(conn_mode, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 
 	if (rc == -EALREADY) {
 		return 0;
