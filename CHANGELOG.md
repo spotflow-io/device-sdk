@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added Zephyr BLE transport support for coredump telemetry chunks.
 * Added coredump support for siwx917
 * Added coredump support for saving coredump to memory
-
+* Added BLE support for TI LP-EM-CC2340R5
 
 ### Fixed
 * Fixed ESP-IDF Spotflow log backend parsing for Log V1 prefixes and corrected `va_list` handling in the `esp_log_set_vprintf()` hook.
