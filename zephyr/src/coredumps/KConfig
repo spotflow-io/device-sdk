@@ -28,6 +28,15 @@ config SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL
 		- 2 WARNING, write LOG_WRN in addition to previous level
 		- 3 INFO, write LOG_INF in addition to previous level
 		- 4 DEBUG, write LOG_DBG in addition to previous level
+
+config SPOTFLOW_COREDUMPS_THREAD_STACK_SIZE
+	int "Spotflow coredumps processing thread stack size"
+	default 1024
+	help
+		Size of the stack used by the thread preparing stored coredumps
+		for transport. Reduce this on RAM-constrained boards only after
+		validating coredump upload.
+
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_COREDUMPS
 	int "Additional heap size required by Spotflow"
 	default 18432 if SPOTFLOW_COREDUMPS
@@ -59,4 +68,12 @@ config SPOTFLOW_USE_DEFAULT_REBOOT_HANDLER
         Use the default Zephyr reboot handler to reset the system after a fatal error.
         If disabled, you will need to implement your own reboot handler.
         Please, make sure you reboot the device and call LOG_PANIC() in your handler.
+
+config SPOTFLOW_COREDUMPS_REBOOT_WARM
+    bool "Use warm reboot after coredump"
+    default n
+    depends on SPOTFLOW_USE_DEFAULT_REBOOT_HANDLER
+    help
+        Use SYS_REBOOT_WARM instead of SYS_REBOOT_COLD after writing a coredump.
+        Enable this on boards where cold reboot is not implemented by the SoC.
 endif #SPOTFLOW_COREDUMPS
