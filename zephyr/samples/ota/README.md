@@ -36,7 +36,7 @@ in the sample.
 ## Set up workspace
 
 The sample can be compiled only within a Zephyr workspace with the Spotflow module.
-The easiest way to set up the workspace in a new directory is to follow the second step of our [Zephyr quickstart guide](https://docs.spotflow.io/quickstart/zephyr).
+The easiest way to set up the workspace in a new directory is to follow the second step ([Create West Workspace](https://docs.spotflow.io/quickstart/zephyr#create-west-workspace)) of our [Zephyr quickstart guide](https://docs.spotflow.io/quickstart/zephyr).
 
 If the virtual environment is not activated, activate it:
 
