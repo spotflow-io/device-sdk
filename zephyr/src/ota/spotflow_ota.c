@@ -152,7 +152,7 @@ void spotflow_ota_reset(void)
 
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 {
-	struct spotflow_ota_cbor_c2d_msg msg;
+	static struct spotflow_ota_cbor_c2d_msg msg;
 	struct spotflow_ota_cbor_decode_status status;
 	int rc = spotflow_ota_cbor_decode_c2d(payload, len, &msg, &status);
 
