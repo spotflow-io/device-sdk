@@ -129,8 +129,8 @@ ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_w
 	zassert_equal(snapshot.current_attempt_id, 10);
 	zassert_false(snapshot.has_pending_attempt);
 
-	spotflow_ota_test_wait_for_persisted_attempt(9, superseded_results,
-						     ARRAY_SIZE(superseded_results));
+	zassert_true(spotflow_ota_test_settings_attempt_was_saved(9, superseded_results,
+								  ARRAY_SIZE(superseded_results)));
 	zassert_equal(fake_transport->publish_count, 0);
 	zassert_ok(spotflow_ota_net_send_pending_message());
 	zassert_equal(fake_transport->publish_count, 0);
@@ -204,6 +204,37 @@ ZTEST(spotflow_ota_worker, test_multi_artifact_success_processed_in_order)
 						     ARRAY_SIZE(expected_results));
 	zassert_ok(spotflow_ota_net_send_pending_message());
 	spotflow_ota_test_expect_update_results_payload(&expected_message);
+}
+
+ZTEST(spotflow_ota_worker, test_accepted_attempt_persisted_before_artifact_processing)
+{
+	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
+		spotflow_ota_test_fake_callbacks_get();
+	struct spotflow_ota_update_msg update = make_delegated_update(1, 1);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_persisted_attempt attempt;
+	const enum spotflow_ota_result expected_pending_results[] = {
+		SPOTFLOW_OTA_RESULT_PENDING,
+	};
+	bool has_attempt;
+
+	fake_callbacks->block_handle = true;
+	fake_callbacks->next_handle_result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
+
+	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
+	wake_worker_from_action(&action);
+	zassert_ok(k_sem_take(&fake_callbacks->handle_called_sem, K_SECONDS(1)));
+
+	zassert_ok(spotflow_ota_persistence_load_attempt(&attempt, &has_attempt));
+	zassert_true(has_attempt);
+	zassert_equal(attempt.attempt_id, 1);
+	zassert_equal(attempt.artifact_count, 1);
+	zassert_false(attempt.has_attempt_error);
+	zassert_mem_equal(attempt.artifact_results, expected_pending_results,
+			  sizeof(expected_pending_results));
+
+	k_sem_give(&fake_callbacks->handle_continue_sem);
+	k_msleep(50);
 }
 
 ZTEST_SUITE(spotflow_ota_worker, NULL, NULL, before_each, NULL, NULL);

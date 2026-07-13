@@ -140,12 +140,32 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 {
 	enum spotflow_ota_result result;
 	struct spotflow_ota_state_snapshot snapshot;
+	int rc;
 
 	LOG_INF("OTA attempt %llu: started artifact '%s' %s (index %zu%s)",
 		(unsigned long long)job->attempt_id, job->artifact.slug, job->artifact.version,
 		job->artifact_index, job->artifact.is_main ? ", main" : "");
 
-	int rc = load_artifact_result(job, &result);
+	/*
+	 * Persist the accepted attempt (pending results) on the worker thread before the first
+	 * physical update or delegated handler runs. Later artifacts rely on the end-of-job
+	 * persist from the previous artifact in the same wake cycle.
+	 */
+	if (job->artifact_index == 0) {
+		spotflow_ota_state_get_snapshot(&snapshot);
+		if (snapshot.has_current_attempt &&
+		    snapshot.current_attempt_id == job->attempt_id && !snapshot.has_attempt_error) {
+			rc = persist_snapshot_attempt(&snapshot);
+			if (rc < 0) {
+				LOG_ERR("Failed to persist OTA attempt %llu before artifact "
+					"processing: %d",
+					(unsigned long long)job->attempt_id, rc);
+				return rc;
+			}
+		}
+	}
+
+	rc = load_artifact_result(job, &result);
 	if (rc < 0) {
 		LOG_ERR("Failed to resolve OTA result for attempt %llu artifact %zu: %d",
 			(unsigned long long)job->attempt_id, job->artifact_index, rc);

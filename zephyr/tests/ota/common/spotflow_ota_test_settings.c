@@ -3,7 +3,10 @@
 
 #include <zephyr/ztest.h>
 
+#include "ota/persistence/spotflow_ota_records_cbor.h"
 #include "spotflow_ota_test_settings.h"
+
+#define SPOTFLOW_OTA_SETTINGS_PATH_ATTEMPT "spotflow/ota/attempt"
 
 struct fake_setting_entry {
 	bool in_use;
@@ -16,6 +19,29 @@ static struct fake_setting_entry fake_entries[8];
 static char last_saved_name[SETTINGS_FULL_NAME_LEN];
 static char last_deleted_name[SETTINGS_FULL_NAME_LEN];
 static const char* save_fail_name;
+static struct spotflow_ota_test_settings_attempt_save
+	attempt_save_history[SPOTFLOW_OTA_TEST_SETTINGS_ATTEMPT_HISTORY_MAX];
+static size_t attempt_save_history_count;
+
+static void record_attempt_save(const void* value, size_t val_len)
+{
+	struct spotflow_ota_persisted_attempt attempt;
+	size_t index;
+
+	if (attempt_save_history_count >= ARRAY_SIZE(attempt_save_history)) {
+		return;
+	}
+
+	if (spotflow_ota_records_cbor_decode_attempt(value, val_len, &attempt) < 0) {
+		return;
+	}
+
+	index = attempt_save_history_count++;
+	attempt_save_history[index].attempt_id = attempt.attempt_id;
+	attempt_save_history[index].artifact_count = attempt.artifact_count;
+	memcpy(attempt_save_history[index].artifact_results, attempt.artifact_results,
+	       sizeof(attempt.artifact_results));
+}
 
 static ssize_t fake_settings_read(void* cb_arg, void* data, size_t len)
 {
@@ -35,6 +61,7 @@ void spotflow_ota_test_settings_reset(void)
 	memset(last_saved_name, 0, sizeof(last_saved_name));
 	memset(last_deleted_name, 0, sizeof(last_deleted_name));
 	save_fail_name = NULL;
+	attempt_save_history_count = 0;
 }
 
 void spotflow_ota_test_settings_set_save_failure(const char* name)
@@ -62,6 +89,27 @@ const char* spotflow_ota_test_settings_get_last_deleted_name(void)
 	return last_deleted_name;
 }
 
+bool spotflow_ota_test_settings_attempt_was_saved(uint64_t attempt_id,
+						  const enum spotflow_ota_result* expected_results,
+						  size_t artifact_count)
+{
+	for (size_t i = 0; i < attempt_save_history_count; i++) {
+		const struct spotflow_ota_test_settings_attempt_save* entry =
+			&attempt_save_history[i];
+
+		if (entry->attempt_id != attempt_id || entry->artifact_count != artifact_count) {
+			continue;
+		}
+
+		if (memcmp(entry->artifact_results, expected_results,
+			   artifact_count * sizeof(expected_results[0])) == 0) {
+			return true;
+		}
+	}
+
+	return false;
+}
+
 int settings_subsys_init(void)
 {
 	return 0;
@@ -83,6 +131,9 @@ int settings_save_one(const char* name, const void* value, size_t val_len)
 			fake_entries[i].value_len = val_len;
 			strncpy(last_saved_name, name, sizeof(last_saved_name) - 1);
 			last_saved_name[sizeof(last_saved_name) - 1] = '\0';
+			if (strcmp(name, SPOTFLOW_OTA_SETTINGS_PATH_ATTEMPT) == 0) {
+				record_attempt_save(value, val_len);
+			}
 			return 0;
 		}
 	}
