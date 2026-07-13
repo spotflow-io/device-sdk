@@ -741,6 +741,11 @@ static int complete_main_firmware_success(const struct spotflow_ota_probation* p
 
 	notify_main_firmware_state(&state);
 
+	rc = persist_snapshot_and_enqueue_results();
+	if (rc < 0) {
+		return rc;
+	}
+
 	rc = spotflow_ota_persistence_clear_probation();
 	if (rc < 0) {
 		LOG_ERR("Failed to clear main firmware probation record: %d", rc);
@@ -748,11 +753,6 @@ static int complete_main_firmware_success(const struct spotflow_ota_probation* p
 	}
 
 	spotflow_ota_state_clear_main_firmware_awaiting_reboot();
-
-	rc = persist_snapshot_and_enqueue_results();
-	if (rc < 0) {
-		return rc;
-	}
 
 	if (!action->wake_worker) {
 		struct spotflow_ota_state_snapshot snapshot;
@@ -788,6 +788,11 @@ static int complete_main_firmware_rollback(const struct spotflow_ota_probation* 
 		return rc;
 	}
 
+	rc = persist_snapshot_and_enqueue_results();
+	if (rc < 0) {
+		return rc;
+	}
+
 	rc = spotflow_ota_persistence_clear_probation();
 	if (rc < 0) {
 		LOG_ERR("Failed to clear main firmware probation record after rollback: %d", rc);
@@ -796,7 +801,7 @@ static int complete_main_firmware_rollback(const struct spotflow_ota_probation* 
 
 	spotflow_ota_state_clear_main_firmware_awaiting_reboot();
 
-	return persist_snapshot_and_enqueue_results();
+	return 0;
 }
 
 static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation)

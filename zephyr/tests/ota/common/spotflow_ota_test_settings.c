@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <string.h>
 
 #include <zephyr/ztest.h>
@@ -14,6 +15,7 @@ struct fake_setting_entry {
 static struct fake_setting_entry fake_entries[8];
 static char last_saved_name[SETTINGS_FULL_NAME_LEN];
 static char last_deleted_name[SETTINGS_FULL_NAME_LEN];
+static const char* save_fail_name;
 
 static ssize_t fake_settings_read(void* cb_arg, void* data, size_t len)
 {
@@ -32,6 +34,12 @@ void spotflow_ota_test_settings_reset(void)
 	memset(fake_entries, 0, sizeof(fake_entries));
 	memset(last_saved_name, 0, sizeof(last_saved_name));
 	memset(last_deleted_name, 0, sizeof(last_deleted_name));
+	save_fail_name = NULL;
+}
+
+void spotflow_ota_test_settings_set_save_failure(const char* name)
+{
+	save_fail_name = name;
 }
 
 void spotflow_ota_test_settings_exhaust_capacity(void)
@@ -61,6 +69,10 @@ int settings_subsys_init(void)
 
 int settings_save_one(const char* name, const void* value, size_t val_len)
 {
+	if (save_fail_name != NULL && strcmp(name, save_fail_name) == 0) {
+		return -EIO;
+	}
+
 	for (size_t i = 0; i < ARRAY_SIZE(fake_entries); i++) {
 		if (!fake_entries[i].in_use || strcmp(fake_entries[i].name, name) == 0) {
 			fake_entries[i].in_use = true;

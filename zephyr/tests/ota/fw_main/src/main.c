@@ -430,6 +430,58 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_mismatch_reports_rollbac
 	zassert_false(has_probation);
 }
 
+ZTEST(spotflow_ota_fw_main, test_success_completion_keeps_probation_when_attempt_persist_fails)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_persisted_attempt attempt;
+	struct spotflow_ota_probation probation;
+	bool has_attempt;
+	bool has_probation;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+
+	fill_build_id(build_id, 0x60);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->image_confirmed = true;
+	spotflow_ota_test_settings_set_save_failure("spotflow/ota/attempt");
+
+	zassert_not_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_true(has_probation);
+	zassert_ok(spotflow_ota_persistence_load_attempt(&attempt, &has_attempt));
+	zassert_true(has_attempt);
+	zassert_equal(attempt.attempt_id, 42);
+	zassert_equal(attempt.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(attempt.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+}
+
+ZTEST(spotflow_ota_fw_main, test_rollback_completion_keeps_probation_when_attempt_persist_fails)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_persisted_attempt attempt;
+	struct spotflow_ota_probation probation;
+	uint8_t expected_build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	uint8_t running_build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	bool has_attempt;
+	bool has_probation;
+
+	fill_build_id(expected_build_id, 0x70);
+	fill_build_id(running_build_id, 0x80);
+	setup_post_reboot_context(expected_build_id, &probation);
+	spotflow_ota_build_id_fake_set_running_build_id(running_build_id);
+	spotflow_ota_test_settings_set_save_failure("spotflow/ota/attempt");
+
+	zassert_not_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_true(has_probation);
+	zassert_ok(spotflow_ota_persistence_load_attempt(&attempt, &has_attempt));
+	zassert_true(has_attempt);
+	zassert_equal(attempt.attempt_id, 42);
+	zassert_equal(attempt.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(attempt.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+}
+
 ZTEST(spotflow_ota_fw_main, test_confirm_api_persists_success_and_wakes_worker)
 {
 	struct spotflow_ota_state_action action;
