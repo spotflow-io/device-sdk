@@ -56,6 +56,11 @@ config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 	bool "Automatically handle main firmware OTA updates"
 	depends on SPOTFLOW_OTA
 	depends on BOOTLOADER_MCUBOOT
+	depends on MCUBOOT_BOOTLOADER_MODE_SWAP_USING_OFFSET || \
+		MCUBOOT_BOOTLOADER_MODE_SWAP_USING_MOVE || \
+		MCUBOOT_BOOTLOADER_MODE_SWAP_SCRATCH || \
+		MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP_WITH_REVERT || \
+		MCUBOOT_BOOTLOADER_MODE_RAM_LOAD_WITH_REVERT
 	depends on ARCH_SUPPORTS_ROM_START || ARCH_POSIX
 	depends on SPOTFLOW_GENERATE_BUILD_ID
 	select FLASH
@@ -70,8 +75,8 @@ config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 	help
 	  When enabled, the Spotflow OTA SDK downloads main firmware artifacts,
 	  requests an MCUboot test upgrade, and reconciles probation state after
-	  reboot. Requires MCUboot (typically via sysbuild), flash partition
-	  layout with a secondary slot, and binary descriptor support for
-	  downloaded-image build ID extraction.
+	  reboot. Requires MCUboot (typically via sysbuild) in a rollback-capable
+	  mode, flash partition layout with a secondary slot, and binary descriptor
+	  support for downloaded-image build ID extraction.
 
 endif # SPOTFLOW_OTA

@@ -31,6 +31,7 @@ in the sample.
 ## Requirements
 
 - Board with [partitions needed for MCUboot](https://docs.mcuboot.com/readme-zephyr.html). Tested with FRDM-RW612 and FRDM-MCXN947 from NXP.
+- MCUboot in a **rollback-capable** mode (swap using offset/move/scratch, or direct XIP / RAM load with revert).
 - Network connectivity (Wi-Fi by default; set `CONFIG_SPOTFLOW_USE_ETH=y` for Ethernet).
 
 ## Set up workspace
@@ -103,7 +104,7 @@ for logging guidance.
 | File | Purpose |
 |---|---|
 | `prj.conf` | Enables Spotflow, OTA, auto main firmware, NVS settings, networking |
-| `sysbuild.conf` | Enables MCUboot (`SB_CONFIG_BOOTLOADER_MCUBOOT=y`) |
+| `sysbuild.conf` | Enables MCUboot (`SB_CONFIG_BOOTLOADER_MCUBOOT=y`); default swap-using-offset mode |
 | `sysbuild/mcuboot.conf` | Optional MCUboot log level |
 | `boards/frdm_rw612.conf` | Board-specific network buffer tuning |
 | `credentials-sample.conf` | Template for `credentials.conf` |
