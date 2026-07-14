@@ -309,5 +309,9 @@ static int validate_probation(const struct spotflow_ota_probation* probation)
 		return -EINVAL;
 	}
 
+	if (probation->artifact_index >= CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS) {
+		return -EINVAL;
+	}
+
 	return 0;
 }
