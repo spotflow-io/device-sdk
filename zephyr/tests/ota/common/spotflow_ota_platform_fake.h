@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <zephyr/kernel.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -22,6 +24,9 @@ struct spotflow_ota_platform_fake {
 	int image_info_result;
 	int begin_write_result;
 	int write_result;
+	bool block_upgrade_request;
+	struct k_sem upgrade_request_entered;
+	struct k_sem continue_upgrade_request;
 	/** Fail writes once this many bytes have been written successfully. */
 	size_t write_fail_after_bytes;
 	size_t upload_image_start;

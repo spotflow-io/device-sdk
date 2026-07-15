@@ -121,6 +121,16 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 			       const struct spotflow_download_request* request,
 			       spotflow_download_block_callback callback, void* callback_ctx)
 {
+	return spotflow_ota_download_artifact(downloader, request, callback, callback_ctx, NULL,
+					      NULL);
+}
+
+int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
+				   const struct spotflow_download_request* request,
+				   spotflow_download_block_callback callback, void* callback_ctx,
+				   spotflow_ota_download_started_callback started_callback,
+				   void* started_callback_ctx)
+{
 	if (downloader == NULL || request == NULL || request->url == NULL ||
 	    request->secret == NULL || callback == NULL) {
 		return -EINVAL;
@@ -152,6 +162,10 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
 	downloader_drain_resume_sem(downloader);
 	downloader->state = SPOTFLOW_DOWNLOADER_STATE_DOWNLOADING;
 	k_mutex_unlock(&downloader->mutex);
+
+	if (started_callback != NULL) {
+		started_callback(downloader, started_callback_ctx);
+	}
 
 	LOG_DBG("Starting artifact download (TLS: %d, port: %u)", url.tls, url.port);
 

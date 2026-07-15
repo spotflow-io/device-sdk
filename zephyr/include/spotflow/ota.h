@@ -124,6 +124,7 @@ bool spotflow_is_update_canceled(void);
  * changes caused directly by @ref spotflow_pause_main_firmware_update,
  * @ref spotflow_resume_main_firmware_update, or
  * @ref spotflow_abort_main_firmware_update.
+ * These control APIs may be called from this callback.
  *
  * The default (weak) implementation is a no-op.
  *
@@ -178,6 +179,11 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
  * @c SPOTFLOW_OTA_PHASE_DOWNLOADING, @c SPOTFLOW_OTA_PHASE_PENDING_UPGRADE, or
  * @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT. Pausing while already paused succeeds
  * and leaves the update paused.
+ *
+ * Pausing in @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT delays the reboot initiated by
+ * the SDK. The MCUboot test upgrade has already been requested, so any reboot
+ * initiated by the application, the user, or a power cycle still starts the new
+ * image.
  *
  * When @p state is not NULL, the current main-firmware state is written on
  * return, including after errors.

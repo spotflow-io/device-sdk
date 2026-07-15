@@ -27,6 +27,24 @@ static size_t progress_phase_count;
 static uint8_t download_payload[128];
 static size_t download_payload_len;
 
+enum progress_control_action {
+	PROGRESS_CONTROL_NONE,
+	PROGRESS_CONTROL_PAUSE,
+	PROGRESS_CONTROL_ABORT,
+};
+
+static struct {
+	enum spotflow_ota_phase phase;
+	enum progress_control_action action;
+	int rc;
+	size_t count;
+	struct spotflow_ota_state_action abort_action;
+} progress_control;
+
+static K_SEM_DEFINE(progress_control_done, 0, 1);
+
+static enum spotflow_ota_result process_thread_result;
+
 static struct spotflow_ota_artifact main_artifact = {
 	.is_main = true,
 	.slug = "main",
@@ -86,6 +104,9 @@ static void reset_test_state(void)
 	platform_fake = spotflow_ota_platform_fake_get();
 	transport_fake = spotflow_ota_downloader_transport_fake_get();
 	progress_phase_count = 0;
+	memset(&progress_control, 0, sizeof(progress_control));
+	while (k_sem_take(&progress_control_done, K_NO_WAIT) == 0) {
+	}
 
 	build_download_payload(download_payload, sizeof(download_payload), &download_payload_len);
 	transport_fake->payload = download_payload;
@@ -113,6 +134,20 @@ void spotflow_on_main_firmware_update_progressed(
 	if (state != NULL && progress_phase_count < ARRAY_SIZE(progress_phases)) {
 		progress_phases[progress_phase_count++] = state->phase;
 	}
+
+	if (state == NULL || progress_control.action == PROGRESS_CONTROL_NONE ||
+	    state->phase != progress_control.phase || progress_control.count > 0) {
+		return;
+	}
+
+	progress_control.count++;
+	if (progress_control.action == PROGRESS_CONTROL_PAUSE) {
+		progress_control.rc = spotflow_ota_fw_main_pause_update(NULL);
+	} else {
+		progress_control.rc =
+			spotflow_ota_fw_main_fail_update(NULL, &progress_control.abort_action);
+	}
+	k_sem_give(&progress_control_done);
 }
 
 bool spotflow_is_update_canceled(void)
@@ -553,6 +588,90 @@ static void pause_after_delay(void* arg1, void* arg2, void* arg3)
 	zassert_ok(spotflow_ota_fw_main_resume_update(NULL));
 }
 
+static void process_main_artifact(void* arg1, void* arg2, void* arg3)
+{
+	ARG_UNUSED(arg1);
+	ARG_UNUSED(arg2);
+	ARG_UNUSED(arg3);
+
+	process_thread_result = spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact);
+}
+
+static void resume_after_progress_pause(void* arg1, void* arg2, void* arg3)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+
+	ARG_UNUSED(arg1);
+	ARG_UNUSED(arg2);
+	ARG_UNUSED(arg3);
+
+	zassert_ok(k_sem_take(&progress_control_done, K_SECONDS(1)));
+	zassert_ok(progress_control.rc);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_true(snapshot.main_firmware_state.is_paused);
+
+	switch (progress_control.phase) {
+	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
+	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
+		zassert_equal(platform_fake->upload_image_size, 0);
+		zassert_equal(platform_fake->upgrade_request_count, 0);
+		break;
+	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
+		zassert_equal(platform_fake->upgrade_request_count, 0);
+		break;
+	case SPOTFLOW_OTA_PHASE_PENDING_REBOOT:
+		zassert_equal(platform_fake->upgrade_request_count, 1);
+		zassert_equal(platform_fake->reboot_count, 0);
+		break;
+	default:
+		zassert_unreachable();
+	}
+
+	zassert_ok(spotflow_ota_fw_main_resume_update(NULL));
+}
+
+static void run_progress_callback_pause(enum spotflow_ota_phase phase)
+{
+	struct k_thread resume_thread;
+	k_thread_stack_t resume_stack[1024];
+	enum spotflow_ota_result result;
+
+	progress_control.phase = phase;
+	progress_control.action = PROGRESS_CONTROL_PAUSE;
+	accept_two_artifact_update();
+
+	k_thread_create(&resume_thread, resume_stack, K_THREAD_STACK_SIZEOF(resume_stack),
+			resume_after_progress_pause, NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0,
+			K_NO_WAIT);
+
+	result = spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact);
+	k_thread_join(&resume_thread, K_FOREVER);
+
+	zassert_equal(result, SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(progress_control.count, 1);
+	zassert_equal(progress_control.rc, 0);
+	zassert_equal(platform_fake->upgrade_request_count, 1);
+	zassert_equal(platform_fake->reboot_count, 1);
+}
+
+static void run_progress_callback_abort(enum spotflow_ota_phase phase)
+{
+	enum spotflow_ota_result result;
+
+	progress_control.phase = phase;
+	progress_control.action = PROGRESS_CONTROL_ABORT;
+	accept_two_artifact_update();
+
+	result = spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact);
+
+	zassert_equal(result, SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(progress_control.count, 1);
+	zassert_equal(progress_control.rc, 0);
+	zassert_equal(platform_fake->upgrade_request_count, 0);
+	zassert_equal(platform_fake->reboot_count, 0);
+}
+
 static struct spotflow_ota_state_action async_fail_action;
 
 static void fail_after_delay(void* arg1, void* arg2, void* arg3)
@@ -644,6 +763,162 @@ ZTEST(spotflow_ota_fw_main, test_pause_valid_pending_reboot_sets_paused)
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
 }
 
+ZTEST(spotflow_ota_fw_main, test_progress_callback_can_pause_pending_download)
+{
+	run_progress_callback_pause(SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD);
+}
+
+ZTEST(spotflow_ota_fw_main, test_progress_callback_can_pause_downloading)
+{
+	run_progress_callback_pause(SPOTFLOW_OTA_PHASE_DOWNLOADING);
+}
+
+ZTEST(spotflow_ota_fw_main, test_progress_callback_can_pause_pending_upgrade)
+{
+	run_progress_callback_pause(SPOTFLOW_OTA_PHASE_PENDING_UPGRADE);
+}
+
+ZTEST(spotflow_ota_fw_main, test_progress_callback_can_pause_pending_reboot)
+{
+	run_progress_callback_pause(SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+}
+
+ZTEST(spotflow_ota_fw_main, test_progress_callback_can_abort_pending_download)
+{
+	run_progress_callback_abort(SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD);
+}
+
+ZTEST(spotflow_ota_fw_main, test_progress_callback_can_abort_downloading)
+{
+	run_progress_callback_abort(SPOTFLOW_OTA_PHASE_DOWNLOADING);
+}
+
+ZTEST(spotflow_ota_fw_main, test_progress_callback_can_abort_pending_upgrade)
+{
+	run_progress_callback_abort(SPOTFLOW_OTA_PHASE_PENDING_UPGRADE);
+}
+
+ZTEST(spotflow_ota_fw_main, test_progress_callback_cannot_abort_pending_reboot)
+{
+	enum spotflow_ota_result result;
+
+	progress_control.phase = SPOTFLOW_OTA_PHASE_PENDING_REBOOT;
+	progress_control.action = PROGRESS_CONTROL_ABORT;
+	accept_two_artifact_update();
+
+	result = spotflow_ota_fw_main_process_artifact(42, 0, &main_artifact);
+
+	zassert_equal(result, SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(progress_control.count, 1);
+	zassert_equal(progress_control.rc, -EINVAL);
+	zassert_equal(platform_fake->upgrade_request_count, 1);
+	zassert_equal(platform_fake->reboot_count, 1);
+}
+
+ZTEST(spotflow_ota_fw_main, test_upgrade_commit_wins_race_with_abort)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_main_firmware_state state;
+	struct k_thread process_thread;
+	k_thread_stack_t process_stack[2048];
+
+	platform_fake->block_upgrade_request = true;
+	accept_two_artifact_update();
+
+	k_thread_create(&process_thread, process_stack, K_THREAD_STACK_SIZEOF(process_stack),
+			process_main_artifact, NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, K_NO_WAIT);
+
+	zassert_ok(k_sem_take(&platform_fake->upgrade_request_entered, K_SECONDS(1)));
+	zassert_equal(spotflow_ota_fw_main_fail_update(&state, &action), -EINVAL);
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_UPGRADE);
+
+	k_sem_give(&platform_fake->continue_upgrade_request);
+	k_thread_join(&process_thread, K_FOREVER);
+
+	zassert_equal(process_thread_result, SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(platform_fake->upgrade_request_count, 1);
+	zassert_equal(platform_fake->reboot_count, 1);
+}
+
+ZTEST(spotflow_ota_fw_main, test_pause_racing_upgrade_commit_defers_reboot)
+{
+	struct spotflow_ota_main_firmware_state state;
+	struct k_thread process_thread;
+	k_thread_stack_t process_stack[2048];
+
+	platform_fake->block_upgrade_request = true;
+	accept_two_artifact_update();
+
+	k_thread_create(&process_thread, process_stack, K_THREAD_STACK_SIZEOF(process_stack),
+			process_main_artifact, NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, K_NO_WAIT);
+
+	zassert_ok(k_sem_take(&platform_fake->upgrade_request_entered, K_SECONDS(1)));
+	zassert_ok(spotflow_ota_fw_main_pause_update(&state));
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_UPGRADE);
+	k_sem_give(&platform_fake->continue_upgrade_request);
+
+	for (size_t i = 0; i < 100; i++) {
+		struct spotflow_ota_state_snapshot snapshot;
+
+		spotflow_ota_state_get_snapshot(&snapshot);
+		state = snapshot.main_firmware_state;
+		if (state.phase == SPOTFLOW_OTA_PHASE_PENDING_REBOOT) {
+			break;
+		}
+		k_sleep(K_MSEC(1));
+	}
+
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+	zassert_true(state.is_paused);
+	zassert_equal(platform_fake->reboot_count, 0);
+	zassert_ok(spotflow_ota_fw_main_resume_update(NULL));
+
+	k_thread_join(&process_thread, K_FOREVER);
+	zassert_equal(process_thread_result, SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(platform_fake->reboot_count, 1);
+}
+
+ZTEST(spotflow_ota_fw_main, test_power_loss_while_pending_reboot_paused_recovers)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_persisted_attempt attempt;
+	struct spotflow_ota_probation probation;
+	struct k_thread process_thread;
+	k_thread_stack_t process_stack[2048];
+	bool has_attempt;
+	bool has_probation;
+
+	progress_control.phase = SPOTFLOW_OTA_PHASE_PENDING_REBOOT;
+	progress_control.action = PROGRESS_CONTROL_PAUSE;
+	accept_two_artifact_update();
+
+	k_thread_create(&process_thread, process_stack, K_THREAD_STACK_SIZEOF(process_stack),
+			process_main_artifact, NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, K_NO_WAIT);
+
+	zassert_ok(k_sem_take(&progress_control_done, K_SECONDS(1)));
+	zassert_ok(progress_control.rc);
+	zassert_equal(platform_fake->upgrade_request_count, 1);
+	zassert_equal(platform_fake->reboot_count, 0);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_true(has_probation);
+	zassert_ok(spotflow_ota_persistence_load_attempt(&attempt, &has_attempt));
+	zassert_true(has_attempt);
+
+	k_thread_abort(&process_thread);
+	k_thread_join(&process_thread, K_FOREVER);
+
+	spotflow_ota_build_id_fake_set_running_build_id(probation.expected_build_id);
+	spotflow_ota_state_reset();
+	spotflow_ota_fw_main_reset();
+	zassert_ok(spotflow_ota_state_init_from_persistence(&attempt, true, &probation, true));
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
+	zassert_false(snapshot.main_firmware_state.is_paused);
+}
+
 ZTEST(spotflow_ota_fw_main, test_fail_invalid_pending_reboot_returns_current_state)
 {
 	struct spotflow_ota_state_action action;
@@ -655,7 +930,7 @@ ZTEST(spotflow_ota_fw_main, test_fail_invalid_pending_reboot_returns_current_sta
 	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_PENDING);
 }
 
-ZTEST(spotflow_ota_fw_main, test_fail_valid_marks_failed_and_cancels_remaining)
+ZTEST(spotflow_ota_fw_main, test_fail_valid_records_asynchronous_abort)
 {
 	struct spotflow_ota_state_action action;
 	struct spotflow_ota_main_firmware_state state;
@@ -663,12 +938,13 @@ ZTEST(spotflow_ota_fw_main, test_fail_valid_marks_failed_and_cancels_remaining)
 
 	setup_pre_reboot_main_update(SPOTFLOW_OTA_PHASE_DOWNLOADING);
 	zassert_ok(spotflow_ota_fw_main_fail_update(&state, &action));
-	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
-	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_DOWNLOADING);
+	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_PENDING);
 
 	spotflow_ota_state_get_snapshot(&snapshot);
-	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
-	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_true(spotflow_ota_state_is_main_firmware_abort_requested());
 }
 
 ZTEST(spotflow_ota_fw_main, test_fail_invalid_not_running_returns_current_state)

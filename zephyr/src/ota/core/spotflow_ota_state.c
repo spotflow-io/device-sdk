@@ -24,6 +24,9 @@ struct attempt_state {
 	size_t main_firmware_artifact_index;
 	struct spotflow_ota_artifact main_firmware_artifact;
 	struct spotflow_ota_main_firmware_state main_firmware_state;
+	bool main_firmware_abort_requested;
+	bool main_firmware_upgrade_commit_started;
+	bool main_firmware_reboot_started;
 };
 
 static struct attempt_state current_attempt;
@@ -53,6 +56,8 @@ static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 static bool attempt_has_terminal_results(const struct attempt_state* attempt);
 static bool attempt_has_reportable_results(const struct attempt_state* attempt);
 static bool attempt_has_succeeded_artifact(const struct attempt_state* attempt);
+static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase);
+static bool main_firmware_phase_allows_abort(enum spotflow_ota_phase phase);
 static void cancel_pending_artifacts(struct attempt_state* attempt);
 static void advance_current_artifact(struct attempt_state* attempt);
 static void fill_action(struct spotflow_ota_state_action* action, uint64_t attempt_id);
@@ -428,7 +433,6 @@ int spotflow_ota_state_set_main_firmware_phase(enum spotflow_ota_phase phase,
 	}
 
 	current_attempt.main_firmware_state.phase = phase;
-	current_attempt.main_firmware_state.is_paused = false;
 	current_attempt.main_firmware_state.result = SPOTFLOW_OTA_RESULT_PENDING;
 
 	if (out_state != NULL) {
@@ -455,6 +459,10 @@ int spotflow_ota_state_set_main_firmware_result(enum spotflow_ota_result result,
 
 	current_attempt.main_firmware_state.result = result;
 	current_attempt.main_firmware_state.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
+	current_attempt.main_firmware_state.is_paused = false;
+	current_attempt.main_firmware_abort_requested = false;
+	current_attempt.main_firmware_upgrade_commit_started = false;
+	current_attempt.main_firmware_reboot_started = false;
 
 	if (out_state != NULL) {
 		*out_state = current_attempt.main_firmware_state;
@@ -481,6 +489,9 @@ int spotflow_ota_state_store_main_firmware_artifact(uint64_t attempt_id, size_t 
 	current_attempt.has_main_firmware_artifact = true;
 	current_attempt.main_firmware_artifact_index = artifact_index;
 	copy_artifact_out(&current_attempt.main_firmware_artifact, artifact);
+	current_attempt.main_firmware_abort_requested = false;
+	current_attempt.main_firmware_upgrade_commit_started = false;
+	current_attempt.main_firmware_reboot_started = false;
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -545,6 +556,9 @@ int spotflow_ota_state_enter_main_firmware_unconfirmed(
 	current_attempt.main_firmware_state.phase = SPOTFLOW_OTA_PHASE_UNCONFIRMED;
 	current_attempt.main_firmware_state.is_paused = false;
 	current_attempt.main_firmware_state.result = SPOTFLOW_OTA_RESULT_PENDING;
+	current_attempt.main_firmware_abort_requested = false;
+	current_attempt.main_firmware_upgrade_commit_started = false;
+	current_attempt.main_firmware_reboot_started = false;
 
 	if (out_state != NULL) {
 		*out_state = current_attempt.main_firmware_state;
@@ -559,7 +573,11 @@ int spotflow_ota_state_set_main_firmware_paused(bool paused,
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
-	if (!current_attempt.active) {
+	if (!current_attempt.active ||
+	    (paused &&
+	     (!main_firmware_phase_allows_pause(current_attempt.main_firmware_state.phase) ||
+	      current_attempt.main_firmware_reboot_started)) ||
+	    (!paused && !current_attempt.main_firmware_state.is_paused)) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}
@@ -572,6 +590,94 @@ int spotflow_ota_state_set_main_firmware_paused(bool paused,
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
+}
+
+int spotflow_ota_state_request_main_firmware_abort(
+	struct spotflow_ota_main_firmware_state* out_state)
+{
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active ||
+	    !main_firmware_phase_allows_abort(current_attempt.main_firmware_state.phase) ||
+	    current_attempt.main_firmware_upgrade_commit_started) {
+		if (out_state != NULL) {
+			*out_state = current_attempt.main_firmware_state;
+		}
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	current_attempt.main_firmware_abort_requested = true;
+	current_attempt.main_firmware_state.is_paused = false;
+
+	if (out_state != NULL) {
+		*out_state = current_attempt.main_firmware_state;
+	}
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+bool spotflow_ota_state_is_main_firmware_abort_requested(void)
+{
+	bool requested;
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+	requested = current_attempt.active && current_attempt.main_firmware_abort_requested;
+	k_mutex_unlock(&state_mutex);
+
+	return requested;
+}
+
+int spotflow_ota_state_begin_main_firmware_upgrade_commit(void)
+{
+	int rc = 0;
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active ||
+	    current_attempt.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_PENDING_UPGRADE ||
+	    current_attempt.main_firmware_upgrade_commit_started) {
+		rc = -EINVAL;
+	} else if (current_attempt.main_firmware_abort_requested ||
+		   current_attempt.actionable_cancellation) {
+		rc = -ECANCELED;
+	} else if (current_attempt.main_firmware_state.is_paused) {
+		rc = -EAGAIN;
+	} else {
+		current_attempt.main_firmware_upgrade_commit_started = true;
+	}
+
+	k_mutex_unlock(&state_mutex);
+	return rc;
+}
+
+void spotflow_ota_state_cancel_main_firmware_upgrade_commit(void)
+{
+	k_mutex_lock(&state_mutex, K_FOREVER);
+	current_attempt.main_firmware_upgrade_commit_started = false;
+	k_mutex_unlock(&state_mutex);
+}
+
+int spotflow_ota_state_begin_main_firmware_reboot(void)
+{
+	int rc = 0;
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active ||
+	    current_attempt.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_PENDING_REBOOT ||
+	    !current_attempt.main_firmware_upgrade_commit_started ||
+	    current_attempt.main_firmware_reboot_started) {
+		rc = -EINVAL;
+	} else if (current_attempt.main_firmware_state.is_paused) {
+		rc = -EAGAIN;
+	} else {
+		current_attempt.main_firmware_reboot_started = true;
+	}
+
+	k_mutex_unlock(&state_mutex);
+	return rc;
 }
 
 int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index)
@@ -757,6 +863,31 @@ static bool attempt_has_succeeded_artifact(const struct attempt_state* attempt)
 	}
 
 	return false;
+}
+
+static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase)
+{
+	switch (phase) {
+	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
+	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
+	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
+	case SPOTFLOW_OTA_PHASE_PENDING_REBOOT:
+		return true;
+	default:
+		return false;
+	}
+}
+
+static bool main_firmware_phase_allows_abort(enum spotflow_ota_phase phase)
+{
+	switch (phase) {
+	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
+	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
+	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
+		return true;
+	default:
+		return false;
+	}
 }
 
 static void cancel_pending_artifacts(struct attempt_state* attempt)

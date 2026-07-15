@@ -105,6 +105,17 @@ int spotflow_ota_state_enter_main_firmware_unconfirmed(
 int spotflow_ota_state_set_main_firmware_paused(bool paused,
 						struct spotflow_ota_main_firmware_state* out_state);
 
+int spotflow_ota_state_request_main_firmware_abort(
+	struct spotflow_ota_main_firmware_state* out_state);
+
+bool spotflow_ota_state_is_main_firmware_abort_requested(void);
+
+int spotflow_ota_state_begin_main_firmware_upgrade_commit(void);
+
+void spotflow_ota_state_cancel_main_firmware_upgrade_commit(void);
+
+int spotflow_ota_state_begin_main_firmware_reboot(void);
+
 int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index);
 
 void spotflow_ota_state_clear_main_firmware_awaiting_reboot(void);

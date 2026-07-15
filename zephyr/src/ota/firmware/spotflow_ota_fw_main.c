@@ -6,6 +6,7 @@
 
 #include <spotflow/downloader.h>
 
+#include "ota/downloader/spotflow_ota_downloader.h"
 #include "ota/firmware/spotflow_ota_fw_custom.h"
 #include "ota/firmware/spotflow_ota_fw_main.h"
 #include "ota/platform/spotflow_ota_identity.h"
@@ -21,8 +22,6 @@ static SPOTFLOW_DEFINE_DOWNLOADER(main_firmware_downloader);
 
 static K_SEM_DEFINE(main_firmware_resume_sem, 0, 1);
 
-static bool user_fail_requested;
-
 struct main_firmware_flash_ctx {
 	int write_err;
 };
@@ -30,15 +29,15 @@ struct main_firmware_flash_ctx {
 static void notify_main_firmware_phase(enum spotflow_ota_phase phase);
 static void notify_main_firmware_state(const struct spotflow_ota_main_firmware_state* state);
 static enum spotflow_ota_result fail_main_firmware(void);
-static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase);
-static bool main_firmware_phase_allows_fail(enum spotflow_ota_phase phase);
 static void fill_main_firmware_state_output(struct spotflow_ota_main_firmware_state* out_state);
 static void main_firmware_wake_paused_worker(void);
 static void main_firmware_drain_resume_sem(void);
-static void wait_while_paused(void);
-static int check_user_abort(void);
-static int complete_user_fail(struct spotflow_ota_state_action* action,
-			      struct spotflow_ota_main_firmware_state* out_state);
+static void wait_while_paused(bool honor_interruptions);
+static int main_firmware_control_checkpoint(void);
+static enum spotflow_ota_result interrupted_main_firmware_result(void);
+static int begin_main_firmware_upgrade_commit(void);
+static int begin_main_firmware_reboot(void);
+static void download_started_cb(struct spotflow_downloader* downloader, void* callback_ctx);
 static void download_block_cb(const struct spotflow_artifact_block* block,
 			      struct spotflow_downloader* downloader, void* callback_ctx);
 static int persist_prereboot_attempt(uint64_t attempt_id);
@@ -57,7 +56,6 @@ void spotflow_ota_fw_main_reset(void)
 	k_mutex_unlock(&main_firmware_downloader.mutex);
 	while (k_sem_take(&main_firmware_downloader.resume_sem, K_NO_WAIT) == 0) {
 	}
-	user_fail_requested = false;
 	main_firmware_drain_resume_sem();
 }
 
@@ -72,15 +70,13 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 	LOG_INF("OTA attempt %llu: started main firmware artifact '%s' %s",
 		(unsigned long long)attempt_id, artifact->slug, artifact->version);
 
-	user_fail_requested = false;
-
 	if (spotflow_ota_state_store_main_firmware_artifact(attempt_id, artifact_index, artifact) <
 	    0) {
 		return SPOTFLOW_OTA_RESULT_FAILED;
 	}
 
-	if (check_user_abort() < 0) {
-		return user_fail_requested ? fail_main_firmware() : SPOTFLOW_OTA_RESULT_CANCELED;
+	if (main_firmware_control_checkpoint() < 0) {
+		return interrupted_main_firmware_result();
 	}
 
 	if (spotflow_is_update_canceled()) {
@@ -89,8 +85,8 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 
 	notify_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD);
 
-	if (check_user_abort() < 0) {
-		return user_fail_requested ? fail_main_firmware() : SPOTFLOW_OTA_RESULT_CANCELED;
+	if (main_firmware_control_checkpoint() < 0) {
+		return interrupted_main_firmware_result();
 	}
 
 	struct spotflow_download_request request = {
@@ -107,16 +103,14 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 		return fail_main_firmware();
 	}
 
-	notify_main_firmware_phase(SPOTFLOW_OTA_PHASE_DOWNLOADING);
-
-	rc = spotflow_download_artifact(&main_firmware_downloader, &request, download_block_cb,
-					&flash_ctx);
+	rc = spotflow_ota_download_artifact(&main_firmware_downloader, &request, download_block_cb,
+					    &flash_ctx, download_started_cb, NULL);
 	if (flash_ctx.write_err != 0) {
 		LOG_ERR("Main firmware flash write failed: %d", flash_ctx.write_err);
 		return fail_main_firmware();
 	}
 	if (rc == -ECANCELED) {
-		return user_fail_requested ? fail_main_firmware() : SPOTFLOW_OTA_RESULT_CANCELED;
+		return interrupted_main_firmware_result();
 	}
 	if (rc < 0) {
 		LOG_ERR("Main firmware download failed: %d", rc);
@@ -127,11 +121,15 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 		return SPOTFLOW_OTA_RESULT_CANCELED;
 	}
 
-	if (check_user_abort() < 0) {
-		return user_fail_requested ? fail_main_firmware() : SPOTFLOW_OTA_RESULT_CANCELED;
+	if (main_firmware_control_checkpoint() < 0) {
+		return interrupted_main_firmware_result();
 	}
 
 	notify_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_UPGRADE);
+
+	if (main_firmware_control_checkpoint() < 0) {
+		return interrupted_main_firmware_result();
+	}
 
 	uint8_t expected_build_id[SPOTFLOW_BUILD_ID_LENGTH];
 
@@ -150,33 +148,54 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 	strncpy(probation.version, artifact->version, sizeof(probation.version) - 1);
 	memcpy(probation.expected_build_id, expected_build_id, sizeof(probation.expected_build_id));
 
+	rc = begin_main_firmware_upgrade_commit();
+	if (rc < 0) {
+		return rc == -ECANCELED ? interrupted_main_firmware_result() : fail_main_firmware();
+	}
+
 	rc = spotflow_ota_persistence_save_probation(&probation);
 	if (rc < 0) {
 		LOG_ERR("Failed to persist main firmware probation record: %d", rc);
+		spotflow_ota_state_cancel_main_firmware_upgrade_commit();
 		return fail_main_firmware();
-	}
-
-	if (check_user_abort() < 0) {
-		return user_fail_requested ? fail_main_firmware() : SPOTFLOW_OTA_RESULT_CANCELED;
 	}
 
 	rc = persist_prereboot_attempt(attempt_id);
 	if (rc < 0) {
 		LOG_ERR("Failed to persist main firmware attempt before reboot: %d", rc);
+		spotflow_ota_state_cancel_main_firmware_upgrade_commit();
 		return fail_main_firmware();
 	}
 
 	rc = spotflow_ota_platform_request_test_upgrade();
 	if (rc < 0) {
 		LOG_ERR("Failed to request main firmware test upgrade: %d", rc);
+		spotflow_ota_state_cancel_main_firmware_upgrade_commit();
 		return fail_main_firmware();
 	}
-
-	notify_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
 
 	rc = spotflow_ota_state_finish_main_firmware_prereboot(NULL);
 	if (rc < 0) {
 		LOG_ERR("Failed to finalize main firmware before reboot: %d", rc);
+		return fail_main_firmware();
+	}
+
+	struct spotflow_ota_main_firmware_state pending_reboot_state;
+
+	rc = spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_REBOOT,
+							&pending_reboot_state);
+	if (rc < 0) {
+		LOG_ERR("Failed to enter main firmware pending-reboot phase: %d", rc);
+		return fail_main_firmware();
+	}
+
+	LOG_INF("Main firmware phase -> %s",
+		spotflow_ota_log_phase_name(SPOTFLOW_OTA_PHASE_PENDING_REBOOT));
+	notify_main_firmware_state(&pending_reboot_state);
+
+	rc = begin_main_firmware_reboot();
+	if (rc < 0) {
+		LOG_ERR("Failed to begin main firmware reboot: %d", rc);
 		return fail_main_firmware();
 	}
 
@@ -357,33 +376,19 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 
 int spotflow_ota_fw_main_pause_update(struct spotflow_ota_main_firmware_state* out_state)
 {
-	struct spotflow_ota_state_snapshot snapshot;
 	enum spotflow_downloader_state downloader_state;
 	int rc;
 
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt ||
-	    !main_firmware_phase_allows_pause(snapshot.main_firmware_state.phase)) {
-		fill_main_firmware_state_output(out_state);
-		return -EINVAL;
-	}
-
-	if (snapshot.main_firmware_state.is_paused) {
-		fill_main_firmware_state_output(out_state);
-		return 0;
-	}
-
 	rc = spotflow_ota_state_set_main_firmware_paused(true, out_state);
 	if (rc < 0) {
+		fill_main_firmware_state_output(out_state);
 		return rc;
 	}
 
 	downloader_state = spotflow_get_downloader_state(&main_firmware_downloader);
 	if (downloader_state == SPOTFLOW_DOWNLOADER_STATE_DOWNLOADING) {
 		rc = spotflow_pause_download(&main_firmware_downloader);
-		if (rc < 0) {
-			(void)spotflow_ota_state_set_main_firmware_paused(false, NULL);
-			fill_main_firmware_state_output(out_state);
+		if (rc < 0 && rc != -EINVAL) {
 			return rc;
 		}
 	}
@@ -426,8 +431,6 @@ int spotflow_ota_fw_main_resume_update(struct spotflow_ota_main_firmware_state* 
 int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* out_state,
 				     struct spotflow_ota_state_action* action)
 {
-	struct spotflow_ota_state_snapshot snapshot;
-	enum spotflow_downloader_state downloader_state;
 	int rc;
 
 	if (action == NULL) {
@@ -436,35 +439,14 @@ int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* ou
 
 	memset(action, 0, sizeof(*action));
 
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt ||
-	    !main_firmware_phase_allows_fail(snapshot.main_firmware_state.phase)) {
+	rc = spotflow_ota_state_request_main_firmware_abort(out_state);
+	if (rc < 0) {
 		fill_main_firmware_state_output(out_state);
-		return -EINVAL;
+		return rc;
 	}
 
-	user_fail_requested = true;
 	spotflow_ota_fw_main_cancel_active_download();
-
-	downloader_state = spotflow_get_downloader_state(&main_firmware_downloader);
-	if (downloader_state == SPOTFLOW_DOWNLOADER_STATE_DOWNLOADING ||
-	    downloader_state == SPOTFLOW_DOWNLOADER_STATE_PAUSED ||
-	    downloader_state == SPOTFLOW_DOWNLOADER_STATE_CANCELING) {
-		fill_main_firmware_state_output(out_state);
-		return 0;
-	}
-
-	if (snapshot.main_firmware_state.is_paused) {
-		fill_main_firmware_state_output(out_state);
-		return 0;
-	}
-
-	rc = complete_user_fail(action, out_state);
-	if (rc == 0) {
-		user_fail_requested = false;
-	}
-
-	return rc;
+	return 0;
 }
 
 void spotflow_ota_fw_main_wake_if_paused(void)
@@ -523,31 +505,6 @@ static enum spotflow_ota_result fail_main_firmware(void)
 	return SPOTFLOW_OTA_RESULT_FAILED;
 }
 
-static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase)
-{
-	switch (phase) {
-	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
-	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
-	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
-	case SPOTFLOW_OTA_PHASE_PENDING_REBOOT:
-		return true;
-	default:
-		return false;
-	}
-}
-
-static bool main_firmware_phase_allows_fail(enum spotflow_ota_phase phase)
-{
-	switch (phase) {
-	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
-	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
-	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
-		return true;
-	default:
-		return false;
-	}
-}
-
 static void fill_main_firmware_state_output(struct spotflow_ota_main_firmware_state* out_state)
 {
 	struct spotflow_ota_state_snapshot snapshot;
@@ -571,12 +528,14 @@ static void main_firmware_drain_resume_sem(void)
 	}
 }
 
-static void wait_while_paused(void)
+static void wait_while_paused(bool honor_interruptions)
 {
 	struct spotflow_ota_state_snapshot snapshot;
 
 	for (;;) {
-		if (user_fail_requested || spotflow_is_update_canceled()) {
+		if (honor_interruptions &&
+		    (spotflow_ota_state_is_main_firmware_abort_requested() ||
+		     spotflow_is_update_canceled())) {
 			return;
 		}
 
@@ -589,51 +548,72 @@ static void wait_while_paused(void)
 	}
 }
 
-static int check_user_abort(void)
+static int main_firmware_control_checkpoint(void)
 {
-	wait_while_paused();
+	wait_while_paused(true);
 
-	if (user_fail_requested || spotflow_is_update_canceled()) {
+	if (spotflow_ota_state_is_main_firmware_abort_requested() ||
+	    spotflow_is_update_canceled()) {
 		return -ECANCELED;
 	}
 
 	return 0;
 }
 
-static int complete_user_fail(struct spotflow_ota_state_action* action,
-			      struct spotflow_ota_main_firmware_state* out_state)
+static enum spotflow_ota_result interrupted_main_firmware_result(void)
+{
+	if (spotflow_ota_state_is_main_firmware_abort_requested()) {
+		return fail_main_firmware();
+	}
+
+	return SPOTFLOW_OTA_RESULT_CANCELED;
+}
+
+static int begin_main_firmware_upgrade_commit(void)
+{
+	for (;;) {
+		int rc = main_firmware_control_checkpoint();
+
+		if (rc < 0) {
+			return rc;
+		}
+
+		rc = spotflow_ota_state_begin_main_firmware_upgrade_commit();
+		if (rc != -EAGAIN) {
+			return rc;
+		}
+	}
+}
+
+static int begin_main_firmware_reboot(void)
+{
+	for (;;) {
+		int rc;
+
+		wait_while_paused(false);
+
+		rc = spotflow_ota_state_begin_main_firmware_reboot();
+		if (rc != -EAGAIN) {
+			return rc;
+		}
+	}
+}
+
+static void download_started_cb(struct spotflow_downloader* downloader, void* callback_ctx)
 {
 	struct spotflow_ota_state_snapshot snapshot;
-	size_t artifact_index;
-	int rc;
 
-	rc = spotflow_ota_state_get_main_firmware_artifact_index(&artifact_index);
-	if (rc < 0) {
-		fill_main_firmware_state_output(out_state);
-		return rc;
+	ARG_UNUSED(callback_ctx);
+
+	notify_main_firmware_phase(SPOTFLOW_OTA_PHASE_DOWNLOADING);
+	spotflow_ota_state_get_snapshot(&snapshot);
+
+	if (spotflow_ota_state_is_main_firmware_abort_requested() ||
+	    spotflow_is_update_canceled()) {
+		(void)spotflow_cancel_download(downloader);
+	} else if (snapshot.main_firmware_state.is_paused) {
+		(void)spotflow_pause_download(downloader);
 	}
-
-	(void)fail_main_firmware();
-
-	rc = spotflow_ota_state_apply_artifact_result(artifact_index, SPOTFLOW_OTA_RESULT_FAILED,
-						      action);
-	if (rc < 0) {
-		fill_main_firmware_state_output(out_state);
-		return rc;
-	}
-
-	rc = persist_snapshot_and_enqueue_results();
-	if (rc < 0) {
-		fill_main_firmware_state_output(out_state);
-		return rc;
-	}
-
-	if (out_state != NULL) {
-		spotflow_ota_state_get_snapshot(&snapshot);
-		*out_state = snapshot.main_firmware_state;
-	}
-
-	return 0;
 }
 
 static void download_block_cb(const struct spotflow_artifact_block* block,

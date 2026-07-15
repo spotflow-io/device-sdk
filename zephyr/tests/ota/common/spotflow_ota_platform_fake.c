@@ -16,6 +16,8 @@ struct spotflow_ota_platform_fake* spotflow_ota_platform_fake_get(void)
 void spotflow_ota_platform_fake_reset(struct spotflow_ota_platform_fake* fake)
 {
 	memset(fake, 0, sizeof(*fake));
+	k_sem_init(&fake->upgrade_request_entered, 0, 1);
+	k_sem_init(&fake->continue_upgrade_request, 0, 1);
 }
 
 int spotflow_ota_platform_request_test_upgrade(void)
@@ -23,6 +25,10 @@ int spotflow_ota_platform_request_test_upgrade(void)
 	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
 
 	fake->upgrade_request_count++;
+	if (fake->block_upgrade_request) {
+		k_sem_give(&fake->upgrade_request_entered);
+		k_sem_take(&fake->continue_upgrade_request, K_FOREVER);
+	}
 
 	return fake->upgrade_request_result;
 }
