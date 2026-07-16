@@ -2,7 +2,8 @@ menuconfig SPOTFLOW_OTA
 	bool "Enable Spotflow over-the-air (OTA) updates"
 	depends on SPOTFLOW
 	depends on SPOTFLOW_TRANSPORT_MQTT
-	select SETTINGS
+	depends on SETTINGS
+	depends on !SETTINGS_NONE
 	select HTTP_CLIENT
 	default n
 	help
