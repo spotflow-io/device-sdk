@@ -12,6 +12,7 @@
 #include <spotflow/downloader.h>
 
 #include "ota/downloader/spotflow_ota_downloader_transport.h"
+#include "ota/downloader/spotflow_ota_downloader_transport_range.h"
 #include "ota/downloader/spotflow_ota_url.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
@@ -25,8 +26,10 @@ struct spotflow_ota_downloader_http_ctx {
 	void* callback_ctx;
 	size_t range_start;
 	size_t offset;
+	uint64_t* artifact_size;
 	int callback_err;
 	bool transient_failure;
+	bool response_validated;
 };
 
 static int connect_socket(const struct ota_url* url);
@@ -39,7 +42,8 @@ int spotflow_ota_downloader_transport_download(
 {
 	if (request == NULL || request->url == NULL || request->authorization_header == NULL ||
 	    request->downloader == NULL || request->callback == NULL ||
-	    request->bytes_downloaded == NULL || request->transient_failure == NULL) {
+	    request->bytes_downloaded == NULL || request->artifact_size == NULL ||
+	    request->transient_failure == NULL) {
 		return -EINVAL;
 	}
 
@@ -59,6 +63,7 @@ int spotflow_ota_downloader_transport_download(
 		.callback_ctx = request->callback_ctx,
 		.range_start = request->range_start,
 		.offset = request->range_start,
+		.artifact_size = request->artifact_size,
 		.callback_err = 0,
 		.transient_failure = false,
 	};
@@ -220,6 +225,19 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 			ctx->transient_failure = rsp->http_status_code >= 500;
 			return ctx->callback_err;
 		}
+	}
+
+	if (ctx->range_start > 0 && !ctx->response_validated) {
+		int rc = spotflow_ota_downloader_transport_validate_range_response(
+			rsp, ctx->range_start, ctx->artifact_size);
+
+		if (rc != 0) {
+			LOG_ERR("Artifact download returned invalid Content-Range");
+			ctx->callback_err = rc;
+			return rc;
+		}
+
+		ctx->response_validated = true;
 	}
 
 	if (rsp->body_frag_len > 0) {

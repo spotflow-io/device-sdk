@@ -170,6 +170,7 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 	LOG_DBG("Starting artifact download (TLS: %d, port: %u)", url.tls, url.port);
 
 	size_t total_bytes_downloaded = 0;
+	uint64_t artifact_size = 0;
 
 	while (true) {
 		if (downloader_is_canceled(downloader)) {
@@ -193,6 +194,7 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 			.callback_ctx = callback_ctx,
 			.range_start = total_bytes_downloaded,
 			.bytes_downloaded = &attempt_bytes,
+			.artifact_size = &artifact_size,
 			.transient_failure = &transient_failure,
 		};
 

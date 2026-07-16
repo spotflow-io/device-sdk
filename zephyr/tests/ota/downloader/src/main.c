@@ -2,12 +2,14 @@
 #include <string.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/net/http/client.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
 #include <spotflow/downloader.h>
 
 #include "ota/downloader/spotflow_ota_downloader.h"
+#include "ota/downloader/spotflow_ota_downloader_transport_range.h"
 #include "ota/downloader/spotflow_ota_url.h"
 
 #include "spotflow_ota_downloader_transport_fake.h"
@@ -301,6 +303,61 @@ ZTEST(spotflow_ota_downloader, test_pause_invalid_when_inactive)
 
 	zassert_equal(spotflow_pause_download(&downloader), -EINVAL);
 	zassert_equal(spotflow_resume_download(&downloader), -EINVAL);
+}
+
+ZTEST(spotflow_ota_downloader, test_validate_resumed_content_range)
+{
+	struct http_response response = {
+		.content_range = {
+			.start = 2,
+			.end = 3,
+			.total = 4,
+		},
+	};
+	uint64_t artifact_size = 0;
+
+	zassert_ok(spotflow_ota_downloader_transport_validate_range_response(&response, 2,
+									     &artifact_size));
+	zassert_equal(artifact_size, 4);
+}
+
+ZTEST(spotflow_ota_downloader, test_reject_invalid_resumed_content_range)
+{
+	struct http_response response = {};
+	uint64_t artifact_size = 0;
+
+	zassert_equal(spotflow_ota_downloader_transport_validate_range_response(&response, 2,
+										&artifact_size),
+		      -EPROTO);
+
+	response.content_range.start = 1;
+	response.content_range.end = 3;
+	response.content_range.total = 4;
+	zassert_equal(spotflow_ota_downloader_transport_validate_range_response(&response, 2,
+										&artifact_size),
+		      -EPROTO);
+
+	response.content_range.start = 2;
+	response.content_range.end = 2;
+	zassert_equal(spotflow_ota_downloader_transport_validate_range_response(&response, 2,
+										&artifact_size),
+		      -EPROTO);
+}
+
+ZTEST(spotflow_ota_downloader, test_reject_inconsistent_resumed_artifact_size)
+{
+	struct http_response response = {
+		.content_range = {
+			.start = 2,
+			.end = 4,
+			.total = 5,
+		},
+	};
+	uint64_t artifact_size = 4;
+
+	zassert_equal(spotflow_ota_downloader_transport_validate_range_response(&response, 2,
+										&artifact_size),
+		      -EPROTO);
 }
 
 ZTEST_SUITE(spotflow_ota_downloader, NULL, NULL, before_each, NULL, NULL);

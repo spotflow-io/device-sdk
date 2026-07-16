@@ -1,7 +1,9 @@
 #ifndef SPOTFLOW_OTA_DOWNLOADER_TRANSPORT_H
 #define SPOTFLOW_OTA_DOWNLOADER_TRANSPORT_H
 
+#include <stdbool.h>
 #include <stddef.h>
+#include <stdint.h>
 
 #include <spotflow/downloader.h>
 
@@ -21,6 +23,11 @@ struct spotflow_ota_downloader_transport_request {
 	size_t range_start;
 	/** Bytes delivered during this transport attempt. */
 	size_t* bytes_downloaded;
+	/**
+	 * Artifact size learned from a previous ranged response, or zero when unknown.
+	 * Ranged responses must report the same total size across retries.
+	 */
+	uint64_t* artifact_size;
 	bool* transient_failure;
 };
 
