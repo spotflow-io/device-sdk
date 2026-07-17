@@ -179,7 +179,8 @@ results and is promoted. The superseded attempt's per-artifact results are not r
 **MCUboot requirements**
 
 Automatic main-firmware handling (`CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE`)
-requires MCUboot in a **rollback-capable** mode. The worker requests
+requires MCUboot in a **rollback-capable** mode, plus `CONFIG_FLASH`,
+`CONFIG_FLASH_MAP`, and `CONFIG_STREAM_FLASH`. The worker requests
 `BOOT_UPGRADE_TEST`, and post-reboot reconciliation infers failure when the running
 build ID does not match the probation record (MCUboot reverted to the previous image).
 

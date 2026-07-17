@@ -12,8 +12,9 @@ menuconfig SPOTFLOW_OTA
 	  image-management options are selected only when automatic main-firmware
 	  handling is enabled.
 
-	  OTA requires the MQTT transport. BLE transport does not support OTA
-	  updates.
+	  OTA requires the MQTT transport and a persistent Zephyr settings storage
+	  backend (SETTINGS_NONE is not supported). BLE transport does not support
+	  OTA updates.
 
 if SPOTFLOW_OTA
 
@@ -64,9 +65,9 @@ config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 		MCUBOOT_BOOTLOADER_MODE_RAM_LOAD_WITH_REVERT
 	depends on ARCH_SUPPORTS_ROM_START || ARCH_POSIX
 	depends on SPOTFLOW_GENERATE_BUILD_ID
-	select FLASH
-	select FLASH_MAP
-	select STREAM_FLASH
+	depends on FLASH
+	depends on FLASH_MAP
+	depends on STREAM_FLASH
 	select IMG_MANAGER
 	select IMG_ERASE_PROGRESSIVELY
 	select REBOOT
@@ -77,7 +78,8 @@ config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 	  When enabled, the Spotflow OTA SDK downloads main firmware artifacts,
 	  requests an MCUboot test upgrade, and reconciles probation state after
 	  reboot. Requires MCUboot (typically via sysbuild) in a rollback-capable
-	  mode, flash partition layout with a secondary slot, and binary descriptor
-	  support for downloaded-image build ID extraction.
+	  mode, flash support (FLASH, FLASH_MAP, STREAM_FLASH), a partition layout
+	  with a secondary slot, and binary descriptor support for downloaded-image
+	  build ID extraction.
 
 endif # SPOTFLOW_OTA

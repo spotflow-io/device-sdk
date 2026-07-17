@@ -117,8 +117,12 @@ Besides the standard Spotflow and networking options, the sample enables:
 ```kconfig
 CONFIG_SPOTFLOW_OTA=y
 CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE=y
+CONFIG_SETTINGS=y
 CONFIG_NVS=y
 CONFIG_SETTINGS_NVS=y
+CONFIG_FLASH=y
+CONFIG_FLASH_MAP=y
+CONFIG_STREAM_FLASH=y
 ```
 
 `CONFIG_SPOTFLOW_GENERATE_BUILD_ID` defaults to `y` on supported platforms and is required
