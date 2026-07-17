@@ -1,14 +1,14 @@
-#include <zcbor_encode.h>
-
-#include <zephyr/logging/log.h>
+#include "net/spotflow_session_metadata.h"
 
 #include "spotflow_build_id.h"
-#include "net/spotflow_session_metadata.h"
 #include "net/spotflow_transport.h"
 #ifdef CONFIG_SPOTFLOW_OTA
 #include "ota/spotflow_ota.h"
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA */
 
+#include <zcbor_encode.h>
+
+#include <zephyr/logging/log.h>
 #include <zephyr/random/random.h>
 
 #define KEY_MESSAGE_TYPE 0x00
@@ -63,12 +63,12 @@ int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t*
 	if (rc != 0) {
 		LOG_DBG("Failed to get build ID for session metadata: %d", rc);
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_GENERATE_BUILD_ID */
 
 #ifdef CONFIG_SPOTFLOW_OTA
 	include_last_update_attempt_id = true;
 	last_update_attempt_id = spotflow_ota_get_last_received_attempt_id();
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA */
 
 	return cbor_encode_session_metadata(build_id, build_id_len, device_run_id,
 					    include_last_update_attempt_id, last_update_attempt_id,

@@ -1,3 +1,10 @@
+#include "ota/downloader/spotflow_ota_downloader_transport.h"
+
+#include <spotflow/downloader.h>
+
+#include "ota/downloader/spotflow_ota_downloader_transport_range.h"
+#include "ota/downloader/spotflow_ota_url.h"
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -8,12 +15,6 @@
 #include <zephyr/net/http/client.h>
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
-
-#include <spotflow/downloader.h>
-
-#include "ota/downloader/spotflow_ota_downloader_transport.h"
-#include "ota/downloader/spotflow_ota_downloader_transport_range.h"
-#include "ota/downloader/spotflow_ota_url.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -32,7 +33,7 @@ struct spotflow_ota_downloader_http_ctx {
 	bool response_validated;
 };
 
-static int connect_socket(const struct ota_url* url);
+static int connect_socket(const struct spotflow_ota_url* url);
 static int http_response_cb(struct http_response* rsp, enum http_final_call final_data,
 			    void* user_data);
 static bool downloader_is_canceled(struct spotflow_downloader* downloader);
@@ -135,7 +136,7 @@ static bool downloader_is_canceled(struct spotflow_downloader* downloader)
 	return canceled;
 }
 
-static int connect_socket(const struct ota_url* url)
+static int connect_socket(const struct spotflow_ota_url* url)
 {
 	struct zsock_addrinfo hints = {
 		.ai_socktype = SOCK_STREAM,

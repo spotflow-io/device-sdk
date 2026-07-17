@@ -1,3 +1,8 @@
+#include "ota/platform/spotflow_ota_identity.h"
+
+#include "spotflow_build_id.h"
+#include "ota/platform/spotflow_ota_platform.h"
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -6,14 +11,80 @@
 #include <zephyr/bindesc.h>
 #include <zephyr/logging/log.h>
 
-#include "spotflow_build_id.h"
-#include "ota/platform/spotflow_ota_identity.h"
-#include "ota/platform/spotflow_ota_platform.h"
-
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #define SPOTFLOW_BINDESC_ID_BUILD_ID 0x5f0
 #define BINDESC_SCAN_CHUNK_SIZE 256
+
+static bool build_id_is_all_zero(const uint8_t* build_id, size_t len);
+static int copy_running_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
+static int read_build_id_from_bindesc_handle(struct bindesc_handle* handle,
+					     uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
+static int find_bindesc_offset(size_t image_start, size_t image_size, size_t* bindesc_offset);
+
+int spotflow_ota_identity_get_running_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+{
+	if (build_id == NULL) {
+		LOG_ERR("build_id cannot be NULL");
+		return -EINVAL;
+	}
+
+	return copy_running_build_id(build_id);
+}
+
+int spotflow_ota_identity_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+{
+	struct bindesc_handle handle;
+	size_t image_start;
+	size_t image_size;
+	size_t bindesc_offset = 0;
+	int rc;
+
+	if (build_id == NULL) {
+		LOG_ERR("build_id cannot be NULL");
+		return -EINVAL;
+	}
+
+	rc = spotflow_ota_platform_get_upload_image_info(&image_start, &image_size);
+	if (rc != 0) {
+		return rc;
+	}
+
+	rc = find_bindesc_offset(image_start, image_size, &bindesc_offset);
+	if (rc != 0) {
+		return rc;
+	}
+
+	rc = spotflow_ota_platform_bindesc_open_upload(&handle, bindesc_offset);
+	if (rc != 0) {
+		return rc;
+	}
+
+	return read_build_id_from_bindesc_handle(&handle, build_id);
+}
+
+enum spotflow_ota_identity_cmp
+spotflow_ota_identity_compare_probation(const uint8_t expected_build_id[SPOTFLOW_BUILD_ID_LENGTH])
+{
+	uint8_t running_build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	int rc;
+
+	if (expected_build_id == NULL) {
+		LOG_ERR("expected_build_id cannot be NULL");
+		return SPOTFLOW_OTA_IDENTITY_UNAVAILABLE;
+	}
+
+	rc = copy_running_build_id(running_build_id);
+	if (rc != 0) {
+		return SPOTFLOW_OTA_IDENTITY_UNAVAILABLE;
+	}
+
+	if (memcmp(expected_build_id, running_build_id, SPOTFLOW_BUILD_ID_LENGTH) == 0) {
+		return SPOTFLOW_OTA_IDENTITY_MATCH;
+	}
+
+	return SPOTFLOW_OTA_IDENTITY_MISMATCH;
+}
 
 static bool build_id_is_all_zero(const uint8_t* build_id, size_t len)
 {
@@ -114,65 +185,4 @@ static int find_bindesc_offset(size_t image_start, size_t image_size, size_t* bi
 	}
 
 	return -ENOENT;
-}
-
-int spotflow_ota_identity_get_running_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
-{
-	if (build_id == NULL) {
-		return -EINVAL;
-	}
-
-	return copy_running_build_id(build_id);
-}
-
-int spotflow_ota_identity_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
-{
-	struct bindesc_handle handle;
-	size_t image_start;
-	size_t image_size;
-	size_t bindesc_offset = 0;
-	int rc;
-
-	if (build_id == NULL) {
-		return -EINVAL;
-	}
-
-	rc = spotflow_ota_platform_get_upload_image_info(&image_start, &image_size);
-	if (rc != 0) {
-		return rc;
-	}
-
-	rc = find_bindesc_offset(image_start, image_size, &bindesc_offset);
-	if (rc != 0) {
-		return rc;
-	}
-
-	rc = spotflow_ota_platform_bindesc_open_upload(&handle, bindesc_offset);
-	if (rc != 0) {
-		return rc;
-	}
-
-	return read_build_id_from_bindesc_handle(&handle, build_id);
-}
-
-enum spotflow_ota_identity_cmp
-spotflow_ota_identity_compare_probation(const uint8_t expected_build_id[SPOTFLOW_BUILD_ID_LENGTH])
-{
-	uint8_t running_build_id[SPOTFLOW_BUILD_ID_LENGTH];
-	int rc;
-
-	if (expected_build_id == NULL) {
-		return SPOTFLOW_OTA_IDENTITY_UNAVAILABLE;
-	}
-
-	rc = copy_running_build_id(running_build_id);
-	if (rc != 0) {
-		return SPOTFLOW_OTA_IDENTITY_UNAVAILABLE;
-	}
-
-	if (memcmp(expected_build_id, running_build_id, SPOTFLOW_BUILD_ID_LENGTH) == 0) {
-		return SPOTFLOW_OTA_IDENTITY_MATCH;
-	}
-
-	return SPOTFLOW_OTA_IDENTITY_MISMATCH;
 }

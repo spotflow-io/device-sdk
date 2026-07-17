@@ -1,8 +1,11 @@
 #include <string.h>
 
+#include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
 #include "ota/core/spotflow_ota_state.h"
+
+LOG_MODULE_REGISTER(spotflow_ota);
 
 static void before_each(void* fixture)
 {

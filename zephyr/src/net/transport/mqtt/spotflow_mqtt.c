@@ -1,25 +1,25 @@
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
-#include <zephyr/net/conn_mgr_connectivity.h>
-#include <zephyr/net/mqtt.h>
-#include <zephyr/random/random.h>
-#include <zephyr/net/socket.h>
+#include "spotflow_mqtt.h"
+
+#include "spotflow_connection_helper.h"
+#include "net/spotflow_device_id.h"
+#include "spotflow_tls.h"
+#ifdef CONFIG_SPOTFLOW_OTA
+#include "ota/protocol/spotflow_ota_cbor.h"
+#endif /* CONFIG_SPOTFLOW_OTA */
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+#include "metrics/system/spotflow_metrics_system.h"
+#endif /* CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION */
+
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 
-#include "spotflow_connection_helper.h"
-#include "spotflow_mqtt.h"
-#include "net/spotflow_device_id.h"
-#include "spotflow_tls.h"
-
-#ifdef CONFIG_SPOTFLOW_OTA
-#include "ota/protocol/spotflow_ota_cbor.h"
-#endif
-
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-#include "metrics/system/spotflow_metrics_system.h"
-#endif
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/net/conn_mgr_connectivity.h>
+#include <zephyr/net/mqtt.h>
+#include <zephyr/net/socket.h>
+#include <zephyr/random/random.h>
 
 /* 80 bytes is just password itself */
 /* should at least match MBEDTLS_SSL_MAX_CONTENT_LEN - default is 4096 */
@@ -103,7 +103,7 @@ static uint8_t c2d_payload_buffer[C2D_PAYLOAD_BUFFER_SIZE];
 #ifdef CONFIG_SPOTFLOW_OTA
 /* Buffer for OTA C2D messages */
 static uint8_t ota_c2d_payload_buffer[SPOTFLOW_OTA_CBOR_MAX_C2D_MESSAGE_SIZE];
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA */
 
 int spotflow_mqtt_poll()
 {
@@ -206,6 +206,78 @@ void spotflow_mqtt_establish_mqtt()
 	LOG_INF("MQTT connected!");
 }
 
+int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback)
+{
+	mqtt_client_toolset.c2d_message_callback = callback;
+
+	struct mqtt_topic topics[] = {
+		{
+			.topic = spotflow_mqtt_config.config_c2d_topic,
+			.qos = MQTT_QOS_0_AT_MOST_ONCE,
+		},
+	};
+
+	struct mqtt_subscription_list param = {
+		.list = topics,
+		.list_count = ARRAY_SIZE(topics),
+		.message_id = sys_rand16_get(),
+	};
+
+	mqtt_client_toolset.c2d_sub_message_id = param.message_id;
+
+	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
+}
+
+#ifdef CONFIG_SPOTFLOW_OTA
+
+int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
+{
+	ARG_UNUSED(callback);
+
+	mqtt_client_toolset.ota_message_callback = callback;
+
+	struct mqtt_topic topics[] = {
+		{
+			.topic = spotflow_mqtt_config.ota_c2d_topic,
+			.qos = MQTT_QOS_1_AT_LEAST_ONCE,
+		},
+	};
+
+	struct mqtt_subscription_list param = {
+		.list = topics,
+		.list_count = ARRAY_SIZE(topics),
+		.message_id = sys_rand16_get(),
+	};
+
+	mqtt_client_toolset.ota_sub_message_id = param.message_id;
+
+	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
+}
+
+#endif /* CONFIG_SPOTFLOW_OTA */
+
+int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len)
+{
+	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.ingest_topic);
+}
+
+int spotflow_mqtt_publish_config_cbor_msg(uint8_t* payload, size_t len)
+{
+	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.config_d2c_topic);
+}
+
+#ifdef CONFIG_SPOTFLOW_OTA
+
+int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
+{
+	ARG_UNUSED(payload);
+	ARG_UNUSED(len);
+
+	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.ota_d2c_topic);
+}
+
+#endif /* CONFIG_SPOTFLOW_OTA */
+
 static int prepare_fds()
 {
 	if (mqtt_client_toolset.mqtt_client.transport.type == MQTT_TRANSPORT_SECURE) {
@@ -279,78 +351,6 @@ static int poll_with_timeout(int timeout)
 	return ret;
 }
 
-int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback)
-{
-	mqtt_client_toolset.c2d_message_callback = callback;
-
-	struct mqtt_topic topics[] = {
-		{
-			.topic = spotflow_mqtt_config.config_c2d_topic,
-			.qos = MQTT_QOS_0_AT_MOST_ONCE,
-		},
-	};
-
-	struct mqtt_subscription_list param = {
-		.list = topics,
-		.list_count = ARRAY_SIZE(topics),
-		.message_id = sys_rand16_get(),
-	};
-
-	mqtt_client_toolset.c2d_sub_message_id = param.message_id;
-
-	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
-}
-
-#ifdef CONFIG_SPOTFLOW_OTA
-
-int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback)
-{
-	ARG_UNUSED(callback);
-
-	mqtt_client_toolset.ota_message_callback = callback;
-
-	struct mqtt_topic topics[] = {
-		{
-			.topic = spotflow_mqtt_config.ota_c2d_topic,
-			.qos = MQTT_QOS_1_AT_LEAST_ONCE,
-		},
-	};
-
-	struct mqtt_subscription_list param = {
-		.list = topics,
-		.list_count = ARRAY_SIZE(topics),
-		.message_id = sys_rand16_get(),
-	};
-
-	mqtt_client_toolset.ota_sub_message_id = param.message_id;
-
-	return mqtt_subscribe(&mqtt_client_toolset.mqtt_client, &param);
-}
-
-#endif /* CONFIG_SPOTFLOW_OTA */
-
-int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len)
-{
-	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.ingest_topic);
-}
-
-int spotflow_mqtt_publish_config_cbor_msg(uint8_t* payload, size_t len)
-{
-	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.config_d2c_topic);
-}
-
-#ifdef CONFIG_SPOTFLOW_OTA
-
-int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len)
-{
-	ARG_UNUSED(payload);
-	ARG_UNUSED(len);
-
-	return spotflow_mqtt_publish_cbor_msg(payload, len, spotflow_mqtt_config.ota_d2c_topic);
-}
-
-#endif /* CONFIG_SPOTFLOW_OTA */
-
 static int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len, struct mqtt_utf8 topic)
 {
 	struct mqtt_publish_param param;
@@ -392,7 +392,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
 		/* Report connection state to system metrics */
 		spotflow_metrics_system_report_connection_state(true);
-#endif
+#endif /* CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION */
 		break;
 	case MQTT_EVT_DISCONNECT:
 		LOG_DBG("MQTT client disconnected %d", evt->result);
@@ -401,7 +401,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
 		/* Report connection state to system metrics */
 		spotflow_metrics_system_report_connection_state(false);
-#endif
+#endif /* CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION */
 
 		clear_fds();
 		break;
@@ -486,7 +486,7 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 					(unsigned int)payload_len);
 			}
 		}
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA */
 		else {
 			uint8_t discard_buffer[64];
 			size_t ignored_bytes_read;

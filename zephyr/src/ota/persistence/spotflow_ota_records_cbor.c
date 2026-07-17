@@ -1,15 +1,15 @@
+#include "ota/persistence/spotflow_ota_records_cbor.h"
+
 #include <errno.h>
 #include <string.h>
-
-#include <zephyr/logging/log.h>
 
 #include <zcbor_common.h>
 #include <zcbor_decode.h>
 #include <zcbor_encode.h>
 
-#include "ota/persistence/spotflow_ota_records_cbor.h"
+#include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_ota);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #define KEY_SCHEMA_VERSION 0
 #define KEY_ATTEMPT_ID 1

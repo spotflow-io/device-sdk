@@ -1,17 +1,17 @@
+#include "ota/protocol/spotflow_ota_cbor.h"
+
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <errno.h>
 #include <string.h>
-
-#include <zephyr/logging/log.h>
 
 #include <zcbor_common.h>
 #include <zcbor_decode.h>
 #include <zcbor_encode.h>
 
-#include "ota/protocol/spotflow_ota_cbor.h"
+#include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_ota);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #define KEY_MESSAGE_TYPE 0x00
 #define KEY_UPDATE_ATTEMPT_ID 32

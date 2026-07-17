@@ -10,14 +10,14 @@
 extern "C" {
 #endif
 
-struct ota_url {
+struct spotflow_ota_url {
 	bool tls;
 	char host[SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH + 1];
 	char path[SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH + 1];
 	uint16_t port;
 };
 
-int spotflow_ota_parse_url(const char* url, struct ota_url* out);
+int spotflow_ota_parse_url(const char* url, struct spotflow_ota_url* out);
 
 #ifdef __cplusplus
 }

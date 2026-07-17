@@ -58,7 +58,7 @@ static void before_each(void* fixture)
 
 ZTEST(spotflow_ota_downloader, test_parse_https_url)
 {
-	struct ota_url parsed;
+	struct spotflow_ota_url parsed;
 
 	zassert_ok(spotflow_ota_parse_url("https://example.com:8443/custom/path?query=1", &parsed));
 	zassert_true(parsed.tls);
@@ -69,14 +69,14 @@ ZTEST(spotflow_ota_downloader, test_parse_https_url)
 
 ZTEST(spotflow_ota_downloader, test_reject_http_url)
 {
-	struct ota_url parsed;
+	struct spotflow_ota_url parsed;
 
 	zassert_equal(spotflow_ota_parse_url("http://example.com/firmware.bin", &parsed), -EINVAL);
 }
 
 ZTEST(spotflow_ota_downloader, test_reject_unsupported_url_scheme)
 {
-	struct ota_url parsed;
+	struct spotflow_ota_url parsed;
 
 	zassert_equal(spotflow_ota_parse_url("ftp://example.com/image.bin", &parsed), -EINVAL);
 }

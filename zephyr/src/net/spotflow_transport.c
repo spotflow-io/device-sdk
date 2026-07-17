@@ -1,16 +1,15 @@
 #include "net/spotflow_transport.h"
 
-#include <zephyr/sys/util.h>
-
 #if CONFIG_SPOTFLOW_TRANSPORT_BLE
 #include "net/transport/ble/spotflow_ble_transport.h"
-#endif
-
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 #if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #include "net/transport/mqtt/spotflow_mqtt.h"
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_MQTT */
 
 #include <errno.h>
+
+#include <zephyr/sys/util.h>
 
 int spotflow_transport_start(void)
 {
@@ -18,7 +17,7 @@ int spotflow_transport_start(void)
 	return spotflow_ble_transport_start();
 #else
 	return 0;
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 }
 
 bool spotflow_transport_is_ready(void)
@@ -27,7 +26,7 @@ bool spotflow_transport_is_ready(void)
 	return spotflow_ble_transport_is_ready();
 #else
 	return spotflow_mqtt_is_connected();
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 }
 
 int spotflow_transport_send_ingest_cbor(uint8_t* payload, size_t len)
@@ -36,7 +35,7 @@ int spotflow_transport_send_ingest_cbor(uint8_t* payload, size_t len)
 	return spotflow_ble_transport_send_ingest_cbor(payload, len);
 #else
 	return spotflow_mqtt_publish_ingest_cbor_msg(payload, len);
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 }
 
 int spotflow_transport_send_config_cbor(uint8_t* payload, size_t len)
@@ -45,7 +44,7 @@ int spotflow_transport_send_config_cbor(uint8_t* payload, size_t len)
 	return spotflow_ble_transport_send_config_cbor(payload, len);
 #else
 	return spotflow_mqtt_publish_config_cbor_msg(payload, len);
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 }
 
 int spotflow_transport_send_ota_cbor(uint8_t* payload, size_t len)
@@ -56,7 +55,7 @@ int spotflow_transport_send_ota_cbor(uint8_t* payload, size_t len)
 	return -ENOTSUP;
 #else
 	return spotflow_mqtt_publish_ota_cbor_msg(payload, len);
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 }
 
 int spotflow_transport_subscribe_config(spotflow_transport_message_cb callback)
@@ -65,7 +64,7 @@ int spotflow_transport_subscribe_config(spotflow_transport_message_cb callback)
 	return spotflow_ble_transport_subscribe_config(callback);
 #else
 	return spotflow_mqtt_request_config_subscription(callback);
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 }
 
 int spotflow_transport_subscribe_ota(spotflow_transport_message_cb callback)
@@ -75,7 +74,7 @@ int spotflow_transport_subscribe_ota(spotflow_transport_message_cb callback)
 	return -ENOTSUP;
 #else
 	return spotflow_mqtt_request_ota_subscription(callback);
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 }
 
 void spotflow_transport_abort(void)
@@ -84,5 +83,5 @@ void spotflow_transport_abort(void)
 	spotflow_ble_transport_abort();
 #else
 	spotflow_mqtt_abort_mqtt();
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
 }

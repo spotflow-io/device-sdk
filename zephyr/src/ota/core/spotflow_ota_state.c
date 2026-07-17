@@ -1,10 +1,14 @@
+#include "ota/core/spotflow_ota_state.h"
+
+#include "ota/persistence/spotflow_ota_records_cbor.h"
+
 #include <errno.h>
 #include <string.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
-#include "ota/persistence/spotflow_ota_records_cbor.h"
-#include "ota/core/spotflow_ota_state.h"
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 struct attempt_state {
 	bool active;
@@ -130,6 +134,11 @@ int spotflow_ota_state_init_from_persistence(const struct spotflow_ota_persisted
 int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 				     struct spotflow_ota_state_action* action)
 {
+	if (action == NULL) {
+		LOG_ERR("action cannot be NULL");
+		return -EINVAL;
+	}
+
 	clear_action(action);
 
 	int rc = validate_update_msg(msg);
@@ -179,9 +188,15 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
 				     struct spotflow_ota_state_action* action)
 {
+	if (action == NULL) {
+		LOG_ERR("action cannot be NULL");
+		return -EINVAL;
+	}
+
 	clear_action(action);
 
 	if (attempt_id == 0) {
+		LOG_ERR("attempt_id cannot be 0");
 		return -EINVAL;
 	}
 
@@ -203,9 +218,15 @@ int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_atte
 
 int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_state_action* action)
 {
+	if (action == NULL) {
+		LOG_ERR("action cannot be NULL");
+		return -EINVAL;
+	}
+
 	clear_action(action);
 
 	if (attempt_id == 0) {
+		LOG_ERR("attempt_id cannot be 0");
 		return -EINVAL;
 	}
 
@@ -243,9 +264,15 @@ int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_st
 int spotflow_ota_state_accept_report_request(uint64_t attempt_id,
 					     struct spotflow_ota_state_action* action)
 {
+	if (action == NULL) {
+		LOG_ERR("action cannot be NULL");
+		return -EINVAL;
+	}
+
 	clear_action(action);
 
 	if (attempt_id == 0) {
+		LOG_ERR("attempt_id cannot be 0");
 		return -EINVAL;
 	}
 
@@ -309,9 +336,15 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflow_ota_result result,
 					     struct spotflow_ota_state_action* action)
 {
+	if (action == NULL) {
+		LOG_ERR("action cannot be NULL");
+		return -EINVAL;
+	}
+
 	clear_action(action);
 
 	if (result == SPOTFLOW_OTA_RESULT_PENDING) {
+		LOG_ERR("result cannot be SPOTFLOW_OTA_RESULT_PENDING");
 		return -EINVAL;
 	}
 
@@ -358,6 +391,11 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 
 int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action)
 {
+	if (action == NULL) {
+		LOG_ERR("action cannot be NULL");
+		return -EINVAL;
+	}
+
 	clear_action(action);
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
@@ -476,6 +514,7 @@ int spotflow_ota_state_store_main_firmware_artifact(uint64_t attempt_id, size_t 
 						    const struct spotflow_ota_artifact* artifact)
 {
 	if (artifact == NULL) {
+		LOG_ERR("artifact cannot be NULL");
 		return -EINVAL;
 	}
 
@@ -501,6 +540,7 @@ int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* inf
 					      struct spotflow_download_request* request_out)
 {
 	if (info == NULL || request_out == NULL) {
+		LOG_ERR("info and request_out cannot be NULL");
 		return -EINVAL;
 	}
 
@@ -683,6 +723,7 @@ int spotflow_ota_state_begin_main_firmware_reboot(void)
 int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index)
 {
 	if (artifact_index == NULL) {
+		LOG_ERR("artifact_index cannot be NULL");
 		return -EINVAL;
 	}
 

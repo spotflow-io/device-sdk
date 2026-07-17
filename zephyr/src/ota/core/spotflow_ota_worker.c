@@ -1,24 +1,25 @@
+#include "ota/core/spotflow_ota_worker.h"
+
+#include "ota/firmware/spotflow_ota_fw_custom.h"
+#include "ota/core/spotflow_ota_log.h"
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+#include "ota/firmware/spotflow_ota_fw_main.h"
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
+#include "ota/protocol/spotflow_ota_net.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/core/spotflow_ota_state.h"
+
 #include <errno.h>
 #include <string.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#include "ota/firmware/spotflow_ota_fw_custom.h"
-#include "ota/core/spotflow_ota_log.h"
-#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-#include "ota/firmware/spotflow_ota_fw_main.h"
-#endif
-#include "ota/protocol/spotflow_ota_net.h"
-#include "ota/persistence/spotflow_ota_persistence.h"
-#include "ota/core/spotflow_ota_state.h"
-#include "ota/core/spotflow_ota_worker.h"
-
-LOG_MODULE_DECLARE(spotflow_ota);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #ifndef CONFIG_SPOTFLOW_OTA_THREAD_STACK_SIZE
 #define CONFIG_SPOTFLOW_OTA_THREAD_STACK_SIZE 4096
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA_THREAD_STACK_SIZE */
 
 static void ota_worker_entry(void* arg1, void* arg2, void* arg3);
 static int process_worker_job(const struct spotflow_ota_worker_job* job);
@@ -327,7 +328,7 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 			job->attempt_id, job->artifact_index, &job->artifact);
 		return 0;
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 
 	*result = spotflow_ota_fw_custom_process_artifact(job->attempt_id, &job->artifact);
 	/*

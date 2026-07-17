@@ -1,37 +1,33 @@
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
+#include "net/spotflow_processor.h"
 
+#include "net/spotflow_transport.h"
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config_net.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 #if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #include "net/transport/mqtt/spotflow_mqtt_session.h"
-#endif
-
-#include "net/spotflow_processor.h"
-#include "net/spotflow_transport.h"
-
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_MQTT */
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 #include "coredumps/spotflow_coredumps_net.h"
 #endif /* CONFIG_SPOTFLOW_COREDUMPS */
-
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "logging/spotflow_log_processor.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
-
 #ifdef CONFIG_SPOTFLOW_METRICS
 #include "metrics/spotflow_metrics_net.h"
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
 #include "metrics/system/spotflow_metrics_system.h"
-#endif
+#endif /* CONFIG_SPOTFLOW_METRICS_SYSTEM */
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 #include "metrics/spotflow_metrics_heartbeat.h"
-#endif
+#endif /* CONFIG_SPOTFLOW_METRICS_HEARTBEAT */
 #endif /* CONFIG_SPOTFLOW_METRICS */
-
 #ifdef CONFIG_SPOTFLOW_OTA
 #include "ota/spotflow_ota.h"
 #endif /* CONFIG_SPOTFLOW_OTA */
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -39,7 +35,7 @@ static void spotflow_processing_thread_entry(void);
 static int process_config_coredumps_metrics_or_logs(void);
 #if !CONFIG_SPOTFLOW_TRANSPORT_MQTT
 static void process_transport_loop(void);
-#endif
+#endif /* !CONFIG_SPOTFLOW_TRANSPORT_MQTT */
 
 K_THREAD_DEFINE(spotflow_processing_thread, CONFIG_SPOTFLOW_PROCESSING_THREAD_STACK_SIZE,
 		spotflow_processing_thread_entry, NULL, NULL, NULL, SPOTFLOW_THREAD_PRIORITY, 0, 0);
@@ -63,8 +59,8 @@ static void spotflow_processing_thread_entry(void)
 	if (rc_sys_metrics < 0) {
 		LOG_ERR("Failed to initialize system metrics: %d", rc_sys_metrics);
 	}
-#endif
-#endif
+#endif /* CONFIG_SPOTFLOW_METRICS_SYSTEM */
+#endif /* CONFIG_SPOTFLOW_METRICS */
 
 	int rc = spotflow_transport_start();
 	if (rc < 0) {
@@ -76,15 +72,15 @@ static void spotflow_processing_thread_entry(void)
 	spotflow_metrics_net_init();
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 	spotflow_metrics_heartbeat_init();
-#endif
-#endif
+#endif /* CONFIG_SPOTFLOW_METRICS_HEARTBEAT */
+#endif /* CONFIG_SPOTFLOW_METRICS */
 
 #ifdef CONFIG_SPOTFLOW_OTA
 	int rc_ota = spotflow_ota_init();
 	if (rc_ota < 0) {
 		LOG_ERR("Failed to initialize OTA updates: %d", rc_ota);
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA */
 
 #if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 	spotflow_mqtt_session_loop(process_config_coredumps_metrics_or_logs);
@@ -92,7 +88,7 @@ static void spotflow_processing_thread_entry(void)
 	while (true) {
 		process_transport_loop();
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_TRANSPORT_MQTT */
 }
 
 static int process_config_coredumps_metrics_or_logs(void)
@@ -105,7 +101,7 @@ static int process_config_coredumps_metrics_or_logs(void)
 		LOG_DBG("Failed to send pending OTA message: %d", rc);
 		return rc;
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA */
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	rc = spotflow_config_send_pending_message();
 	if (rc < 0) {
@@ -142,7 +138,7 @@ static int process_config_coredumps_metrics_or_logs(void)
 			return rc;
 		}
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 	return rc;
 }
 
@@ -161,4 +157,4 @@ static void process_transport_loop(void)
 		k_sleep(K_MSEC(100));
 	}
 }
-#endif
+#endif /* !CONFIG_SPOTFLOW_TRANSPORT_MQTT */

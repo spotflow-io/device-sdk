@@ -1,14 +1,17 @@
-#include <stdbool.h>
+#include "ota/platform/spotflow_ota_platform.h"
+
 #include <errno.h>
+#include <stdbool.h>
 #include <stddef.h>
 
 #include <zephyr/bindesc.h>
 #include <zephyr/dfu/flash_img.h>
 #include <zephyr/dfu/mcuboot.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/reboot.h>
 
-#include "ota/platform/spotflow_ota_platform.h"
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static struct flash_img_context upload_ctx;
 
@@ -96,7 +99,7 @@ int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
 	flash_area_close(fa);
 
 	return rc;
-#endif
+#endif /* CONFIG_BINDESC_READ_FLASH */
 }
 
 int spotflow_ota_platform_begin_image_write(void)

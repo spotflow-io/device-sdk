@@ -1,12 +1,12 @@
+#include "ota/persistence/spotflow_ota_persistence.h"
+
 #include <errno.h>
 #include <string.h>
 
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
 
-#include "ota/persistence/spotflow_ota_persistence.h"
-
-LOG_MODULE_DECLARE(spotflow_ota);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #define SPOTFLOW_OTA_SETTINGS_ROOT "spotflow/ota"
 #define SPOTFLOW_OTA_SETTINGS_KEY_ATTEMPT "attempt"

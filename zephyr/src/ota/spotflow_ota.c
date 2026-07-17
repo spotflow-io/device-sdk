@@ -1,3 +1,19 @@
+#include "ota/spotflow_ota.h"
+
+#include <spotflow/ota.h>
+
+#include "ota/protocol/spotflow_ota_cbor.h"
+#include "ota/firmware/spotflow_ota_fw_custom.h"
+#include "ota/core/spotflow_ota_log.h"
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+#include "ota/firmware/spotflow_ota_fw_main.h"
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
+#include "ota/protocol/spotflow_ota_net.h"
+#include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/core/spotflow_ota_state.h"
+#include "ota/core/spotflow_ota_worker.h"
+#include "net/spotflow_transport.h"
+
 #include <errno.h>
 
 #include <zephyr/kernel.h>
@@ -5,22 +21,7 @@
 
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA) && IS_ENABLED(CONFIG_SPOTFLOW_TRANSPORT_BLE)
 #error "Spotflow OTA requires MQTT transport; BLE does not support OTA updates"
-#endif
-
-#include <spotflow/ota.h>
-
-#include "ota/spotflow_ota.h"
-#include "ota/protocol/spotflow_ota_cbor.h"
-#include "ota/firmware/spotflow_ota_fw_custom.h"
-#include "ota/core/spotflow_ota_log.h"
-#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-#include "ota/firmware/spotflow_ota_fw_main.h"
-#endif
-#include "ota/protocol/spotflow_ota_net.h"
-#include "ota/persistence/spotflow_ota_persistence.h"
-#include "ota/core/spotflow_ota_state.h"
-#include "ota/core/spotflow_ota_worker.h"
-#include "net/spotflow_transport.h"
+#endif /* CONFIG_SPOTFLOW_OTA && CONFIG_SPOTFLOW_TRANSPORT_BLE */
 
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -45,6 +46,7 @@ int spotflow_ota_init(void)
 
 	int rc = spotflow_ota_persistence_init();
 	if (rc < 0) {
+		LOG_ERR("Failed to initialize OTA persistence: %d", rc);
 		k_mutex_unlock(&ota_mutex);
 		return rc;
 	}
@@ -53,6 +55,7 @@ int spotflow_ota_init(void)
 	bool has_attempt;
 	rc = spotflow_ota_persistence_load_attempt(&attempt, &has_attempt);
 	if (rc < 0) {
+		LOG_ERR("Failed to load persisted OTA attempt: %d", rc);
 		k_mutex_unlock(&ota_mutex);
 		return rc;
 	}
@@ -63,6 +66,7 @@ int spotflow_ota_init(void)
 	bool has_probation;
 	rc = spotflow_ota_persistence_load_probation(&probation, &has_probation);
 	if (rc < 0) {
+		LOG_ERR("Failed to load persisted OTA probation: %d", rc);
 		k_mutex_unlock(&ota_mutex);
 		return rc;
 	}
@@ -71,6 +75,7 @@ int spotflow_ota_init(void)
 
 	rc = spotflow_ota_worker_init();
 	if (rc < 0) {
+		LOG_ERR("Failed to initialize OTA worker: %d", rc);
 		k_mutex_unlock(&ota_mutex);
 		return rc;
 	}
@@ -85,13 +90,14 @@ int spotflow_ota_init(void)
 		rc = spotflow_ota_fw_main_reconcile_startup(has_probation ? &probation : NULL,
 							    has_probation, &action);
 		if (rc < 0) {
+			LOG_ERR("Failed to reconcile main firmware state at startup: %d", rc);
 			k_mutex_unlock(&ota_mutex);
 			return rc;
 		}
 
 		handle_state_action(&action);
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 
 	last_received_attempt_id = has_attempt ? attempt.attempt_id : 0;
 	ota_initialized = true;
@@ -147,7 +153,149 @@ void spotflow_ota_reset(void)
 	spotflow_ota_worker_reset();
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	spotflow_ota_fw_main_reset();
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
+}
+
+bool spotflow_is_update_canceled(void)
+{
+	if (spotflow_ota_init() < 0) {
+		return false;
+	}
+
+	return spotflow_ota_state_is_update_canceled();
+}
+
+int spotflow_get_main_firmware_update_state(struct spotflow_ota_main_firmware_state* state)
+{
+	if (state == NULL) {
+		LOG_ERR("state cannot be NULL");
+		return -EINVAL;
+	}
+
+	int rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	struct spotflow_ota_state_snapshot snapshot;
+	spotflow_ota_state_get_snapshot(&snapshot);
+	*state = snapshot.main_firmware_state;
+	return 0;
+}
+
+int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
+					   struct spotflow_download_request* request)
+{
+	if (info == NULL || request == NULL) {
+		LOG_ERR("info and request cannot be NULL");
+		return -EINVAL;
+	}
+
+	int rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	return spotflow_ota_state_get_main_firmware_info(info, request);
+}
+
+int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
+{
+#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (state != NULL) {
+		(void)spotflow_get_main_firmware_update_state(state);
+	}
+
+	LOG_ERR("Main firmware auto-handling is not enabled");
+	return -ENOTSUP;
+#else
+	int rc;
+
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	return spotflow_ota_fw_main_pause_update(state);
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
+}
+
+int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
+{
+#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (state != NULL) {
+		(void)spotflow_get_main_firmware_update_state(state);
+	}
+
+	LOG_ERR("Main firmware auto-handling is not enabled");
+	return -ENOTSUP;
+#else
+	int rc;
+
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	return spotflow_ota_fw_main_resume_update(state);
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
+}
+
+int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
+{
+#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (state != NULL) {
+		(void)spotflow_get_main_firmware_update_state(state);
+	}
+
+	LOG_ERR("Main firmware auto-handling is not enabled");
+	return -ENOTSUP;
+#else
+	struct spotflow_ota_state_action action;
+	int rc;
+
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		return rc;
+	}
+
+	rc = spotflow_ota_fw_main_fail_update(state, &action);
+	if (rc < 0) {
+		return rc;
+	}
+
+	handle_state_action(&action);
+	return 0;
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
+}
+
+int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state* state)
+{
+#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (state != NULL) {
+		(void)spotflow_get_main_firmware_update_state(state);
+	}
+
+	LOG_ERR("Main firmware auto-handling is not enabled");
+	return -ENOTSUP;
+#else
+	struct spotflow_ota_state_action action;
+	int rc;
+
+	rc = spotflow_ota_init();
+	if (rc < 0) {
+		LOG_ERR("Failed to initialize OTA before main firmware confirmation: %d", rc);
+		return rc;
+	}
+
+	rc = spotflow_ota_fw_main_confirm_image(state, &action);
+	if (rc < 0) {
+		return rc;
+	}
+
+	handle_state_action(&action);
+	return 0;
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 }
 
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
@@ -260,142 +408,6 @@ static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* ms
 						snapshot.artifact_results, snapshot.artifact_count);
 }
 
-bool spotflow_is_update_canceled(void)
-{
-	if (spotflow_ota_init() < 0) {
-		return false;
-	}
-
-	return spotflow_ota_state_is_update_canceled();
-}
-
-int spotflow_get_main_firmware_update_state(struct spotflow_ota_main_firmware_state* state)
-{
-	if (state == NULL) {
-		return -EINVAL;
-	}
-
-	int rc = spotflow_ota_init();
-	if (rc < 0) {
-		return rc;
-	}
-
-	struct spotflow_ota_state_snapshot snapshot;
-	spotflow_ota_state_get_snapshot(&snapshot);
-	*state = snapshot.main_firmware_state;
-	return 0;
-}
-
-int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
-					   struct spotflow_download_request* request)
-{
-	if (info == NULL || request == NULL) {
-		return -EINVAL;
-	}
-
-	int rc = spotflow_ota_init();
-	if (rc < 0) {
-		return rc;
-	}
-
-	return spotflow_ota_state_get_main_firmware_info(info, request);
-}
-
-int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
-{
-#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-	if (state != NULL) {
-		(void)spotflow_get_main_firmware_update_state(state);
-	}
-
-	return -ENOTSUP;
-#else
-	int rc;
-
-	rc = spotflow_ota_init();
-	if (rc < 0) {
-		return rc;
-	}
-
-	return spotflow_ota_fw_main_pause_update(state);
-#endif
-}
-
-int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
-{
-#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-	if (state != NULL) {
-		(void)spotflow_get_main_firmware_update_state(state);
-	}
-
-	return -ENOTSUP;
-#else
-	int rc;
-
-	rc = spotflow_ota_init();
-	if (rc < 0) {
-		return rc;
-	}
-
-	return spotflow_ota_fw_main_resume_update(state);
-#endif
-}
-
-int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
-{
-#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-	if (state != NULL) {
-		(void)spotflow_get_main_firmware_update_state(state);
-	}
-
-	return -ENOTSUP;
-#else
-	struct spotflow_ota_state_action action;
-	int rc;
-
-	rc = spotflow_ota_init();
-	if (rc < 0) {
-		return rc;
-	}
-
-	rc = spotflow_ota_fw_main_fail_update(state, &action);
-	if (rc < 0) {
-		return rc;
-	}
-
-	handle_state_action(&action);
-	return 0;
-#endif
-}
-
-int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state* state)
-{
-#if !IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-	if (state != NULL) {
-		(void)spotflow_get_main_firmware_update_state(state);
-	}
-
-	return -ENOTSUP;
-#else
-	struct spotflow_ota_state_action action;
-	int rc;
-
-	rc = spotflow_ota_init();
-	if (rc < 0) {
-		LOG_ERR("Failed to initialize OTA before main firmware confirmation: %d", rc);
-		return rc;
-	}
-
-	rc = spotflow_ota_fw_main_confirm_image(state, &action);
-	if (rc < 0) {
-		return rc;
-	}
-
-	handle_state_action(&action);
-	return 0;
-#endif
-}
-
 static void handle_state_action(const struct spotflow_ota_state_action* action)
 {
 	if (action == NULL) {
@@ -406,14 +418,14 @@ static void handle_state_action(const struct spotflow_ota_state_action* action)
 		spotflow_ota_fw_custom_notify_canceled();
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 		spotflow_ota_fw_main_cancel_active_download();
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 	}
 
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	if (action->superseded_current) {
 		spotflow_ota_fw_main_cancel_active_download();
 	}
-#endif
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 
 	if (action->wake_worker) {
 		spotflow_ota_worker_wake();

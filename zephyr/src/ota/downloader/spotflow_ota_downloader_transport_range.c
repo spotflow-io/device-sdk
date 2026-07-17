@@ -1,7 +1,11 @@
+#include "ota/downloader/spotflow_ota_downloader_transport_range.h"
+
 #include <errno.h>
 #include <limits.h>
 
-#include "ota/downloader/spotflow_ota_downloader_transport_range.h"
+#include <zephyr/logging/log.h>
+
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 int spotflow_ota_downloader_transport_validate_range_response(const struct http_response* response,
 							      size_t range_start,

@@ -29,12 +29,14 @@ int spotflow_ota_init(void);
  * @return 0 on success, negative errno on failure
  *         -EINVAL: MQTT subscription request failed
  */
-int spotflow_ota_init_session();
+int spotflow_ota_init_session(void);
 
 /**
  * @brief Send one pending OTA D2C message, if any.
  *
  * Called from the MQTT processing loop.
+ *
+ * @return 0 on success, negative errno on failure
  */
 int spotflow_ota_send_pending_message(void);
 

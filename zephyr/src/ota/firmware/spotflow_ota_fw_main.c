@@ -1,14 +1,9 @@
-#include <errno.h>
-#include <string.h>
-
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
+#include "ota/firmware/spotflow_ota_fw_main.h"
 
 #include <spotflow/downloader.h>
 
 #include "ota/downloader/spotflow_ota_downloader.h"
 #include "ota/firmware/spotflow_ota_fw_custom.h"
-#include "ota/firmware/spotflow_ota_fw_main.h"
 #include "ota/platform/spotflow_ota_identity.h"
 #include "ota/core/spotflow_ota_log.h"
 #include "ota/protocol/spotflow_ota_net.h"
@@ -16,15 +11,21 @@
 #include "ota/platform/spotflow_ota_platform.h"
 #include "ota/core/spotflow_ota_state.h"
 
+#include <errno.h>
+#include <string.h>
+
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
+
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
-
-static SPOTFLOW_DEFINE_DOWNLOADER(main_firmware_downloader);
-
-static K_SEM_DEFINE(main_firmware_resume_sem, 0, 1);
 
 struct main_firmware_flash_ctx {
 	int write_err;
 };
+
+static SPOTFLOW_DEFINE_DOWNLOADER(main_firmware_downloader);
+
+static K_SEM_DEFINE(main_firmware_resume_sem, 0, 1);
 
 static void notify_main_firmware_phase(enum spotflow_ota_phase phase);
 static void notify_main_firmware_state(const struct spotflow_ota_main_firmware_state* state);

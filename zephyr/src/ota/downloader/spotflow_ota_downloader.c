@@ -1,3 +1,10 @@
+#include "ota/downloader/spotflow_ota_downloader.h"
+
+#include <spotflow/downloader.h>
+
+#include "ota/downloader/spotflow_ota_downloader_transport.h"
+#include "ota/downloader/spotflow_ota_url.h"
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -5,12 +12,6 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
-
-#include <spotflow/downloader.h>
-
-#include "ota/downloader/spotflow_ota_downloader.h"
-#include "ota/downloader/spotflow_ota_downloader_transport.h"
-#include "ota/downloader/spotflow_ota_url.h"
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -31,6 +32,7 @@ int spotflow_ota_downloader_build_authorization_header(const char* secret, char*
 {
 	/* secret is used only for the HTTP Authorization header and must not be logged. */
 	if (secret == NULL || out == NULL || out_len == 0) {
+		LOG_ERR("secret and out cannot be NULL, out_len cannot be 0");
 		return -EINVAL;
 	}
 
@@ -49,6 +51,7 @@ enum spotflow_downloader_state
 spotflow_get_downloader_state(const struct spotflow_downloader* downloader)
 {
 	if (downloader == NULL) {
+		LOG_ERR("downloader cannot be NULL");
 		return SPOTFLOW_DOWNLOADER_STATE_INACTIVE;
 	}
 
@@ -58,6 +61,7 @@ spotflow_get_downloader_state(const struct spotflow_downloader* downloader)
 int spotflow_pause_download(struct spotflow_downloader* downloader)
 {
 	if (downloader == NULL) {
+		LOG_ERR("downloader cannot be NULL");
 		return -EINVAL;
 	}
 
@@ -77,6 +81,7 @@ int spotflow_pause_download(struct spotflow_downloader* downloader)
 int spotflow_resume_download(struct spotflow_downloader* downloader)
 {
 	if (downloader == NULL) {
+		LOG_ERR("downloader cannot be NULL");
 		return -EINVAL;
 	}
 
@@ -98,6 +103,7 @@ int spotflow_resume_download(struct spotflow_downloader* downloader)
 int spotflow_cancel_download(struct spotflow_downloader* downloader)
 {
 	if (downloader == NULL) {
+		LOG_ERR("downloader cannot be NULL");
 		return -EINVAL;
 	}
 
@@ -133,10 +139,12 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 {
 	if (downloader == NULL || request == NULL || request->url == NULL ||
 	    request->secret == NULL || callback == NULL) {
+		LOG_ERR("downloader, request, request->url, request->secret and callback cannot "
+			"be NULL");
 		return -EINVAL;
 	}
 
-	struct ota_url url;
+	struct spotflow_ota_url url;
 	int rc = spotflow_ota_parse_url(request->url, &url);
 
 	if (rc < 0) {

@@ -1,3 +1,5 @@
+#include "ota/downloader/spotflow_ota_url.h"
+
 #include <errno.h>
 #include <string.h>
 
@@ -5,12 +7,15 @@
 #include <zephyr/net/http/parser_url.h>
 #include <zephyr/sys/util.h>
 
-#include "ota/downloader/spotflow_ota_url.h"
-
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
-int spotflow_ota_parse_url(const char* url, struct ota_url* out)
+int spotflow_ota_parse_url(const char* url, struct spotflow_ota_url* out)
 {
+	if (url == NULL || out == NULL) {
+		LOG_ERR("url and out cannot be NULL");
+		return -EINVAL;
+	}
+
 	struct http_parser_url parsed;
 
 	http_parser_url_init(&parsed);

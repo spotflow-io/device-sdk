@@ -1,13 +1,16 @@
+#include "spotflow_reset_helper.h"
+
 #include "spotflow_metrics_system.h"
 #include "metrics/spotflow_metrics_backend.h"
-#include "zephyr/logging/log.h"
 
 #if defined(CONFIG_MCUBOOT_IMG_MANAGER)
 #include <zephyr/dfu/mcuboot.h>
-#endif
-#include <zephyr/drivers/hwinfo.h>
+#endif /* CONFIG_MCUBOOT_IMG_MANAGER */
 #include <errno.h>
 #include <stdio.h>
+
+#include <zephyr/drivers/hwinfo.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 
@@ -122,7 +125,7 @@ static bool is_test_firmware_upgrade(void)
 	return !boot_is_img_confirmed();
 #else
 	return false;
-#endif
+#endif /* CONFIG_MCUBOOT_IMG_MANAGER */
 }
 
 static bool append_cause_name(char* buf, size_t buf_len, size_t* used, bool* first,

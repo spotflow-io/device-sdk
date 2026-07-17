@@ -1,11 +1,15 @@
+#include "ota/protocol/spotflow_ota_net.h"
+
+#include "net/spotflow_transport.h"
+#include "ota/protocol/spotflow_ota_cbor.h"
+
 #include <errno.h>
 #include <string.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
-#include "net/spotflow_transport.h"
-#include "ota/protocol/spotflow_ota_cbor.h"
-#include "ota/protocol/spotflow_ota_net.h"
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 #define SPOTFLOW_OTA_NET_MAX_CBOR_SIZE 128
 
