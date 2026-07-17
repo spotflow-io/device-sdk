@@ -6,6 +6,7 @@
 #include <stdint.h>
 
 #include <zephyr/kernel.h>
+#include <zephyr/sys/iterable_sections.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -26,9 +27,10 @@ enum spotflow_downloader_state {
 /**
  * @brief Downloader instance for streaming one OTA artifact over HTTP(S).
  *
- * Allocate statically with @ref SPOTFLOW_DEFINE_DOWNLOADER. Fields are visible
- * so applications can embed the downloader, but they are owned by the SDK and
- * must not be modified by application code.
+ * Define at file scope with @ref SPOTFLOW_DEFINE_DOWNLOADER or initialize with
+ * @ref spotflow_init_downloader. Fields are visible so applications can embed
+ * the downloader, but they are owned by the SDK and must not be modified by
+ * application code.
  */
 struct spotflow_downloader {
 	enum spotflow_downloader_state state;
@@ -37,13 +39,28 @@ struct spotflow_downloader {
 	struct k_sem resume_sem;
 };
 
-/** Define and statically initialize a @ref spotflow_downloader. */
-#define SPOTFLOW_DEFINE_DOWNLOADER(name)                                \
-	struct spotflow_downloader name = {                             \
-		.state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE,            \
-		.mutex = Z_MUTEX_INITIALIZER(name.mutex),               \
-		.resume_sem = Z_SEM_INITIALIZER(name.resume_sem, 0, 1), \
-	}
+/**
+ * @brief Define and initialize a file-scope @ref spotflow_downloader.
+ *
+ * The downloader is initialized before application code runs.
+ *
+ * @param name Name of the downloader.
+ */
+#define SPOTFLOW_DEFINE_DOWNLOADER(name) STRUCT_SECTION_ITERABLE(spotflow_downloader, name) = { 0 }
+
+/**
+ * @brief Initialize a downloader.
+ *
+ * Use this function for local downloader variables and downloaders embedded in
+ * another structure. The downloader must be initialized before its first use.
+ *
+ * @param downloader Downloader instance. Must not be NULL.
+ *
+ * @retval 0 Downloader initialized.
+ * @retval -EINVAL @p downloader is NULL.
+ * @retval <0 Kernel object initialization failed.
+ */
+int spotflow_init_downloader(struct spotflow_downloader* downloader);
 
 /** One block of artifact bytes delivered during a download. */
 struct spotflow_artifact_block {

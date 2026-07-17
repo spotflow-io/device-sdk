@@ -10,8 +10,10 @@
 #include <stdint.h>
 #include <string.h>
 
+#include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/iterable_sections.h>
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -26,6 +28,9 @@ static void downloader_wake_waiters(struct spotflow_downloader* downloader);
 static void downloader_drain_resume_sem(struct spotflow_downloader* downloader);
 static void downloader_wait_if_paused(struct spotflow_downloader* downloader);
 static void downloader_finish(struct spotflow_downloader* downloader);
+static int init_static_downloaders(void);
+
+SYS_INIT(init_static_downloaders, PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
 
 int spotflow_ota_downloader_build_authorization_header(const char* secret, char* out,
 						       size_t out_len)
@@ -43,6 +48,30 @@ int spotflow_ota_downloader_build_authorization_header(const char* secret, char*
 	if (written < 0 || (size_t)written >= out_len) {
 		return -ENOMEM;
 	}
+
+	return 0;
+}
+
+int spotflow_init_downloader(struct spotflow_downloader* downloader)
+{
+	if (downloader == NULL) {
+		LOG_ERR("downloader cannot be NULL");
+		return -EINVAL;
+	}
+
+	int rc = k_mutex_init(&downloader->mutex);
+
+	if (rc < 0) {
+		return rc;
+	}
+
+	rc = k_sem_init(&downloader->resume_sem, 0, 1);
+	if (rc < 0) {
+		return rc;
+	}
+
+	downloader->state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE;
+	downloader->cancel_requested = false;
 
 	return 0;
 }
@@ -279,4 +308,18 @@ static void downloader_wait_if_paused(struct spotflow_downloader* downloader)
 
 		k_sem_take(&downloader->resume_sem, K_FOREVER);
 	}
+}
+
+static int init_static_downloaders(void)
+{
+	STRUCT_SECTION_FOREACH(spotflow_downloader, downloader)
+	{
+		int rc = spotflow_init_downloader(downloader);
+
+		if (rc < 0) {
+			return rc;
+		}
+	}
+
+	return 0;
 }

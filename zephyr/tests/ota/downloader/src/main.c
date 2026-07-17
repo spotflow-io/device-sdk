@@ -19,6 +19,7 @@ LOG_MODULE_REGISTER(spotflow_ota, CONFIG_LOG_DEFAULT_LEVEL);
 static const uint8_t sample_payload[] = { 0x01, 0x02, 0x03, 0x04 };
 static size_t received_bytes;
 static bool received_last_block;
+static SPOTFLOW_DEFINE_DOWNLOADER(static_downloader);
 
 static void reset_test_state(void)
 {
@@ -83,12 +84,13 @@ ZTEST(spotflow_ota_downloader, test_reject_unsupported_url_scheme)
 
 ZTEST(spotflow_ota_downloader, test_reject_http_download_request)
 {
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "http://example.com/firmware.bin",
 		.secret = "secret",
 	};
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	zassert_equal(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL),
 		      -EINVAL);
 	zassert_equal(spotflow_get_downloader_state(&downloader),
@@ -100,12 +102,13 @@ ZTEST(spotflow_ota_downloader, test_authorization_header_contains_ota_secret)
 	char header[96];
 	struct spotflow_ota_downloader_transport_fake* fake =
 		spotflow_ota_downloader_transport_fake_get();
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "https://example.com/firmware.bin",
 		.secret = "test-secret-value",
 	};
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	zassert_ok(spotflow_ota_downloader_build_authorization_header(request.secret, header,
 								      sizeof(header)));
 	zassert_equal(strcmp(header, "Authorization: OtaSecret test-secret-value\r\n"), 0);
@@ -123,7 +126,7 @@ ZTEST(spotflow_ota_downloader, test_cancel_stops_download)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
 		spotflow_ota_downloader_transport_fake_get();
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "https://example.com/firmware.bin",
 		.secret = "secret",
@@ -132,6 +135,7 @@ ZTEST(spotflow_ota_downloader, test_cancel_stops_download)
 	k_thread_stack_t cancel_stack[1024];
 	int download_result = 0;
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	fake->block_until_cancel = true;
 
 	k_thread_create(&cancel_thread, cancel_stack, K_THREAD_STACK_SIZEOF(cancel_stack),
@@ -152,12 +156,13 @@ ZTEST(spotflow_ota_downloader, test_transient_failure_resumes_with_range)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
 		spotflow_ota_downloader_transport_fake_get();
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "https://example.com/firmware.bin",
 		.secret = "secret",
 	};
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	fake->payload = sample_payload;
 	fake->payload_len = sizeof(sample_payload);
 	fake->partial_transient_fail_after_bytes = 2;
@@ -173,12 +178,13 @@ ZTEST(spotflow_ota_downloader, test_partial_ebadmsg_resumes_with_range)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
 		spotflow_ota_downloader_transport_fake_get();
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "https://example.com/firmware.bin",
 		.secret = "secret",
 	};
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	fake->payload = sample_payload;
 	fake->payload_len = sizeof(sample_payload);
 	fake->partial_transient_fail_after_bytes = 2;
@@ -195,12 +201,13 @@ ZTEST(spotflow_ota_downloader, test_partial_econnreset_resumes_with_range)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
 		spotflow_ota_downloader_transport_fake_get();
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "https://example.com/firmware.bin",
 		.secret = "secret",
 	};
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	fake->payload = sample_payload;
 	fake->payload_len = sizeof(sample_payload);
 	fake->partial_transient_fail_after_bytes = 2;
@@ -217,13 +224,14 @@ ZTEST(spotflow_ota_downloader, test_ebadmsg_without_progress_is_fatal)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
 		spotflow_ota_downloader_transport_fake_get();
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "https://example.com/firmware.bin",
 		.secret = "secret",
 	};
 	const int results[] = { -EBADMSG };
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	spotflow_ota_downloader_transport_fake_set_results(fake, results, ARRAY_SIZE(results));
 
 	zassert_equal(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL),
@@ -236,13 +244,14 @@ ZTEST(spotflow_ota_downloader, test_transient_errors_are_retried)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
 		spotflow_ota_downloader_transport_fake_get();
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "https://example.com/firmware.bin",
 		.secret = "secret",
 	};
 	const int transient_results[] = { -EAGAIN, -EAGAIN, 0 };
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	spotflow_ota_downloader_transport_fake_set_results(fake, transient_results,
 							   ARRAY_SIZE(transient_results));
 	fake->payload = sample_payload;
@@ -269,7 +278,7 @@ ZTEST(spotflow_ota_downloader, test_pause_and_resume_block_download)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
 		spotflow_ota_downloader_transport_fake_get();
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 	struct spotflow_download_request request = {
 		.url = "https://example.com/firmware.bin",
 		.secret = "secret",
@@ -278,6 +287,7 @@ ZTEST(spotflow_ota_downloader, test_pause_and_resume_block_download)
 	k_thread_stack_t control_stack[1024];
 	int download_result = 0;
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	fake->block_until_pause = true;
 	fake->payload = sample_payload;
 	fake->payload_len = sizeof(sample_payload);
@@ -299,10 +309,23 @@ ZTEST(spotflow_ota_downloader, test_pause_and_resume_block_download)
 
 ZTEST(spotflow_ota_downloader, test_pause_invalid_when_inactive)
 {
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
+	struct spotflow_downloader downloader;
 
+	zassert_ok(spotflow_init_downloader(&downloader));
 	zassert_equal(spotflow_pause_download(&downloader), -EINVAL);
 	zassert_equal(spotflow_resume_download(&downloader), -EINVAL);
+}
+
+ZTEST(spotflow_ota_downloader, test_static_downloader_is_initialized)
+{
+	zassert_equal(spotflow_get_downloader_state(&static_downloader),
+		      SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
+	zassert_equal(spotflow_pause_download(&static_downloader), -EINVAL);
+}
+
+ZTEST(spotflow_ota_downloader, test_init_rejects_null)
+{
+	zassert_equal(spotflow_init_downloader(NULL), -EINVAL);
 }
 
 ZTEST(spotflow_ota_downloader, test_validate_resumed_content_range)

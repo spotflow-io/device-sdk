@@ -5,6 +5,16 @@ cmake_minimum_required(VERSION 3.20.0)
 find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(spotflow_ota_fw_main)
 
+zephyr_linker_sources(
+        DATA_SECTIONS
+        ../../../src/ota/downloader/spotflow_ota_downloader.ld
+)
+zephyr_iterable_section(
+        NAME spotflow_downloader
+        GROUP DATA_REGION
+        ${XIP_ALIGN_WITH_INPUT}
+)
+
 target_include_directories(app PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/../../../include
         ${CMAKE_CURRENT_LIST_DIR}/../../../src

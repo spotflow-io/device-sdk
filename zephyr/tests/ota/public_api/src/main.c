@@ -40,7 +40,6 @@ ZTEST(spotflow_ota_public_api, test_public_headers_expose_expected_ota_types)
 
 ZTEST(spotflow_ota_public_api, test_public_headers_expose_expected_downloader_types)
 {
-	SPOTFLOW_DEFINE_DOWNLOADER(downloader);
 	struct spotflow_artifact_block block = {
 		.offset = 0,
 		.data = NULL,
@@ -48,7 +47,7 @@ ZTEST(spotflow_ota_public_api, test_public_headers_expose_expected_downloader_ty
 		.is_last = true,
 	};
 
-	zassert_equal(downloader.state, SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
+	zassert_true(sizeof(struct spotflow_downloader) > 0);
 	zassert_equal(block.offset, 0);
 	zassert_true(block.is_last);
 }
