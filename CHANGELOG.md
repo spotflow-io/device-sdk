@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added Zephyr BLE transport support for coredump telemetry chunks.
 * Added coredump support for siwx917
 * Added coredump support for saving coredump to memory
+* Added implementation of over-the-air (OTA) firmware updates for Zephyr.
 
 
 ### Fixed
