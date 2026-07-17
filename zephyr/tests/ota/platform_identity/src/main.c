@@ -1,6 +1,7 @@
 #include <errno.h>
 #include <string.h>
 
+#include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
 #include "spotflow_build_id.h"
@@ -9,6 +10,8 @@
 #include "spotflow_ota_bindesc_test_util.h"
 #include "spotflow_ota_build_id_fake.h"
 #include "spotflow_ota_platform_fake.h"
+
+LOG_MODULE_REGISTER(spotflow_ota);
 
 static struct spotflow_ota_platform_fake* fake;
 
