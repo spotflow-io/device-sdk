@@ -404,7 +404,7 @@ static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* ms
 		return prepare_persisted_results_for_attempt(msg->attempt_id);
 	}
 
-	if (snapshot.has_attempt_error) {
+	if (snapshot.has_attempt_error || snapshot.artifact_result_commit_pending) {
 		return prepare_persisted_results_for_attempt(msg->attempt_id);
 	}
 

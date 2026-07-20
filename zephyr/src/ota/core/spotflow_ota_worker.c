@@ -21,15 +21,45 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 #define CONFIG_SPOTFLOW_OTA_THREAD_STACK_SIZE 4096
 #endif /* CONFIG_SPOTFLOW_OTA_THREAD_STACK_SIZE */
 
+#define OTA_WORKER_RETRY_INITIAL_DELAY_MS 20U
+#define OTA_WORKER_RETRY_MAX_SHIFT 6U
+
+enum worker_operation_stage {
+	WORKER_STAGE_NONE,
+	WORKER_STAGE_REJECT_PERSIST,
+	WORKER_STAGE_REJECT_REPORT,
+	WORKER_STAGE_ARTIFACT_PERSIST_INITIAL,
+	WORKER_STAGE_ARTIFACT_LOAD_VERSION,
+	WORKER_STAGE_ARTIFACT_RUN_HANDLER,
+	WORKER_STAGE_ARTIFACT_STAGE_RESULT,
+	WORKER_STAGE_ARTIFACT_SAVE_VERSION,
+	WORKER_STAGE_ARTIFACT_PERSIST_RESULT,
+	WORKER_STAGE_ARTIFACT_COMMIT_RESULT,
+	WORKER_STAGE_ARTIFACT_REPORT_RESULT,
+};
+
+struct worker_operation {
+	bool active;
+	struct spotflow_ota_worker_job job;
+	enum worker_operation_stage stage;
+	enum spotflow_ota_result result;
+	struct spotflow_ota_state_snapshot persisted_snapshot;
+	uint8_t retry_count;
+};
+
 static void ota_worker_entry(void* arg1, void* arg2, void* arg3);
-static int process_worker_job(const struct spotflow_ota_worker_job* job);
-static int process_rejected_attempt_job(const struct spotflow_ota_worker_job* job);
-static int process_artifact_job(const struct spotflow_ota_worker_job* job);
-static bool persist_and_enqueue_terminal_attempt_if_needed(void);
+static void ota_worker_retry_handler(struct k_work* work);
+static void initialize_worker_operation(const struct spotflow_ota_worker_job* job);
+static int process_worker_operation(void);
+static int process_rejected_operation(void);
+static int process_artifact_operation(void);
+static int process_idle_terminal_attempt(void);
+static void advance_operation(enum worker_operation_stage stage);
+static void schedule_worker_retry(void);
 static bool snapshot_has_terminal_results(const struct spotflow_ota_state_snapshot* snapshot);
 static int persist_snapshot_attempt(const struct spotflow_ota_state_snapshot* snapshot);
-static int load_artifact_result(const struct spotflow_ota_worker_job* job,
-				enum spotflow_ota_result* result);
+static int artifact_is_installed(const struct spotflow_ota_worker_job* job, bool* is_installed);
+static enum spotflow_ota_result run_artifact_handler(const struct spotflow_ota_worker_job* job);
 static int persist_attempt(const struct spotflow_ota_persisted_attempt* attempt);
 
 #if defined(CONFIG_ZTEST)
@@ -37,9 +67,12 @@ void __weak spotflow_ota_worker_test_after_artifact_result_applied(void) {}
 #endif /* CONFIG_ZTEST */
 
 static K_SEM_DEFINE(ota_work_sem, 0, 1);
+static K_MUTEX_DEFINE(worker_operation_mutex);
+static K_WORK_DELAYABLE_DEFINE(ota_worker_retry, ota_worker_retry_handler);
 static K_THREAD_STACK_DEFINE(ota_worker_stack, CONFIG_SPOTFLOW_OTA_THREAD_STACK_SIZE);
 static struct k_thread ota_worker_thread;
 static k_tid_t ota_worker_tid;
+static struct worker_operation operation;
 
 int spotflow_ota_worker_init(void)
 {
@@ -61,8 +94,12 @@ void spotflow_ota_worker_wake(void)
 
 void spotflow_ota_worker_reset(void)
 {
+	k_mutex_lock(&worker_operation_mutex, K_FOREVER);
+	(void)k_work_cancel_delayable(&ota_worker_retry);
+	memset(&operation, 0, sizeof(operation));
 	while (k_sem_take(&ota_work_sem, K_NO_WAIT) == 0) {
 	}
+	k_mutex_unlock(&worker_operation_mutex);
 }
 
 static void ota_worker_entry(void* arg1, void* arg2, void* arg3)
@@ -73,209 +110,311 @@ static void ota_worker_entry(void* arg1, void* arg2, void* arg3)
 
 	for (;;) {
 		k_sem_take(&ota_work_sem, K_FOREVER);
+		(void)k_work_cancel_delayable(&ota_worker_retry);
 
 		for (;;) {
-			struct spotflow_ota_worker_job job;
+			int rc;
 
-			if (!spotflow_ota_state_get_worker_job(&job)) {
-				if (persist_and_enqueue_terminal_attempt_if_needed()) {
-					continue;
+			k_mutex_lock(&worker_operation_mutex, K_FOREVER);
+
+			if (!operation.active) {
+				struct spotflow_ota_worker_job job;
+
+				if (!spotflow_ota_state_get_worker_job(&job)) {
+					rc = process_idle_terminal_attempt();
+					k_mutex_unlock(&worker_operation_mutex);
+
+					if (rc > 0) {
+						continue;
+					}
+					if (rc < 0) {
+						schedule_worker_retry();
+					}
+					break;
 				}
+
+				initialize_worker_operation(&job);
+			}
+
+			rc = process_worker_operation();
+			if (rc < 0) {
+				LOG_ERR("OTA worker operation failed for attempt %llu at stage %d: "
+					"%d",
+					(unsigned long long)operation.job.attempt_id,
+					operation.stage, rc);
+				schedule_worker_retry();
+				k_mutex_unlock(&worker_operation_mutex);
 				break;
 			}
 
-			int rc = process_worker_job(&job);
-			if (rc < 0) {
-				LOG_ERR("OTA worker job failed for attempt %llu: %d",
-					(unsigned long long)job.attempt_id, rc);
-			}
+			memset(&operation, 0, sizeof(operation));
+			k_mutex_unlock(&worker_operation_mutex);
 		}
 	}
 }
 
-static int process_worker_job(const struct spotflow_ota_worker_job* job)
+static void ota_worker_retry_handler(struct k_work* work)
 {
-	if (job == NULL) {
-		return -EINVAL;
-	}
+	ARG_UNUSED(work);
+	spotflow_ota_worker_wake();
+}
+
+static void initialize_worker_operation(const struct spotflow_ota_worker_job* job)
+{
+	memset(&operation, 0, sizeof(operation));
+	operation.active = true;
+	operation.job = *job;
 
 	switch (job->type) {
 	case SPOTFLOW_OTA_WORKER_JOB_REJECTED_ATTEMPT:
-		return process_rejected_attempt_job(job);
+		operation.stage = WORKER_STAGE_REJECT_PERSIST;
+		LOG_INF("OTA attempt %llu rejected (%s)", (unsigned long long)job->attempt_id,
+			spotflow_ota_log_attempt_error_name(job->attempt_error));
+		break;
 	case SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT:
-		return process_artifact_job(job);
+		operation.stage = job->artifact_index == 0 ? WORKER_STAGE_ARTIFACT_PERSIST_INITIAL
+							   : WORKER_STAGE_ARTIFACT_LOAD_VERSION;
+		LOG_INF("OTA attempt %llu: started artifact '%s' %s (index %zu%s)",
+			(unsigned long long)job->attempt_id, job->artifact.slug,
+			job->artifact.version, job->artifact_index,
+			job->artifact.is_main ? ", main" : "");
+		break;
+	case SPOTFLOW_OTA_WORKER_JOB_NONE:
+	default:
+		operation.active = false;
+		operation.stage = WORKER_STAGE_NONE;
+		break;
+	}
+}
+
+static int process_worker_operation(void)
+{
+	switch (operation.job.type) {
+	case SPOTFLOW_OTA_WORKER_JOB_REJECTED_ATTEMPT:
+		return process_rejected_operation();
+	case SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT:
+		return process_artifact_operation();
 	case SPOTFLOW_OTA_WORKER_JOB_NONE:
 	default:
 		return -EINVAL;
 	}
 }
 
-static int process_rejected_attempt_job(const struct spotflow_ota_worker_job* job)
+static int process_rejected_operation(void)
 {
-	struct spotflow_ota_persisted_attempt attempt = {
-		.attempt_id = job->attempt_id,
-		.has_attempt_error = true,
-		.attempt_error = job->attempt_error,
-	};
+	for (;;) {
+		switch (operation.stage) {
+		case WORKER_STAGE_REJECT_PERSIST: {
+			struct spotflow_ota_persisted_attempt attempt = {
+				.attempt_id = operation.job.attempt_id,
+				.has_attempt_error = true,
+				.attempt_error = operation.job.attempt_error,
+			};
 
-	for (size_t i = 0; i < ARRAY_SIZE(attempt.artifact_results); i++) {
-		attempt.artifact_results[i] = SPOTFLOW_OTA_RESULT_PENDING;
-	}
+			for (size_t i = 0; i < ARRAY_SIZE(attempt.artifact_results); i++) {
+				attempt.artifact_results[i] = SPOTFLOW_OTA_RESULT_PENDING;
+			}
 
-	LOG_INF("OTA attempt %llu rejected (%s)", (unsigned long long)job->attempt_id,
-		spotflow_ota_log_attempt_error_name(job->attempt_error));
-
-	int rc = persist_attempt(&attempt);
-	if (rc < 0) {
-		LOG_ERR("Failed to persist rejected OTA attempt %llu: %d",
-			(unsigned long long)job->attempt_id, rc);
-		return rc;
-	}
-
-	rc = spotflow_ota_net_prepare_attempt_error(job->attempt_id, job->attempt_error);
-	if (rc < 0) {
-		LOG_ERR("Failed to queue rejected OTA attempt %llu for reporting: %d",
-			(unsigned long long)job->attempt_id, rc);
-	}
-
-	return rc;
-}
-
-static int process_artifact_job(const struct spotflow_ota_worker_job* job)
-{
-	enum spotflow_ota_result result;
-	struct spotflow_ota_state_snapshot snapshot;
-	int rc;
-
-	LOG_INF("OTA attempt %llu: started artifact '%s' %s (index %zu%s)",
-		(unsigned long long)job->attempt_id, job->artifact.slug, job->artifact.version,
-		job->artifact_index, job->artifact.is_main ? ", main" : "");
-
-	/*
-	 * Persist the accepted attempt (pending results) on the worker thread before the first
-	 * physical update or delegated handler runs. Later artifacts rely on the end-of-job
-	 * persist from the previous artifact in the same wake cycle.
-	 */
-	if (job->artifact_index == 0) {
-		spotflow_ota_state_get_snapshot(&snapshot);
-		if (snapshot.has_current_attempt &&
-		    snapshot.current_attempt_id == job->attempt_id && !snapshot.has_attempt_error) {
-			rc = persist_snapshot_attempt(&snapshot);
+			int rc = persist_attempt(&attempt);
 			if (rc < 0) {
-				LOG_ERR("Failed to persist OTA attempt %llu before artifact "
-					"processing: %d",
-					(unsigned long long)job->attempt_id, rc);
 				return rc;
 			}
+			advance_operation(WORKER_STAGE_REJECT_REPORT);
+			break;
+		}
+		case WORKER_STAGE_REJECT_REPORT: {
+			int rc = spotflow_ota_net_prepare_attempt_error(
+				operation.job.attempt_id, operation.job.attempt_error);
+			if (rc < 0) {
+				return rc;
+			}
+			return 0;
+		}
+		default:
+			return -EINVAL;
 		}
 	}
+}
 
-	rc = load_artifact_result(job, &result);
-	if (rc < 0) {
-		LOG_ERR("Failed to resolve OTA result for attempt %llu artifact %zu: %d",
-			(unsigned long long)job->attempt_id, job->artifact_index, rc);
-		return rc;
-	}
+static int process_artifact_operation(void)
+{
+	for (;;) {
+		switch (operation.stage) {
+		case WORKER_STAGE_ARTIFACT_PERSIST_INITIAL: {
+			struct spotflow_ota_state_snapshot snapshot;
 
-	LOG_INF("OTA attempt %llu: artifact '%s' %s %s", (unsigned long long)job->attempt_id,
-		job->artifact.slug, job->artifact.version, spotflow_ota_log_result_name(result));
+			spotflow_ota_state_get_snapshot(&snapshot);
+			if (!snapshot.has_current_attempt ||
+			    snapshot.current_attempt_id != operation.job.attempt_id ||
+			    snapshot.has_attempt_error) {
+				return -EINVAL;
+			}
 
-	if (result == SPOTFLOW_OTA_RESULT_SUCCEEDED) {
-		rc = spotflow_ota_persistence_save_installed_version(job->artifact.slug,
-								     job->artifact.version);
-		if (rc < 0) {
-			LOG_ERR("Failed to persist installed version for OTA attempt %llu artifact "
-				"'%s': %d",
-				(unsigned long long)job->attempt_id, job->artifact.slug, rc);
-			return rc;
+			int rc = persist_snapshot_attempt(&snapshot);
+			if (rc < 0) {
+				return rc;
+			}
+			advance_operation(WORKER_STAGE_ARTIFACT_LOAD_VERSION);
+			break;
 		}
-	}
+		case WORKER_STAGE_ARTIFACT_LOAD_VERSION: {
+			bool is_installed;
+			int rc = artifact_is_installed(&operation.job, &is_installed);
+			if (rc < 0) {
+				return rc;
+			}
 
-	struct spotflow_ota_state_action action;
-	rc = spotflow_ota_state_apply_artifact_result(job->artifact_index, result, &action);
-	if (rc < 0) {
-		LOG_ERR("Failed to apply OTA result for attempt %llu artifact %zu: %d",
-			(unsigned long long)job->attempt_id, job->artifact_index, rc);
-		return rc;
-	}
+			if (is_installed) {
+				operation.result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
+				advance_operation(WORKER_STAGE_ARTIFACT_STAGE_RESULT);
+			} else {
+				advance_operation(WORKER_STAGE_ARTIFACT_RUN_HANDLER);
+			}
+			break;
+		}
+		case WORKER_STAGE_ARTIFACT_RUN_HANDLER:
+			operation.result = run_artifact_handler(&operation.job);
+			advance_operation(WORKER_STAGE_ARTIFACT_STAGE_RESULT);
+			break;
+		case WORKER_STAGE_ARTIFACT_STAGE_RESULT: {
+			LOG_INF("OTA attempt %llu: artifact '%s' %s %s",
+				(unsigned long long)operation.job.attempt_id,
+				operation.job.artifact.slug, operation.job.artifact.version,
+				spotflow_ota_log_result_name(operation.result));
+
+			int rc = spotflow_ota_state_stage_artifact_result(
+				operation.job.attempt_id, operation.job.artifact_index,
+				operation.result);
+			if (rc < 0) {
+				return rc;
+			}
 
 #if defined(CONFIG_ZTEST)
-	spotflow_ota_worker_test_after_artifact_result_applied();
+			spotflow_ota_worker_test_after_artifact_result_applied();
 #endif /* CONFIG_ZTEST */
 
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (snapshot.has_current_attempt && snapshot.current_attempt_id == job->attempt_id &&
-	    !snapshot.has_attempt_error) {
-		rc = persist_snapshot_attempt(&snapshot);
-		if (rc < 0) {
-			LOG_ERR("Failed to persist OTA attempt %llu results before reporting: %d",
-				(unsigned long long)job->attempt_id, rc);
-			return rc;
+			advance_operation(operation.result == SPOTFLOW_OTA_RESULT_SUCCEEDED
+						  ? WORKER_STAGE_ARTIFACT_SAVE_VERSION
+						  : WORKER_STAGE_ARTIFACT_PERSIST_RESULT);
+			break;
 		}
-
-		if (!snapshot.has_pending_attempt) {
-			rc = spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
-							      snapshot.artifact_results,
-							      snapshot.artifact_count);
+		case WORKER_STAGE_ARTIFACT_SAVE_VERSION: {
+			int rc = spotflow_ota_persistence_save_installed_version(
+				operation.job.artifact.slug, operation.job.artifact.version);
 			if (rc < 0) {
-				LOG_ERR("Failed to queue OTA attempt %llu results for reporting: "
-					"%d",
-					(unsigned long long)job->attempt_id, rc);
 				return rc;
 			}
+			advance_operation(WORKER_STAGE_ARTIFACT_PERSIST_RESULT);
+			break;
+		}
+		case WORKER_STAGE_ARTIFACT_PERSIST_RESULT: {
+			spotflow_ota_state_get_snapshot(&operation.persisted_snapshot);
+			if (!operation.persisted_snapshot.has_current_attempt ||
+			    operation.persisted_snapshot.current_attempt_id !=
+				    operation.job.attempt_id ||
+			    !operation.persisted_snapshot.artifact_result_commit_pending ||
+			    operation.persisted_snapshot.has_attempt_error) {
+				return -EINVAL;
+			}
+
+			int rc = persist_snapshot_attempt(&operation.persisted_snapshot);
+			if (rc < 0) {
+				return rc;
+			}
+			advance_operation(WORKER_STAGE_ARTIFACT_COMMIT_RESULT);
+			break;
+		}
+		case WORKER_STAGE_ARTIFACT_COMMIT_RESULT: {
+			struct spotflow_ota_state_action action;
+			int rc = spotflow_ota_state_commit_artifact_result(
+				operation.job.attempt_id, operation.job.artifact_index, &action);
+			if (rc < 0) {
+				return rc;
+			}
+
+			advance_operation(WORKER_STAGE_ARTIFACT_REPORT_RESULT);
+			break;
+		}
+		case WORKER_STAGE_ARTIFACT_REPORT_RESULT: {
+			struct spotflow_ota_state_snapshot current_snapshot;
+
+			spotflow_ota_state_get_snapshot(&current_snapshot);
+			if (!current_snapshot.has_current_attempt ||
+			    current_snapshot.current_attempt_id != operation.job.attempt_id ||
+			    current_snapshot.has_pending_attempt) {
+				return 0;
+			}
+
+			int rc = spotflow_ota_net_prepare_results(
+				operation.persisted_snapshot.current_attempt_id,
+				operation.persisted_snapshot.artifact_results,
+				operation.persisted_snapshot.artifact_count);
+			if (rc < 0) {
+				return rc;
+			}
+			return 0;
+		}
+		default:
+			return -EINVAL;
 		}
 	}
-
-	if (action.wake_worker) {
-		spotflow_ota_worker_wake();
-	}
-
-	return 0;
 }
 
-static bool persist_and_enqueue_terminal_attempt_if_needed(void)
+static int process_idle_terminal_attempt(void)
 {
 	struct spotflow_ota_state_snapshot snapshot;
 	spotflow_ota_state_get_snapshot(&snapshot);
 
 	if (!snapshot.has_current_attempt || snapshot.has_attempt_error ||
-	    !snapshot_has_terminal_results(&snapshot)) {
-		return false;
+	    snapshot.artifact_result_commit_pending || !snapshot_has_terminal_results(&snapshot)) {
+		return 0;
 	}
 
-	if (persist_snapshot_attempt(&snapshot) < 0) {
+	int rc = persist_snapshot_attempt(&snapshot);
+	if (rc < 0) {
 		LOG_ERR("Failed to persist terminal OTA attempt %llu before idle handling",
 			(unsigned long long)snapshot.current_attempt_id);
-		return false;
+		return rc;
 	}
 
 	if (!snapshot.has_pending_attempt) {
-		if (spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
-						     snapshot.artifact_results,
-						     snapshot.artifact_count) < 0) {
-			LOG_ERR("Failed to queue terminal OTA attempt %llu for reporting during "
-				"idle handling",
+		rc = spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
+						      snapshot.artifact_results,
+						      snapshot.artifact_count);
+		if (rc < 0) {
+			LOG_ERR("Failed to queue terminal OTA attempt %llu during idle handling",
 				(unsigned long long)snapshot.current_attempt_id);
-			return false;
 		}
-
-		return false;
+		return rc;
 	}
 
 	LOG_DBG("OTA attempt %llu finished; promoting pending attempt %llu and discarding "
 		"superseded results",
 		(unsigned long long)snapshot.current_attempt_id,
 		(unsigned long long)snapshot.pending_attempt_id);
-
 	spotflow_ota_net_discard_pending();
 
 	struct spotflow_ota_state_action action;
-	int rc = spotflow_ota_state_promote_pending(&action);
-	if (rc == 0 && action.wake_worker) {
-		spotflow_ota_worker_wake();
+	rc = spotflow_ota_state_promote_pending(&action);
+	return rc < 0 ? rc : 1;
+}
+
+static void advance_operation(enum worker_operation_stage stage)
+{
+	operation.stage = stage;
+	operation.retry_count = 0;
+}
+
+static void schedule_worker_retry(void)
+{
+	uint8_t shift = MIN(operation.retry_count, OTA_WORKER_RETRY_MAX_SHIFT);
+	uint32_t delay_ms = OTA_WORKER_RETRY_INITIAL_DELAY_MS << shift;
+
+	if (operation.retry_count < UINT8_MAX) {
+		operation.retry_count++;
 	}
 
-	return rc == 0;
+	(void)k_work_reschedule(&ota_worker_retry, K_MSEC(delay_ms));
 }
 
 static bool snapshot_has_terminal_results(const struct spotflow_ota_state_snapshot* snapshot)
@@ -302,13 +441,8 @@ static int persist_snapshot_attempt(const struct spotflow_ota_state_snapshot* sn
 	return persist_attempt(&attempt);
 }
 
-static int load_artifact_result(const struct spotflow_ota_worker_job* job,
-				enum spotflow_ota_result* result)
+static int artifact_is_installed(const struct spotflow_ota_worker_job* job, bool* is_installed)
 {
-	if (job == NULL || result == NULL) {
-		return -EINVAL;
-	}
-
 	char installed_version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
 	bool has_installed_version = false;
 	int rc = spotflow_ota_persistence_load_installed_version(
@@ -318,36 +452,30 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 		return rc;
 	}
 
-	if (has_installed_version && strcmp(installed_version, job->artifact.version) == 0) {
+	*is_installed =
+		has_installed_version && strcmp(installed_version, job->artifact.version) == 0;
+	if (*is_installed) {
 		LOG_INF("OTA attempt %llu: artifact '%s' already at version %s, skipping handler",
 			(unsigned long long)job->attempt_id, job->artifact.slug,
 			job->artifact.version);
-		*result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
-		return 0;
-	}
-
-#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-	if (job->artifact.is_main) {
-		/*
-		 * A successful main firmware update reboots before returning. Only failure and
-		 * cancellation paths return to the worker.
-		 */
-		*result = spotflow_ota_fw_main_process_artifact(
-			job->attempt_id, job->artifact_index, &job->artifact);
-		return 0;
-	}
-#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
-
-	*result = spotflow_ota_fw_custom_process_artifact(job->attempt_id, &job->artifact);
-	/*
-	 * The public callback contract requires a terminal result. Therefore, returning the PENDING
-	 * result here is invalid and is treated as FAILED.
-	 */
-	if (*result == SPOTFLOW_OTA_RESULT_PENDING) {
-		*result = SPOTFLOW_OTA_RESULT_FAILED;
 	}
 
 	return 0;
+}
+
+static enum spotflow_ota_result run_artifact_handler(const struct spotflow_ota_worker_job* job)
+{
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (job->artifact.is_main) {
+		/* Success reboots before returning; only failure and cancellation return here. */
+		return spotflow_ota_fw_main_process_artifact(job->attempt_id, job->artifact_index,
+							     &job->artifact);
+	}
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
+
+	enum spotflow_ota_result result =
+		spotflow_ota_fw_custom_process_artifact(job->attempt_id, &job->artifact);
+	return result == SPOTFLOW_OTA_RESULT_PENDING ? SPOTFLOW_OTA_RESULT_FAILED : result;
 }
 
 static int persist_attempt(const struct spotflow_ota_persisted_attempt* attempt)

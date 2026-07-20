@@ -20,6 +20,8 @@ struct attempt_state {
 	size_t current_artifact_index;
 	bool artifact_running;
 	size_t running_artifact_index;
+	bool artifact_result_commit_pending;
+	size_t committing_artifact_index;
 	bool actionable_cancellation;
 	bool stop_remaining_artifacts;
 	bool has_attempt_error;
@@ -66,6 +68,9 @@ static bool attempt_has_terminal_results(const struct attempt_state* attempt);
 static bool attempt_has_reportable_results(const struct attempt_state* attempt);
 static bool attempt_has_succeeded_artifact(const struct attempt_state* attempt);
 static bool attempt_has_runnable_artifact(const struct attempt_state* attempt);
+static void set_artifact_result(struct attempt_state* attempt, size_t artifact_index,
+				enum spotflow_ota_result result);
+static void fill_artifact_result_action(struct spotflow_ota_state_action* action);
 static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase);
 static bool main_firmware_phase_allows_abort(enum spotflow_ota_phase phase);
 static void cancel_pending_artifacts(struct attempt_state* attempt);
@@ -184,7 +189,8 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 		return 0;
 	}
 
-	if (attempt_has_terminal_results(&current_attempt)) {
+	if (attempt_has_terminal_results(&current_attempt) &&
+	    !current_attempt.artifact_result_commit_pending) {
 		start_attempt(msg, &current_attempt);
 		clear_pending_attempt();
 		fill_action(action, msg->attempt_id);
@@ -219,7 +225,8 @@ int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_atte
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!current_attempt.active || current_attempt.attempt_id == attempt_id ||
-	    attempt_has_terminal_results(&current_attempt)) {
+	    (attempt_has_terminal_results(&current_attempt) &&
+	     !current_attempt.artifact_result_commit_pending)) {
 		apply_immediate_rejection(attempt_id, error, action);
 		k_mutex_unlock(&state_mutex);
 		return 0;
@@ -367,6 +374,11 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 		return -EINVAL;
 	}
 
+	if (current_attempt.artifact_result_commit_pending) {
+		k_mutex_unlock(&state_mutex);
+		return -EBUSY;
+	}
+
 	if (current_attempt.results[artifact_index] != SPOTFLOW_OTA_RESULT_PENDING) {
 		fill_action(action, current_attempt.attempt_id);
 		action->can_promote_pending =
@@ -375,26 +387,59 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 		return 0;
 	}
 
-	current_attempt.results[artifact_index] = result;
-	current_attempt.artifact_running = false;
-	fill_action(action, current_attempt.attempt_id);
+	set_artifact_result(&current_attempt, artifact_index, result);
+	fill_artifact_result_action(action);
 
-	if (current_attempt.actionable_cancellation && result == SPOTFLOW_OTA_RESULT_SUCCEEDED) {
-		current_attempt.actionable_cancellation = false;
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+int spotflow_ota_state_stage_artifact_result(uint64_t attempt_id, size_t artifact_index,
+					     enum spotflow_ota_result result)
+{
+	if (attempt_id == 0 || result == SPOTFLOW_OTA_RESULT_PENDING) {
+		return -EINVAL;
 	}
 
-	if (result == SPOTFLOW_OTA_RESULT_FAILED || result == SPOTFLOW_OTA_RESULT_CANCELED) {
-		current_attempt.stop_remaining_artifacts = true;
-		cancel_pending_artifacts(&current_attempt);
-	} else if (current_attempt.actionable_cancellation) {
-		cancel_pending_artifacts(&current_attempt);
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active || current_attempt.attempt_id != attempt_id ||
+	    !current_attempt.artifact_running ||
+	    current_attempt.running_artifact_index != artifact_index ||
+	    artifact_index >= current_attempt.update.artifact_count ||
+	    current_attempt.results[artifact_index] != SPOTFLOW_OTA_RESULT_PENDING ||
+	    current_attempt.artifact_result_commit_pending) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
 	}
 
-	advance_current_artifact(&current_attempt);
-	action->wake_worker = !attempt_has_terminal_results(&current_attempt) &&
-		attempt_has_runnable_artifact(&current_attempt);
-	action->can_promote_pending =
-		has_pending_attempt && attempt_has_terminal_results(&current_attempt);
+	set_artifact_result(&current_attempt, artifact_index, result);
+	current_attempt.artifact_result_commit_pending = true;
+	current_attempt.committing_artifact_index = artifact_index;
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+int spotflow_ota_state_commit_artifact_result(uint64_t attempt_id, size_t artifact_index,
+					      struct spotflow_ota_state_action* action)
+{
+	if (action == NULL) {
+		return -EINVAL;
+	}
+
+	clear_action(action);
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active || current_attempt.attempt_id != attempt_id ||
+	    !current_attempt.artifact_result_commit_pending ||
+	    current_attempt.committing_artifact_index != artifact_index) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	current_attempt.artifact_result_commit_pending = false;
+	fill_artifact_result_action(action);
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -411,7 +456,8 @@ int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action)
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
-	if (!has_pending_attempt || !attempt_has_terminal_results(&current_attempt)) {
+	if (!has_pending_attempt || !attempt_has_terminal_results(&current_attempt) ||
+	    current_attempt.artifact_result_commit_pending) {
 		k_mutex_unlock(&state_mutex);
 		return -EAGAIN;
 	}
@@ -456,6 +502,7 @@ void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapsho
 	snapshot->has_current_attempt = current_attempt.active;
 	snapshot->current_attempt_id = current_attempt.attempt_id;
 	snapshot->manifest_available = current_attempt.manifest_available;
+	snapshot->artifact_result_commit_pending = current_attempt.artifact_result_commit_pending;
 	snapshot->artifact_count = current_attempt.update.artifact_count;
 	snapshot->current_artifact_index = current_attempt.current_artifact_index;
 	snapshot->actionable_cancellation = current_attempt.actionable_cancellation;
@@ -955,9 +1002,40 @@ static bool attempt_has_runnable_artifact(const struct attempt_state* attempt)
 {
 	return attempt->active && attempt->manifest_available &&
 		!attempt->stop_remaining_artifacts && !attempt->actionable_cancellation &&
-		!attempt->artifact_running && !attempt->main_firmware_probation_pending &&
+		!attempt->artifact_running && !attempt->artifact_result_commit_pending &&
+		!attempt->main_firmware_probation_pending &&
 		attempt->current_artifact_index < attempt->update.artifact_count &&
 		attempt->results[attempt->current_artifact_index] == SPOTFLOW_OTA_RESULT_PENDING;
+}
+
+static void set_artifact_result(struct attempt_state* attempt, size_t artifact_index,
+				enum spotflow_ota_result result)
+{
+	attempt->results[artifact_index] = result;
+	attempt->artifact_running = false;
+
+	if (attempt->actionable_cancellation && result == SPOTFLOW_OTA_RESULT_SUCCEEDED) {
+		attempt->actionable_cancellation = false;
+	}
+
+	if (result == SPOTFLOW_OTA_RESULT_FAILED || result == SPOTFLOW_OTA_RESULT_CANCELED) {
+		attempt->stop_remaining_artifacts = true;
+		cancel_pending_artifacts(attempt);
+	} else if (attempt->actionable_cancellation) {
+		cancel_pending_artifacts(attempt);
+	}
+
+	advance_current_artifact(attempt);
+}
+
+static void fill_artifact_result_action(struct spotflow_ota_state_action* action)
+{
+	fill_action(action, current_attempt.attempt_id);
+	action->wake_worker = !attempt_has_terminal_results(&current_attempt) &&
+		attempt_has_runnable_artifact(&current_attempt);
+	action->can_promote_pending = has_pending_attempt &&
+		attempt_has_terminal_results(&current_attempt) &&
+		!current_attempt.artifact_result_commit_pending;
 }
 
 static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase)
