@@ -366,6 +366,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_unconfirmed_match)
 	struct spotflow_ota_state_action action;
 	struct spotflow_ota_state_snapshot snapshot;
 	struct spotflow_ota_probation probation;
+	struct spotflow_ota_worker_job job;
 	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
 	bool has_probation;
 
@@ -381,15 +382,61 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_unconfirmed_match)
 	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_false(spotflow_ota_state_get_worker_job(&job),
+		      "unconfirmed main firmware must remain protected by probation");
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
 	zassert_true(has_probation);
+}
+
+ZTEST(spotflow_ota_fw_main, test_cancel_does_not_terminalize_probationary_main_artifact)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_probation probation;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+
+	fill_build_id(build_id, 0x11);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->image_confirmed = false;
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+
+	zassert_ok(spotflow_ota_state_accept_cancel(probation.attempt_id, &action));
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.artifact_results[probation.artifact_index],
+		      SPOTFLOW_OTA_RESULT_PENDING,
+		      "running probationary image cannot be reported as canceled");
+}
+
+ZTEST(spotflow_ota_fw_main, test_supersession_preserves_probationary_main_artifact)
+{
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_update_msg newer_update = build_two_artifact_update();
+	struct spotflow_ota_probation probation;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+
+	fill_build_id(build_id, 0x12);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->image_confirmed = false;
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+
+	newer_update.attempt_id++;
+	zassert_ok(spotflow_ota_state_accept_update(&newer_update, &action));
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_true(snapshot.has_pending_attempt);
+	zassert_equal(snapshot.pending_attempt_id, newer_update.attempt_id);
+	zassert_equal(snapshot.artifact_results[probation.artifact_index],
+		      SPOTFLOW_OTA_RESULT_PENDING,
+		      "supersession cannot cancel an image that is already on probation");
 }
 
 ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 {
 	struct spotflow_ota_state_action action;
 	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_update_msg update = build_two_artifact_update();
 	struct spotflow_ota_probation probation;
+	struct spotflow_ota_worker_job job;
 	char installed_version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
 	bool has_probation;
 	bool has_version;
@@ -400,7 +447,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 	platform_fake->image_confirmed = true;
 
 	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
-	zassert_true(action.wake_worker);
+	zassert_false(action.wake_worker, "worker must wait until the manifest is received again");
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
@@ -413,6 +460,17 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 		"main", installed_version, sizeof(installed_version), &has_version));
 	zassert_true(has_version);
 	zassert_str_equal(installed_version, "1.0.0");
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
+
+	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
+	zassert_true(action.wake_worker);
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.attempt_id, update.attempt_id);
+	zassert_equal(job.artifact_index, 1);
+	zassert_str_equal(job.artifact.slug, secondary_artifact.slug);
+	zassert_str_equal(job.artifact.url, secondary_artifact.url);
+	zassert_str_equal(job.artifact.secret, secondary_artifact.secret);
+	zassert_str_equal(job.artifact.version, secondary_artifact.version);
 }
 
 ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_identity_unavailable_reports_failure)
@@ -517,7 +575,7 @@ ZTEST(spotflow_ota_fw_main, test_rollback_completion_keeps_probation_when_attemp
 	zassert_equal(attempt.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
 }
 
-ZTEST(spotflow_ota_fw_main, test_confirm_api_persists_success_and_wakes_worker)
+ZTEST(spotflow_ota_fw_main, test_confirm_api_persists_success_and_waits_for_manifest)
 {
 	struct spotflow_ota_state_action action;
 	struct spotflow_ota_main_firmware_state state;
@@ -531,7 +589,7 @@ ZTEST(spotflow_ota_fw_main, test_confirm_api_persists_success_and_wakes_worker)
 	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
 
 	zassert_ok(spotflow_ota_fw_main_confirm_image(&state, &action));
-	zassert_true(action.wake_worker);
+	zassert_false(action.wake_worker, "worker must wait until the manifest is received again");
 	zassert_equal(platform_fake->confirm_count, 1);
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
 	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_SUCCEEDED);

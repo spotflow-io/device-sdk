@@ -26,6 +26,12 @@ void spotflow_ota_test_settings_exhaust_capacity(void);
 
 void spotflow_ota_test_settings_set_save_failure(const char* name);
 
+void spotflow_ota_test_settings_set_save_failure_once(const char* name);
+
+void spotflow_ota_test_settings_clear_save_failure(void);
+
+void spotflow_ota_test_settings_set_load_failure_once(int error);
+
 const char* spotflow_ota_test_settings_get_last_saved_name(void);
 
 const char* spotflow_ota_test_settings_get_last_deleted_name(void);

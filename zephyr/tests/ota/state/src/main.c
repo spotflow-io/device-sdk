@@ -35,6 +35,54 @@ static struct spotflow_ota_update_msg make_update(uint64_t attempt_id, size_t ar
 	return msg;
 }
 
+ZTEST(spotflow_ota_state, test_restored_unfinished_attempt_waits_for_manifest)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 1,
+		.artifact_count = 2,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_SUCCEEDED,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, NULL, false));
+	zassert_false(spotflow_ota_state_get_worker_job(&job),
+		      "restored attempt must not run without artifact descriptors");
+}
+
+ZTEST(spotflow_ota_state, test_same_attempt_manifest_rehydrates_restored_attempt)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 1,
+		.artifact_count = 2,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_SUCCEEDED,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+	struct spotflow_ota_update_msg msg = make_update(1, 2);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, NULL, false));
+	zassert_ok(spotflow_ota_state_accept_update(&msg, &action));
+	zassert_true(action.wake_worker, "rehydrated attempt must resume pending work");
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.attempt_id, 1);
+	zassert_equal(job.artifact_index, 1);
+	zassert_str_equal(job.artifact.slug, msg.artifacts[1].slug);
+	zassert_str_equal(job.artifact.url, msg.artifacts[1].url);
+	zassert_str_equal(job.artifact.secret, msg.artifacts[1].secret);
+	zassert_str_equal(job.artifact.version, msg.artifacts[1].version);
+}
+
 ZTEST(spotflow_ota_state, test_accept_first_attempt_and_ignore_duplicate)
 {
 	struct spotflow_ota_update_msg msg = make_update(1, 2);

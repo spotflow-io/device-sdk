@@ -32,6 +32,10 @@ static int load_artifact_result(const struct spotflow_ota_worker_job* job,
 				enum spotflow_ota_result* result);
 static int persist_attempt(const struct spotflow_ota_persisted_attempt* attempt);
 
+#if defined(CONFIG_ZTEST)
+void __weak spotflow_ota_worker_test_after_artifact_result_applied(void) {}
+#endif /* CONFIG_ZTEST */
+
 static K_SEM_DEFINE(ota_work_sem, 0, 1);
 static K_THREAD_STACK_DEFINE(ota_worker_stack, CONFIG_SPOTFLOW_OTA_THREAD_STACK_SIZE);
 static struct k_thread ota_worker_thread;
@@ -194,6 +198,10 @@ static int process_artifact_job(const struct spotflow_ota_worker_job* job)
 			(unsigned long long)job->attempt_id, job->artifact_index, rc);
 		return rc;
 	}
+
+#if defined(CONFIG_ZTEST)
+	spotflow_ota_worker_test_after_artifact_result_applied();
+#endif /* CONFIG_ZTEST */
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	if (snapshot.has_current_attempt && snapshot.current_attempt_id == job->attempt_id &&
