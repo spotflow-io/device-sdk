@@ -83,6 +83,25 @@ ZTEST(spotflow_ota_state, test_same_attempt_manifest_rehydrates_restored_attempt
 	zassert_str_equal(job.artifact.version, msg.artifacts[1].version);
 }
 
+ZTEST(spotflow_ota_state, test_rehydration_rejects_mismatched_artifact_count)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 1,
+		.artifact_count = 2,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_SUCCEEDED,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+	struct spotflow_ota_update_msg msg = make_update(1, 1);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, NULL, false));
+	zassert_not_ok(spotflow_ota_state_accept_update(&msg, &action));
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
+}
+
 ZTEST(spotflow_ota_state, test_accept_first_attempt_and_ignore_duplicate)
 {
 	struct spotflow_ota_update_msg msg = make_update(1, 2);

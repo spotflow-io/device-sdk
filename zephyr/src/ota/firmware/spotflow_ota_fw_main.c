@@ -48,6 +48,7 @@ static int complete_main_firmware_success(const struct spotflow_ota_probation* p
 static int complete_main_firmware_rollback(const struct spotflow_ota_probation* probation,
 					   struct spotflow_ota_state_action* action);
 static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation);
+static void request_worker_for_remaining_or_pending(struct spotflow_ota_state_action* action);
 
 void spotflow_ota_fw_main_reset(void)
 {
@@ -684,6 +685,9 @@ static int persist_snapshot_and_enqueue_results(void)
 		LOG_ERR("Failed to persist main firmware attempt results: %d", rc);
 		return rc;
 	}
+	if (snapshot.has_pending_attempt) {
+		return 0;
+	}
 
 	rc = spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
 					      snapshot.artifact_results, snapshot.artifact_count);
@@ -733,19 +737,8 @@ static int complete_main_firmware_success(const struct spotflow_ota_probation* p
 		return rc;
 	}
 
-	spotflow_ota_state_clear_main_firmware_awaiting_reboot();
-
-	if (!action->wake_worker) {
-		struct spotflow_ota_state_snapshot snapshot;
-
-		spotflow_ota_state_get_snapshot(&snapshot);
-		for (size_t i = 0; i < snapshot.artifact_count; i++) {
-			if (snapshot.artifact_results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
-				action->wake_worker = true;
-				break;
-			}
-		}
-	}
+	spotflow_ota_state_resolve_main_firmware_probation();
+	request_worker_for_remaining_or_pending(action);
 
 	return 0;
 }
@@ -780,9 +773,36 @@ static int complete_main_firmware_rollback(const struct spotflow_ota_probation* 
 		return rc;
 	}
 
-	spotflow_ota_state_clear_main_firmware_awaiting_reboot();
+	spotflow_ota_state_resolve_main_firmware_probation();
+	request_worker_for_remaining_or_pending(action);
 
 	return 0;
+}
+
+static void request_worker_for_remaining_or_pending(struct spotflow_ota_state_action* action)
+{
+	struct spotflow_ota_state_snapshot snapshot;
+
+	if (action == NULL || action->wake_worker) {
+		return;
+	}
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	if (snapshot.has_pending_attempt) {
+		action->wake_worker = true;
+		return;
+	}
+
+	if (!snapshot.manifest_available) {
+		return;
+	}
+
+	for (size_t i = 0; i < snapshot.artifact_count; i++) {
+		if (snapshot.artifact_results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
+			action->wake_worker = true;
+			return;
+		}
+	}
 }
 
 static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation)

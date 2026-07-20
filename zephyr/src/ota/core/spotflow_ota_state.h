@@ -29,6 +29,7 @@ struct spotflow_ota_worker_job {
 struct spotflow_ota_state_action {
 	bool wake_worker;
 	bool accepted_update;
+	bool rehydrated_update;
 	bool ignored_duplicate_update;
 	bool accepted_cancel;
 	bool ignored_late_cancel;
@@ -43,6 +44,7 @@ struct spotflow_ota_state_action {
 struct spotflow_ota_state_snapshot {
 	bool has_current_attempt;
 	uint64_t current_attempt_id;
+	bool manifest_available;
 	size_t artifact_count;
 	size_t current_artifact_index;
 	bool actionable_cancellation;
@@ -118,7 +120,7 @@ int spotflow_ota_state_begin_main_firmware_reboot(void);
 
 int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index);
 
-void spotflow_ota_state_clear_main_firmware_awaiting_reboot(void);
+void spotflow_ota_state_resolve_main_firmware_probation(void);
 
 #ifdef __cplusplus
 }
