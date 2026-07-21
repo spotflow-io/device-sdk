@@ -153,6 +153,27 @@ ZTEST(spotflow_ota_state, test_accept_first_attempt_and_ignore_duplicate)
 	zassert_false(action.wake_worker);
 }
 
+ZTEST(spotflow_ota_state, test_stale_worker_job_cannot_mutate_replaced_attempt)
+{
+	struct spotflow_ota_update_msg msg = make_update(1, 1);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job stale_job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&msg, &action));
+	zassert_true(spotflow_ota_state_get_worker_job(&stale_job));
+	zassert_ok(spotflow_ota_state_reject_update(
+		msg.attempt_id, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE, &action));
+
+	zassert_equal(
+		spotflow_ota_state_stage_artifact_result(&stale_job, SPOTFLOW_OTA_RESULT_SUCCEEDED),
+		-ESTALE);
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.current_attempt_id, msg.attempt_id);
+	zassert_not_equal(snapshot.current_attempt_generation, stale_job.generation);
+	zassert_true(snapshot.has_attempt_error);
+}
+
 ZTEST(spotflow_ota_state, test_reject_first_attempt_with_attempt_error)
 {
 	struct spotflow_ota_state_action action;
@@ -415,6 +436,31 @@ ZTEST(spotflow_ota_state, test_report_request_matches_current_attempt_only)
 	zassert_equal(job.attempt_id, 5);
 }
 
+ZTEST(spotflow_ota_state, test_report_requests_coalesce_while_report_is_claimed)
+{
+	struct spotflow_ota_update_msg msg = make_update(5, 1);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_worker_job first_job;
+	struct spotflow_ota_worker_job second_job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&msg, &action));
+	zassert_ok(spotflow_ota_state_accept_report_request(msg.attempt_id, &action));
+	zassert_true(spotflow_ota_state_get_worker_job(&first_job));
+	zassert_equal(first_job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
+
+	zassert_ok(spotflow_ota_state_accept_report_request(msg.attempt_id, &action));
+	zassert_ok(spotflow_ota_state_complete_report_job(&first_job, true));
+	zassert_true(spotflow_ota_state_get_worker_job(&second_job));
+	zassert_equal(second_job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
+	zassert_ok(spotflow_ota_state_complete_report_job(&second_job, false));
+	zassert_true(spotflow_ota_state_get_worker_job(&second_job));
+	zassert_equal(second_job.type, SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT);
+
+	zassert_ok(spotflow_ota_state_accept_report_request(msg.attempt_id, &action));
+	zassert_true(spotflow_ota_state_get_worker_job(&second_job));
+	zassert_equal(second_job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
+}
+
 ZTEST(spotflow_ota_state, test_ignore_duplicate_update_after_terminal_failure)
 {
 	struct spotflow_ota_update_msg msg = make_update(13, 2);
@@ -657,6 +703,8 @@ ZTEST(spotflow_ota_state, test_cancel_is_ignored_after_main_upgrade_commit_start
 
 	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_ok(spotflow_ota_state_store_main_firmware_artifact(
+		update.attempt_id, job.artifact_index, &update.artifacts[job.artifact_index]));
 	zassert_ok(spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
 							      NULL));
 	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit());
@@ -681,6 +729,8 @@ ZTEST(spotflow_ota_state, test_supersession_does_not_mutate_attempt_after_upgrad
 
 	zassert_ok(spotflow_ota_state_accept_update(&current, &action));
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_ok(spotflow_ota_state_store_main_firmware_artifact(
+		current.attempt_id, job.artifact_index, &current.artifacts[job.artifact_index]));
 	zassert_ok(spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
 							      NULL));
 	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit());

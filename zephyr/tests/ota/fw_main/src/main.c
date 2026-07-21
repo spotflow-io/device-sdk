@@ -368,6 +368,10 @@ ZTEST(spotflow_ota_fw_main, test_finish_prereboot_keeps_main_artifact_pending)
 
 	accept_two_artifact_update();
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_ok(spotflow_ota_state_store_main_firmware_artifact(42, 0, &main_artifact));
+	zassert_ok(spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
+							      NULL));
+	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit());
 	zassert_ok(spotflow_ota_state_finish_main_firmware_prereboot(&action));
 
 	spotflow_ota_state_get_snapshot(&snapshot);

@@ -2,6 +2,150 @@
 
 This document summarizes important design decisions on the implementation of over-the-air updates.
 
+## State-machine overview
+
+OTA state is modeled as several coordinated state machines rather than one combined
+state. All domain transitions are serialized by `state_mutex`; persistence, networking,
+firmware handlers, callbacks, and platform operations run after the mutex is released.
+The worker receives a job containing the attempt ID and an in-memory generation. Both
+must still match when the worker stages or commits a result, which prevents a delayed job
+from changing a replacement attempt even if an attempt ID is reused.
+
+### Attempt lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> Empty
+    Empty --> AwaitingManifest: load unfinished persisted attempt
+    Empty --> Active: accept UPDATE_ARTIFACTS
+    Empty --> Rejecting: reject message with trusted attempt ID
+
+    AwaitingManifest --> Active: receive matching full manifest
+    AwaitingManifest --> Finalizing: cancellation makes restored attempt terminal
+
+    Active --> Active: commit partial artifact result
+    Active --> Finalizing: terminal results await persistence
+    Finalizing --> Terminal: persist terminal attempt
+
+    Rejecting --> RejectionClaimed: worker claims rejection
+    RejectionClaimed --> Rejected: persist attempt error
+
+    Terminal --> Active: accept different attempt
+    Rejected --> Active: accept different attempt
+    Terminal --> Terminal: matching update requests report
+    Rejected --> Rejected: matching update requests report
+```
+
+An unfinished current attempt has one tagged pending slot: `NONE`, `UPDATE`, or
+`REJECTION`. A different attempt received while work is in progress fills that slot and
+normally cancels the unfinished current work. Once the current attempt is durably
+terminal, the report operation promotes the pending entry. Supersession after the main
+upgrade commit boundary stores the pending entry but does not mutate the current attempt.
+
+The full manifest is intentionally RAM-only. Loading an unfinished attempt therefore
+enters `AwaitingManifest`; receiving the matching `UPDATE_ARTIFACTS` rehydrates its
+artifact descriptors, requests a report for any durable results, and resumes remaining
+artifacts.
+
+### Artifact transaction
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Running: worker claims artifact
+    Running --> ResultStaged: handler returns terminal result
+    Running --> Idle: main firmware enters reboot probation
+    ResultStaged --> ResultStaged: transient persistence failure
+    ResultStaged --> Idle: persist and commit result
+
+    Idle --> Running: worker claims reconciled main result
+```
+
+Only one artifact transaction exists. It contains its artifact index, and every worker
+transition validates the attempt ID, generation, and index. `ResultStaged` means the
+in-memory result snapshot is protected from attempt replacement until it is persisted and
+committed. A failure or cancellation also stages the cancellation of all remaining
+artifacts as part of the same persisted attempt snapshot.
+
+### Main-firmware upgrade and probation
+
+The pre-reboot upgrade state and the cross-reboot probation state are orthogonal. This
+avoids combinations of `upgrade_commit_started`, `reboot_started`, and
+`probation_pending` booleans.
+
+```mermaid
+stateDiagram-v2
+    state "Upgrade state" as upgrade {
+        [*] --> Idle
+        Idle --> HandlerActive: main artifact claimed
+        HandlerActive --> Committing: begin irreversible upgrade commit
+        Committing --> HandlerActive: probation or boot request fails
+        Committing --> RebootReady: probation saved and test upgrade requested
+        RebootReady --> RebootStarted: reboot begins
+        HandlerActive --> Idle: handler fails or is canceled
+    }
+
+    state "Probation state" as probation {
+        [*] --> None
+        None --> Pending: save/restore probation
+        Pending --> CompletionQueued: confirm success or infer rollback
+        CompletionQueued --> CompletionClaimed: worker claims reconciled result
+        CompletionClaimed --> None: result durable, then clear probation
+    }
+```
+
+The externally visible phases (`PENDING_DOWNLOAD`, `DOWNLOADING`, `PENDING_UPGRADE`,
+`PENDING_REBOOT`, and `UNCONFIRMED`) remain unchanged. Pause is an orthogonal flag valid
+only in the documented pre-reboot phases. Cancellation and supersession are rejected once
+the upgrade state reaches `Committing` because the persisted attempt must no longer
+change across the irreversible boot transition.
+
+### Report request and network outbox
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Requested: durable result / REPORT_UPDATE_RESULTS / matching UPDATE_ARTIFACTS
+    Blocked --> Requested: new report trigger
+    Requested --> Claimed: worker claims report
+    Claimed --> ClaimedRerunRequested: another trigger arrives
+    Claimed --> Idle: message prepared
+    Claimed --> Blocked: permanent preparation error
+    ClaimedRerunRequested --> Requested: current preparation finishes
+```
+
+`Requested` is a coalescing obligation, not a delivery acknowledgment. The encoded
+network outbox separately retains a message while the transport returns `-EAGAIN` and
+drops it after a successful QoS 0 publish. A new `UPDATE_ARTIFACTS` for an attempt with
+reportable results always requests another report, including after rehydration.
+
+### Worker executor
+
+The worker holds one tagged operation: rejection, artifact, report, or terminal-attempt
+finalization. Each union member has only its valid stage type; there is no shared stage
+enum that can represent, for example, an artifact operation in a report stage.
+
+```mermaid
+flowchart LR
+    idle[Idle] --> claim[Claim state job]
+    claim --> stage[Run current typed stage]
+    stage -->|success| next{More stages?}
+    next -->|yes| stage
+    next -->|no| idle
+    stage -->|transient error| retry[Retry delay]
+    retry --> stage
+    stage -->|stale token| idle
+    stage -->|permanent domain error| reject[Fail current attempt]
+    reject --> idle
+```
+
+Artifact operations share the durable tail for delegated and main firmware:
+
+```text
+stage result → save installed version on success → persist attempt
+             → clear probation when applicable → commit result → request report
+```
+
 ## Module map
 
 The repository [README](../../README.md#ota-updates) provides a high-level overview of the OTA implementation while the text below describes the individual folders and files.
