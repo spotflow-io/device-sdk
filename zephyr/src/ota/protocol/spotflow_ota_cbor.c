@@ -257,6 +257,13 @@ static int decode_artifact(zcbor_state_t* state, struct spotflow_ota_artifact* a
 		return -EINVAL;
 	}
 
+	if (artifact->slug[0] == '\0' || strchr(artifact->slug, '/') != NULL ||
+	    artifact->url[0] == '\0' || artifact->secret[0] == '\0' ||
+	    artifact->version[0] == '\0') {
+		*error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;
+		return -EINVAL;
+	}
+
 	if (search_uint32_key(state, KEY_IS_MAIN) &&
 	    !zcbor_bool_decode(state, &artifact->is_main)) {
 		*error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE;

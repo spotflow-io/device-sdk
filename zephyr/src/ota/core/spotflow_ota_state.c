@@ -50,6 +50,7 @@ static void clear_attempt(struct attempt_state* attempt);
 static void
 restore_main_firmware_artifact_from_probation(const struct spotflow_ota_probation* probation);
 static int validate_update_msg(const struct spotflow_ota_update_msg* msg);
+static bool validate_artifact(const struct spotflow_ota_artifact* artifact);
 static void start_attempt(const struct spotflow_ota_update_msg* msg, struct attempt_state* attempt);
 static int rehydrate_attempt(const struct spotflow_ota_update_msg* msg,
 			     struct attempt_state* attempt,
@@ -445,6 +446,40 @@ int spotflow_ota_state_commit_artifact_result(uint64_t attempt_id, size_t artifa
 	return 0;
 }
 
+int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id,
+					     struct spotflow_ota_state_action* action)
+{
+	if (attempt_id == 0 || action == NULL) {
+		return -EINVAL;
+	}
+
+	clear_action(action);
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active || current_attempt.attempt_id != attempt_id) {
+		k_mutex_unlock(&state_mutex);
+		return -ESTALE;
+	}
+
+	current_attempt.artifact_running = false;
+	current_attempt.artifact_result_commit_pending = false;
+	current_attempt.stop_remaining_artifacts = true;
+	current_attempt.has_attempt_error = true;
+	current_attempt.attempt_error = SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR;
+	current_attempt.rejected_job_pending = true;
+	current_attempt.main_firmware_state.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
+	current_attempt.main_firmware_state.is_paused = false;
+	current_attempt.main_firmware_state.result = SPOTFLOW_OTA_RESULT_FAILED;
+	current_attempt.main_firmware_abort_requested = false;
+	current_attempt.main_firmware_upgrade_commit_started = false;
+	current_attempt.main_firmware_reboot_started = false;
+	fill_action(action, attempt_id);
+	action->wake_worker = true;
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
 int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action)
 {
 	if (action == NULL) {
@@ -831,7 +866,27 @@ static int validate_update_msg(const struct spotflow_ota_update_msg* msg)
 		return -EINVAL;
 	}
 
+	for (size_t i = 0; i < msg->artifact_count; i++) {
+		if (!validate_artifact(&msg->artifacts[i])) {
+			return -EINVAL;
+		}
+	}
+
 	return 0;
+}
+
+static bool validate_artifact(const struct spotflow_ota_artifact* artifact)
+{
+	if (artifact == NULL || artifact->slug[0] == '\0' || artifact->version[0] == '\0' ||
+	    artifact->url[0] == '\0' || artifact->secret[0] == '\0' ||
+	    memchr(artifact->slug, '\0', sizeof(artifact->slug)) == NULL ||
+	    memchr(artifact->version, '\0', sizeof(artifact->version)) == NULL ||
+	    memchr(artifact->url, '\0', sizeof(artifact->url)) == NULL ||
+	    memchr(artifact->secret, '\0', sizeof(artifact->secret)) == NULL) {
+		return false;
+	}
+
+	return strchr(artifact->slug, '/') == NULL;
 }
 
 static void start_attempt(const struct spotflow_ota_update_msg* msg, struct attempt_state* attempt)

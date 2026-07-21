@@ -392,4 +392,75 @@ ZTEST(spotflow_ota_worker, test_terminal_result_is_persisted_before_new_attempt_
 		     "new attempt replaced the terminal result before it became durable");
 }
 
+ZTEST(spotflow_ota_worker, test_invalid_handler_result_is_reported_as_failed)
+{
+	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
+		spotflow_ota_test_fake_callbacks_get();
+	struct spotflow_ota_update_msg update = make_delegated_update(1, 1);
+	struct spotflow_ota_state_action action;
+	const enum spotflow_ota_result expected_results[] = {
+		SPOTFLOW_OTA_RESULT_FAILED,
+	};
+
+	fake_callbacks->next_handle_result = (enum spotflow_ota_result)99;
+	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
+	wake_worker_from_action(&action);
+
+	zassert_ok(k_sem_take(&fake_callbacks->handle_called_sem, K_SECONDS(1)));
+	spotflow_ota_test_wait_for_persisted_attempt(1, expected_results,
+						     ARRAY_SIZE(expected_results));
+	zassert_equal(fake_callbacks->handle_call_count, 1);
+}
+
+ZTEST(spotflow_ota_worker, test_permanent_persistence_error_is_not_retried_forever)
+{
+	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
+		spotflow_ota_test_fake_callbacks_get();
+	struct spotflow_ota_update_msg update = make_delegated_update(1, 1);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+
+	spotflow_ota_test_settings_set_save_failure_error(ATTEMPT_SETTINGS_PATH, -EINVAL);
+	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
+	wake_worker_from_action(&action);
+	k_msleep(100);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_true(snapshot.has_attempt_error);
+	zassert_equal(snapshot.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR);
+	zassert_equal(fake_callbacks->handle_call_count, 0);
+	zassert_equal(spotflow_ota_test_settings_get_save_failure_count(), 2);
+
+	k_msleep(100);
+	zassert_equal(spotflow_ota_test_settings_get_save_failure_count(), 2,
+		      "deterministic validation failures must not schedule retries");
+}
+
+ZTEST(spotflow_ota_worker, test_terminal_finalization_retries_storage_failure)
+{
+	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
+		spotflow_ota_test_fake_callbacks_get();
+	struct spotflow_ota_update_msg update = make_delegated_update(1, 1);
+	struct spotflow_ota_state_action action;
+	const enum spotflow_ota_result expected_results[] = {
+		SPOTFLOW_OTA_RESULT_CANCELED,
+	};
+	const struct spotflow_ota_cbor_update_results expected_message = {
+		.attempt_id = 1,
+		.canceled_count = 1,
+		.canceled = { 0 },
+	};
+
+	update.is_canceled = true;
+	spotflow_ota_test_settings_set_save_failure_once(ATTEMPT_SETTINGS_PATH);
+	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
+	wake_worker_from_action(&action);
+
+	spotflow_ota_test_wait_for_persisted_attempt(1, expected_results,
+						     ARRAY_SIZE(expected_results));
+	zassert_equal(fake_callbacks->handle_call_count, 0);
+	zassert_ok(spotflow_ota_net_send_pending_message());
+	spotflow_ota_test_expect_update_results_payload(&expected_message);
+}
+
 ZTEST_SUITE(spotflow_ota_worker, NULL, NULL, before_each, NULL, NULL);

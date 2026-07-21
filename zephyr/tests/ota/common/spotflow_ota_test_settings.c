@@ -20,6 +20,8 @@ static char last_saved_name[SETTINGS_FULL_NAME_LEN];
 static char last_deleted_name[SETTINGS_FULL_NAME_LEN];
 static const char* save_fail_name;
 static bool save_fail_once;
+static int save_fail_error;
+static size_t save_failure_count;
 static int load_fail_once;
 static struct spotflow_ota_test_settings_attempt_save
 	attempt_save_history[SPOTFLOW_OTA_TEST_SETTINGS_ATTEMPT_HISTORY_MAX];
@@ -64,6 +66,8 @@ void spotflow_ota_test_settings_reset(void)
 	memset(last_deleted_name, 0, sizeof(last_deleted_name));
 	save_fail_name = NULL;
 	save_fail_once = false;
+	save_fail_error = -EIO;
+	save_failure_count = 0;
 	load_fail_once = 0;
 	attempt_save_history_count = 0;
 }
@@ -72,12 +76,21 @@ void spotflow_ota_test_settings_set_save_failure(const char* name)
 {
 	save_fail_name = name;
 	save_fail_once = false;
+	save_fail_error = -EIO;
 }
 
 void spotflow_ota_test_settings_set_save_failure_once(const char* name)
 {
 	save_fail_name = name;
 	save_fail_once = true;
+	save_fail_error = -EIO;
+}
+
+void spotflow_ota_test_settings_set_save_failure_error(const char* name, int error)
+{
+	save_fail_name = name;
+	save_fail_once = false;
+	save_fail_error = error;
 }
 
 void spotflow_ota_test_settings_clear_save_failure(void)
@@ -89,6 +102,11 @@ void spotflow_ota_test_settings_clear_save_failure(void)
 void spotflow_ota_test_settings_set_load_failure_once(int error)
 {
 	load_fail_once = error;
+}
+
+size_t spotflow_ota_test_settings_get_save_failure_count(void)
+{
+	return save_failure_count;
 }
 
 void spotflow_ota_test_settings_exhaust_capacity(void)
@@ -140,10 +158,11 @@ int settings_subsys_init(void)
 int settings_save_one(const char* name, const void* value, size_t val_len)
 {
 	if (save_fail_name != NULL && strcmp(name, save_fail_name) == 0) {
+		save_failure_count++;
 		if (save_fail_once) {
 			spotflow_ota_test_settings_clear_save_failure();
 		}
-		return -EIO;
+		return save_fail_error;
 	}
 
 	for (size_t i = 0; i < ARRAY_SIZE(fake_entries); i++) {

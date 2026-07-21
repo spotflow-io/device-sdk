@@ -88,6 +88,9 @@ int spotflow_ota_state_stage_artifact_result(uint64_t attempt_id, size_t artifac
 int spotflow_ota_state_commit_artifact_result(uint64_t attempt_id, size_t artifact_index,
 					      struct spotflow_ota_state_action* action);
 
+int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id,
+					     struct spotflow_ota_state_action* action);
+
 int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action);
 
 bool spotflow_ota_state_is_update_canceled(void);

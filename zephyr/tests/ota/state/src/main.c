@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <string.h>
 
 #include <zephyr/logging/log.h>
@@ -33,6 +34,17 @@ static struct spotflow_ota_update_msg make_update(uint64_t attempt_id, size_t ar
 	}
 
 	return msg;
+}
+
+ZTEST(spotflow_ota_state, test_rejects_artifact_slug_that_cannot_be_persisted)
+{
+	struct spotflow_ota_update_msg msg = make_update(1, 1);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_worker_job job;
+
+	strcpy(msg.artifacts[0].slug, "invalid/slug");
+	zassert_equal(spotflow_ota_state_accept_update(&msg, &action), -EINVAL);
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
 }
 
 ZTEST(spotflow_ota_state, test_restored_unfinished_attempt_waits_for_manifest)

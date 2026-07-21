@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <string.h>
 
 #include <zephyr/logging/log.h>
@@ -171,6 +172,22 @@ ZTEST(spotflow_ota_cbor, test_decode_update_artifacts)
 	zassert_str_equal(artifact->url, "https://a");
 	zassert_str_equal(artifact->secret, "secret");
 	zassert_str_equal(artifact->version, "1.0.0");
+}
+
+ZTEST(spotflow_ota_cbor, test_decode_rejects_slug_that_cannot_be_persisted)
+{
+	uint8_t payload[sizeof(update_artifacts_payload)];
+	struct spotflow_ota_cbor_c2d_msg msg;
+	struct spotflow_ota_cbor_decode_status status;
+
+	memcpy(payload, update_artifacts_payload, sizeof(payload));
+	payload[18] = '/'; /* Change "main" to "ma/n". */
+
+	zassert_equal(spotflow_ota_cbor_decode_c2d(payload, sizeof(payload), &msg, &status),
+		      -EINVAL);
+	zassert_true(status.has_trustworthy_attempt_id);
+	zassert_true(status.has_attempt_error);
+	zassert_equal(status.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 }
 
 ZTEST(spotflow_ota_cbor, test_decode_cancel_update)
