@@ -7,6 +7,7 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
         downloader/spotflow_ota_downloader_transport_socket.c
         firmware/spotflow_ota_fw_custom.c
         core/spotflow_ota_log.c
+        core/spotflow_ota_results.c
         protocol/spotflow_ota_net.c
         persistence/spotflow_ota_persistence.c
         persistence/spotflow_ota_records_cbor.c

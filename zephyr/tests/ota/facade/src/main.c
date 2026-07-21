@@ -430,20 +430,22 @@ ZTEST(spotflow_ota_facade, test_report_request_queues_current_attempt_results)
 {
 	struct spotflow_ota_test_fake_transport* fake_transport =
 		spotflow_ota_test_fake_transport_get();
-	struct spotflow_ota_state_action action;
+	struct spotflow_ota_persisted_attempt attempt = {
+		.attempt_id = 1,
+		.artifact_count = 1,
+		.artifact_results = { SPOTFLOW_OTA_RESULT_FAILED },
+	};
 	struct spotflow_ota_cbor_update_results expected_message = {
 		.attempt_id = 1,
 		.failed_count = 1,
 		.failed = { 0 },
 	};
 
+	zassert_ok(spotflow_ota_persistence_save_attempt(&attempt));
 	zassert_ok(spotflow_ota_init_session());
-	invoke_ota_callback((uint8_t*)valid_update_artifacts_payload,
-			    sizeof(valid_update_artifacts_payload));
-	zassert_ok(
-		spotflow_ota_state_apply_artifact_result(0, SPOTFLOW_OTA_RESULT_FAILED, &action));
 	invoke_ota_callback((uint8_t*)report_update_results_payload,
 			    sizeof(report_update_results_payload));
+	k_msleep(50);
 	zassert_ok(spotflow_ota_send_pending_message());
 	zassert_equal(fake_transport->publish_count, 1);
 
@@ -453,6 +455,28 @@ ZTEST(spotflow_ota_facade, test_report_request_queues_current_attempt_results)
 		&expected_message, expected_payload, sizeof(expected_payload), &expected_len));
 	zassert_equal(fake_transport->last_payload_len, expected_len);
 	zassert_mem_equal(fake_transport->last_payload, expected_payload, expected_len);
+}
+
+ZTEST(spotflow_ota_facade, test_report_request_retries_result_persistence_failure)
+{
+	struct spotflow_ota_test_fake_transport* fake_transport =
+		spotflow_ota_test_fake_transport_get();
+	struct spotflow_ota_persisted_attempt attempt = {
+		.attempt_id = 1,
+		.artifact_count = 1,
+		.artifact_results = { SPOTFLOW_OTA_RESULT_FAILED },
+	};
+
+	zassert_ok(spotflow_ota_persistence_save_attempt(&attempt));
+	zassert_ok(spotflow_ota_init_session());
+	spotflow_ota_test_settings_set_save_failure_once("spotflow/ota/attempt");
+	invoke_ota_callback((uint8_t*)report_update_results_payload,
+			    sizeof(report_update_results_payload));
+	k_msleep(100);
+
+	zassert_equal(spotflow_ota_test_settings_get_save_failure_count(), 1);
+	zassert_ok(spotflow_ota_send_pending_message());
+	zassert_equal(fake_transport->publish_count, 1);
 }
 
 ZTEST(spotflow_ota_facade, test_version_match_skips_callback_and_reports_success)
@@ -504,6 +528,7 @@ ZTEST(spotflow_ota_facade, test_rejected_attempt_is_persisted_and_reported)
 
 	invoke_ota_callback((uint8_t*)report_update_results_payload,
 			    sizeof(report_update_results_payload));
+	k_msleep(50);
 	zassert_ok(spotflow_ota_send_pending_message());
 	zassert_equal(fake_transport->publish_count, 2);
 	spotflow_ota_test_expect_update_results_payload(&expected_message);

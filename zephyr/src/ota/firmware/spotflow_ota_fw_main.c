@@ -6,7 +6,7 @@
 #include "ota/firmware/spotflow_ota_fw_custom.h"
 #include "ota/platform/spotflow_ota_identity.h"
 #include "ota/core/spotflow_ota_log.h"
-#include "ota/protocol/spotflow_ota_net.h"
+#include "ota/core/spotflow_ota_results.h"
 #include "ota/persistence/spotflow_ota_persistence.h"
 #include "ota/platform/spotflow_ota_platform.h"
 #include "ota/core/spotflow_ota_state.h"
@@ -641,24 +641,13 @@ static void download_block_cb(const struct spotflow_artifact_block* block,
 static int persist_prereboot_attempt(uint64_t attempt_id)
 {
 	struct spotflow_ota_state_snapshot snapshot;
-	struct spotflow_ota_persisted_attempt attempt;
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != attempt_id) {
 		return -EINVAL;
 	}
 
-	attempt = (struct spotflow_ota_persisted_attempt){
-		.attempt_id = snapshot.current_attempt_id,
-		.artifact_count = snapshot.artifact_count,
-		.actionable_cancellation = snapshot.actionable_cancellation,
-		.has_attempt_error = snapshot.has_attempt_error,
-		.attempt_error = snapshot.attempt_error,
-	};
-	memcpy(attempt.artifact_results, snapshot.artifact_results,
-	       sizeof(attempt.artifact_results));
-
-	return spotflow_ota_persistence_save_attempt(&attempt);
+	return spotflow_ota_results_persist_snapshot(&snapshot);
 }
 
 static int persist_snapshot_and_enqueue_results(void)
@@ -672,15 +661,10 @@ static int persist_snapshot_and_enqueue_results(void)
 		return -EINVAL;
 	}
 
-	attempt = (struct spotflow_ota_persisted_attempt){
-		.attempt_id = snapshot.current_attempt_id,
-		.artifact_count = snapshot.artifact_count,
-		.actionable_cancellation = snapshot.actionable_cancellation,
-	};
-	memcpy(attempt.artifact_results, snapshot.artifact_results,
-	       sizeof(attempt.artifact_results));
-
-	rc = spotflow_ota_persistence_save_attempt(&attempt);
+	rc = spotflow_ota_results_build_attempt(&snapshot, &attempt);
+	if (rc == 0) {
+		rc = spotflow_ota_results_persist_attempt(&attempt);
+	}
 	if (rc < 0) {
 		LOG_ERR("Failed to persist main firmware attempt results: %d", rc);
 		return rc;
@@ -689,13 +673,13 @@ static int persist_snapshot_and_enqueue_results(void)
 		return 0;
 	}
 
-	rc = spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
-					      snapshot.artifact_results, snapshot.artifact_count);
+	rc = spotflow_ota_results_prepare_attempt(&attempt);
 	if (rc < 0) {
 		LOG_ERR("Failed to queue main firmware attempt results: %d", rc);
 	}
 
-	return rc;
+	/* Results are durable. A deterministic encoding failure must not retain probation. */
+	return 0;
 }
 
 static int complete_main_firmware_success(const struct spotflow_ota_probation* probation,

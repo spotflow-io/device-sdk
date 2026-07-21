@@ -87,6 +87,9 @@ ZTEST(spotflow_ota_state, test_same_attempt_manifest_rehydrates_restored_attempt
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
+	zassert_equal(job.attempt_id, 1);
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
 	zassert_equal(job.attempt_id, 1);
 	zassert_equal(job.artifact_index, 1);
 	zassert_str_equal(job.artifact.slug, msg.artifacts[1].slug);
@@ -191,7 +194,7 @@ ZTEST(spotflow_ota_state, test_duplicate_update_after_rejected_attempt_requests_
 	zassert_true(action.ignored_duplicate_update);
 	zassert_true(action.report_requested);
 	zassert_false(action.accepted_update);
-	zassert_false(action.wake_worker);
+	zassert_true(action.wake_worker);
 }
 
 ZTEST(spotflow_ota_state, test_accept_cancel_before_success)
@@ -405,6 +408,11 @@ ZTEST(spotflow_ota_state, test_report_request_matches_current_attempt_only)
 	zassert_true(action.report_requested);
 	zassert_true(action.wake_worker);
 	zassert_equal(action.attempt_id, 5);
+
+	struct spotflow_ota_worker_job job;
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
+	zassert_equal(job.attempt_id, 5);
 }
 
 ZTEST(spotflow_ota_state, test_ignore_duplicate_update_after_terminal_failure)
@@ -425,7 +433,7 @@ ZTEST(spotflow_ota_state, test_ignore_duplicate_update_after_terminal_failure)
 	zassert_true(action.ignored_duplicate_update);
 	zassert_true(action.report_requested);
 	zassert_false(action.accepted_update);
-	zassert_false(action.wake_worker);
+	zassert_true(action.wake_worker);
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 
@@ -434,6 +442,8 @@ ZTEST(spotflow_ota_state, test_ignore_duplicate_update_after_terminal_failure)
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
 	zassert_false(snapshot.actionable_cancellation);
 	zassert_false(spotflow_ota_state_is_update_canceled());
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
 	zassert_false(spotflow_ota_state_get_worker_job(&job));
 }
 
@@ -455,13 +465,15 @@ ZTEST(spotflow_ota_state, test_duplicate_update_with_partial_results_requests_re
 	zassert_true(action.ignored_duplicate_update);
 	zassert_true(action.report_requested);
 	zassert_false(action.accepted_update);
-	zassert_false(action.wake_worker);
+	zassert_true(action.wake_worker);
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 
 	zassert_equal(snapshot.current_attempt_id, 20);
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
 	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT);
 	zassert_equal(job.artifact_index, 1);

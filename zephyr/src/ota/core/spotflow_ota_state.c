@@ -27,6 +27,7 @@ struct attempt_state {
 	bool has_attempt_error;
 	enum spotflow_ota_attempt_error attempt_error;
 	bool rejected_job_pending;
+	bool report_job_pending;
 	bool main_firmware_probation_pending;
 	bool has_main_firmware_artifact;
 	size_t main_firmware_artifact_index;
@@ -185,6 +186,8 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 		action->ignored_duplicate_update = true;
 		if (attempt_has_reportable_results(&current_attempt)) {
 			action->report_requested = true;
+			current_attempt.report_job_pending = true;
+			action->wake_worker = true;
 		}
 		k_mutex_unlock(&state_mutex);
 		return 0;
@@ -305,6 +308,7 @@ int spotflow_ota_state_accept_report_request(uint64_t attempt_id,
 	if (current_attempt.active && current_attempt.attempt_id == attempt_id) {
 		fill_action(action, attempt_id);
 		action->report_requested = true;
+		current_attempt.report_job_pending = true;
 		action->wake_worker = true;
 	}
 
@@ -332,6 +336,14 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 		job->attempt_id = current_attempt.attempt_id;
 		job->attempt_error = current_attempt.attempt_error;
 		current_attempt.rejected_job_pending = false;
+		k_mutex_unlock(&state_mutex);
+		return true;
+	}
+
+	if (current_attempt.report_job_pending) {
+		job->type = SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT;
+		job->attempt_id = current_attempt.attempt_id;
+		current_attempt.report_job_pending = false;
 		k_mutex_unlock(&state_mutex);
 		return true;
 	}
@@ -467,6 +479,7 @@ int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id,
 	current_attempt.has_attempt_error = true;
 	current_attempt.attempt_error = SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR;
 	current_attempt.rejected_job_pending = true;
+	current_attempt.report_job_pending = false;
 	current_attempt.main_firmware_state.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
 	current_attempt.main_firmware_state.is_paused = false;
 	current_attempt.main_firmware_state.result = SPOTFLOW_OTA_RESULT_FAILED;
@@ -928,6 +941,7 @@ static int rehydrate_attempt(const struct spotflow_ota_update_msg* msg,
 	fill_action(action, msg->attempt_id);
 	action->rehydrated_update = true;
 	action->report_requested = attempt_has_reportable_results(attempt);
+	attempt->report_job_pending = action->report_requested;
 
 	if (msg->is_canceled && !attempt_has_succeeded_artifact(attempt)) {
 		attempt->actionable_cancellation = true;

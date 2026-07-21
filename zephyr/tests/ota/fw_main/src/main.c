@@ -465,6 +465,8 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
 	zassert_true(action.wake_worker);
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
 	zassert_equal(job.attempt_id, update.attempt_id);
 	zassert_equal(job.artifact_index, 1);
 	zassert_str_equal(job.artifact.slug, secondary_artifact.slug);

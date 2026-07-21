@@ -33,7 +33,6 @@ static void handle_ota_c2d_msg(uint8_t* payload, size_t len);
 static void update_last_received_attempt_id(uint64_t attempt_id);
 static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* msg);
 static void handle_state_action(const struct spotflow_ota_state_action* action);
-static int prepare_persisted_results_for_attempt(uint64_t attempt_id);
 
 int spotflow_ota_init(void)
 {
@@ -394,22 +393,7 @@ static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* ms
 	}
 
 	handle_state_action(&action);
-
-	if (!action.report_requested) {
-		return 0;
-	}
-
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != msg->attempt_id) {
-		return prepare_persisted_results_for_attempt(msg->attempt_id);
-	}
-
-	if (snapshot.has_attempt_error || snapshot.artifact_result_commit_pending) {
-		return prepare_persisted_results_for_attempt(msg->attempt_id);
-	}
-
-	return spotflow_ota_net_prepare_results(snapshot.current_attempt_id,
-						snapshot.artifact_results, snapshot.artifact_count);
+	return 0;
 }
 
 static void handle_state_action(const struct spotflow_ota_state_action* action)
@@ -434,26 +418,4 @@ static void handle_state_action(const struct spotflow_ota_state_action* action)
 	if (action->wake_worker) {
 		spotflow_ota_worker_wake();
 	}
-}
-
-static int prepare_persisted_results_for_attempt(uint64_t attempt_id)
-{
-	struct spotflow_ota_persisted_attempt attempt;
-	bool has_attempt;
-	int rc = spotflow_ota_persistence_load_attempt(&attempt, &has_attempt);
-	if (rc < 0) {
-		return rc;
-	}
-
-	if (!has_attempt || attempt.attempt_id != attempt_id) {
-		return 0;
-	}
-
-	if (attempt.has_attempt_error) {
-		return spotflow_ota_net_prepare_attempt_error(attempt.attempt_id,
-							      attempt.attempt_error);
-	}
-
-	return spotflow_ota_net_prepare_results(attempt.attempt_id, attempt.artifact_results,
-						attempt.artifact_count);
 }
