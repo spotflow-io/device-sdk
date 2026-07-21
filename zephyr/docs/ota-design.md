@@ -42,7 +42,6 @@ flowchart TD
 
     firmware --> downloader
     firmware --> platform
-    firmware --> protocol
     firmware --> persistence
     firmware --> core
 
@@ -200,12 +199,50 @@ next boot with the attempt, artifact, slug, version, and expected build ID.
 | Running build ID vs probation | MCUboot confirmed | Outcome |
 |---|---|---|
 | Match | No | Phase `UNCONFIRMED`; wait for `spotflow_confirm_main_firmware_image()` |
-| Match | Yes | Infer success; persist version/result; clear probation; queue D2C |
-| Mismatch | — | Infer rollback/failed swap; report main failed; cancel rest; clear probation |
-| Unavailable | — | Report main failed; cancel rest; clear probation |
+| Match | Yes | Infer success; enqueue worker completion |
+| Mismatch | — | Infer rollback/failed swap; enqueue failed worker completion |
+| Unavailable | — | Enqueue failed worker completion |
 
 The main artifact result stays **pending** until confirmation or rollback inference so
 the cloud does not see success before the device has actually run the new image.
+
+Post-reboot reconciliation does not persist attempt results or prepare an MQTT report
+directly. It gives the worker a reconciled main-firmware result, which enters the same
+durable completion pipeline as a result returned by a delegated artifact handler:
+
+```mermaid
+flowchart TD
+    reconcile["Main firmware reconciliation\nconfirm success or infer rollback"]
+    handler["Artifact handler returns\na terminal result"]
+    stage["State: stage artifact result\n(commit pending)"]
+    version{"Succeeded?"}
+    saveVersion["Persist installed version"]
+    saveAttempt["Persist attempt snapshot"]
+    probation{"Post-reboot main\nfirmware result?"}
+    clearProbation["Clear probation record"]
+    commit["State: commit artifact result"]
+    next{"Pending newer attempt?"}
+    promote["Promote pending attempt\nand discard old report"]
+    report["Prepare cumulative\nUPDATE_RESULTS"]
+
+    reconcile --> stage
+    handler --> stage
+    stage --> version
+    version -- yes --> saveVersion --> saveAttempt
+    version -- no --> saveAttempt
+    saveAttempt --> probation
+    probation -- yes --> clearProbation --> commit
+    probation -- no --> commit
+    commit --> next
+    next -- yes --> promote
+    next -- no --> report
+```
+
+The worker owns installed-version persistence, attempt-result persistence, pending-attempt
+promotion, and report preparation for both main and delegated firmware. The main-firmware
+module owns only image handling, MCUboot operations, identity comparison, and probation
+creation. Probation is cleared after the terminal result is durable; therefore a reset or
+transient Settings failure before that point causes reconciliation to run again safely.
 
 **Identity**
 
@@ -224,8 +261,10 @@ Settings keys (namespace `spotflow/ota/`):
 **Write ordering**
 
 Terminal artifact results and attempt metadata are persisted **before** queueing D2C
-reporting. Probation is written **before** requesting MCUboot test upgrade. This ordering
-reduces the window where a power loss leaves the cloud and device inconsistent.
+reporting. Probation is written **before** requesting MCUboot test upgrade and is cleared
+only **after** the reconciled main-artifact result has been persisted. The accepted attempt
+is persisted by the worker before invoking any artifact handler, so the main-firmware
+handler does not write the same unchanged attempt again immediately before reboot.
 
 **Corruption**
 
@@ -260,6 +299,10 @@ Corrupt records loaded from Settings are ignored.
   is no longer actionable for remaining artifacts unless the handler itself was canceled.
 - Late `CANCEL_UPDATE` after partial success is logged internally, not exposed through the
   public API.
+- Cancellation and supersession stop mutating the current attempt after the main-firmware
+  upgrade commit begins. At that point reboot is irreversible and the already-persisted
+  attempt must remain unchanged; a newer manifest is processed after reboot when the cloud
+  sends it again.
 
 Delegated handlers should poll `spotflow_is_update_canceled()` and call
 `spotflow_cancel_download()` when a download is active.

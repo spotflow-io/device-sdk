@@ -15,6 +15,7 @@ extern "C" {
 enum spotflow_ota_worker_job_type {
 	SPOTFLOW_OTA_WORKER_JOB_NONE,
 	SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT,
+	SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE,
 	SPOTFLOW_OTA_WORKER_JOB_REJECTED_ATTEMPT,
 	SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT,
 };
@@ -24,6 +25,7 @@ struct spotflow_ota_worker_job {
 	uint64_t attempt_id;
 	size_t artifact_index;
 	struct spotflow_ota_artifact artifact;
+	enum spotflow_ota_result reconciled_result;
 	enum spotflow_ota_attempt_error attempt_error;
 };
 
@@ -88,6 +90,11 @@ int spotflow_ota_state_stage_artifact_result(uint64_t attempt_id, size_t artifac
 
 int spotflow_ota_state_commit_artifact_result(uint64_t attempt_id, size_t artifact_index,
 					      struct spotflow_ota_state_action* action);
+
+int spotflow_ota_state_queue_main_firmware_result(
+	uint64_t attempt_id, size_t artifact_index, enum spotflow_ota_result result,
+	struct spotflow_ota_main_firmware_state* out_state,
+	struct spotflow_ota_state_action* action);
 
 int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id,
 					     struct spotflow_ota_state_action* action);

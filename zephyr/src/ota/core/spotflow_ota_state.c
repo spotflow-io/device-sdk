@@ -28,6 +28,8 @@ struct attempt_state {
 	enum spotflow_ota_attempt_error attempt_error;
 	bool rejected_job_pending;
 	bool report_job_pending;
+	bool main_firmware_result_job_pending;
+	enum spotflow_ota_result main_firmware_reconciled_result;
 	bool main_firmware_probation_pending;
 	bool has_main_firmware_artifact;
 	size_t main_firmware_artifact_index;
@@ -267,7 +269,8 @@ int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_st
 	fill_action(action, attempt_id);
 
 	if (attempt_has_terminal_results(&current_attempt) ||
-	    attempt_has_succeeded_artifact(&current_attempt)) {
+	    attempt_has_succeeded_artifact(&current_attempt) ||
+	    current_attempt.main_firmware_upgrade_commit_started) {
 		action->ignored_late_cancel = true;
 		k_mutex_unlock(&state_mutex);
 		return 0;
@@ -336,6 +339,19 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 		job->attempt_id = current_attempt.attempt_id;
 		job->attempt_error = current_attempt.attempt_error;
 		current_attempt.rejected_job_pending = false;
+		k_mutex_unlock(&state_mutex);
+		return true;
+	}
+
+	if (current_attempt.main_firmware_result_job_pending) {
+		job->type = SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE;
+		job->attempt_id = current_attempt.attempt_id;
+		job->artifact_index = current_attempt.main_firmware_artifact_index;
+		job->reconciled_result = current_attempt.main_firmware_reconciled_result;
+		copy_artifact_out(&job->artifact, &current_attempt.main_firmware_artifact);
+		current_attempt.main_firmware_result_job_pending = false;
+		current_attempt.artifact_running = true;
+		current_attempt.running_artifact_index = job->artifact_index;
 		k_mutex_unlock(&state_mutex);
 		return true;
 	}
@@ -454,6 +470,51 @@ int spotflow_ota_state_commit_artifact_result(uint64_t attempt_id, size_t artifa
 	current_attempt.artifact_result_commit_pending = false;
 	fill_artifact_result_action(action);
 
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+int spotflow_ota_state_queue_main_firmware_result(
+	uint64_t attempt_id, size_t artifact_index, enum spotflow_ota_result result,
+	struct spotflow_ota_main_firmware_state* out_state,
+	struct spotflow_ota_state_action* action)
+{
+	if (attempt_id == 0 ||
+	    (result != SPOTFLOW_OTA_RESULT_SUCCEEDED && result != SPOTFLOW_OTA_RESULT_FAILED) ||
+	    action == NULL) {
+		return -EINVAL;
+	}
+
+	clear_action(action);
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!current_attempt.active || current_attempt.attempt_id != attempt_id ||
+	    !current_attempt.main_firmware_probation_pending ||
+	    !current_attempt.has_main_firmware_artifact ||
+	    current_attempt.main_firmware_artifact_index != artifact_index ||
+	    artifact_index >= current_attempt.update.artifact_count ||
+	    current_attempt.results[artifact_index] != SPOTFLOW_OTA_RESULT_PENDING ||
+	    current_attempt.artifact_running || current_attempt.artifact_result_commit_pending ||
+	    current_attempt.main_firmware_result_job_pending) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	current_attempt.main_firmware_state.result = result;
+	current_attempt.main_firmware_state.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
+	current_attempt.main_firmware_state.is_paused = false;
+	current_attempt.main_firmware_abort_requested = false;
+	current_attempt.main_firmware_upgrade_commit_started = false;
+	current_attempt.main_firmware_reboot_started = false;
+	current_attempt.main_firmware_reconciled_result = result;
+	current_attempt.main_firmware_result_job_pending = true;
+
+	if (out_state != NULL) {
+		*out_state = current_attempt.main_firmware_state;
+	}
+
+	fill_action(action, attempt_id);
+	action->wake_worker = true;
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
@@ -1000,6 +1061,12 @@ static void apply_immediate_rejection(uint64_t attempt_id, enum spotflow_ota_att
 
 static void supersede_current_for_pending(struct spotflow_ota_state_action* action)
 {
+	if (current_attempt.main_firmware_upgrade_commit_started) {
+		fill_action(action, current_attempt.attempt_id);
+		action->superseded_current = true;
+		return;
+	}
+
 	current_attempt.actionable_cancellation = true;
 	cancel_pending_artifacts(&current_attempt);
 	fill_action(action, current_attempt.attempt_id);

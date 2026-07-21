@@ -128,6 +128,21 @@ static void apply_main_result(enum spotflow_ota_result result)
 	zassert_ok(spotflow_ota_state_apply_artifact_result(0, result, &action));
 }
 
+static void expect_reconciled_main_job(enum spotflow_ota_result result)
+{
+	struct spotflow_ota_worker_job job;
+
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE);
+	zassert_equal(job.attempt_id, 42);
+	zassert_equal(job.artifact_index, 0);
+	zassert_equal(job.reconciled_result, result);
+	zassert_true(job.artifact.is_main);
+	zassert_str_equal(job.artifact.slug, main_artifact.slug);
+	zassert_str_equal(job.artifact.version, main_artifact.version);
+	zassert_false(spotflow_ota_state_get_worker_job(&job));
+}
+
 void spotflow_on_main_firmware_update_progressed(
 	const struct spotflow_ota_main_firmware_state* state)
 {
@@ -434,9 +449,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 {
 	struct spotflow_ota_state_action action;
 	struct spotflow_ota_state_snapshot snapshot;
-	struct spotflow_ota_update_msg update = build_two_artifact_update();
 	struct spotflow_ota_probation probation;
-	struct spotflow_ota_worker_job job;
 	char installed_version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
 	bool has_probation;
 	bool has_version;
@@ -447,32 +460,19 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 	platform_fake->image_confirmed = true;
 
 	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
-	zassert_false(action.wake_worker, "worker must wait until the manifest is received again");
+	zassert_true(action.wake_worker);
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
 	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_SUCCEEDED);
-	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
-	zassert_false(has_probation);
+	zassert_true(has_probation);
 	zassert_ok(spotflow_ota_persistence_load_installed_version(
 		"main", installed_version, sizeof(installed_version), &has_version));
-	zassert_true(has_version);
-	zassert_str_equal(installed_version, "1.0.0");
-	zassert_false(spotflow_ota_state_get_worker_job(&job));
-
-	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
-	zassert_true(action.wake_worker);
-	zassert_true(spotflow_ota_state_get_worker_job(&job));
-	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
-	zassert_true(spotflow_ota_state_get_worker_job(&job));
-	zassert_equal(job.attempt_id, update.attempt_id);
-	zassert_equal(job.artifact_index, 1);
-	zassert_str_equal(job.artifact.slug, secondary_artifact.slug);
-	zassert_str_equal(job.artifact.url, secondary_artifact.url);
-	zassert_str_equal(job.artifact.secret, secondary_artifact.secret);
-	zassert_str_equal(job.artifact.version, secondary_artifact.version);
+	zassert_false(has_version);
+	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_SUCCEEDED);
 }
 
 ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_identity_unavailable_reports_failure)
@@ -488,15 +488,16 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_identity_unavailable_rep
 	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
 
 	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
-	zassert_false(action.wake_worker);
+	zassert_true(action.wake_worker);
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
 	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_FAILED);
-	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
-	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
-	zassert_false(has_probation);
+	zassert_true(has_probation);
+	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_FAILED);
 }
 
 ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_mismatch_reports_rollback)
@@ -514,18 +515,19 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_mismatch_reports_rollbac
 	spotflow_ota_build_id_fake_set_running_build_id(running_build_id);
 
 	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
-	zassert_false(action.wake_worker);
+	zassert_true(action.wake_worker);
 
 	spotflow_ota_state_get_snapshot(&snapshot);
 	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
 	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_FAILED);
-	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
-	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
-	zassert_false(has_probation);
+	zassert_true(has_probation);
+	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_FAILED);
 }
 
-ZTEST(spotflow_ota_fw_main, test_success_completion_keeps_probation_when_attempt_persist_fails)
+ZTEST(spotflow_ota_fw_main, test_success_completion_defers_attempt_persistence_to_worker)
 {
 	struct spotflow_ota_state_action action;
 	struct spotflow_ota_persisted_attempt attempt;
@@ -539,7 +541,8 @@ ZTEST(spotflow_ota_fw_main, test_success_completion_keeps_probation_when_attempt
 	platform_fake->image_confirmed = true;
 	spotflow_ota_test_settings_set_save_failure("spotflow/ota/attempt");
 
-	zassert_not_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+	zassert_true(action.wake_worker);
 
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
 	zassert_true(has_probation);
@@ -548,9 +551,11 @@ ZTEST(spotflow_ota_fw_main, test_success_completion_keeps_probation_when_attempt
 	zassert_equal(attempt.attempt_id, 42);
 	zassert_equal(attempt.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(attempt.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(spotflow_ota_test_settings_get_save_failure_count(), 0);
+	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_SUCCEEDED);
 }
 
-ZTEST(spotflow_ota_fw_main, test_rollback_completion_keeps_probation_when_attempt_persist_fails)
+ZTEST(spotflow_ota_fw_main, test_rollback_completion_defers_attempt_persistence_to_worker)
 {
 	struct spotflow_ota_state_action action;
 	struct spotflow_ota_persisted_attempt attempt;
@@ -566,7 +571,8 @@ ZTEST(spotflow_ota_fw_main, test_rollback_completion_keeps_probation_when_attemp
 	spotflow_ota_build_id_fake_set_running_build_id(running_build_id);
 	spotflow_ota_test_settings_set_save_failure("spotflow/ota/attempt");
 
-	zassert_not_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
+	zassert_true(action.wake_worker);
 
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
 	zassert_true(has_probation);
@@ -575,9 +581,11 @@ ZTEST(spotflow_ota_fw_main, test_rollback_completion_keeps_probation_when_attemp
 	zassert_equal(attempt.attempt_id, 42);
 	zassert_equal(attempt.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(attempt.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(spotflow_ota_test_settings_get_save_failure_count(), 0);
+	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_FAILED);
 }
 
-ZTEST(spotflow_ota_fw_main, test_confirm_api_persists_success_and_waits_for_manifest)
+ZTEST(spotflow_ota_fw_main, test_confirm_api_queues_successful_completion)
 {
 	struct spotflow_ota_state_action action;
 	struct spotflow_ota_main_firmware_state state;
@@ -591,14 +599,15 @@ ZTEST(spotflow_ota_fw_main, test_confirm_api_persists_success_and_waits_for_mani
 	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &action));
 
 	zassert_ok(spotflow_ota_fw_main_confirm_image(&state, &action));
-	zassert_false(action.wake_worker, "worker must wait until the manifest is received again");
+	zassert_true(action.wake_worker);
 	zassert_equal(platform_fake->confirm_count, 1);
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
 	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_SUCCEEDED);
 
 	spotflow_ota_state_get_snapshot(&snapshot);
-	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_SUCCEEDED);
 }
 
 ZTEST(spotflow_ota_fw_main, test_confirm_idempotent_when_already_succeeded)
@@ -617,6 +626,7 @@ ZTEST(spotflow_ota_fw_main, test_confirm_idempotent_when_already_succeeded)
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
 	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_SUCCEEDED);
 	zassert_equal(platform_fake->confirm_count, 0);
+	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_SUCCEEDED);
 }
 
 ZTEST(spotflow_ota_fw_main, test_confirm_invalid_phase_returns_current_state)
@@ -952,6 +962,8 @@ ZTEST(spotflow_ota_fw_main, test_power_loss_while_pending_reboot_paused_recovers
 	progress_control.phase = SPOTFLOW_OTA_PHASE_PENDING_REBOOT;
 	progress_control.action = PROGRESS_CONTROL_PAUSE;
 	accept_two_artifact_update();
+	/* The production worker persists the accepted attempt before invoking the handler. */
+	persist_pending_post_reboot_attempt();
 
 	k_thread_create(&process_thread, process_stack, K_THREAD_STACK_SIZEOF(process_stack),
 			process_main_artifact, NULL, NULL, NULL, K_PRIO_PREEMPT(0), 0, K_NO_WAIT);

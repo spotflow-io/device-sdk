@@ -54,6 +54,49 @@ static void wake_worker_from_action(const struct spotflow_ota_state_action* acti
 	}
 }
 
+static void queue_reconciled_main_result(enum spotflow_ota_result result)
+{
+	const struct spotflow_ota_persisted_attempt attempt = {
+		.attempt_id = 42,
+		.artifact_count = 2,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_PENDING,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+	const struct spotflow_ota_probation probation = {
+		.attempt_id = 42,
+		.artifact_index = 0,
+		.slug = "main",
+		.version = "1.0.0",
+	};
+	struct spotflow_ota_state_action action;
+
+	zassert_ok(spotflow_ota_persistence_save_attempt(&attempt));
+	zassert_ok(spotflow_ota_persistence_save_probation(&probation));
+	zassert_ok(spotflow_ota_state_init_from_persistence(&attempt, true, &probation, true));
+	zassert_ok(spotflow_ota_state_queue_main_firmware_result(
+		attempt.attempt_id, probation.artifact_index, result, NULL, &action));
+	zassert_true(action.wake_worker);
+}
+
+static void wait_for_probation_to_clear(void)
+{
+	for (int i = 0; i < 100; i++) {
+		struct spotflow_ota_probation probation;
+		bool has_probation;
+
+		zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+		if (!has_probation) {
+			return;
+		}
+
+		k_sleep(K_MSEC(10));
+	}
+
+	zassert_unreachable("Timed out waiting for OTA probation to clear");
+}
+
 static void before_each(void* fixture)
 {
 	ARG_UNUSED(fixture);
@@ -459,6 +502,78 @@ ZTEST(spotflow_ota_worker, test_terminal_finalization_retries_storage_failure)
 	spotflow_ota_test_wait_for_persisted_attempt(1, expected_results,
 						     ARRAY_SIZE(expected_results));
 	zassert_equal(fake_callbacks->handle_call_count, 0);
+	zassert_ok(spotflow_ota_net_send_pending_message());
+	spotflow_ota_test_expect_update_results_payload(&expected_message);
+}
+
+ZTEST(spotflow_ota_worker, test_reconciled_main_success_uses_durable_artifact_pipeline)
+{
+	const enum spotflow_ota_result expected_results[] = {
+		SPOTFLOW_OTA_RESULT_SUCCEEDED,
+		SPOTFLOW_OTA_RESULT_PENDING,
+	};
+	const struct spotflow_ota_cbor_update_results expected_message = {
+		.attempt_id = 42,
+		.succeeded_count = 1,
+		.succeeded = { 0 },
+	};
+	struct spotflow_ota_persisted_attempt persisted_attempt;
+	struct spotflow_ota_probation probation;
+	char installed_version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
+	bool has_attempt;
+	bool has_probation;
+	bool has_version;
+
+	queue_reconciled_main_result(SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	spotflow_ota_test_settings_set_save_failure(ATTEMPT_SETTINGS_PATH);
+	spotflow_ota_worker_wake();
+	k_sleep(K_MSEC(100));
+
+	zassert_ok(spotflow_ota_persistence_load_attempt(&persisted_attempt, &has_attempt));
+	zassert_true(has_attempt);
+	zassert_equal(persisted_attempt.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_true(has_probation, "probation must remain until the result is durable");
+
+	spotflow_ota_test_settings_clear_save_failure();
+	spotflow_ota_worker_wake();
+	spotflow_ota_test_wait_for_persisted_attempt(42, expected_results,
+						     ARRAY_SIZE(expected_results));
+	wait_for_probation_to_clear();
+
+	zassert_ok(spotflow_ota_persistence_load_installed_version(
+		"main", installed_version, sizeof(installed_version), &has_version));
+	zassert_true(has_version);
+	zassert_str_equal(installed_version, "1.0.0");
+	zassert_ok(spotflow_ota_net_send_pending_message());
+	spotflow_ota_test_expect_update_results_payload(&expected_message);
+}
+
+ZTEST(spotflow_ota_worker, test_reconciled_main_rollback_uses_artifact_pipeline)
+{
+	const enum spotflow_ota_result expected_results[] = {
+		SPOTFLOW_OTA_RESULT_FAILED,
+		SPOTFLOW_OTA_RESULT_CANCELED,
+	};
+	const struct spotflow_ota_cbor_update_results expected_message = {
+		.attempt_id = 42,
+		.failed_count = 1,
+		.failed = { 0 },
+		.canceled_count = 1,
+		.canceled = { 1 },
+	};
+	char installed_version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
+	bool has_version;
+
+	queue_reconciled_main_result(SPOTFLOW_OTA_RESULT_FAILED);
+	spotflow_ota_worker_wake();
+	spotflow_ota_test_wait_for_persisted_attempt(42, expected_results,
+						     ARRAY_SIZE(expected_results));
+	wait_for_probation_to_clear();
+
+	zassert_ok(spotflow_ota_persistence_load_installed_version(
+		"main", installed_version, sizeof(installed_version), &has_version));
+	zassert_false(has_version);
 	zassert_ok(spotflow_ota_net_send_pending_message());
 	spotflow_ota_test_expect_update_results_payload(&expected_message);
 }

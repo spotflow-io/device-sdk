@@ -42,6 +42,7 @@ enum worker_operation_stage {
 	WORKER_STAGE_ARTIFACT_STAGE_RESULT,
 	WORKER_STAGE_ARTIFACT_SAVE_VERSION,
 	WORKER_STAGE_ARTIFACT_PERSIST_RESULT,
+	WORKER_STAGE_ARTIFACT_CLEAR_PROBATION,
 	WORKER_STAGE_ARTIFACT_COMMIT_RESULT,
 	WORKER_STAGE_ARTIFACT_REPORT_RESULT,
 	WORKER_STAGE_REPORT_CAPTURE,
@@ -254,6 +255,16 @@ static void initialize_worker_operation(const struct spotflow_ota_worker_job* jo
 			job->artifact.version, job->artifact_index,
 			job->artifact.is_main ? ", main" : "");
 		break;
+	case SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE:
+		operation.type = WORKER_OPERATION_ARTIFACT;
+		operation.continue_worker = true;
+		operation.result = job->reconciled_result;
+		operation.stage = WORKER_STAGE_ARTIFACT_STAGE_RESULT;
+		LOG_INF("OTA attempt %llu: completing reconciled main firmware artifact '%s' %s "
+			"(index %zu)",
+			(unsigned long long)job->attempt_id, job->artifact.slug,
+			job->artifact.version, job->artifact_index);
+		break;
 	case SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT:
 		operation.type = WORKER_OPERATION_REPORT_ATTEMPT;
 		operation.stage = WORKER_STAGE_REPORT_CAPTURE;
@@ -418,6 +429,19 @@ static struct worker_outcome process_artifact_operation(void)
 			if (rc < 0) {
 				return classify_storage_error(rc, true);
 			}
+			advance_operation(
+				operation.job.type == SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE
+					? WORKER_STAGE_ARTIFACT_CLEAR_PROBATION
+					: WORKER_STAGE_ARTIFACT_COMMIT_RESULT);
+			break;
+		}
+		case WORKER_STAGE_ARTIFACT_CLEAR_PROBATION: {
+			int rc = spotflow_ota_persistence_clear_probation();
+			if (rc < 0) {
+				return classify_storage_error(rc, true);
+			}
+
+			spotflow_ota_state_resolve_main_firmware_probation();
 			advance_operation(WORKER_STAGE_ARTIFACT_COMMIT_RESULT);
 			break;
 		}

@@ -648,4 +648,53 @@ ZTEST(spotflow_ota_state, test_supersede_unfinished_attempt_and_promote_pending)
 	zassert_equal(job.artifact_index, 0);
 }
 
+ZTEST(spotflow_ota_state, test_cancel_is_ignored_after_main_upgrade_commit_starts)
+{
+	struct spotflow_ota_update_msg update = make_update(30, 2);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_ok(spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
+							      NULL));
+	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit());
+
+	zassert_ok(spotflow_ota_state_accept_cancel(update.attempt_id, &action));
+	zassert_true(action.ignored_late_cancel);
+	zassert_false(action.accepted_cancel);
+	zassert_false(spotflow_ota_state_is_update_canceled());
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+}
+
+ZTEST(spotflow_ota_state, test_supersession_does_not_mutate_attempt_after_upgrade_commit)
+{
+	struct spotflow_ota_update_msg current = make_update(30, 2);
+	struct spotflow_ota_update_msg newer = make_update(31, 1);
+	struct spotflow_ota_state_action action;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&current, &action));
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_ok(spotflow_ota_state_set_main_firmware_phase(SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
+							      NULL));
+	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit());
+
+	zassert_ok(spotflow_ota_state_accept_update(&newer, &action));
+	zassert_true(action.superseded_current);
+	zassert_false(action.wake_worker);
+	zassert_false(spotflow_ota_state_is_update_canceled());
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_true(snapshot.has_pending_attempt);
+	zassert_equal(snapshot.pending_attempt_id, newer.attempt_id);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+}
+
 ZTEST_SUITE(spotflow_ota_state, NULL, NULL, before_each, NULL, NULL);

@@ -6,7 +6,6 @@
 #include "ota/firmware/spotflow_ota_fw_custom.h"
 #include "ota/platform/spotflow_ota_identity.h"
 #include "ota/core/spotflow_ota_log.h"
-#include "ota/core/spotflow_ota_results.h"
 #include "ota/persistence/spotflow_ota_persistence.h"
 #include "ota/platform/spotflow_ota_platform.h"
 #include "ota/core/spotflow_ota_state.h"
@@ -41,14 +40,11 @@ static int begin_main_firmware_reboot(void);
 static void download_started_cb(struct spotflow_downloader* downloader, void* callback_ctx);
 static void download_block_cb(const struct spotflow_artifact_block* block,
 			      struct spotflow_downloader* downloader, void* callback_ctx);
-static int persist_prereboot_attempt(uint64_t attempt_id);
-static int persist_snapshot_and_enqueue_results(void);
 static int complete_main_firmware_success(const struct spotflow_ota_probation* probation,
 					  struct spotflow_ota_state_action* action);
 static int complete_main_firmware_rollback(const struct spotflow_ota_probation* probation,
 					   struct spotflow_ota_state_action* action);
 static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation);
-static void request_worker_for_remaining_or_pending(struct spotflow_ota_state_action* action);
 
 void spotflow_ota_fw_main_reset(void)
 {
@@ -158,13 +154,6 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 	rc = spotflow_ota_persistence_save_probation(&probation);
 	if (rc < 0) {
 		LOG_ERR("Failed to persist main firmware probation record: %d", rc);
-		spotflow_ota_state_cancel_main_firmware_upgrade_commit();
-		return fail_main_firmware();
-	}
-
-	rc = persist_prereboot_attempt(attempt_id);
-	if (rc < 0) {
-		LOG_ERR("Failed to persist main firmware attempt before reboot: %d", rc);
 		spotflow_ota_state_cancel_main_firmware_upgrade_commit();
 		return fail_main_firmware();
 	}
@@ -638,50 +627,6 @@ static void download_block_cb(const struct spotflow_artifact_block* block,
 	}
 }
 
-static int persist_prereboot_attempt(uint64_t attempt_id)
-{
-	struct spotflow_ota_state_snapshot snapshot;
-
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != attempt_id) {
-		return -EINVAL;
-	}
-
-	return spotflow_ota_results_persist_snapshot(&snapshot);
-}
-
-static int persist_snapshot_and_enqueue_results(void)
-{
-	struct spotflow_ota_state_snapshot snapshot;
-	struct spotflow_ota_persisted_attempt attempt;
-	int rc;
-
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt || snapshot.has_attempt_error) {
-		return -EINVAL;
-	}
-
-	rc = spotflow_ota_results_build_attempt(&snapshot, &attempt);
-	if (rc == 0) {
-		rc = spotflow_ota_results_persist_attempt(&attempt);
-	}
-	if (rc < 0) {
-		LOG_ERR("Failed to persist main firmware attempt results: %d", rc);
-		return rc;
-	}
-	if (snapshot.has_pending_attempt) {
-		return 0;
-	}
-
-	rc = spotflow_ota_results_prepare_attempt(&attempt);
-	if (rc < 0) {
-		LOG_ERR("Failed to queue main firmware attempt results: %d", rc);
-	}
-
-	/* Results are durable. A deterministic encoding failure must not retain probation. */
-	return 0;
-}
-
 static int complete_main_firmware_success(const struct spotflow_ota_probation* probation,
 					  struct spotflow_ota_state_action* action)
 {
@@ -691,39 +636,14 @@ static int complete_main_firmware_success(const struct spotflow_ota_probation* p
 	LOG_INF("Main firmware update succeeded for OTA attempt %llu ('%s' %s)",
 		(unsigned long long)probation->attempt_id, probation->slug, probation->version);
 
-	rc = spotflow_ota_persistence_save_installed_version(probation->slug, probation->version);
-	if (rc < 0) {
-		LOG_ERR("Failed to persist installed main firmware version: %d", rc);
-		return rc;
-	}
-
-	rc = spotflow_ota_state_apply_artifact_result(probation->artifact_index,
-						      SPOTFLOW_OTA_RESULT_SUCCEEDED, action);
-	if (rc < 0) {
-		return rc;
-	}
-
-	rc = spotflow_ota_state_set_main_firmware_result(SPOTFLOW_OTA_RESULT_SUCCEEDED, &state);
+	rc = spotflow_ota_state_queue_main_firmware_result(
+		probation->attempt_id, probation->artifact_index, SPOTFLOW_OTA_RESULT_SUCCEEDED,
+		&state, action);
 	if (rc < 0) {
 		return rc;
 	}
 
 	notify_main_firmware_state(&state);
-
-	rc = persist_snapshot_and_enqueue_results();
-	if (rc < 0) {
-		return rc;
-	}
-
-	rc = spotflow_ota_persistence_clear_probation();
-	if (rc < 0) {
-		LOG_ERR("Failed to clear main firmware probation record: %d", rc);
-		return rc;
-	}
-
-	spotflow_ota_state_resolve_main_firmware_probation();
-	request_worker_for_remaining_or_pending(action);
-
 	return 0;
 }
 
@@ -733,60 +653,15 @@ static int complete_main_firmware_rollback(const struct spotflow_ota_probation* 
 	struct spotflow_ota_main_firmware_state state;
 	int rc;
 
-	rc = spotflow_ota_state_set_main_firmware_result(SPOTFLOW_OTA_RESULT_FAILED, &state);
+	rc = spotflow_ota_state_queue_main_firmware_result(
+		probation->attempt_id, probation->artifact_index, SPOTFLOW_OTA_RESULT_FAILED,
+		&state, action);
 	if (rc < 0) {
 		return rc;
 	}
 
 	notify_main_firmware_state(&state);
-
-	rc = spotflow_ota_state_apply_artifact_result(probation->artifact_index,
-						      SPOTFLOW_OTA_RESULT_FAILED, action);
-	if (rc < 0) {
-		return rc;
-	}
-
-	rc = persist_snapshot_and_enqueue_results();
-	if (rc < 0) {
-		return rc;
-	}
-
-	rc = spotflow_ota_persistence_clear_probation();
-	if (rc < 0) {
-		LOG_ERR("Failed to clear main firmware probation record after rollback: %d", rc);
-		return rc;
-	}
-
-	spotflow_ota_state_resolve_main_firmware_probation();
-	request_worker_for_remaining_or_pending(action);
-
 	return 0;
-}
-
-static void request_worker_for_remaining_or_pending(struct spotflow_ota_state_action* action)
-{
-	struct spotflow_ota_state_snapshot snapshot;
-
-	if (action == NULL || action->wake_worker) {
-		return;
-	}
-
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (snapshot.has_pending_attempt) {
-		action->wake_worker = true;
-		return;
-	}
-
-	if (!snapshot.manifest_available) {
-		return;
-	}
-
-	for (size_t i = 0; i < snapshot.artifact_count; i++) {
-		if (snapshot.artifact_results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
-			action->wake_worker = true;
-			return;
-		}
-	}
 }
 
 static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation)
