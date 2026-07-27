@@ -4,17 +4,11 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "ota/core/spotflow_ota_state.h"
 #include "ota/persistence/spotflow_ota_records_cbor.h"
 
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-int spotflow_ota_results_build_attempt(const struct spotflow_ota_state_snapshot* snapshot,
-				       struct spotflow_ota_persisted_attempt* attempt);
-
-int spotflow_ota_results_persist_snapshot(const struct spotflow_ota_state_snapshot* snapshot);
 
 int spotflow_ota_results_persist_attempt(const struct spotflow_ota_persisted_attempt* attempt);
 

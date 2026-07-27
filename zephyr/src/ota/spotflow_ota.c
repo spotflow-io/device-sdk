@@ -176,9 +176,9 @@ int spotflow_get_main_firmware_update_state(struct spotflow_ota_main_firmware_st
 		return rc;
 	}
 
-	struct spotflow_ota_state_snapshot snapshot;
-	spotflow_ota_state_get_snapshot(&snapshot);
-	*state = snapshot.main_firmware_state;
+	struct spotflow_ota_main_firmware_view view;
+	spotflow_ota_state_get_main_firmware_view(&view);
+	*state = view.state;
 	return 0;
 }
 

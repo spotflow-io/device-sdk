@@ -137,10 +137,15 @@ transition validates the attempt ID, generation, and index. The artifact plan's
 result, whether remaining artifacts must be canceled, and whether the result came from a
 handler or main-firmware reconciliation.
 
-Persistence is built from a projected copy: durable results with the staged mutation
-overlaid. Commit applies the mutation to the durable array only after that projection has
-been saved. A report job cannot be claimed while a mutation is staged, so reporting never
-interprets a projected result as already committed.
+The worker does not read general state fields to build persistence records. It asks the
+state module to capture either the durable attempt or the staged-result projection for
+its claimed job. The state module validates the attempt ID, generation, job kind, and
+transaction state and builds the record atomically under `state_mutex`.
+
+For a staged result, the captured record is built from a projected copy: durable results
+with the staged mutation overlaid. Commit applies the mutation to the durable array only
+after that record has been saved. A report job cannot be claimed while a mutation is
+staged, so reporting never interprets a projected result as already committed.
 
 Each mutation has a revision. Cancellation or supersession arriving after staging keeps
 the handler result, sets `cancel_remaining`, and advances the revision. If the revision
@@ -460,7 +465,7 @@ flowchart TD
     stage["State: stage artifact result\n(commit pending)"]
     version{"Succeeded?"}
     saveVersion["Persist installed version"]
-    saveAttempt["Persist attempt snapshot"]
+    saveAttempt["Capture and persist\nattempt record"]
     probation{"Post-reboot main\nfirmware result?"}
     clearProbation["Clear probation record"]
     commit["State: commit artifact result"]
@@ -486,6 +491,12 @@ promotion, and report preparation for both main and delegated firmware. The main
 module owns only image handling, MCUboot operations, identity comparison, and probation
 creation. Probation is cleared after the terminal result is durable; therefore a reset or
 transient Settings failure before that point causes reconciliation to run again safely.
+
+Production orchestration uses purpose-specific state queries: persistence capture,
+report/promotion planning, operation-token validation, and a main-firmware public-status
+view. The broader state diagnostic projection exists for state-machine tests and
+diagnostics only; the worker, facade, results component, and main-firmware implementation
+do not use it to make transition decisions.
 
 **Identity**
 

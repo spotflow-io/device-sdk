@@ -195,7 +195,7 @@ ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_w
 	struct spotflow_ota_update_msg first = make_delegated_update(9, 2);
 	struct spotflow_ota_update_msg second = make_delegated_update(10, 1);
 	struct spotflow_ota_update_result result;
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_state_diagnostic snapshot;
 	const enum spotflow_ota_result superseded_results[] = {
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 		SPOTFLOW_OTA_RESULT_CANCELED,
@@ -225,7 +225,7 @@ ZTEST(spotflow_ota_worker, test_superseded_attempt_promoted_after_terminal_via_w
 	zassert_equal(fake_callbacks->last_attempt_id, 10);
 	zassert_equal(fake_callbacks->handle_call_count, 2);
 
-	spotflow_ota_state_get_snapshot(&snapshot);
+	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_equal(snapshot.current_attempt_id, 10);
 	zassert_false(snapshot.has_pending_attempt);
 
@@ -420,7 +420,7 @@ ZTEST(spotflow_ota_worker, test_next_artifact_waits_for_previous_result_persiste
 		spotflow_ota_test_fake_callbacks_get();
 	struct spotflow_ota_update_msg update = make_delegated_update(1, 2);
 	struct spotflow_ota_update_result result;
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_state_diagnostic snapshot;
 	const enum spotflow_ota_result expected_results[] = {
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
@@ -433,7 +433,7 @@ ZTEST(spotflow_ota_worker, test_next_artifact_waits_for_previous_result_persiste
 
 	zassert_equal(k_sem_take(&fake_callbacks->handle_called_sem, K_MSEC(100)), -EAGAIN,
 		      "next artifact started before the previous result became durable");
-	spotflow_ota_state_get_snapshot(&snapshot);
+	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING,
 		      "a staged result must not change the durable in-memory result");
 	zassert_equal(snapshot.projected_artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
@@ -452,7 +452,7 @@ ZTEST(spotflow_ota_worker, test_cancel_after_staging_is_persisted_with_handler_r
 		spotflow_ota_test_fake_callbacks_get();
 	struct spotflow_ota_update_msg update = make_delegated_update(1, 2);
 	struct spotflow_ota_update_result result;
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_state_diagnostic snapshot;
 	const enum spotflow_ota_result expected_results[] = {
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 		SPOTFLOW_OTA_RESULT_CANCELED,
@@ -469,7 +469,7 @@ ZTEST(spotflow_ota_worker, test_cancel_after_staging_is_persisted_with_handler_r
 	zassert_equal(staged_cancel_result.disposition, SPOTFLOW_OTA_CANCEL_ACCEPTED);
 	zassert_equal(fake_callbacks->handle_call_count, 1);
 
-	spotflow_ota_state_get_snapshot(&snapshot);
+	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
 }
@@ -551,14 +551,14 @@ ZTEST(spotflow_ota_worker, test_permanent_persistence_error_is_not_retried_forev
 		spotflow_ota_test_fake_callbacks_get();
 	struct spotflow_ota_update_msg update = make_delegated_update(1, 1);
 	struct spotflow_ota_update_result result;
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_state_diagnostic snapshot;
 
 	spotflow_ota_test_settings_set_save_failure_error(ATTEMPT_SETTINGS_PATH, -EINVAL);
 	zassert_ok(spotflow_ota_state_accept_update(&update, &result));
 	wake_worker_from_effects(result.effects);
 	k_msleep(100);
 
-	spotflow_ota_state_get_snapshot(&snapshot);
+	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_true(snapshot.has_attempt_error);
 	zassert_equal(snapshot.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR);
 	zassert_equal(fake_callbacks->handle_call_count, 0);

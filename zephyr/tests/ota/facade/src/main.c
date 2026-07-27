@@ -365,14 +365,14 @@ ZTEST(spotflow_ota_facade, test_ota_init_session_requests_subscription)
 
 ZTEST(spotflow_ota_facade, test_c2d_handler_accepts_valid_update_message)
 {
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_state_diagnostic snapshot;
 	struct spotflow_ota_worker_job job;
 
 	zassert_ok(spotflow_ota_init_session());
 	invoke_ota_callback((uint8_t*)valid_update_artifacts_payload,
 			    sizeof(valid_update_artifacts_payload));
 
-	spotflow_ota_state_get_snapshot(&snapshot);
+	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_true(snapshot.has_current_attempt);
 	zassert_equal(snapshot.current_attempt_id, 1);
 	zassert_equal(snapshot.artifact_count, 1);
@@ -387,7 +387,7 @@ ZTEST(spotflow_ota_facade,
 {
 	struct spotflow_ota_test_fake_transport* fake_transport =
 		spotflow_ota_test_fake_transport_get();
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_state_diagnostic snapshot;
 	uint8_t payload[sizeof(valid_update_artifacts_payload)];
 
 	memcpy(payload, valid_update_artifacts_payload, sizeof(payload));
@@ -396,7 +396,7 @@ ZTEST(spotflow_ota_facade,
 	zassert_ok(spotflow_ota_init_session());
 	invoke_ota_callback(payload, sizeof(payload));
 
-	spotflow_ota_state_get_snapshot(&snapshot);
+	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_true(snapshot.has_current_attempt);
 	zassert_true(snapshot.has_attempt_error);
 	zassert_equal(snapshot.current_attempt_id, 1);
@@ -410,7 +410,7 @@ ZTEST(spotflow_ota_facade, test_c2d_handler_ignores_message_without_trustworthy_
 {
 	struct spotflow_ota_test_fake_transport* fake_transport =
 		spotflow_ota_test_fake_transport_get();
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_state_diagnostic snapshot;
 	uint8_t payload[sizeof(cancel_update_payload)];
 
 	memcpy(payload, cancel_update_payload, sizeof(payload));
@@ -419,7 +419,7 @@ ZTEST(spotflow_ota_facade, test_c2d_handler_ignores_message_without_trustworthy_
 	zassert_ok(spotflow_ota_init_session());
 	invoke_ota_callback(payload, sizeof(payload));
 
-	spotflow_ota_state_get_snapshot(&snapshot);
+	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_false(snapshot.has_current_attempt);
 	zassert_equal(spotflow_ota_get_last_received_attempt_id(), 0);
 	zassert_ok(spotflow_ota_send_pending_message());

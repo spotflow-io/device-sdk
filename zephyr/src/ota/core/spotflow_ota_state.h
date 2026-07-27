@@ -106,7 +106,28 @@ struct spotflow_ota_report_result {
 	spotflow_ota_state_effects effects;
 };
 
-struct spotflow_ota_state_snapshot {
+enum spotflow_ota_persistence_view {
+	SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE,
+	SPOTFLOW_OTA_PERSISTENCE_VIEW_STAGED_RESULT,
+};
+
+struct spotflow_ota_persistence_capture {
+	struct spotflow_ota_persisted_attempt attempt;
+	uint32_t mutation_revision;
+};
+
+struct spotflow_ota_report_plan {
+	bool promote_pending;
+	bool continue_worker;
+};
+
+struct spotflow_ota_main_firmware_view {
+	bool has_current_attempt;
+	uint64_t attempt_id;
+	struct spotflow_ota_main_firmware_state state;
+};
+
+struct spotflow_ota_state_diagnostic {
 	bool has_current_attempt;
 	uint64_t current_attempt_id;
 	uint32_t current_attempt_generation;
@@ -150,8 +171,15 @@ int spotflow_ota_state_accept_report_request(uint64_t attempt_id,
 
 bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job);
 
-int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflow_ota_result result,
-					     spotflow_ota_state_effects* effects);
+#if defined(CONFIG_ZTEST)
+int spotflow_ota_state_test_apply_artifact_result(size_t artifact_index,
+						  enum spotflow_ota_result result,
+						  spotflow_ota_state_effects* effects);
+#endif /* CONFIG_ZTEST */
+
+int spotflow_ota_state_capture_persisted_attempt(const struct spotflow_ota_worker_job* job,
+						 enum spotflow_ota_persistence_view view,
+						 struct spotflow_ota_persistence_capture* capture);
 
 int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_job* job,
 					     enum spotflow_ota_result result);
@@ -166,17 +194,26 @@ int spotflow_ota_state_commit_attempt_finalization(const struct spotflow_ota_wor
 int spotflow_ota_state_complete_report_job(const struct spotflow_ota_worker_job* job,
 					   bool prepared);
 
+int spotflow_ota_state_get_report_plan(const struct spotflow_ota_worker_job* job,
+				       struct spotflow_ota_report_plan* plan);
+
 int spotflow_ota_state_queue_main_firmware_result(
 	uint64_t attempt_id, size_t artifact_index, enum spotflow_ota_result result,
 	struct spotflow_ota_main_firmware_state* out_state, spotflow_ota_state_effects* effects);
 
 int spotflow_ota_state_fail_worker_operation(const struct spotflow_ota_operation_token* token);
 
-int spotflow_ota_state_promote_pending(void);
+int spotflow_ota_state_promote_pending(const struct spotflow_ota_worker_job* report_job);
 
 bool spotflow_ota_state_is_update_canceled(void);
 
-void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapshot);
+int spotflow_ota_state_validate_operation(const struct spotflow_ota_operation_token* token);
+
+int spotflow_ota_state_get_main_firmware_view(struct spotflow_ota_main_firmware_view* view);
+
+bool spotflow_ota_state_is_main_artifact_pending(uint64_t attempt_id, size_t artifact_index);
+
+void spotflow_ota_state_get_diagnostic(struct spotflow_ota_state_diagnostic* diagnostic);
 
 int spotflow_ota_state_set_main_firmware_phase(enum spotflow_ota_phase phase,
 					       struct spotflow_ota_main_firmware_state* out_state);

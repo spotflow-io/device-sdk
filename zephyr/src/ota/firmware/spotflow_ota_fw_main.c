@@ -266,7 +266,7 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* out_state,
 				       spotflow_ota_state_effects* effects)
 {
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_main_firmware_view view;
 	struct spotflow_ota_probation probation;
 	bool has_probation;
 	int rc;
@@ -277,20 +277,20 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 
 	*effects = 0;
 
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt) {
+	spotflow_ota_state_get_main_firmware_view(&view);
+	if (!view.has_current_attempt) {
 		if (out_state != NULL) {
-			*out_state = snapshot.main_firmware_state;
+			*out_state = view.state;
 		}
 
 		return -EINVAL;
 	}
 
-	if (snapshot.main_firmware_state.phase == SPOTFLOW_OTA_PHASE_NOT_RUNNING &&
-	    snapshot.main_firmware_state.result == SPOTFLOW_OTA_RESULT_SUCCEEDED &&
+	if (view.state.phase == SPOTFLOW_OTA_PHASE_NOT_RUNNING &&
+	    view.state.result == SPOTFLOW_OTA_RESULT_SUCCEEDED &&
 	    spotflow_ota_platform_is_image_confirmed()) {
 		if (out_state != NULL) {
-			*out_state = snapshot.main_firmware_state;
+			*out_state = view.state;
 		}
 
 		return 0;
@@ -301,42 +301,41 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 		return rc;
 	}
 
-	if (has_probation && probation.attempt_id == snapshot.current_attempt_id &&
+	if (has_probation && probation.attempt_id == view.attempt_id &&
 	    spotflow_ota_identity_compare_probation(probation.expected_build_id) ==
 		    SPOTFLOW_OTA_IDENTITY_MATCH &&
 	    spotflow_ota_platform_is_image_confirmed() &&
-	    snapshot.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
+	    view.state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
 		rc = complete_main_firmware_success(&probation, effects);
 		if (rc < 0) {
 			return rc;
 		}
 
 		if (out_state != NULL) {
-			spotflow_ota_state_get_snapshot(&snapshot);
-			*out_state = snapshot.main_firmware_state;
+			spotflow_ota_state_get_main_firmware_view(&view);
+			*out_state = view.state;
 		}
 
 		return 0;
 	}
 
-	if (snapshot.main_firmware_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
+	if (view.state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
 		LOG_ERR("Main firmware confirmation rejected: has_attempt=%d phase=%d result=%d",
-			snapshot.has_current_attempt, snapshot.main_firmware_state.phase,
-			snapshot.main_firmware_state.result);
+			view.has_current_attempt, view.state.phase, view.state.result);
 		if (out_state != NULL) {
-			*out_state = snapshot.main_firmware_state;
+			*out_state = view.state;
 		}
 
 		return -EINVAL;
 	}
 
-	if (!has_probation || probation.attempt_id != snapshot.current_attempt_id) {
+	if (!has_probation || probation.attempt_id != view.attempt_id) {
 		LOG_ERR("Main firmware confirmation rejected: has_probation=%d attempt_id=%llu "
 			"current_attempt_id=%llu",
 			has_probation, (unsigned long long)probation.attempt_id,
-			(unsigned long long)snapshot.current_attempt_id);
+			(unsigned long long)view.attempt_id);
 		if (out_state != NULL) {
-			*out_state = snapshot.main_firmware_state;
+			*out_state = view.state;
 		}
 
 		return -EINVAL;
@@ -345,7 +344,7 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 	rc = spotflow_ota_platform_confirm_image();
 	if (rc < 0) {
 		if (out_state != NULL) {
-			*out_state = snapshot.main_firmware_state;
+			*out_state = view.state;
 		}
 
 		return rc;
@@ -357,8 +356,8 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 	}
 
 	if (out_state != NULL) {
-		spotflow_ota_state_get_snapshot(&snapshot);
-		*out_state = snapshot.main_firmware_state;
+		spotflow_ota_state_get_main_firmware_view(&view);
+		*out_state = view.state;
 	}
 
 	return 0;
@@ -388,12 +387,12 @@ int spotflow_ota_fw_main_pause_update(struct spotflow_ota_main_firmware_state* o
 
 int spotflow_ota_fw_main_resume_update(struct spotflow_ota_main_firmware_state* out_state)
 {
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_main_firmware_view view;
 	enum spotflow_downloader_state downloader_state;
 	int rc;
 
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt || !snapshot.main_firmware_state.is_paused) {
+	spotflow_ota_state_get_main_firmware_view(&view);
+	if (!view.has_current_attempt || !view.state.is_paused) {
 		fill_main_firmware_state_output(out_state);
 		return -EINVAL;
 	}
@@ -434,10 +433,10 @@ int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* ou
 
 void spotflow_ota_fw_main_wake_if_paused(void)
 {
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_main_firmware_view view;
 
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (snapshot.has_current_attempt && snapshot.main_firmware_state.is_paused) {
+	spotflow_ota_state_get_main_firmware_view(&view);
+	if (view.has_current_attempt && view.state.is_paused) {
 		main_firmware_wake_paused_worker();
 	}
 }
@@ -490,14 +489,14 @@ static enum spotflow_ota_result fail_main_firmware(void)
 
 static void fill_main_firmware_state_output(struct spotflow_ota_main_firmware_state* out_state)
 {
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_main_firmware_view view;
 
 	if (out_state == NULL) {
 		return;
 	}
 
-	spotflow_ota_state_get_snapshot(&snapshot);
-	*out_state = snapshot.main_firmware_state;
+	spotflow_ota_state_get_main_firmware_view(&view);
+	*out_state = view.state;
 }
 
 static void main_firmware_wake_paused_worker(void)
@@ -513,7 +512,7 @@ static void main_firmware_drain_resume_sem(void)
 
 static void wait_while_paused(bool honor_interruptions)
 {
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_main_firmware_view view;
 
 	for (;;) {
 		if (honor_interruptions &&
@@ -522,8 +521,8 @@ static void wait_while_paused(bool honor_interruptions)
 			return;
 		}
 
-		spotflow_ota_state_get_snapshot(&snapshot);
-		if (!snapshot.main_firmware_state.is_paused) {
+		spotflow_ota_state_get_main_firmware_view(&view);
+		if (!view.state.is_paused) {
 			return;
 		}
 
@@ -584,17 +583,17 @@ static int begin_main_firmware_reboot(void)
 
 static void download_started_cb(struct spotflow_downloader* downloader, void* callback_ctx)
 {
-	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_main_firmware_view view;
 
 	ARG_UNUSED(callback_ctx);
 
 	notify_main_firmware_phase(SPOTFLOW_OTA_PHASE_DOWNLOADING);
-	spotflow_ota_state_get_snapshot(&snapshot);
+	spotflow_ota_state_get_main_firmware_view(&view);
 
 	if (spotflow_ota_state_is_main_firmware_abort_requested() ||
 	    spotflow_is_update_canceled()) {
 		(void)spotflow_cancel_download(downloader);
-	} else if (snapshot.main_firmware_state.is_paused) {
+	} else if (view.state.is_paused) {
 		(void)spotflow_pause_download(downloader);
 	}
 }
@@ -658,16 +657,6 @@ static int complete_main_firmware_rollback(const struct spotflow_ota_probation* 
 
 static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation)
 {
-	struct spotflow_ota_state_snapshot snapshot;
-
-	spotflow_ota_state_get_snapshot(&snapshot);
-	if (!snapshot.has_current_attempt || snapshot.current_attempt_id != probation->attempt_id) {
-		return false;
-	}
-
-	if (probation->artifact_index >= snapshot.artifact_count) {
-		return false;
-	}
-
-	return snapshot.artifact_results[probation->artifact_index] == SPOTFLOW_OTA_RESULT_PENDING;
+	return spotflow_ota_state_is_main_artifact_pending(probation->attempt_id,
+							   probation->artifact_index);
 }

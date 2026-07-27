@@ -4,40 +4,9 @@
 #include "ota/persistence/spotflow_ota_persistence.h"
 
 #include <errno.h>
-#include <string.h>
-
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
-
-int spotflow_ota_results_build_attempt(const struct spotflow_ota_state_snapshot* snapshot,
-				       struct spotflow_ota_persisted_attempt* attempt)
-{
-	if (snapshot == NULL || attempt == NULL || !snapshot->has_current_attempt ||
-	    snapshot->current_attempt_id == 0 ||
-	    snapshot->artifact_count > CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS) {
-		return -EINVAL;
-	}
-
-	*attempt = (struct spotflow_ota_persisted_attempt){
-		.attempt_id = snapshot->current_attempt_id,
-		.artifact_count = snapshot->artifact_count,
-		.actionable_cancellation = snapshot->actionable_cancellation,
-		.has_attempt_error = snapshot->has_attempt_error,
-		.attempt_error = snapshot->attempt_error,
-	};
-	memcpy(attempt->artifact_results, snapshot->projected_artifact_results,
-	       sizeof(attempt->artifact_results));
-	return 0;
-}
-
-int spotflow_ota_results_persist_snapshot(const struct spotflow_ota_state_snapshot* snapshot)
-{
-	struct spotflow_ota_persisted_attempt attempt;
-	int rc = spotflow_ota_results_build_attempt(snapshot, &attempt);
-
-	return rc < 0 ? rc : spotflow_ota_results_persist_attempt(&attempt);
-}
 
 int spotflow_ota_results_persist_attempt(const struct spotflow_ota_persisted_attempt* attempt)
 {

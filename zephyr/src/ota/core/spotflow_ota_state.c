@@ -592,8 +592,108 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 	return false;
 }
 
-int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflow_ota_result result,
-					     spotflow_ota_state_effects* effects)
+int spotflow_ota_state_capture_persisted_attempt(const struct spotflow_ota_worker_job* job,
+						 enum spotflow_ota_persistence_view view,
+						 struct spotflow_ota_persistence_capture* capture)
+{
+	if (job == NULL || capture == NULL || job->token.attempt_id == 0 ||
+	    job->token.generation == 0 ||
+	    (view != SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE &&
+	     view != SPOTFLOW_OTA_PERSISTENCE_VIEW_STAGED_RESULT)) {
+		return -EINVAL;
+	}
+
+	memset(capture, 0, sizeof(*capture));
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!attempt_exists(&ota_state.current_attempt) ||
+	    ota_state.current_attempt.identity.id != job->token.attempt_id) {
+		k_mutex_unlock(&state_mutex);
+		return -ENOENT;
+	}
+
+	if (ota_state.current_attempt.identity.generation != job->token.generation) {
+		k_mutex_unlock(&state_mutex);
+		return -ESTALE;
+	}
+
+	bool valid = false;
+	switch (job->type) {
+	case SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT:
+		valid = ota_state.current_attempt.execution.transaction.artifact_index ==
+				job->data.process_artifact.artifact_index &&
+			((view == SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE &&
+			  ota_state.current_attempt.execution.transaction.state ==
+				  ARTIFACT_TRANSACTION_RUNNING) ||
+			 (view == SPOTFLOW_OTA_PERSISTENCE_VIEW_STAGED_RESULT &&
+			  artifact_result_commit_is_pending(&ota_state.current_attempt) &&
+			  ota_state.current_attempt.execution.transaction.mutation.source ==
+				  ARTIFACT_RESULT_SOURCE_HANDLER));
+		break;
+	case SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE:
+		valid = view == SPOTFLOW_OTA_PERSISTENCE_VIEW_STAGED_RESULT &&
+			artifact_result_commit_is_pending(&ota_state.current_attempt) &&
+			ota_state.current_attempt.execution.transaction.artifact_index ==
+				job->data.complete_main_firmware.artifact_index &&
+			ota_state.current_attempt.execution.transaction.mutation.source ==
+				ARTIFACT_RESULT_SOURCE_MAIN_RECONCILIATION;
+		break;
+	case SPOTFLOW_OTA_WORKER_JOB_REJECTED_ATTEMPT:
+		valid = view == SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE &&
+			ota_state.current_attempt.identity.lifecycle ==
+				ATTEMPT_LIFECYCLE_REJECTION_CLAIMED &&
+			ota_state.current_attempt.failure.state == ATTEMPT_FAILURE_PRESENT;
+		break;
+	case SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT:
+		valid = view == SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE &&
+			!artifact_result_commit_is_pending(&ota_state.current_attempt) &&
+			(ota_state.report_state == REPORT_STATE_CLAIMED ||
+			 ota_state.report_state == REPORT_STATE_CLAIMED_RERUN_REQUESTED);
+		break;
+	case SPOTFLOW_OTA_WORKER_JOB_FINALIZE_ATTEMPT:
+		valid = view == SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE &&
+			ota_state.current_attempt.identity.lifecycle ==
+				ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED &&
+			!artifact_result_commit_is_pending(&ota_state.current_attempt) &&
+			attempt_has_terminal_results(&ota_state.current_attempt);
+		break;
+	case SPOTFLOW_OTA_WORKER_JOB_NONE:
+	default:
+		break;
+	}
+
+	if (!valid) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
+	capture->attempt = (struct spotflow_ota_persisted_attempt){
+		.attempt_id = ota_state.current_attempt.identity.id,
+		.artifact_count = ota_state.current_attempt.plan.count,
+		.actionable_cancellation =
+			ota_state.current_attempt.execution.cancellation_requested,
+		.has_attempt_error =
+			ota_state.current_attempt.failure.state == ATTEMPT_FAILURE_PRESENT,
+		.attempt_error = ota_state.current_attempt.failure.error,
+	};
+	if (view == SPOTFLOW_OTA_PERSISTENCE_VIEW_STAGED_RESULT) {
+		project_artifact_results(&ota_state.current_attempt,
+					 capture->attempt.artifact_results);
+		capture->mutation_revision =
+			ota_state.current_attempt.execution.transaction.mutation_revision;
+	} else {
+		memcpy(capture->attempt.artifact_results, ota_state.current_attempt.plan.results,
+		       sizeof(capture->attempt.artifact_results));
+	}
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+#if defined(CONFIG_ZTEST)
+int spotflow_ota_state_test_apply_artifact_result(size_t artifact_index,
+						  enum spotflow_ota_result result,
+						  spotflow_ota_state_effects* effects)
 {
 	if (effects == NULL) {
 		LOG_ERR("effects cannot be NULL");
@@ -635,6 +735,7 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
+#endif /* CONFIG_ZTEST */
 
 int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_job* job,
 					     enum spotflow_ota_result result)
@@ -821,6 +922,44 @@ int spotflow_ota_state_complete_report_job(const struct spotflow_ota_worker_job*
 	return 0;
 }
 
+int spotflow_ota_state_get_report_plan(const struct spotflow_ota_worker_job* job,
+				       struct spotflow_ota_report_plan* plan)
+{
+	if (job == NULL || plan == NULL || job->type != SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT ||
+	    job->token.attempt_id == 0 || job->token.generation == 0) {
+		return -EINVAL;
+	}
+
+	memset(plan, 0, sizeof(*plan));
+	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	bool is_current = attempt_exists(&ota_state.current_attempt) &&
+		ota_state.current_attempt.identity.id == job->token.attempt_id;
+	if (is_current && ota_state.current_attempt.identity.generation != job->token.generation) {
+		k_mutex_unlock(&state_mutex);
+		return -ESTALE;
+	}
+
+	if (!is_current) {
+		plan->continue_worker = true;
+		k_mutex_unlock(&state_mutex);
+		return 0;
+	}
+
+	if (ota_state.report_state != REPORT_STATE_CLAIMED &&
+	    ota_state.report_state != REPORT_STATE_CLAIMED_RERUN_REQUESTED) {
+		k_mutex_unlock(&state_mutex);
+		return -ESTALE;
+	}
+
+	plan->promote_pending = ota_state.pending_attempt.kind != PENDING_ATTEMPT_NONE &&
+		attempt_is_durably_terminal(&ota_state.current_attempt);
+	plan->continue_worker = !attempt_is_durably_terminal(&ota_state.current_attempt);
+
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
 int spotflow_ota_state_queue_main_firmware_result(
 	uint64_t attempt_id, size_t artifact_index, enum spotflow_ota_result result,
 	struct spotflow_ota_main_firmware_state* out_state, spotflow_ota_state_effects* effects)
@@ -896,12 +1035,26 @@ int spotflow_ota_state_fail_worker_operation(const struct spotflow_ota_operation
 	return 0;
 }
 
-int spotflow_ota_state_promote_pending(void)
+int spotflow_ota_state_promote_pending(const struct spotflow_ota_worker_job* report_job)
 {
+	if (report_job == NULL || report_job->type != SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT ||
+	    report_job->token.attempt_id == 0 || report_job->token.generation == 0) {
+		return -EINVAL;
+	}
+
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
+	if (!attempt_exists(&ota_state.current_attempt) ||
+	    ota_state.current_attempt.identity.id != report_job->token.attempt_id ||
+	    ota_state.current_attempt.identity.generation != report_job->token.generation) {
+		k_mutex_unlock(&state_mutex);
+		return -ESTALE;
+	}
+
 	if (ota_state.pending_attempt.kind == PENDING_ATTEMPT_NONE ||
-	    !attempt_is_durably_terminal(&ota_state.current_attempt)) {
+	    !attempt_is_durably_terminal(&ota_state.current_attempt) ||
+	    (ota_state.report_state != REPORT_STATE_CLAIMED &&
+	     ota_state.report_state != REPORT_STATE_CLAIMED_RERUN_REQUESTED)) {
 		k_mutex_unlock(&state_mutex);
 		return -EAGAIN;
 	}
@@ -933,45 +1086,90 @@ bool spotflow_ota_state_is_update_canceled(void)
 	return canceled;
 }
 
-void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapshot)
+int spotflow_ota_state_validate_operation(const struct spotflow_ota_operation_token* token)
 {
-	if (snapshot == NULL) {
+	if (token == NULL || token->attempt_id == 0 || token->generation == 0) {
+		return -EINVAL;
+	}
+
+	k_mutex_lock(&state_mutex, K_FOREVER);
+	bool valid = attempt_exists(&ota_state.current_attempt) &&
+		ota_state.current_attempt.identity.id == token->attempt_id &&
+		ota_state.current_attempt.identity.generation == token->generation &&
+		ota_state.current_attempt.failure.state != ATTEMPT_FAILURE_PRESENT;
+	k_mutex_unlock(&state_mutex);
+
+	return valid ? 0 : -ESTALE;
+}
+
+int spotflow_ota_state_get_main_firmware_view(struct spotflow_ota_main_firmware_view* view)
+{
+	if (view == NULL) {
+		return -EINVAL;
+	}
+
+	memset(view, 0, sizeof(*view));
+	k_mutex_lock(&state_mutex, K_FOREVER);
+	view->has_current_attempt = attempt_exists(&ota_state.current_attempt);
+	view->attempt_id = ota_state.current_attempt.identity.id;
+	view->state = ota_state.current_attempt.main_firmware.status;
+	k_mutex_unlock(&state_mutex);
+	return 0;
+}
+
+bool spotflow_ota_state_is_main_artifact_pending(uint64_t attempt_id, size_t artifact_index)
+{
+	k_mutex_lock(&state_mutex, K_FOREVER);
+	bool pending = attempt_id != 0 && attempt_exists(&ota_state.current_attempt) &&
+		ota_state.current_attempt.identity.id == attempt_id &&
+		artifact_index < ota_state.current_attempt.plan.count &&
+		ota_state.current_attempt.plan.results[artifact_index] ==
+			SPOTFLOW_OTA_RESULT_PENDING;
+	k_mutex_unlock(&state_mutex);
+	return pending;
+}
+
+void spotflow_ota_state_get_diagnostic(struct spotflow_ota_state_diagnostic* diagnostic)
+{
+	if (diagnostic == NULL) {
 		return;
 	}
 
-	memset(snapshot, 0, sizeof(*snapshot));
+	memset(diagnostic, 0, sizeof(*diagnostic));
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
 	assert_state_locked();
 
-	snapshot->has_current_attempt = attempt_exists(&ota_state.current_attempt);
-	snapshot->current_attempt_id = ota_state.current_attempt.identity.id;
-	snapshot->current_attempt_generation = ota_state.current_attempt.identity.generation;
-	snapshot->current_attempt_terminal =
+	diagnostic->has_current_attempt = attempt_exists(&ota_state.current_attempt);
+	diagnostic->current_attempt_id = ota_state.current_attempt.identity.id;
+	diagnostic->current_attempt_generation = ota_state.current_attempt.identity.generation;
+	diagnostic->current_attempt_terminal =
 		attempt_has_projected_terminal_results(&ota_state.current_attempt);
-	snapshot->current_attempt_durable = attempt_is_durably_terminal(&ota_state.current_attempt);
-	snapshot->manifest_available =
+	diagnostic->current_attempt_durable =
+		attempt_is_durably_terminal(&ota_state.current_attempt);
+	diagnostic->manifest_available =
 		ota_state.current_attempt.plan.source == ARTIFACT_PLAN_FULL_MANIFEST;
-	snapshot->artifact_result_commit_pending =
+	diagnostic->artifact_result_commit_pending =
 		artifact_result_commit_is_pending(&ota_state.current_attempt);
-	snapshot->artifact_result_mutation_revision =
+	diagnostic->artifact_result_mutation_revision =
 		ota_state.current_attempt.execution.transaction.mutation_revision;
-	snapshot->artifact_count = ota_state.current_attempt.plan.count;
-	snapshot->current_artifact_index = ota_state.current_attempt.execution.next_index;
-	snapshot->actionable_cancellation =
+	diagnostic->artifact_count = ota_state.current_attempt.plan.count;
+	diagnostic->current_artifact_index = ota_state.current_attempt.execution.next_index;
+	diagnostic->actionable_cancellation =
 		ota_state.current_attempt.execution.cancellation_requested;
-	snapshot->has_pending_attempt = ota_state.pending_attempt.kind != PENDING_ATTEMPT_NONE;
-	snapshot->pending_attempt_id = ota_state.pending_attempt.update.attempt_id;
-	snapshot->pending_is_rejection =
+	diagnostic->has_pending_attempt = ota_state.pending_attempt.kind != PENDING_ATTEMPT_NONE;
+	diagnostic->pending_attempt_id = ota_state.pending_attempt.update.attempt_id;
+	diagnostic->pending_is_rejection =
 		ota_state.pending_attempt.kind == PENDING_ATTEMPT_REJECTION;
-	snapshot->pending_rejection_error = ota_state.pending_attempt.rejection_error;
-	snapshot->has_attempt_error =
+	diagnostic->pending_rejection_error = ota_state.pending_attempt.rejection_error;
+	diagnostic->has_attempt_error =
 		ota_state.current_attempt.failure.state == ATTEMPT_FAILURE_PRESENT;
-	snapshot->attempt_error = ota_state.current_attempt.failure.error;
-	snapshot->main_firmware_state = ota_state.current_attempt.main_firmware.status;
-	memcpy(snapshot->artifact_results, ota_state.current_attempt.plan.results,
-	       sizeof(snapshot->artifact_results));
-	project_artifact_results(&ota_state.current_attempt, snapshot->projected_artifact_results);
+	diagnostic->attempt_error = ota_state.current_attempt.failure.error;
+	diagnostic->main_firmware_state = ota_state.current_attempt.main_firmware.status;
+	memcpy(diagnostic->artifact_results, ota_state.current_attempt.plan.results,
+	       sizeof(diagnostic->artifact_results));
+	project_artifact_results(&ota_state.current_attempt,
+				 diagnostic->projected_artifact_results);
 
 	k_mutex_unlock(&state_mutex);
 }
