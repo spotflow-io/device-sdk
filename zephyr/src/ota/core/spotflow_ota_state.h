@@ -18,6 +18,7 @@ enum spotflow_ota_worker_job_type {
 	SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE,
 	SPOTFLOW_OTA_WORKER_JOB_REJECTED_ATTEMPT,
 	SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT,
+	SPOTFLOW_OTA_WORKER_JOB_FINALIZE_ATTEMPT,
 };
 
 struct spotflow_ota_operation_token {
@@ -25,14 +26,29 @@ struct spotflow_ota_operation_token {
 	uint32_t generation;
 };
 
-struct spotflow_ota_worker_job {
-	enum spotflow_ota_worker_job_type type;
-	uint64_t attempt_id;
-	uint32_t generation;
+struct spotflow_ota_process_artifact_job {
 	size_t artifact_index;
 	struct spotflow_ota_artifact artifact;
-	enum spotflow_ota_result reconciled_result;
-	enum spotflow_ota_attempt_error attempt_error;
+};
+
+struct spotflow_ota_complete_main_firmware_job {
+	size_t artifact_index;
+	struct spotflow_ota_artifact artifact;
+	enum spotflow_ota_result result;
+};
+
+struct spotflow_ota_rejected_attempt_job {
+	enum spotflow_ota_attempt_error error;
+};
+
+struct spotflow_ota_worker_job {
+	enum spotflow_ota_worker_job_type type;
+	struct spotflow_ota_operation_token token;
+	union {
+		struct spotflow_ota_process_artifact_job process_artifact;
+		struct spotflow_ota_complete_main_firmware_job complete_main_firmware;
+		struct spotflow_ota_rejected_attempt_job rejected_attempt;
+	} data;
 };
 
 enum spotflow_ota_state_effect {
@@ -94,6 +110,8 @@ struct spotflow_ota_state_snapshot {
 	bool has_current_attempt;
 	uint64_t current_attempt_id;
 	uint32_t current_attempt_generation;
+	bool current_attempt_terminal;
+	bool current_attempt_durable;
 	bool manifest_available;
 	bool artifact_result_commit_pending;
 	size_t artifact_count;

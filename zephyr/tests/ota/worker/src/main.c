@@ -507,6 +507,25 @@ ZTEST(spotflow_ota_worker, test_terminal_finalization_retries_storage_failure)
 	spotflow_ota_test_expect_update_results_payload(&expected_message);
 }
 
+ZTEST(spotflow_ota_worker, test_durable_terminal_attempt_is_not_finalized_again)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 1,
+		.artifact_count = 1,
+		.artifact_results = { SPOTFLOW_OTA_RESULT_SUCCEEDED },
+	};
+
+	zassert_ok(spotflow_ota_persistence_save_attempt(&persisted));
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, NULL, false));
+	spotflow_ota_test_settings_set_save_failure(ATTEMPT_SETTINGS_PATH);
+
+	spotflow_ota_worker_wake();
+	k_sleep(K_MSEC(100));
+
+	zassert_equal(spotflow_ota_test_settings_get_save_failure_count(), 0,
+		      "a durable terminal attempt must not be finalized after a spurious wake");
+}
+
 ZTEST(spotflow_ota_worker, test_reconciled_main_success_uses_durable_artifact_pipeline)
 {
 	const enum spotflow_ota_result expected_results[] = {

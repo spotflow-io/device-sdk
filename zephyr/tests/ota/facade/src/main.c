@@ -379,7 +379,7 @@ ZTEST(spotflow_ota_facade, test_c2d_handler_accepts_valid_update_message)
 	zassert_equal(spotflow_ota_get_last_received_attempt_id(), 1);
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
 	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT);
-	zassert_equal(job.attempt_id, 1);
+	zassert_equal(job.token.attempt_id, 1);
 }
 
 ZTEST(spotflow_ota_facade,

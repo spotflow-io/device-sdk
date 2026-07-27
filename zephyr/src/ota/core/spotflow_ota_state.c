@@ -15,6 +15,7 @@ enum attempt_lifecycle {
 	ATTEMPT_LIFECYCLE_AWAITING_MANIFEST,
 	ATTEMPT_LIFECYCLE_ACTIVE,
 	ATTEMPT_LIFECYCLE_FINALIZING,
+	ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED,
 	ATTEMPT_LIFECYCLE_TERMINAL,
 	ATTEMPT_LIFECYCLE_REJECTING,
 	ATTEMPT_LIFECYCLE_REJECTION_CLAIMED,
@@ -155,6 +156,7 @@ static bool artifact_transaction_is_active(const struct attempt_state* attempt);
 static bool artifact_result_commit_is_pending(const struct attempt_state* attempt);
 static bool main_probation_is_pending(const struct attempt_state* attempt);
 static bool main_upgrade_is_irreversible(const struct attempt_state* attempt);
+static bool attempt_is_durably_terminal(const struct attempt_state* attempt);
 static bool state_is_valid(void);
 static void assert_state_locked(void);
 static void request_report(void);
@@ -325,8 +327,7 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 		return 0;
 	}
 
-	if (attempt_has_terminal_results(&ota_state.current_attempt) &&
-	    !artifact_result_commit_is_pending(&ota_state.current_attempt)) {
+	if (attempt_is_durably_terminal(&ota_state.current_attempt)) {
 		start_attempt(msg, &ota_state.current_attempt);
 		clear_pending_attempt();
 		result->disposition = SPOTFLOW_OTA_UPDATE_STARTED;
@@ -367,8 +368,7 @@ int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_atte
 
 	if (!attempt_exists(&ota_state.current_attempt) ||
 	    ota_state.current_attempt.identity.id == attempt_id ||
-	    (attempt_has_terminal_results(&ota_state.current_attempt) &&
-	     !artifact_result_commit_is_pending(&ota_state.current_attempt))) {
+	    attempt_is_durably_terminal(&ota_state.current_attempt)) {
 		apply_immediate_rejection(attempt_id, error, result);
 		assert_state_locked();
 		k_mutex_unlock(&state_mutex);
@@ -485,9 +485,9 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 
 	if (ota_state.current_attempt.identity.lifecycle == ATTEMPT_LIFECYCLE_REJECTING) {
 		job->type = SPOTFLOW_OTA_WORKER_JOB_REJECTED_ATTEMPT;
-		job->attempt_id = ota_state.current_attempt.identity.id;
-		job->generation = ota_state.current_attempt.identity.generation;
-		job->attempt_error = ota_state.current_attempt.failure.error;
+		job->token.attempt_id = ota_state.current_attempt.identity.id;
+		job->token.generation = ota_state.current_attempt.identity.generation;
+		job->data.rejected_attempt.error = ota_state.current_attempt.failure.error;
 		ota_state.current_attempt.identity.lifecycle = ATTEMPT_LIFECYCLE_REJECTION_CLAIMED;
 		k_mutex_unlock(&state_mutex);
 		return true;
@@ -496,27 +496,45 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 	if (ota_state.current_attempt.main_firmware.probation.state ==
 	    MAIN_PROBATION_COMPLETION_QUEUED) {
 		job->type = SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE;
-		job->attempt_id = ota_state.current_attempt.identity.id;
-		job->generation = ota_state.current_attempt.identity.generation;
-		job->artifact_index = ota_state.current_attempt.main_firmware.artifact_index;
-		job->reconciled_result =
+		job->token.attempt_id = ota_state.current_attempt.identity.id;
+		job->token.generation = ota_state.current_attempt.identity.generation;
+		job->data.complete_main_firmware.artifact_index =
+			ota_state.current_attempt.main_firmware.artifact_index;
+		job->data.complete_main_firmware.result =
 			ota_state.current_attempt.main_firmware.probation.reconciled_result;
-		copy_artifact_out(&job->artifact,
+		copy_artifact_out(&job->data.complete_main_firmware.artifact,
 				  &ota_state.current_attempt.main_firmware.artifact);
 		ota_state.current_attempt.main_firmware.probation.state =
 			MAIN_PROBATION_COMPLETION_CLAIMED;
 		ota_state.current_attempt.execution.transaction.state =
 			ARTIFACT_TRANSACTION_RUNNING;
 		ota_state.current_attempt.execution.transaction.artifact_index =
-			job->artifact_index;
+			job->data.complete_main_firmware.artifact_index;
 		k_mutex_unlock(&state_mutex);
 		return true;
 	}
 
+	if (ota_state.current_attempt.identity.lifecycle == ATTEMPT_LIFECYCLE_FINALIZING &&
+	    !artifact_result_commit_is_pending(&ota_state.current_attempt)) {
+		job->type = SPOTFLOW_OTA_WORKER_JOB_FINALIZE_ATTEMPT;
+		job->token.attempt_id = ota_state.current_attempt.identity.id;
+		job->token.generation = ota_state.current_attempt.identity.generation;
+		ota_state.current_attempt.identity.lifecycle =
+			ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED;
+		k_mutex_unlock(&state_mutex);
+		return true;
+	}
+
+	if (ota_state.current_attempt.identity.lifecycle ==
+	    ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED) {
+		k_mutex_unlock(&state_mutex);
+		return false;
+	}
+
 	if (ota_state.report_state == REPORT_STATE_REQUESTED) {
 		job->type = SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT;
-		job->attempt_id = ota_state.current_attempt.identity.id;
-		job->generation = ota_state.current_attempt.identity.generation;
+		job->token.attempt_id = ota_state.current_attempt.identity.id;
+		job->token.generation = ota_state.current_attempt.identity.generation;
 		ota_state.report_state = REPORT_STATE_CLAIMED;
 		k_mutex_unlock(&state_mutex);
 		return true;
@@ -526,10 +544,11 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 		size_t index = ota_state.current_attempt.execution.next_index;
 
 		job->type = SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT;
-		job->attempt_id = ota_state.current_attempt.identity.id;
-		job->generation = ota_state.current_attempt.identity.generation;
-		job->artifact_index = index;
-		copy_artifact_out(&job->artifact, &ota_state.current_attempt.plan.artifacts[index]);
+		job->token.attempt_id = ota_state.current_attempt.identity.id;
+		job->token.generation = ota_state.current_attempt.identity.generation;
+		job->data.process_artifact.artifact_index = index;
+		copy_artifact_out(&job->data.process_artifact.artifact,
+				  &ota_state.current_attempt.plan.artifacts[index]);
 		ota_state.current_attempt.execution.transaction.state =
 			ARTIFACT_TRANSACTION_RUNNING;
 		ota_state.current_attempt.execution.transaction.artifact_index = index;
@@ -586,34 +605,38 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_job* job,
 					     enum spotflow_ota_result result)
 {
-	if (job == NULL || job->attempt_id == 0 ||
+	if (job == NULL || job->token.attempt_id == 0 ||
 	    (job->type != SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT &&
 	     job->type != SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE) ||
 	    result == SPOTFLOW_OTA_RESULT_PENDING) {
 		return -EINVAL;
 	}
 
+	size_t artifact_index = job->type == SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT
+		? job->data.process_artifact.artifact_index
+		: job->data.complete_main_firmware.artifact_index;
+
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&ota_state.current_attempt) ||
-	    ota_state.current_attempt.identity.id != job->attempt_id ||
-	    ota_state.current_attempt.identity.generation != job->generation) {
+	    ota_state.current_attempt.identity.id != job->token.attempt_id ||
+	    ota_state.current_attempt.identity.generation != job->token.generation) {
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
 
 	if (ota_state.current_attempt.execution.transaction.state != ARTIFACT_TRANSACTION_RUNNING ||
-	    ota_state.current_attempt.execution.transaction.artifact_index != job->artifact_index ||
-	    job->artifact_index >= ota_state.current_attempt.plan.count ||
-	    ota_state.current_attempt.plan.results[job->artifact_index] !=
-		    SPOTFLOW_OTA_RESULT_PENDING ||
+	    ota_state.current_attempt.execution.transaction.artifact_index != artifact_index ||
+	    artifact_index >= ota_state.current_attempt.plan.count ||
+	    ota_state.current_attempt.plan.results[artifact_index] != SPOTFLOW_OTA_RESULT_PENDING ||
 	    artifact_result_commit_is_pending(&ota_state.current_attempt)) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}
 
-	set_artifact_result(&ota_state.current_attempt, job->artifact_index, result);
-	if (job->type == SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT && job->artifact.is_main) {
+	set_artifact_result(&ota_state.current_attempt, artifact_index, result);
+	if (job->type == SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT &&
+	    job->data.process_artifact.artifact.is_main) {
 		ota_state.current_attempt.main_firmware.status.phase =
 			SPOTFLOW_OTA_PHASE_NOT_RUNNING;
 		ota_state.current_attempt.main_firmware.status.is_paused = false;
@@ -622,7 +645,7 @@ int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_jo
 		ota_state.current_attempt.main_firmware.upgrade = MAIN_UPGRADE_IDLE;
 	}
 	ota_state.current_attempt.execution.transaction.state = ARTIFACT_TRANSACTION_RESULT_STAGED;
-	ota_state.current_attempt.execution.transaction.artifact_index = job->artifact_index;
+	ota_state.current_attempt.execution.transaction.artifact_index = artifact_index;
 	refresh_attempt_lifecycle(&ota_state.current_attempt);
 
 	k_mutex_unlock(&state_mutex);
@@ -640,15 +663,19 @@ int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_j
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&ota_state.current_attempt) ||
-	    ota_state.current_attempt.identity.id != job->attempt_id ||
-	    ota_state.current_attempt.identity.generation != job->generation) {
+	    ota_state.current_attempt.identity.id != job->token.attempt_id ||
+	    ota_state.current_attempt.identity.generation != job->token.generation) {
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
 
+	size_t artifact_index = job->type == SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT
+		? job->data.process_artifact.artifact_index
+		: job->data.complete_main_firmware.artifact_index;
+
 	if (ota_state.current_attempt.execution.transaction.state !=
 		    ARTIFACT_TRANSACTION_RESULT_STAGED ||
-	    ota_state.current_attempt.execution.transaction.artifact_index != job->artifact_index) {
+	    ota_state.current_attempt.execution.transaction.artifact_index != artifact_index) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}
@@ -671,8 +698,8 @@ int spotflow_ota_state_commit_rejected_attempt(const struct spotflow_ota_worker_
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&ota_state.current_attempt) ||
-	    ota_state.current_attempt.identity.id != job->attempt_id ||
-	    ota_state.current_attempt.identity.generation != job->generation ||
+	    ota_state.current_attempt.identity.id != job->token.attempt_id ||
+	    ota_state.current_attempt.identity.generation != job->token.generation ||
 	    ota_state.current_attempt.identity.lifecycle != ATTEMPT_LIFECYCLE_REJECTION_CLAIMED) {
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
@@ -686,19 +713,25 @@ int spotflow_ota_state_commit_rejected_attempt(const struct spotflow_ota_worker_
 
 int spotflow_ota_state_commit_attempt_finalization(const struct spotflow_ota_worker_job* job)
 {
-	if (job == NULL) {
+	if (job == NULL || job->type != SPOTFLOW_OTA_WORKER_JOB_FINALIZE_ATTEMPT) {
 		return -EINVAL;
 	}
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&ota_state.current_attempt) ||
-	    ota_state.current_attempt.identity.id != job->attempt_id ||
-	    ota_state.current_attempt.identity.generation != job->generation ||
+	    ota_state.current_attempt.identity.id != job->token.attempt_id ||
+	    ota_state.current_attempt.identity.generation != job->token.generation) {
+		k_mutex_unlock(&state_mutex);
+		return -ESTALE;
+	}
+
+	if (ota_state.current_attempt.identity.lifecycle !=
+		    ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED ||
 	    artifact_result_commit_is_pending(&ota_state.current_attempt) ||
 	    !attempt_has_terminal_results(&ota_state.current_attempt)) {
 		k_mutex_unlock(&state_mutex);
-		return -ESTALE;
+		return -EINVAL;
 	}
 
 	ota_state.current_attempt.identity.lifecycle = ATTEMPT_LIFECYCLE_TERMINAL;
@@ -716,8 +749,8 @@ int spotflow_ota_state_complete_report_job(const struct spotflow_ota_worker_job*
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&ota_state.current_attempt) ||
-	    ota_state.current_attempt.identity.id != job->attempt_id ||
-	    ota_state.current_attempt.identity.generation != job->generation ||
+	    ota_state.current_attempt.identity.id != job->token.attempt_id ||
+	    ota_state.current_attempt.identity.generation != job->token.generation ||
 	    (ota_state.report_state != REPORT_STATE_CLAIMED &&
 	     ota_state.report_state != REPORT_STATE_CLAIMED_RERUN_REQUESTED)) {
 		k_mutex_unlock(&state_mutex);
@@ -814,8 +847,7 @@ int spotflow_ota_state_promote_pending(void)
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (ota_state.pending_attempt.kind == PENDING_ATTEMPT_NONE ||
-	    !attempt_has_terminal_results(&ota_state.current_attempt) ||
-	    artifact_result_commit_is_pending(&ota_state.current_attempt)) {
+	    !attempt_is_durably_terminal(&ota_state.current_attempt)) {
 		k_mutex_unlock(&state_mutex);
 		return -EAGAIN;
 	}
@@ -861,6 +893,9 @@ void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapsho
 	snapshot->has_current_attempt = attempt_exists(&ota_state.current_attempt);
 	snapshot->current_attempt_id = ota_state.current_attempt.identity.id;
 	snapshot->current_attempt_generation = ota_state.current_attempt.identity.generation;
+	snapshot->current_attempt_terminal =
+		attempt_has_terminal_results(&ota_state.current_attempt);
+	snapshot->current_attempt_durable = attempt_is_durably_terminal(&ota_state.current_attempt);
 	snapshot->manifest_available =
 		ota_state.current_attempt.plan.source == ARTIFACT_PLAN_FULL_MANIFEST;
 	snapshot->artifact_result_commit_pending =
@@ -1258,6 +1293,12 @@ static bool main_upgrade_is_irreversible(const struct attempt_state* attempt)
 		attempt->main_firmware.upgrade == MAIN_UPGRADE_REBOOT_STARTED;
 }
 
+static bool attempt_is_durably_terminal(const struct attempt_state* attempt)
+{
+	return attempt->identity.lifecycle == ATTEMPT_LIFECYCLE_TERMINAL ||
+		attempt->identity.lifecycle == ATTEMPT_LIFECYCLE_REJECTED;
+}
+
 static bool state_is_valid(void)
 {
 	if (!attempt_exists(&ota_state.current_attempt)) {
@@ -1316,6 +1357,13 @@ static bool state_is_valid(void)
 		return false;
 	}
 
+	if (ota_state.current_attempt.identity.lifecycle ==
+		    ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED &&
+	    (artifact_result_commit_is_pending(&ota_state.current_attempt) ||
+	     !attempt_has_terminal_results(&ota_state.current_attempt))) {
+		return false;
+	}
+
 	return ota_state.pending_attempt.kind == PENDING_ATTEMPT_NONE ||
 		ota_state.pending_attempt.update.attempt_id != 0;
 }
@@ -1347,7 +1395,8 @@ static void refresh_attempt_lifecycle(struct attempt_state* attempt)
 	if (!attempt_exists(attempt) ||
 	    attempt->identity.lifecycle == ATTEMPT_LIFECYCLE_REJECTING ||
 	    attempt->identity.lifecycle == ATTEMPT_LIFECYCLE_REJECTION_CLAIMED ||
-	    attempt->identity.lifecycle == ATTEMPT_LIFECYCLE_REJECTED) {
+	    attempt->identity.lifecycle == ATTEMPT_LIFECYCLE_REJECTED ||
+	    attempt->identity.lifecycle == ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED) {
 		return;
 	}
 
@@ -1528,7 +1577,9 @@ static spotflow_ota_state_effects supersede_current_for_pending(void)
 
 	ota_state.current_attempt.execution.cancellation_requested = true;
 	cancel_pending_artifacts(&ota_state.current_attempt);
-	if (attempt_has_terminal_results(&ota_state.current_attempt)) {
+	if (attempt_has_terminal_results(&ota_state.current_attempt) &&
+	    ota_state.current_attempt.identity.lifecycle !=
+		    ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED) {
 		ota_state.current_attempt.identity.lifecycle = ATTEMPT_LIFECYCLE_FINALIZING;
 	}
 	return effects | SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;

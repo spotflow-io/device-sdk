@@ -133,12 +133,12 @@ static void expect_reconciled_main_job(enum spotflow_ota_result result)
 
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
 	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE);
-	zassert_equal(job.attempt_id, 42);
-	zassert_equal(job.artifact_index, 0);
-	zassert_equal(job.reconciled_result, result);
-	zassert_true(job.artifact.is_main);
-	zassert_str_equal(job.artifact.slug, main_artifact.slug);
-	zassert_str_equal(job.artifact.version, main_artifact.version);
+	zassert_equal(job.token.attempt_id, 42);
+	zassert_equal(job.data.complete_main_firmware.artifact_index, 0);
+	zassert_equal(job.data.complete_main_firmware.result, result);
+	zassert_true(job.data.complete_main_firmware.artifact.is_main);
+	zassert_str_equal(job.data.complete_main_firmware.artifact.slug, main_artifact.slug);
+	zassert_str_equal(job.data.complete_main_firmware.artifact.version, main_artifact.version);
 	zassert_false(spotflow_ota_state_get_worker_job(&job));
 }
 

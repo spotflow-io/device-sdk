@@ -91,7 +91,9 @@ stateDiagram-v2
 
     Active --> Active: commit partial artifact result
     Active --> Finalizing: terminal results await persistence
-    Finalizing --> Terminal: persist terminal attempt
+    Finalizing --> FinalizationClaimed: worker claims finalization
+    FinalizationClaimed --> FinalizationClaimed: transient persistence failure
+    FinalizationClaimed --> Terminal: persist terminal attempt
 
     Rejecting --> RejectionClaimed: worker claims rejection
     RejectionClaimed --> Rejected: persist attempt error
@@ -187,9 +189,25 @@ reportable results always requests another report, including after rehydration.
 
 ### Worker executor
 
-The worker holds one tagged operation: rejection, artifact, report, or terminal-attempt
-finalization. Each union member has only its valid stage type; there is no shared stage
-enum that can represent, for example, an artifact operation in a report stage.
+The state selector returns one tagged job: rejection, artifact, reconciled main-firmware
+completion, report, or terminal-attempt finalization. The job carries the current attempt
+token plus only the payload valid for its kind. The worker then holds one corresponding
+tagged operation; each union member has only its valid stage type, so there is no shared
+stage enum that can represent, for example, an artifact operation in a report stage.
+
+`spotflow_ota_state_get_worker_job()` is the only source of executable worker work. It
+selects jobs in this order:
+
+1. attempt rejection;
+2. reconciled main-firmware completion;
+3. required terminal-attempt finalization;
+4. requested result report;
+5. runnable artifact.
+
+This order makes an undurable terminal attempt persist before a report for it is prepared.
+Claiming finalization changes the lifecycle to `FinalizationClaimed`; a transient storage
+failure retains that same job and token for retry. A durable `Terminal` attempt never
+produces another finalization job merely because the worker is woken again.
 
 ```mermaid
 flowchart LR
