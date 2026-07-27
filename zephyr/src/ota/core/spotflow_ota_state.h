@@ -20,6 +20,11 @@ enum spotflow_ota_worker_job_type {
 	SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT,
 };
 
+struct spotflow_ota_operation_token {
+	uint64_t attempt_id;
+	uint32_t generation;
+};
+
 struct spotflow_ota_worker_job {
 	enum spotflow_ota_worker_job_type type;
 	uint64_t attempt_id;
@@ -144,7 +149,7 @@ int spotflow_ota_state_queue_main_firmware_result(
 	uint64_t attempt_id, size_t artifact_index, enum spotflow_ota_result result,
 	struct spotflow_ota_main_firmware_state* out_state, spotflow_ota_state_effects* effects);
 
-int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id);
+int spotflow_ota_state_fail_worker_operation(const struct spotflow_ota_operation_token* token);
 
 int spotflow_ota_state_promote_pending(void);
 
@@ -185,7 +190,8 @@ int spotflow_ota_state_begin_main_firmware_reboot(void);
 
 int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index);
 
-void spotflow_ota_state_resolve_main_firmware_probation(void);
+int spotflow_ota_state_resolve_main_firmware_probation(
+	const struct spotflow_ota_operation_token* token);
 
 #ifdef __cplusplus
 }

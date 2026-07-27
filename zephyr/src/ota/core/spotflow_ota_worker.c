@@ -203,21 +203,24 @@ static void ota_worker_entry(void* arg1, void* arg2, void* arg3)
 				k_mutex_unlock(&worker_operation_mutex);
 				continue;
 			case WORKER_OUTCOME_FAIL_ATTEMPT: {
-				uint64_t attempt_id = operation.job.attempt_id;
+				const struct spotflow_ota_operation_token token = {
+					.attempt_id = operation.job.attempt_id,
+					.generation = operation.job.generation,
+				};
 
 				LOG_ERR("OTA attempt %llu failed due to a permanent worker error "
 					"at "
 					"stage %d: %d",
-					(unsigned long long)attempt_id, current_operation_stage(),
-					outcome.error);
-				int rc = spotflow_ota_state_fail_worker_operation(attempt_id);
+					(unsigned long long)token.attempt_id,
+					current_operation_stage(), outcome.error);
+				int rc = spotflow_ota_state_fail_worker_operation(&token);
 				memset(&operation, 0, sizeof(operation));
 				k_mutex_unlock(&worker_operation_mutex);
 				if (rc == 0 || rc == -ESTALE) {
 					continue;
 				}
 				LOG_ERR("Failed to recover OTA worker state for attempt %llu: %d",
-					(unsigned long long)attempt_id, rc);
+					(unsigned long long)token.attempt_id, rc);
 				break;
 			}
 			case WORKER_OUTCOME_INTERNAL_ERROR:
@@ -463,7 +466,14 @@ static struct worker_outcome process_artifact_operation(void)
 				return classify_storage_error(rc, true);
 			}
 
-			spotflow_ota_state_resolve_main_firmware_probation();
+			const struct spotflow_ota_operation_token token = {
+				.attempt_id = operation.job.attempt_id,
+				.generation = operation.job.generation,
+			};
+			rc = spotflow_ota_state_resolve_main_firmware_probation(&token);
+			if (rc < 0) {
+				return classify_state_error(&operation.job, rc);
+			}
 			advance_artifact_operation(ARTIFACT_STAGE_COMMIT_RESULT);
 			break;
 		}

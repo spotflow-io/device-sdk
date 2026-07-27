@@ -36,6 +36,15 @@ static struct spotflow_ota_update_msg make_update(uint64_t attempt_id, size_t ar
 	return msg;
 }
 
+static struct spotflow_ota_operation_token
+operation_token_from_job(const struct spotflow_ota_worker_job* job)
+{
+	return (struct spotflow_ota_operation_token){
+		.attempt_id = job->attempt_id,
+		.generation = job->generation,
+	};
+}
+
 ZTEST(spotflow_ota_state, test_rejects_artifact_slug_that_cannot_be_persisted)
 {
 	struct spotflow_ota_update_msg msg = make_update(1, 1);
@@ -164,6 +173,8 @@ ZTEST(spotflow_ota_state, test_stale_worker_job_cannot_mutate_replaced_attempt)
 
 	zassert_ok(spotflow_ota_state_accept_update(&msg, &update_result));
 	zassert_true(spotflow_ota_state_get_worker_job(&stale_job));
+	const struct spotflow_ota_operation_token stale_token =
+		operation_token_from_job(&stale_job);
 	zassert_ok(spotflow_ota_state_reject_update(msg.attempt_id,
 						    SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE,
 						    &rejection_result));
@@ -171,10 +182,60 @@ ZTEST(spotflow_ota_state, test_stale_worker_job_cannot_mutate_replaced_attempt)
 	zassert_equal(
 		spotflow_ota_state_stage_artifact_result(&stale_job, SPOTFLOW_OTA_RESULT_SUCCEEDED),
 		-ESTALE);
+	zassert_equal(spotflow_ota_state_commit_artifact_result(&stale_job), -ESTALE);
+	zassert_equal(spotflow_ota_state_fail_worker_operation(&stale_token), -ESTALE);
+
+	stale_job.type = SPOTFLOW_OTA_WORKER_JOB_REJECTED_ATTEMPT;
+	zassert_equal(spotflow_ota_state_commit_rejected_attempt(&stale_job), -ESTALE);
+	zassert_equal(spotflow_ota_state_commit_attempt_finalization(&stale_job), -ESTALE);
+
+	stale_job.type = SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT;
+	zassert_equal(spotflow_ota_state_complete_report_job(&stale_job, true), -ESTALE);
+
 	spotflow_ota_state_get_snapshot(&snapshot);
 	zassert_equal(snapshot.current_attempt_id, msg.attempt_id);
 	zassert_not_equal(snapshot.current_attempt_generation, stale_job.generation);
 	zassert_true(snapshot.has_attempt_error);
+	zassert_equal(snapshot.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
+}
+
+ZTEST(spotflow_ota_state, test_stale_main_completion_cannot_resolve_replacement_probation)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 1,
+		.artifact_count = 1,
+		.artifact_results = { SPOTFLOW_OTA_RESULT_PENDING },
+	};
+	const struct spotflow_ota_probation probation = {
+		.attempt_id = 1,
+		.artifact_index = 0,
+		.slug = "main",
+		.version = "1.0.0",
+	};
+	struct spotflow_ota_rejection_result rejection_result;
+	struct spotflow_ota_state_snapshot snapshot;
+	struct spotflow_ota_worker_job stale_job;
+	spotflow_ota_state_effects effects;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, &probation, true));
+	zassert_ok(spotflow_ota_state_queue_main_firmware_result(
+		persisted.attempt_id, probation.artifact_index, SPOTFLOW_OTA_RESULT_SUCCEEDED, NULL,
+		&effects));
+	zassert_true(spotflow_ota_state_get_worker_job(&stale_job));
+	zassert_equal(stale_job.type, SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE);
+	const struct spotflow_ota_operation_token stale_token =
+		operation_token_from_job(&stale_job);
+
+	zassert_ok(spotflow_ota_state_reject_update(persisted.attempt_id,
+						    SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE,
+						    &rejection_result));
+	zassert_equal(spotflow_ota_state_resolve_main_firmware_probation(&stale_token), -ESTALE);
+
+	spotflow_ota_state_get_snapshot(&snapshot);
+	zassert_equal(snapshot.current_attempt_id, persisted.attempt_id);
+	zassert_not_equal(snapshot.current_attempt_generation, stale_token.generation);
+	zassert_true(snapshot.has_attempt_error);
+	zassert_equal(snapshot.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE);
 }
 
 ZTEST(spotflow_ota_state, test_reject_first_attempt_with_attempt_error)

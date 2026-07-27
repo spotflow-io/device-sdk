@@ -777,16 +777,17 @@ int spotflow_ota_state_queue_main_firmware_result(
 	return 0;
 }
 
-int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id)
+int spotflow_ota_state_fail_worker_operation(const struct spotflow_ota_operation_token* token)
 {
-	if (attempt_id == 0) {
+	if (token == NULL || token->attempt_id == 0 || token->generation == 0) {
 		return -EINVAL;
 	}
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&ota_state.current_attempt) ||
-	    ota_state.current_attempt.identity.id != attempt_id) {
+	    ota_state.current_attempt.identity.id != token->attempt_id ||
+	    ota_state.current_attempt.identity.generation != token->generation) {
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
@@ -1168,12 +1169,35 @@ int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index)
 	return 0;
 }
 
-void spotflow_ota_state_resolve_main_firmware_probation(void)
+int spotflow_ota_state_resolve_main_firmware_probation(
+	const struct spotflow_ota_operation_token* token)
 {
+	if (token == NULL || token->attempt_id == 0 || token->generation == 0) {
+		return -EINVAL;
+	}
+
 	k_mutex_lock(&state_mutex, K_FOREVER);
+
+	if (!attempt_exists(&ota_state.current_attempt) ||
+	    ota_state.current_attempt.identity.id != token->attempt_id ||
+	    ota_state.current_attempt.identity.generation != token->generation) {
+		k_mutex_unlock(&state_mutex);
+		return -ESTALE;
+	}
+
+	if (ota_state.current_attempt.main_firmware.probation.state !=
+		    MAIN_PROBATION_COMPLETION_CLAIMED ||
+	    ota_state.current_attempt.execution.transaction.state !=
+		    ARTIFACT_TRANSACTION_RESULT_STAGED) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
+
 	ota_state.current_attempt.main_firmware.probation.state = MAIN_PROBATION_NONE;
 	ota_state.current_attempt.main_firmware.upgrade = MAIN_UPGRADE_IDLE;
+	assert_state_locked();
 	k_mutex_unlock(&state_mutex);
+	return 0;
 }
 
 static void clear_worker_job(struct spotflow_ota_worker_job* job)
