@@ -114,6 +114,7 @@ struct spotflow_ota_state_snapshot {
 	bool current_attempt_durable;
 	bool manifest_available;
 	bool artifact_result_commit_pending;
+	uint32_t artifact_result_mutation_revision;
 	size_t artifact_count;
 	size_t current_artifact_index;
 	bool actionable_cancellation;
@@ -124,6 +125,7 @@ struct spotflow_ota_state_snapshot {
 	bool has_attempt_error;
 	enum spotflow_ota_attempt_error attempt_error;
 	enum spotflow_ota_result artifact_results[CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS];
+	enum spotflow_ota_result projected_artifact_results[CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS];
 	struct spotflow_ota_main_firmware_state main_firmware_state;
 };
 
@@ -154,7 +156,8 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_job* job,
 					     enum spotflow_ota_result result);
 
-int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_job* job);
+int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_job* job,
+					      uint32_t mutation_revision);
 
 int spotflow_ota_state_commit_rejected_attempt(const struct spotflow_ota_worker_job* job);
 

@@ -73,6 +73,7 @@ struct worker_operation {
 		struct {
 			enum artifact_operation_stage stage;
 			enum spotflow_ota_result result;
+			bool probation_resolved;
 			struct spotflow_ota_state_snapshot persisted_snapshot;
 		} artifact;
 		struct {
@@ -113,6 +114,7 @@ static enum spotflow_ota_result run_artifact_handler(const struct spotflow_ota_w
 
 #if defined(CONFIG_ZTEST)
 void __weak spotflow_ota_worker_test_after_artifact_result_applied(void) {}
+void __weak spotflow_ota_worker_test_after_artifact_result_persisted(void) {}
 #endif /* CONFIG_ZTEST */
 
 static K_SEM_DEFINE(ota_work_sem, 0, 1);
@@ -446,8 +448,14 @@ static struct worker_outcome process_artifact_operation(void)
 			if (rc < 0) {
 				return classify_storage_error(rc, true);
 			}
+
+#if defined(CONFIG_ZTEST)
+			spotflow_ota_worker_test_after_artifact_result_persisted();
+#endif /* CONFIG_ZTEST */
+
 			advance_artifact_operation(
-				operation.job.type == SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE
+				operation.job.type == SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE &&
+						!operation.data.artifact.probation_resolved
 					? ARTIFACT_STAGE_CLEAR_PROBATION
 					: ARTIFACT_STAGE_COMMIT_RESULT);
 			break;
@@ -463,11 +471,19 @@ static struct worker_outcome process_artifact_operation(void)
 			if (rc < 0) {
 				return classify_state_error(&operation.job, rc);
 			}
+			operation.data.artifact.probation_resolved = true;
 			advance_artifact_operation(ARTIFACT_STAGE_COMMIT_RESULT);
 			break;
 		}
 		case ARTIFACT_STAGE_COMMIT_RESULT: {
-			int rc = spotflow_ota_state_commit_artifact_result(&operation.job);
+			int rc = spotflow_ota_state_commit_artifact_result(
+				&operation.job,
+				operation.data.artifact.persisted_snapshot
+					.artifact_result_mutation_revision);
+			if (rc == -EAGAIN) {
+				advance_artifact_operation(ARTIFACT_STAGE_PERSIST_RESULT);
+				break;
+			}
 			if (rc < 0) {
 				return classify_state_error(&operation.job, rc);
 			}

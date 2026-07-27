@@ -41,9 +41,23 @@ enum artifact_transaction_state {
 	ARTIFACT_TRANSACTION_RESULT_STAGED,
 };
 
+enum artifact_result_source {
+	ARTIFACT_RESULT_SOURCE_HANDLER,
+	ARTIFACT_RESULT_SOURCE_MAIN_RECONCILIATION,
+};
+
+struct artifact_result_mutation {
+	size_t artifact_index;
+	enum spotflow_ota_result result;
+	bool cancel_remaining;
+	enum artifact_result_source source;
+};
+
 struct artifact_transaction {
 	enum artifact_transaction_state state;
 	size_t artifact_index;
+	uint32_t mutation_revision;
+	struct artifact_result_mutation mutation;
 };
 
 struct artifact_plan {
@@ -180,16 +194,25 @@ static spotflow_ota_state_effects supersede_current_for_pending(void);
 static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 			      const struct spotflow_ota_artifact* source);
 static bool attempt_has_terminal_results(const struct attempt_state* attempt);
+static bool attempt_has_projected_terminal_results(const struct attempt_state* attempt);
 static bool attempt_has_reportable_results(const struct attempt_state* attempt);
 static bool attempt_has_succeeded_artifact(const struct attempt_state* attempt);
 static bool attempt_has_runnable_artifact(const struct attempt_state* attempt);
-static void set_artifact_result(struct attempt_state* attempt, size_t artifact_index,
-				enum spotflow_ota_result result);
+static void stage_result_mutation(struct attempt_state* attempt, size_t artifact_index,
+				  enum spotflow_ota_result result,
+				  enum artifact_result_source source);
+static void apply_staged_result_mutation(struct attempt_state* attempt);
+static void project_artifact_results(const struct attempt_state* attempt,
+				     enum spotflow_ota_result* results);
 static spotflow_ota_state_effects artifact_result_effects(void);
 static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase);
 static bool main_firmware_phase_allows_abort(enum spotflow_ota_phase phase);
 static void cancel_pending_artifacts(struct attempt_state* attempt);
+static void cancel_pending_results(const struct attempt_state* attempt,
+				   enum spotflow_ota_result* results);
 static void advance_current_artifact(struct attempt_state* attempt);
+static void clear_artifact_transaction(struct attempt_state* attempt);
+static void advance_artifact_mutation_revision(struct attempt_state* attempt);
 
 void spotflow_ota_state_reset(void)
 {
@@ -418,6 +441,10 @@ int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_ca
 	}
 
 	ota_state.current_attempt.execution.cancellation_requested = true;
+	if (artifact_result_commit_is_pending(&ota_state.current_attempt)) {
+		ota_state.current_attempt.execution.transaction.mutation.cancel_remaining = true;
+		advance_artifact_mutation_revision(&ota_state.current_attempt);
+	}
 	result->disposition = SPOTFLOW_OTA_CANCEL_ACCEPTED;
 	result->effects = SPOTFLOW_OTA_STATE_EFFECT_NOTIFY_CUSTOM_FIRMWARE_CANCELED |
 		SPOTFLOW_OTA_STATE_EFFECT_CANCEL_MAIN_FIRMWARE_DOWNLOAD;
@@ -514,6 +541,11 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 		return true;
 	}
 
+	if (artifact_result_commit_is_pending(&ota_state.current_attempt)) {
+		k_mutex_unlock(&state_mutex);
+		return false;
+	}
+
 	if (ota_state.current_attempt.identity.lifecycle == ATTEMPT_LIFECYCLE_FINALIZING &&
 	    !artifact_result_commit_is_pending(&ota_state.current_attempt)) {
 		job->type = SPOTFLOW_OTA_WORKER_JOB_FINALIZE_ATTEMPT;
@@ -593,7 +625,9 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 		return 0;
 	}
 
-	set_artifact_result(&ota_state.current_attempt, artifact_index, result);
+	stage_result_mutation(&ota_state.current_attempt, artifact_index, result,
+			      ARTIFACT_RESULT_SOURCE_HANDLER);
+	apply_staged_result_mutation(&ota_state.current_attempt);
 	refresh_attempt_lifecycle(&ota_state.current_attempt);
 	*effects = artifact_result_effects();
 	assert_state_locked();
@@ -634,7 +668,11 @@ int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_jo
 		return -EINVAL;
 	}
 
-	set_artifact_result(&ota_state.current_attempt, artifact_index, result);
+	enum artifact_result_source source =
+		job->type == SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE
+		? ARTIFACT_RESULT_SOURCE_MAIN_RECONCILIATION
+		: ARTIFACT_RESULT_SOURCE_HANDLER;
+	stage_result_mutation(&ota_state.current_attempt, artifact_index, result, source);
 	if (job->type == SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT &&
 	    job->data.process_artifact.artifact.is_main) {
 		ota_state.current_attempt.main_firmware.status.phase =
@@ -644,19 +682,20 @@ int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_jo
 		ota_state.current_attempt.main_firmware.abort_requested = false;
 		ota_state.current_attempt.main_firmware.upgrade = MAIN_UPGRADE_IDLE;
 	}
-	ota_state.current_attempt.execution.transaction.state = ARTIFACT_TRANSACTION_RESULT_STAGED;
-	ota_state.current_attempt.execution.transaction.artifact_index = artifact_index;
 	refresh_attempt_lifecycle(&ota_state.current_attempt);
+	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
 
-int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_job* job)
+int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_job* job,
+					      uint32_t mutation_revision)
 {
 	if (job == NULL ||
 	    (job->type != SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT &&
-	     job->type != SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE)) {
+	     job->type != SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE) ||
+	    mutation_revision == 0) {
 		return -EINVAL;
 	}
 
@@ -672,15 +711,30 @@ int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_j
 	size_t artifact_index = job->type == SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT
 		? job->data.process_artifact.artifact_index
 		: job->data.complete_main_firmware.artifact_index;
+	enum artifact_result_source expected_source =
+		job->type == SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE
+		? ARTIFACT_RESULT_SOURCE_MAIN_RECONCILIATION
+		: ARTIFACT_RESULT_SOURCE_HANDLER;
 
 	if (ota_state.current_attempt.execution.transaction.state !=
 		    ARTIFACT_TRANSACTION_RESULT_STAGED ||
-	    ota_state.current_attempt.execution.transaction.artifact_index != artifact_index) {
+	    ota_state.current_attempt.execution.transaction.artifact_index != artifact_index ||
+	    ota_state.current_attempt.execution.transaction.mutation.artifact_index !=
+		    artifact_index ||
+	    ota_state.current_attempt.execution.transaction.mutation.source != expected_source ||
+	    (expected_source == ARTIFACT_RESULT_SOURCE_MAIN_RECONCILIATION &&
+	     ota_state.current_attempt.main_firmware.probation.state != MAIN_PROBATION_NONE)) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}
 
-	ota_state.current_attempt.execution.transaction.state = ARTIFACT_TRANSACTION_IDLE;
+	if (ota_state.current_attempt.execution.transaction.mutation_revision !=
+	    mutation_revision) {
+		k_mutex_unlock(&state_mutex);
+		return -EAGAIN;
+	}
+
+	apply_staged_result_mutation(&ota_state.current_attempt);
 	refresh_attempt_lifecycle(&ota_state.current_attempt);
 	request_report();
 	assert_state_locked();
@@ -825,7 +879,7 @@ int spotflow_ota_state_fail_worker_operation(const struct spotflow_ota_operation
 		return -ESTALE;
 	}
 
-	ota_state.current_attempt.execution.transaction.state = ARTIFACT_TRANSACTION_IDLE;
+	clear_artifact_transaction(&ota_state.current_attempt);
 	ota_state.current_attempt.execution.sequence_policy = ARTIFACT_SEQUENCE_STOP_REMAINING;
 	ota_state.current_attempt.failure.state = ATTEMPT_FAILURE_PRESENT;
 	ota_state.current_attempt.failure.error = SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR;
@@ -894,12 +948,14 @@ void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapsho
 	snapshot->current_attempt_id = ota_state.current_attempt.identity.id;
 	snapshot->current_attempt_generation = ota_state.current_attempt.identity.generation;
 	snapshot->current_attempt_terminal =
-		attempt_has_terminal_results(&ota_state.current_attempt);
+		attempt_has_projected_terminal_results(&ota_state.current_attempt);
 	snapshot->current_attempt_durable = attempt_is_durably_terminal(&ota_state.current_attempt);
 	snapshot->manifest_available =
 		ota_state.current_attempt.plan.source == ARTIFACT_PLAN_FULL_MANIFEST;
 	snapshot->artifact_result_commit_pending =
 		artifact_result_commit_is_pending(&ota_state.current_attempt);
+	snapshot->artifact_result_mutation_revision =
+		ota_state.current_attempt.execution.transaction.mutation_revision;
 	snapshot->artifact_count = ota_state.current_attempt.plan.count;
 	snapshot->current_artifact_index = ota_state.current_attempt.execution.next_index;
 	snapshot->actionable_cancellation =
@@ -915,6 +971,7 @@ void spotflow_ota_state_get_snapshot(struct spotflow_ota_state_snapshot* snapsho
 	snapshot->main_firmware_state = ota_state.current_attempt.main_firmware.status;
 	memcpy(snapshot->artifact_results, ota_state.current_attempt.plan.results,
 	       sizeof(snapshot->artifact_results));
+	project_artifact_results(&ota_state.current_attempt, snapshot->projected_artifact_results);
 
 	k_mutex_unlock(&state_mutex);
 }
@@ -1032,7 +1089,7 @@ int spotflow_ota_state_finish_main_firmware_prereboot(void)
 		return -EINVAL;
 	}
 
-	ota_state.current_attempt.execution.transaction.state = ARTIFACT_TRANSACTION_IDLE;
+	clear_artifact_transaction(&ota_state.current_attempt);
 	ota_state.current_attempt.main_firmware.probation.state = MAIN_PROBATION_PENDING;
 	ota_state.current_attempt.main_firmware.upgrade = MAIN_UPGRADE_REBOOT_READY;
 	assert_state_locked();
@@ -1223,7 +1280,11 @@ int spotflow_ota_state_resolve_main_firmware_probation(
 	if (ota_state.current_attempt.main_firmware.probation.state !=
 		    MAIN_PROBATION_COMPLETION_CLAIMED ||
 	    ota_state.current_attempt.execution.transaction.state !=
-		    ARTIFACT_TRANSACTION_RESULT_STAGED) {
+		    ARTIFACT_TRANSACTION_RESULT_STAGED ||
+	    ota_state.current_attempt.execution.transaction.mutation.source !=
+		    ARTIFACT_RESULT_SOURCE_MAIN_RECONCILIATION ||
+	    ota_state.current_attempt.execution.transaction.mutation.artifact_index !=
+		    ota_state.current_attempt.main_firmware.artifact_index) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}
@@ -1336,11 +1397,26 @@ static bool state_is_valid(void)
 		return false;
 	}
 
-	if (artifact_result_commit_is_pending(&ota_state.current_attempt) &&
-	    ota_state.current_attempt.plan.results[ota_state.current_attempt.execution.transaction
-							   .artifact_index] ==
-		    SPOTFLOW_OTA_RESULT_PENDING) {
-		return false;
+	if (artifact_result_commit_is_pending(&ota_state.current_attempt)) {
+		const struct artifact_transaction* transaction =
+			&ota_state.current_attempt.execution.transaction;
+
+		if (transaction->artifact_index != transaction->mutation.artifact_index ||
+		    transaction->mutation_revision == 0 ||
+		    transaction->mutation.result == SPOTFLOW_OTA_RESULT_PENDING ||
+		    ota_state.current_attempt.plan.results[transaction->artifact_index] !=
+			    SPOTFLOW_OTA_RESULT_PENDING ||
+		    (transaction->mutation.source != ARTIFACT_RESULT_SOURCE_HANDLER &&
+		     transaction->mutation.source != ARTIFACT_RESULT_SOURCE_MAIN_RECONCILIATION)) {
+			return false;
+		}
+
+		if (transaction->mutation.source == ARTIFACT_RESULT_SOURCE_MAIN_RECONCILIATION &&
+		    (ota_state.current_attempt.main_firmware.presence != MAIN_FIRMWARE_PRESENT ||
+		     ota_state.current_attempt.main_firmware.artifact_index !=
+			     transaction->artifact_index)) {
+			return false;
+		}
 	}
 
 	if (main_probation_is_pending(&ota_state.current_attempt) &&
@@ -1403,7 +1479,7 @@ static void refresh_attempt_lifecycle(struct attempt_state* attempt)
 	if (attempt->failure.state == ATTEMPT_FAILURE_PRESENT) {
 		attempt->identity.lifecycle = ATTEMPT_LIFECYCLE_REJECTED;
 	} else if (artifact_result_commit_is_pending(attempt)) {
-		attempt->identity.lifecycle = attempt_has_terminal_results(attempt)
+		attempt->identity.lifecycle = attempt_has_projected_terminal_results(attempt)
 			? ATTEMPT_LIFECYCLE_FINALIZING
 			: ATTEMPT_LIFECYCLE_ACTIVE;
 	} else if (attempt_has_terminal_results(attempt)) {
@@ -1576,7 +1652,12 @@ static spotflow_ota_state_effects supersede_current_for_pending(void)
 	}
 
 	ota_state.current_attempt.execution.cancellation_requested = true;
-	cancel_pending_artifacts(&ota_state.current_attempt);
+	if (artifact_result_commit_is_pending(&ota_state.current_attempt)) {
+		ota_state.current_attempt.execution.transaction.mutation.cancel_remaining = true;
+		advance_artifact_mutation_revision(&ota_state.current_attempt);
+	} else {
+		cancel_pending_artifacts(&ota_state.current_attempt);
+	}
 	if (attempt_has_terminal_results(&ota_state.current_attempt) &&
 	    ota_state.current_attempt.identity.lifecycle !=
 		    ATTEMPT_LIFECYCLE_FINALIZATION_CLAIMED) {
@@ -1607,6 +1688,24 @@ static bool attempt_has_terminal_results(const struct attempt_state* attempt)
 
 	for (size_t i = 0; i < attempt->plan.count; i++) {
 		if (attempt->plan.results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+static bool attempt_has_projected_terminal_results(const struct attempt_state* attempt)
+{
+	enum spotflow_ota_result results[CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS];
+
+	project_artifact_results(attempt, results);
+	if (attempt->plan.count == 0) {
+		return attempt->failure.state == ATTEMPT_FAILURE_PRESENT;
+	}
+
+	for (size_t i = 0; i < attempt->plan.count; i++) {
+		if (results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
 			return false;
 		}
 	}
@@ -1654,24 +1753,57 @@ static bool attempt_has_runnable_artifact(const struct attempt_state* attempt)
 		attempt->plan.results[attempt->execution.next_index] == SPOTFLOW_OTA_RESULT_PENDING;
 }
 
-static void set_artifact_result(struct attempt_state* attempt, size_t artifact_index,
-				enum spotflow_ota_result result)
+static void stage_result_mutation(struct attempt_state* attempt, size_t artifact_index,
+				  enum spotflow_ota_result result,
+				  enum artifact_result_source source)
 {
-	attempt->plan.results[artifact_index] = result;
-	attempt->execution.transaction.state = ARTIFACT_TRANSACTION_IDLE;
+	bool stop_remaining = result == SPOTFLOW_OTA_RESULT_FAILED ||
+		result == SPOTFLOW_OTA_RESULT_CANCELED ||
+		attempt->execution.sequence_policy == ARTIFACT_SEQUENCE_STOP_REMAINING;
 
-	if (attempt->execution.cancellation_requested && result == SPOTFLOW_OTA_RESULT_SUCCEEDED) {
+	if (attempt->execution.cancellation_requested && result == SPOTFLOW_OTA_RESULT_SUCCEEDED &&
+	    !stop_remaining) {
 		attempt->execution.cancellation_requested = false;
 	}
 
-	if (result == SPOTFLOW_OTA_RESULT_FAILED || result == SPOTFLOW_OTA_RESULT_CANCELED) {
+	attempt->execution.transaction.state = ARTIFACT_TRANSACTION_RESULT_STAGED;
+	attempt->execution.transaction.artifact_index = artifact_index;
+	attempt->execution.transaction.mutation_revision = 1;
+	attempt->execution.transaction.mutation = (struct artifact_result_mutation){
+		.artifact_index = artifact_index,
+		.result = result,
+		.cancel_remaining = stop_remaining || attempt->execution.cancellation_requested,
+		.source = source,
+	};
+}
+
+static void apply_staged_result_mutation(struct attempt_state* attempt)
+{
+	const struct artifact_result_mutation mutation = attempt->execution.transaction.mutation;
+
+	attempt->plan.results[mutation.artifact_index] = mutation.result;
+	if (mutation.cancel_remaining) {
 		attempt->execution.sequence_policy = ARTIFACT_SEQUENCE_STOP_REMAINING;
-		cancel_pending_artifacts(attempt);
-	} else if (attempt->execution.cancellation_requested) {
-		cancel_pending_artifacts(attempt);
+		cancel_pending_results(attempt, attempt->plan.results);
 	}
 
+	clear_artifact_transaction(attempt);
 	advance_current_artifact(attempt);
+}
+
+static void project_artifact_results(const struct attempt_state* attempt,
+				     enum spotflow_ota_result* results)
+{
+	memcpy(results, attempt->plan.results, sizeof(attempt->plan.results));
+	if (!artifact_result_commit_is_pending(attempt)) {
+		return;
+	}
+
+	results[attempt->execution.transaction.mutation.artifact_index] =
+		attempt->execution.transaction.mutation.result;
+	if (attempt->execution.transaction.mutation.cancel_remaining) {
+		cancel_pending_results(attempt, results);
+	}
 }
 
 static spotflow_ota_state_effects artifact_result_effects(void)
@@ -1709,6 +1841,13 @@ static bool main_firmware_phase_allows_abort(enum spotflow_ota_phase phase)
 
 static void cancel_pending_artifacts(struct attempt_state* attempt)
 {
+	cancel_pending_results(attempt, attempt->plan.results);
+	advance_current_artifact(attempt);
+}
+
+static void cancel_pending_results(const struct attempt_state* attempt,
+				   enum spotflow_ota_result* results)
+{
 	for (size_t i = 0; i < attempt->plan.count; i++) {
 		if (artifact_transaction_is_active(attempt) &&
 		    i == attempt->execution.transaction.artifact_index) {
@@ -1719,12 +1858,10 @@ static void cancel_pending_artifacts(struct attempt_state* attempt)
 			continue;
 		}
 
-		if (attempt->plan.results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
-			attempt->plan.results[i] = SPOTFLOW_OTA_RESULT_CANCELED;
+		if (results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
+			results[i] = SPOTFLOW_OTA_RESULT_CANCELED;
 		}
 	}
-
-	advance_current_artifact(attempt);
 }
 
 static void advance_current_artifact(struct attempt_state* attempt)
@@ -1737,6 +1874,20 @@ static void advance_current_artifact(struct attempt_state* attempt)
 	}
 
 	attempt->execution.next_index = attempt->plan.count;
+}
+
+static void clear_artifact_transaction(struct attempt_state* attempt)
+{
+	memset(&attempt->execution.transaction, 0, sizeof(attempt->execution.transaction));
+	attempt->execution.transaction.state = ARTIFACT_TRANSACTION_IDLE;
+}
+
+static void advance_artifact_mutation_revision(struct attempt_state* attempt)
+{
+	attempt->execution.transaction.mutation_revision++;
+	if (attempt->execution.transaction.mutation_revision == 0) {
+		attempt->execution.transaction.mutation_revision++;
+	}
 }
 
 static void

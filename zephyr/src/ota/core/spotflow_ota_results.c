@@ -26,7 +26,7 @@ int spotflow_ota_results_build_attempt(const struct spotflow_ota_state_snapshot*
 		.has_attempt_error = snapshot->has_attempt_error,
 		.attempt_error = snapshot->attempt_error,
 	};
-	memcpy(attempt->artifact_results, snapshot->artifact_results,
+	memcpy(attempt->artifact_results, snapshot->projected_artifact_results,
 	       sizeof(attempt->artifact_results));
 	return 0;
 }

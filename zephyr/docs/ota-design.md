@@ -58,7 +58,7 @@ Each attempt substructure has an explicit validity rule:
 |---|---|
 | `identity` | The ID and generation are nonzero whenever lifecycle is not `Empty`. |
 | `artifact plan` | `source` states which other fields can be trusted; `results[0..count)` are valid for every source except `NONE`, while descriptors are valid only for `FULL_MANIFEST`. |
-| `artifact execution` | `transaction.artifact_index` is valid only in `Running` or `ResultStaged`; `next_index` identifies the first pending result or equals `count`. |
+| `artifact execution` | `transaction.artifact_index` is valid only in `Running` or `ResultStaged`; the mutation and its revision are valid only in `ResultStaged`; `next_index` identifies the first pending durable result or equals `count`. |
 | `attempt failure` | `error` is meaningful only when failure state is `PRESENT`. |
 | `main-firmware context` | Artifact identity and index are meaningful only when presence is `PRESENT`; the reconciled result is meaningful only while probation completion is queued or claimed. |
 
@@ -123,17 +123,31 @@ stateDiagram-v2
     Idle --> Running: worker claims artifact
     Running --> ResultStaged: handler returns terminal result
     Running --> Idle: main firmware enters reboot probation
-    ResultStaged --> ResultStaged: transient persistence failure
-    ResultStaged --> Idle: persist and commit result
+    ResultStaged --> ResultStaged: transient persistence failure / cancellation merge
+    ResultStaged --> ResultStaged: revision changed; persist newer projection
+    ResultStaged --> Idle: persisted revision matches; commit mutation
 
     Idle --> Running: worker claims reconciled main result
 ```
 
 Only one artifact transaction exists. It contains its artifact index, and every worker
-transition validates the attempt ID, generation, and index. `ResultStaged` means the
-in-memory result snapshot is protected from attempt replacement until it is persisted and
-committed. A failure or cancellation also stages the cancellation of all remaining
-artifacts as part of the same persisted attempt snapshot.
+transition validates the attempt ID, generation, and index. The artifact plan's
+`results[]` array is the authoritative durable in-memory view and remains unchanged in
+`ResultStaged`. Instead, the transaction owns a mutation containing the prospective
+result, whether remaining artifacts must be canceled, and whether the result came from a
+handler or main-firmware reconciliation.
+
+Persistence is built from a projected copy: durable results with the staged mutation
+overlaid. Commit applies the mutation to the durable array only after that projection has
+been saved. A report job cannot be claimed while a mutation is staged, so reporting never
+interprets a projected result as already committed.
+
+Each mutation has a revision. Cancellation or supersession arriving after staging keeps
+the handler result, sets `cancel_remaining`, and advances the revision. If the revision
+changes after the worker saves a projection but before state commit, the worker captures
+and saves the newer projection before trying commit again. This closes the persistence-
+to-commit race without invoking the artifact handler again. Main-firmware probation can
+be resolved only for a mutation whose source is main reconciliation.
 
 ### Main-firmware upgrade and probation
 
@@ -226,8 +240,9 @@ flowchart LR
 Artifact operations share the durable tail for delegated and main firmware:
 
 ```text
-stage result → save installed version on success → persist attempt
-             → clear probation when applicable → commit result → request report
+stage mutation → save installed version on success → persist projected attempt
+               → clear probation when applicable → validate mutation revision
+               → commit mutation → request report
 ```
 
 ## Module map
