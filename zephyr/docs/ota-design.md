@@ -11,6 +11,14 @@ The worker receives a job containing the attempt ID and an in-memory generation.
 must still match when the worker stages or commits a result, which prevents a delayed job
 from changing a replacement attempt even if an attempt ID is reused.
 
+State commands return operation-specific dispositions rather than a shared set of boolean
+flags. For example, an update result is exactly one of `STARTED`, `REHYDRATED`,
+`DUPLICATE`, or `QUEUED`, while a cancellation result is exactly one of `NOT_CURRENT`,
+`ACCEPTED`, or `IGNORED_LATE`. Orthogonal work outside the state lock is returned
+separately as explicit effects: wake the worker, notify delegated firmware about a
+cancellation, or cancel the automatic main-firmware download. The facade performs those
+effects after the transition returns.
+
 ### Attempt lifecycle
 
 ```mermaid

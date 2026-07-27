@@ -30,19 +30,59 @@ struct spotflow_ota_worker_job {
 	enum spotflow_ota_attempt_error attempt_error;
 };
 
-struct spotflow_ota_state_action {
-	bool wake_worker;
-	bool accepted_update;
-	bool rehydrated_update;
-	bool ignored_duplicate_update;
-	bool accepted_cancel;
-	bool ignored_late_cancel;
-	bool rejected_attempt;
-	bool report_requested;
-	bool superseded_current;
-	bool can_promote_pending;
-	bool promoted_pending;
-	uint64_t attempt_id;
+enum spotflow_ota_state_effect {
+	SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER = 1U << 0,
+	SPOTFLOW_OTA_STATE_EFFECT_NOTIFY_CUSTOM_FIRMWARE_CANCELED = 1U << 1,
+	SPOTFLOW_OTA_STATE_EFFECT_CANCEL_MAIN_FIRMWARE_DOWNLOAD = 1U << 2,
+};
+
+typedef uint32_t spotflow_ota_state_effects;
+
+enum spotflow_ota_update_disposition {
+	SPOTFLOW_OTA_UPDATE_STARTED,
+	SPOTFLOW_OTA_UPDATE_REHYDRATED,
+	SPOTFLOW_OTA_UPDATE_DUPLICATE,
+	SPOTFLOW_OTA_UPDATE_QUEUED,
+};
+
+struct spotflow_ota_update_result {
+	enum spotflow_ota_update_disposition disposition;
+	spotflow_ota_state_effects effects;
+	uint64_t current_attempt_id;
+	uint64_t pending_attempt_id;
+};
+
+enum spotflow_ota_rejection_disposition {
+	SPOTFLOW_OTA_REJECTION_STARTED,
+	SPOTFLOW_OTA_REJECTION_QUEUED,
+};
+
+struct spotflow_ota_rejection_result {
+	enum spotflow_ota_rejection_disposition disposition;
+	spotflow_ota_state_effects effects;
+	uint64_t current_attempt_id;
+	uint64_t pending_attempt_id;
+};
+
+enum spotflow_ota_cancel_disposition {
+	SPOTFLOW_OTA_CANCEL_NOT_CURRENT,
+	SPOTFLOW_OTA_CANCEL_ACCEPTED,
+	SPOTFLOW_OTA_CANCEL_IGNORED_LATE,
+};
+
+struct spotflow_ota_cancel_result {
+	enum spotflow_ota_cancel_disposition disposition;
+	spotflow_ota_state_effects effects;
+};
+
+enum spotflow_ota_report_disposition {
+	SPOTFLOW_OTA_REPORT_NOT_CURRENT,
+	SPOTFLOW_OTA_REPORT_REQUESTED,
+};
+
+struct spotflow_ota_report_result {
+	enum spotflow_ota_report_disposition disposition;
+	spotflow_ota_state_effects effects;
 };
 
 struct spotflow_ota_state_snapshot {
@@ -72,26 +112,26 @@ int spotflow_ota_state_init_from_persistence(const struct spotflow_ota_persisted
 					     bool has_probation);
 
 int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
-				     struct spotflow_ota_state_action* action);
+				     struct spotflow_ota_update_result* result);
 
 int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
-				     struct spotflow_ota_state_action* action);
+				     struct spotflow_ota_rejection_result* result);
 
-int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_state_action* action);
+int spotflow_ota_state_accept_cancel(uint64_t attempt_id,
+				     struct spotflow_ota_cancel_result* result);
 
 int spotflow_ota_state_accept_report_request(uint64_t attempt_id,
-					     struct spotflow_ota_state_action* action);
+					     struct spotflow_ota_report_result* result);
 
 bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job);
 
 int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflow_ota_result result,
-					     struct spotflow_ota_state_action* action);
+					     spotflow_ota_state_effects* effects);
 
 int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_job* job,
 					     enum spotflow_ota_result result);
 
-int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_job* job,
-					      struct spotflow_ota_state_action* action);
+int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_job* job);
 
 int spotflow_ota_state_commit_rejected_attempt(const struct spotflow_ota_worker_job* job);
 
@@ -102,13 +142,11 @@ int spotflow_ota_state_complete_report_job(const struct spotflow_ota_worker_job*
 
 int spotflow_ota_state_queue_main_firmware_result(
 	uint64_t attempt_id, size_t artifact_index, enum spotflow_ota_result result,
-	struct spotflow_ota_main_firmware_state* out_state,
-	struct spotflow_ota_state_action* action);
+	struct spotflow_ota_main_firmware_state* out_state, spotflow_ota_state_effects* effects);
 
-int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id,
-					     struct spotflow_ota_state_action* action);
+int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id);
 
-int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action);
+int spotflow_ota_state_promote_pending(void);
 
 bool spotflow_ota_state_is_update_canceled(void);
 
@@ -126,7 +164,7 @@ int spotflow_ota_state_store_main_firmware_artifact(uint64_t attempt_id, size_t 
 int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* info,
 					      struct spotflow_download_request* request_out);
 
-int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_action* action);
+int spotflow_ota_state_finish_main_firmware_prereboot(void);
 
 int spotflow_ota_state_enter_main_firmware_unconfirmed(
 	struct spotflow_ota_main_firmware_state* out_state);

@@ -100,7 +100,7 @@ static void before_each(void* fixture)
 
 ZTEST(spotflow_ota_public_api, test_get_main_firmware_update_info_request_outlives_call)
 {
-	struct spotflow_ota_state_action action;
+	struct spotflow_ota_update_result result;
 	struct spotflow_ota_update_msg update = {
 		.attempt_id = 42,
 		.artifact_count = 1,
@@ -117,7 +117,7 @@ ZTEST(spotflow_ota_public_api, test_get_main_firmware_update_info_request_outliv
 
 	update.artifacts[0] = main_artifact;
 
-	zassert_ok(spotflow_ota_state_accept_update(&update, &action));
+	zassert_ok(spotflow_ota_state_accept_update(&update, &result));
 	zassert_ok(spotflow_ota_state_store_main_firmware_artifact(42, 0, &main_artifact));
 
 	zassert_ok(spotflow_get_main_firmware_update_info(&info, &request));

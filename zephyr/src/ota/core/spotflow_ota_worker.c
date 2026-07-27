@@ -204,15 +204,13 @@ static void ota_worker_entry(void* arg1, void* arg2, void* arg3)
 				continue;
 			case WORKER_OUTCOME_FAIL_ATTEMPT: {
 				uint64_t attempt_id = operation.job.attempt_id;
-				struct spotflow_ota_state_action action;
 
 				LOG_ERR("OTA attempt %llu failed due to a permanent worker error "
 					"at "
 					"stage %d: %d",
 					(unsigned long long)attempt_id, current_operation_stage(),
 					outcome.error);
-				int rc = spotflow_ota_state_fail_worker_operation(attempt_id,
-										  &action);
+				int rc = spotflow_ota_state_fail_worker_operation(attempt_id);
 				memset(&operation, 0, sizeof(operation));
 				k_mutex_unlock(&worker_operation_mutex);
 				if (rc == 0 || rc == -ESTALE) {
@@ -470,8 +468,7 @@ static struct worker_outcome process_artifact_operation(void)
 			break;
 		}
 		case ARTIFACT_STAGE_COMMIT_RESULT: {
-			struct spotflow_ota_state_action action;
-			int rc = spotflow_ota_state_commit_artifact_result(&operation.job, &action);
+			int rc = spotflow_ota_state_commit_artifact_result(&operation.job);
 			if (rc < 0) {
 				return classify_state_error(&operation.job, rc);
 			}
@@ -580,8 +577,7 @@ static struct worker_outcome process_report_operation(void)
 			return complete_operation();
 		}
 		case REPORT_STAGE_PROMOTE: {
-			struct spotflow_ota_state_action action;
-			int rc = spotflow_ota_state_promote_pending(&action);
+			int rc = spotflow_ota_state_promote_pending();
 			if (rc == 0) {
 				spotflow_ota_net_discard_pending();
 				operation.continue_worker = true;

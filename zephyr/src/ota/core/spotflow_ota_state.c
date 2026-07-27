@@ -102,7 +102,6 @@ static struct pending_attempt_state pending_attempt;
 static uint32_t next_attempt_generation;
 static K_MUTEX_DEFINE(state_mutex);
 
-static void clear_action(struct spotflow_ota_state_action* action);
 static void clear_worker_job(struct spotflow_ota_worker_job* job);
 static void clear_attempt(struct attempt_state* attempt);
 static uint32_t allocate_attempt_generation(void);
@@ -122,15 +121,15 @@ static bool validate_artifact(const struct spotflow_ota_artifact* artifact);
 static void start_attempt(const struct spotflow_ota_update_msg* msg, struct attempt_state* attempt);
 static int rehydrate_attempt(const struct spotflow_ota_update_msg* msg,
 			     struct attempt_state* attempt,
-			     struct spotflow_ota_state_action* action);
+			     struct spotflow_ota_update_result* result);
 static void start_rejected_attempt(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
 				   struct attempt_state* attempt);
 static void clear_pending_attempt(void);
 static void store_pending_manifest(const struct spotflow_ota_update_msg* msg);
 static void store_pending_rejection(uint64_t attempt_id, enum spotflow_ota_attempt_error error);
 static void apply_immediate_rejection(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
-				      struct spotflow_ota_state_action* action);
-static void supersede_current_for_pending(struct spotflow_ota_state_action* action);
+				      struct spotflow_ota_rejection_result* result);
+static spotflow_ota_state_effects supersede_current_for_pending(void);
 static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 			      const struct spotflow_ota_artifact* source);
 static bool attempt_has_terminal_results(const struct attempt_state* attempt);
@@ -139,12 +138,11 @@ static bool attempt_has_succeeded_artifact(const struct attempt_state* attempt);
 static bool attempt_has_runnable_artifact(const struct attempt_state* attempt);
 static void set_artifact_result(struct attempt_state* attempt, size_t artifact_index,
 				enum spotflow_ota_result result);
-static void fill_artifact_result_action(struct spotflow_ota_state_action* action);
+static spotflow_ota_state_effects artifact_result_effects(void);
 static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase);
 static bool main_firmware_phase_allows_abort(enum spotflow_ota_phase phase);
 static void cancel_pending_artifacts(struct attempt_state* attempt);
 static void advance_current_artifact(struct attempt_state* attempt);
-static void fill_action(struct spotflow_ota_state_action* action, uint64_t attempt_id);
 
 void spotflow_ota_state_reset(void)
 {
@@ -219,14 +217,14 @@ int spotflow_ota_state_init_from_persistence(const struct spotflow_ota_persisted
 }
 
 int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
-				     struct spotflow_ota_state_action* action)
+				     struct spotflow_ota_update_result* result)
 {
-	if (action == NULL) {
-		LOG_ERR("action cannot be NULL");
+	if (result == NULL) {
+		LOG_ERR("result cannot be NULL");
 		return -EINVAL;
 	}
 
-	clear_action(action);
+	memset(result, 0, sizeof(*result));
 
 	int rc = validate_update_msg(msg);
 	if (rc < 0) {
@@ -239,9 +237,10 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 	if (!attempt_exists(&current_attempt)) {
 		start_attempt(msg, &current_attempt);
 		clear_pending_attempt();
-		fill_action(action, msg->attempt_id);
-		action->accepted_update = true;
-		action->wake_worker = true;
+		result->disposition = SPOTFLOW_OTA_UPDATE_STARTED;
+		result->effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+		result->current_attempt_id = msg->attempt_id;
+		assert_state_locked();
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
@@ -250,19 +249,19 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 		if (current_attempt.manifest == MANIFEST_UNAVAILABLE &&
 		    !current_attempt.has_attempt_error &&
 		    !attempt_has_terminal_results(&current_attempt)) {
-			int rc = rehydrate_attempt(msg, &current_attempt, action);
+			int rc = rehydrate_attempt(msg, &current_attempt, result);
 
 			k_mutex_unlock(&state_mutex);
 			return rc;
 		}
 
-		fill_action(action, msg->attempt_id);
-		action->ignored_duplicate_update = true;
+		result->disposition = SPOTFLOW_OTA_UPDATE_DUPLICATE;
+		result->current_attempt_id = msg->attempt_id;
 		if (attempt_has_reportable_results(&current_attempt)) {
-			action->report_requested = true;
 			request_report(&current_attempt);
-			action->wake_worker = true;
+			result->effects |= SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
 		}
+		assert_state_locked();
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
@@ -271,29 +270,34 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 	    !artifact_result_commit_is_pending(&current_attempt)) {
 		start_attempt(msg, &current_attempt);
 		clear_pending_attempt();
-		fill_action(action, msg->attempt_id);
-		action->accepted_update = true;
-		action->wake_worker = true;
+		result->disposition = SPOTFLOW_OTA_UPDATE_STARTED;
+		result->effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+		result->current_attempt_id = msg->attempt_id;
+		assert_state_locked();
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
 
 	store_pending_manifest(msg);
-	supersede_current_for_pending(action);
+	result->disposition = SPOTFLOW_OTA_UPDATE_QUEUED;
+	result->effects = supersede_current_for_pending();
+	result->current_attempt_id = current_attempt.attempt_id;
+	result->pending_attempt_id = msg->attempt_id;
+	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
 
 int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
-				     struct spotflow_ota_state_action* action)
+				     struct spotflow_ota_rejection_result* result)
 {
-	if (action == NULL) {
-		LOG_ERR("action cannot be NULL");
+	if (result == NULL) {
+		LOG_ERR("result cannot be NULL");
 		return -EINVAL;
 	}
 
-	clear_action(action);
+	memset(result, 0, sizeof(*result));
 
 	if (attempt_id == 0) {
 		LOG_ERR("attempt_id cannot be 0");
@@ -305,26 +309,32 @@ int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_atte
 	if (!attempt_exists(&current_attempt) || current_attempt.attempt_id == attempt_id ||
 	    (attempt_has_terminal_results(&current_attempt) &&
 	     !artifact_result_commit_is_pending(&current_attempt))) {
-		apply_immediate_rejection(attempt_id, error, action);
+		apply_immediate_rejection(attempt_id, error, result);
+		assert_state_locked();
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
 
 	store_pending_rejection(attempt_id, error);
-	supersede_current_for_pending(action);
+	result->disposition = SPOTFLOW_OTA_REJECTION_QUEUED;
+	result->effects = supersede_current_for_pending();
+	result->current_attempt_id = current_attempt.attempt_id;
+	result->pending_attempt_id = attempt_id;
+	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
 
-int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_state_action* action)
+int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_cancel_result* result)
 {
-	if (action == NULL) {
-		LOG_ERR("action cannot be NULL");
+	if (result == NULL) {
+		LOG_ERR("result cannot be NULL");
 		return -EINVAL;
 	}
 
-	clear_action(action);
+	memset(result, 0, sizeof(*result));
+	result->disposition = SPOTFLOW_OTA_CANCEL_NOT_CURRENT;
 
 	if (attempt_id == 0) {
 		LOG_ERR("attempt_id cannot be 0");
@@ -338,19 +348,21 @@ int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_st
 		return 0;
 	}
 
-	fill_action(action, attempt_id);
-
 	if (attempt_has_terminal_results(&current_attempt) ||
 	    attempt_has_succeeded_artifact(&current_attempt) ||
 	    main_upgrade_is_irreversible(&current_attempt)) {
-		action->ignored_late_cancel = true;
+		result->disposition = SPOTFLOW_OTA_CANCEL_IGNORED_LATE;
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
 
 	current_attempt.actionable_cancellation = true;
-	action->accepted_cancel = true;
-	action->wake_worker = !artifact_transaction_is_active(&current_attempt);
+	result->disposition = SPOTFLOW_OTA_CANCEL_ACCEPTED;
+	result->effects = SPOTFLOW_OTA_STATE_EFFECT_NOTIFY_CUSTOM_FIRMWARE_CANCELED |
+		SPOTFLOW_OTA_STATE_EFFECT_CANCEL_MAIN_FIRMWARE_DOWNLOAD;
+	if (!artifact_transaction_is_active(&current_attempt)) {
+		result->effects |= SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+	}
 
 	if (!artifact_transaction_is_active(&current_attempt)) {
 		cancel_pending_artifacts(&current_attempt);
@@ -359,22 +371,21 @@ int spotflow_ota_state_accept_cancel(uint64_t attempt_id, struct spotflow_ota_st
 		}
 	}
 
-	action->can_promote_pending = pending_attempt.kind != PENDING_ATTEMPT_NONE &&
-		attempt_has_terminal_results(&current_attempt);
-
+	assert_state_locked();
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
 
 int spotflow_ota_state_accept_report_request(uint64_t attempt_id,
-					     struct spotflow_ota_state_action* action)
+					     struct spotflow_ota_report_result* result)
 {
-	if (action == NULL) {
-		LOG_ERR("action cannot be NULL");
+	if (result == NULL) {
+		LOG_ERR("result cannot be NULL");
 		return -EINVAL;
 	}
 
-	clear_action(action);
+	memset(result, 0, sizeof(*result));
+	result->disposition = SPOTFLOW_OTA_REPORT_NOT_CURRENT;
 
 	if (attempt_id == 0) {
 		LOG_ERR("attempt_id cannot be 0");
@@ -384,10 +395,10 @@ int spotflow_ota_state_accept_report_request(uint64_t attempt_id,
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (attempt_exists(&current_attempt) && current_attempt.attempt_id == attempt_id) {
-		fill_action(action, attempt_id);
-		action->report_requested = true;
+		result->disposition = SPOTFLOW_OTA_REPORT_REQUESTED;
+		result->effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
 		request_report(&current_attempt);
-		action->wake_worker = true;
+		assert_state_locked();
 	}
 
 	k_mutex_unlock(&state_mutex);
@@ -462,14 +473,14 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 }
 
 int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflow_ota_result result,
-					     struct spotflow_ota_state_action* action)
+					     spotflow_ota_state_effects* effects)
 {
-	if (action == NULL) {
-		LOG_ERR("action cannot be NULL");
+	if (effects == NULL) {
+		LOG_ERR("effects cannot be NULL");
 		return -EINVAL;
 	}
 
-	clear_action(action);
+	*effects = 0;
 
 	if (result == SPOTFLOW_OTA_RESULT_PENDING) {
 		LOG_ERR("result cannot be SPOTFLOW_OTA_RESULT_PENDING");
@@ -490,16 +501,14 @@ int spotflow_ota_state_apply_artifact_result(size_t artifact_index, enum spotflo
 	}
 
 	if (current_attempt.results[artifact_index] != SPOTFLOW_OTA_RESULT_PENDING) {
-		fill_action(action, current_attempt.attempt_id);
-		action->can_promote_pending = pending_attempt.kind != PENDING_ATTEMPT_NONE &&
-			attempt_has_terminal_results(&current_attempt);
 		k_mutex_unlock(&state_mutex);
 		return 0;
 	}
 
 	set_artifact_result(&current_attempt, artifact_index, result);
 	refresh_attempt_lifecycle(&current_attempt);
-	fill_artifact_result_action(action);
+	*effects = artifact_result_effects();
+	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -548,16 +557,14 @@ int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_jo
 	return 0;
 }
 
-int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_job* job,
-					      struct spotflow_ota_state_action* action)
+int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_job* job)
 {
-	if (job == NULL || action == NULL ||
+	if (job == NULL ||
 	    (job->type != SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT &&
 	     job->type != SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE)) {
 		return -EINVAL;
 	}
 
-	clear_action(action);
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&current_attempt) || current_attempt.attempt_id != job->attempt_id ||
@@ -575,7 +582,7 @@ int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_j
 	current_attempt.artifact_transaction.state = ARTIFACT_TRANSACTION_IDLE;
 	refresh_attempt_lifecycle(&current_attempt);
 	request_report(&current_attempt);
-	fill_artifact_result_action(action);
+	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -652,16 +659,15 @@ int spotflow_ota_state_complete_report_job(const struct spotflow_ota_worker_job*
 
 int spotflow_ota_state_queue_main_firmware_result(
 	uint64_t attempt_id, size_t artifact_index, enum spotflow_ota_result result,
-	struct spotflow_ota_main_firmware_state* out_state,
-	struct spotflow_ota_state_action* action)
+	struct spotflow_ota_main_firmware_state* out_state, spotflow_ota_state_effects* effects)
 {
 	if (attempt_id == 0 ||
 	    (result != SPOTFLOW_OTA_RESULT_SUCCEEDED && result != SPOTFLOW_OTA_RESULT_FAILED) ||
-	    action == NULL) {
+	    effects == NULL) {
 		return -EINVAL;
 	}
 
-	clear_action(action);
+	*effects = 0;
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&current_attempt) || current_attempt.attempt_id != attempt_id ||
@@ -687,20 +693,18 @@ int spotflow_ota_state_queue_main_firmware_result(
 		*out_state = current_attempt.main_firmware_state;
 	}
 
-	fill_action(action, attempt_id);
-	action->wake_worker = true;
+	*effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+	assert_state_locked();
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
 
-int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id,
-					     struct spotflow_ota_state_action* action)
+int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id)
 {
-	if (attempt_id == 0 || action == NULL) {
+	if (attempt_id == 0) {
 		return -EINVAL;
 	}
 
-	clear_action(action);
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&current_attempt) || current_attempt.attempt_id != attempt_id) {
@@ -719,22 +723,14 @@ int spotflow_ota_state_fail_worker_operation(uint64_t attempt_id,
 	current_attempt.main_firmware_abort_requested = false;
 	current_attempt.main_upgrade_state = MAIN_UPGRADE_IDLE;
 	current_attempt.lifecycle = ATTEMPT_LIFECYCLE_REJECTING;
-	fill_action(action, attempt_id);
-	action->wake_worker = true;
+	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
 
-int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action)
+int spotflow_ota_state_promote_pending(void)
 {
-	if (action == NULL) {
-		LOG_ERR("action cannot be NULL");
-		return -EINVAL;
-	}
-
-	clear_action(action);
-
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (pending_attempt.kind == PENDING_ATTEMPT_NONE ||
@@ -752,9 +748,7 @@ int spotflow_ota_state_promote_pending(struct spotflow_ota_state_action* action)
 	}
 
 	clear_pending_attempt();
-	fill_action(action, current_attempt.attempt_id);
-	action->promoted_pending = true;
-	action->wake_worker = true;
+	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -905,10 +899,8 @@ int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* inf
 	return 0;
 }
 
-int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_action* action)
+int spotflow_ota_state_finish_main_firmware_prereboot(void)
 {
-	clear_action(action);
-
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!attempt_exists(&current_attempt) ||
@@ -920,7 +912,7 @@ int spotflow_ota_state_finish_main_firmware_prereboot(struct spotflow_ota_state_
 	current_attempt.artifact_transaction.state = ARTIFACT_TRANSACTION_IDLE;
 	current_attempt.main_probation_state = MAIN_PROBATION_PENDING;
 	current_attempt.main_upgrade_state = MAIN_UPGRADE_REBOOT_READY;
-	fill_action(action, current_attempt.attempt_id);
+	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -1090,13 +1082,6 @@ void spotflow_ota_state_resolve_main_firmware_probation(void)
 	current_attempt.main_probation_state = MAIN_PROBATION_NONE;
 	current_attempt.main_upgrade_state = MAIN_UPGRADE_IDLE;
 	k_mutex_unlock(&state_mutex);
-}
-
-static void clear_action(struct spotflow_ota_state_action* action)
-{
-	if (action != NULL) {
-		memset(action, 0, sizeof(*action));
-	}
 }
 
 static void clear_worker_job(struct spotflow_ota_worker_job* job)
@@ -1297,7 +1282,7 @@ static void start_attempt(const struct spotflow_ota_update_msg* msg, struct atte
 
 static int rehydrate_attempt(const struct spotflow_ota_update_msg* msg,
 			     struct attempt_state* attempt,
-			     struct spotflow_ota_state_action* action)
+			     struct spotflow_ota_update_result* result)
 {
 	if (attempt->artifact_count_known &&
 	    attempt->update.artifact_count != msg->artifact_count) {
@@ -1313,10 +1298,9 @@ static int rehydrate_attempt(const struct spotflow_ota_update_msg* msg,
 	attempt->artifact_count_known = true;
 	advance_current_artifact(attempt);
 
-	fill_action(action, msg->attempt_id);
-	action->rehydrated_update = true;
-	action->report_requested = attempt_has_reportable_results(attempt);
-	if (action->report_requested) {
+	result->disposition = SPOTFLOW_OTA_UPDATE_REHYDRATED;
+	result->current_attempt_id = msg->attempt_id;
+	if (attempt_has_reportable_results(attempt)) {
 		request_report(attempt);
 	}
 
@@ -1325,9 +1309,11 @@ static int rehydrate_attempt(const struct spotflow_ota_update_msg* msg,
 		cancel_pending_artifacts(attempt);
 	}
 
-	action->wake_worker =
-		attempt_has_terminal_results(attempt) || attempt_has_runnable_artifact(attempt);
+	if (attempt_has_terminal_results(attempt) || attempt_has_runnable_artifact(attempt)) {
+		result->effects |= SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+	}
 	refresh_attempt_lifecycle(attempt);
+	assert_state_locked();
 	return 0;
 }
 
@@ -1365,21 +1351,22 @@ static void store_pending_rejection(uint64_t attempt_id, enum spotflow_ota_attem
 }
 
 static void apply_immediate_rejection(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
-				      struct spotflow_ota_state_action* action)
+				      struct spotflow_ota_rejection_result* result)
 {
 	start_rejected_attempt(attempt_id, error, &current_attempt);
 	clear_pending_attempt();
-	fill_action(action, attempt_id);
-	action->rejected_attempt = true;
-	action->wake_worker = true;
+	result->disposition = SPOTFLOW_OTA_REJECTION_STARTED;
+	result->effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+	result->current_attempt_id = attempt_id;
 }
 
-static void supersede_current_for_pending(struct spotflow_ota_state_action* action)
+static spotflow_ota_state_effects supersede_current_for_pending(void)
 {
+	spotflow_ota_state_effects effects =
+		SPOTFLOW_OTA_STATE_EFFECT_CANCEL_MAIN_FIRMWARE_DOWNLOAD;
+
 	if (main_upgrade_is_irreversible(&current_attempt)) {
-		fill_action(action, current_attempt.attempt_id);
-		action->superseded_current = true;
-		return;
+		return effects;
 	}
 
 	current_attempt.actionable_cancellation = true;
@@ -1387,10 +1374,7 @@ static void supersede_current_for_pending(struct spotflow_ota_state_action* acti
 	if (attempt_has_terminal_results(&current_attempt)) {
 		current_attempt.lifecycle = ATTEMPT_LIFECYCLE_FINALIZING;
 	}
-	fill_action(action, current_attempt.attempt_id);
-	action->superseded_current = true;
-	action->wake_worker = true;
-	action->can_promote_pending = attempt_has_terminal_results(&current_attempt);
+	return effects | SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
 }
 
 static void copy_artifact_out(struct spotflow_ota_artifact* destination,
@@ -1481,14 +1465,12 @@ static void set_artifact_result(struct attempt_state* attempt, size_t artifact_i
 	advance_current_artifact(attempt);
 }
 
-static void fill_artifact_result_action(struct spotflow_ota_state_action* action)
+static spotflow_ota_state_effects artifact_result_effects(void)
 {
-	fill_action(action, current_attempt.attempt_id);
-	action->wake_worker = !attempt_has_terminal_results(&current_attempt) &&
-		attempt_has_runnable_artifact(&current_attempt);
-	action->can_promote_pending = pending_attempt.kind != PENDING_ATTEMPT_NONE &&
-		attempt_has_terminal_results(&current_attempt) &&
-		!artifact_result_commit_is_pending(&current_attempt);
+	return !attempt_has_terminal_results(&current_attempt) &&
+			attempt_has_runnable_artifact(&current_attempt)
+		? SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER
+		: 0;
 }
 
 static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase)
@@ -1546,14 +1528,6 @@ static void advance_current_artifact(struct attempt_state* attempt)
 	}
 
 	attempt->current_artifact_index = attempt->update.artifact_count;
-}
-
-static void fill_action(struct spotflow_ota_state_action* action, uint64_t attempt_id)
-{
-	assert_state_locked();
-	if (action != NULL) {
-		action->attempt_id = attempt_id;
-	}
 }
 
 static void

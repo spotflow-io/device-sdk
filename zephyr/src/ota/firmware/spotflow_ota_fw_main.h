@@ -19,18 +19,16 @@ spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index
 				      const struct spotflow_ota_artifact* artifact);
 
 int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* probation,
-					   bool has_probation,
-					   struct spotflow_ota_state_action* action);
+					   bool has_probation, spotflow_ota_state_effects* effects);
 
 int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* out_state,
-				       struct spotflow_ota_state_action* action);
+				       spotflow_ota_state_effects* effects);
 
 int spotflow_ota_fw_main_pause_update(struct spotflow_ota_main_firmware_state* out_state);
 
 int spotflow_ota_fw_main_resume_update(struct spotflow_ota_main_firmware_state* out_state);
 
-int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* out_state,
-				     struct spotflow_ota_state_action* action);
+int spotflow_ota_fw_main_fail_update(struct spotflow_ota_main_firmware_state* out_state);
 
 void spotflow_ota_fw_main_wake_if_paused(void);
 

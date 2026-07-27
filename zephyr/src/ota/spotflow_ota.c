@@ -32,7 +32,7 @@ static uint64_t last_received_attempt_id;
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len);
 static void update_last_received_attempt_id(uint64_t attempt_id);
 static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* msg);
-static void handle_state_action(const struct spotflow_ota_state_action* action);
+static void handle_state_effects(spotflow_ota_state_effects effects);
 
 int spotflow_ota_init(void)
 {
@@ -84,17 +84,17 @@ int spotflow_ota_init(void)
 
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	{
-		struct spotflow_ota_state_action action;
+		spotflow_ota_state_effects effects;
 
 		rc = spotflow_ota_fw_main_reconcile_startup(has_probation ? &probation : NULL,
-							    has_probation, &action);
+							    has_probation, &effects);
 		if (rc < 0) {
 			LOG_ERR("Failed to reconcile main firmware state at startup: %d", rc);
 			k_mutex_unlock(&ota_mutex);
 			return rc;
 		}
 
-		handle_state_action(&action);
+		handle_state_effects(effects);
 	}
 #endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 
@@ -250,7 +250,6 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
 	LOG_ERR("Main firmware auto-handling is not enabled");
 	return -ENOTSUP;
 #else
-	struct spotflow_ota_state_action action;
 	int rc;
 
 	rc = spotflow_ota_init();
@@ -258,12 +257,11 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
 		return rc;
 	}
 
-	rc = spotflow_ota_fw_main_fail_update(state, &action);
+	rc = spotflow_ota_fw_main_fail_update(state);
 	if (rc < 0) {
 		return rc;
 	}
 
-	handle_state_action(&action);
 	return 0;
 #endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 }
@@ -278,7 +276,7 @@ int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state
 	LOG_ERR("Main firmware auto-handling is not enabled");
 	return -ENOTSUP;
 #else
-	struct spotflow_ota_state_action action;
+	spotflow_ota_state_effects effects;
 	int rc;
 
 	rc = spotflow_ota_init();
@@ -287,12 +285,12 @@ int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state
 		return rc;
 	}
 
-	rc = spotflow_ota_fw_main_confirm_image(state, &action);
+	rc = spotflow_ota_fw_main_confirm_image(state, &effects);
 	if (rc < 0) {
 		return rc;
 	}
 
-	handle_state_action(&action);
+	handle_state_effects(effects);
 	return 0;
 #endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 }
@@ -309,17 +307,17 @@ static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 
 	if (rc < 0) {
 		if (status.has_trustworthy_attempt_id && status.has_attempt_error) {
-			struct spotflow_ota_state_action action;
+			struct spotflow_ota_rejection_result result;
 
 			rc = spotflow_ota_state_reject_update(status.attempt_id,
-							      status.attempt_error, &action);
+							      status.attempt_error, &result);
 			if (rc < 0) {
 				LOG_ERR("Failed to reject OTA attempt %llu: %d",
 					(unsigned long long)status.attempt_id, rc);
 				return;
 			}
 
-			handle_state_action(&action);
+			handle_state_effects(result.effects);
 		}
 
 		return;
@@ -343,79 +341,84 @@ static void update_last_received_attempt_id(uint64_t attempt_id)
 
 static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* msg)
 {
-	struct spotflow_ota_state_action action;
-	struct spotflow_ota_state_snapshot snapshot;
-	int rc;
-
 	switch (msg->type) {
-	case SPOTFLOW_OTA_CBOR_MSG_UPDATE_ARTIFACTS:
-		rc = spotflow_ota_state_accept_update(&msg->payload.update, &action);
-		break;
-	case SPOTFLOW_OTA_CBOR_MSG_CANCEL_UPDATE:
-		rc = spotflow_ota_state_accept_cancel(msg->attempt_id, &action);
-		break;
-	case SPOTFLOW_OTA_CBOR_MSG_REPORT_UPDATE_RESULTS:
-		rc = spotflow_ota_state_accept_report_request(msg->attempt_id, &action);
-		break;
-	default:
-		return -EINVAL;
-	}
+	case SPOTFLOW_OTA_CBOR_MSG_UPDATE_ARTIFACTS: {
+		struct spotflow_ota_update_result result;
+		int rc = spotflow_ota_state_accept_update(&msg->payload.update, &result);
+		if (rc < 0) {
+			return rc;
+		}
 
-	if (rc < 0) {
-		return rc;
-	}
-
-	if (msg->type == SPOTFLOW_OTA_CBOR_MSG_UPDATE_ARTIFACTS) {
-		if (action.accepted_update) {
+		switch (result.disposition) {
+		case SPOTFLOW_OTA_UPDATE_STARTED:
 			LOG_INF("OTA attempt %llu accepted (%zu artifacts)",
 				(unsigned long long)msg->payload.update.attempt_id,
 				msg->payload.update.artifact_count);
-		} else if (action.rehydrated_update) {
+			break;
+		case SPOTFLOW_OTA_UPDATE_REHYDRATED:
 			LOG_INF("OTA attempt %llu restored from persisted results (%zu artifacts)",
 				(unsigned long long)msg->payload.update.attempt_id,
 				msg->payload.update.artifact_count);
-		} else if (action.ignored_duplicate_update) {
+			break;
+		case SPOTFLOW_OTA_UPDATE_DUPLICATE:
 			LOG_INF("Ignoring duplicate UPDATE_ARTIFACTS for OTA attempt %llu",
 				(unsigned long long)msg->payload.update.attempt_id);
-		} else if (action.superseded_current) {
-			spotflow_ota_state_get_snapshot(&snapshot);
+			break;
+		case SPOTFLOW_OTA_UPDATE_QUEUED:
 			LOG_DBG("OTA attempt %llu superseded; pending attempt %llu",
-				(unsigned long long)snapshot.current_attempt_id,
-				(unsigned long long)snapshot.pending_attempt_id);
+				(unsigned long long)result.current_attempt_id,
+				(unsigned long long)result.pending_attempt_id);
+			break;
 		}
-	} else if (msg->type == SPOTFLOW_OTA_CBOR_MSG_CANCEL_UPDATE) {
-		if (action.accepted_cancel) {
+
+		handle_state_effects(result.effects);
+		return 0;
+	}
+	case SPOTFLOW_OTA_CBOR_MSG_CANCEL_UPDATE: {
+		struct spotflow_ota_cancel_result result;
+		int rc = spotflow_ota_state_accept_cancel(msg->attempt_id, &result);
+		if (rc < 0) {
+			return rc;
+		}
+
+		if (result.disposition == SPOTFLOW_OTA_CANCEL_ACCEPTED) {
 			LOG_INF("OTA attempt %llu canceled", (unsigned long long)msg->attempt_id);
-		} else if (action.ignored_late_cancel) {
+		} else if (result.disposition == SPOTFLOW_OTA_CANCEL_IGNORED_LATE) {
 			LOG_DBG("Ignoring late CANCEL_UPDATE for OTA attempt %llu",
 				(unsigned long long)msg->attempt_id);
 		}
-	}
 
-	handle_state_action(&action);
-	return 0;
+		handle_state_effects(result.effects);
+		return 0;
+	}
+	case SPOTFLOW_OTA_CBOR_MSG_REPORT_UPDATE_RESULTS: {
+		struct spotflow_ota_report_result result;
+		int rc = spotflow_ota_state_accept_report_request(msg->attempt_id, &result);
+		if (rc < 0) {
+			return rc;
+		}
+
+		handle_state_effects(result.effects);
+		return 0;
+	}
+	default:
+		return -EINVAL;
+	}
 }
 
-static void handle_state_action(const struct spotflow_ota_state_action* action)
+static void handle_state_effects(spotflow_ota_state_effects effects)
 {
-	if (action == NULL) {
-		return;
-	}
-
-	if (action->accepted_cancel) {
+	if ((effects & SPOTFLOW_OTA_STATE_EFFECT_NOTIFY_CUSTOM_FIRMWARE_CANCELED) != 0) {
 		spotflow_ota_fw_custom_notify_canceled();
-#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-		spotflow_ota_fw_main_cancel_active_download();
-#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 	}
 
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-	if (action->superseded_current) {
+	if ((effects & SPOTFLOW_OTA_STATE_EFFECT_CANCEL_MAIN_FIRMWARE_DOWNLOAD) != 0) {
 		spotflow_ota_fw_main_cancel_active_download();
 	}
 #endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 
-	if (action->wake_worker) {
+	if ((effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER) != 0) {
 		spotflow_ota_worker_wake();
 	}
 }
