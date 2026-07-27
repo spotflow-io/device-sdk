@@ -19,6 +19,64 @@ separately as explicit effects: wake the worker, notify delegated firmware about
 cancellation, or cancel the automatic main-firmware download. The facade performs those
 effects after the transition returns.
 
+### In-memory state aggregate
+
+The mutex-protected store separates attempt-owned state from scheduler-owned state:
+
+```mermaid
+flowchart TD
+    store["ota_state_store"]
+    current["current_attempt"]
+    pending["pending_attempt"]
+    report["report_state"]
+    generation["next_attempt_generation"]
+    identity["identity\nID, generation, lifecycle"]
+    plan["artifact plan\nsource, count, descriptors, results"]
+    execution["artifact execution\nnext index, transaction,\ncancellation, sequence policy"]
+    failure["attempt failure\npresence, error"]
+    main["main-firmware context\npresence, artifact, status,\nupgrade, probation"]
+
+    store --> current
+    store --> pending
+    store --> report
+    store --> generation
+    current --> identity
+    current --> plan
+    current --> execution
+    current --> failure
+    current --> main
+```
+
+`pending_attempt` and `report_state` are deliberately not members of
+`current_attempt`. They schedule replacement and report work for the store as a whole.
+Starting or promoting an attempt resets the report scheduler, so a claimed report for an
+old generation cannot become an obligation of the replacement attempt.
+
+Each attempt substructure has an explicit validity rule:
+
+| Context | When its fields are meaningful |
+|---|---|
+| `identity` | The ID and generation are nonzero whenever lifecycle is not `Empty`. |
+| `artifact plan` | `source` states which other fields can be trusted; `results[0..count)` are valid for every source except `NONE`, while descriptors are valid only for `FULL_MANIFEST`. |
+| `artifact execution` | `transaction.artifact_index` is valid only in `Running` or `ResultStaged`; `next_index` identifies the first pending result or equals `count`. |
+| `attempt failure` | `error` is meaningful only when failure state is `PRESENT`. |
+| `main-firmware context` | Artifact identity and index are meaningful only when presence is `PRESENT`; the reconciled result is meaningful only while probation completion is queued or claimed. |
+
+The artifact plan source replaces ambiguous combinations such as “manifest unavailable,
+but artifact count known”:
+
+| Plan source | Count semantics | Descriptors | Typical origin |
+|---|---|---|---|
+| `NONE` | No artifact plan | Unavailable | Empty or whole-attempt rejection |
+| `PROBATION_PREFIX` | Minimum known prefix ending at the main artifact | Main artifact identity comes from probation only | Probation exists but the attempt-results record does not |
+| `PERSISTED_RESULTS` | Exact artifact count | Unavailable | Attempt results restored after reboot |
+| `FULL_MANIFEST` | Exact artifact count | Available | `UPDATE_ARTIFACTS` received in this boot |
+
+When a full manifest rehydrates a `PROBATION_PREFIX`, it may extend the prefix but cannot
+contain fewer artifacts than the probation index requires. When it rehydrates
+`PERSISTED_RESULTS`, its artifact count must match exactly. These checks make it explicit
+that probation alone cannot reconstruct the full manifest.
+
 ### Attempt lifecycle
 
 ```mermaid
