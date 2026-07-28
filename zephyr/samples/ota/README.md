@@ -135,4 +135,4 @@ for automatic main-firmware handling.
 - Implement `spotflow_on_handle_firmware_update()` if your manifests include non-main
   artifacts.
 - SDK contributors: see
-  [OTA implementation design note](../../docs/ota-design.md) for internal architecture.
+  [OTA implementation design note](../../docs/ota.md) for internal architecture.

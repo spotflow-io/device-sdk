@@ -225,7 +225,7 @@ More details:
 
 - [Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr) — integrator guide for the OTA device module
 - [OTA sample](zephyr/samples/ota) — end-to-end sample with MCUboot sysbuild
-- [OTA implementation design notes](zephyr/docs/ota-design.md) — design and implementation summary for SDK contributors
+- [OTA implementation design notes](zephyr/docs/ota.md) — design and implementation summary for SDK contributors
 
 ### Build ID
 
