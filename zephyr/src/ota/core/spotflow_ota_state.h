@@ -215,21 +215,33 @@ bool spotflow_ota_state_is_main_artifact_pending(uint64_t attempt_id, size_t art
 
 void spotflow_ota_state_get_diagnostic(struct spotflow_ota_state_diagnostic* diagnostic);
 
-int spotflow_ota_state_set_main_firmware_phase(enum spotflow_ota_phase phase,
-					       struct spotflow_ota_main_firmware_state* out_state);
+int spotflow_ota_state_claim_main_firmware(const struct spotflow_ota_worker_job* job,
+					   struct spotflow_ota_main_firmware_state* out_state);
 
-int spotflow_ota_state_set_main_firmware_result(enum spotflow_ota_result result,
-						struct spotflow_ota_main_firmware_state* out_state);
+int spotflow_ota_state_main_firmware_download_pending(
+	const struct spotflow_ota_operation_token* token,
+	struct spotflow_ota_main_firmware_state* out_state);
 
-int spotflow_ota_state_store_main_firmware_artifact(uint64_t attempt_id, size_t artifact_index,
-						    const struct spotflow_ota_artifact* artifact);
+int spotflow_ota_state_main_firmware_download_started(
+	const struct spotflow_ota_operation_token* token,
+	struct spotflow_ota_main_firmware_state* out_state);
+
+int spotflow_ota_state_main_firmware_download_completed(
+	const struct spotflow_ota_operation_token* token,
+	struct spotflow_ota_main_firmware_state* out_state);
+
+int spotflow_ota_state_fail_main_firmware(const struct spotflow_ota_operation_token* token,
+					  struct spotflow_ota_main_firmware_state* out_state);
 
 int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* info,
 					      struct spotflow_download_request* request_out);
 
-int spotflow_ota_state_finish_main_firmware_prereboot(void);
+int spotflow_ota_state_finish_main_firmware_prereboot(
+	const struct spotflow_ota_operation_token* token,
+	struct spotflow_ota_main_firmware_state* out_state);
 
 int spotflow_ota_state_enter_main_firmware_unconfirmed(
+	uint64_t attempt_id, size_t artifact_index,
 	struct spotflow_ota_main_firmware_state* out_state);
 
 int spotflow_ota_state_set_main_firmware_paused(bool paused,
@@ -240,15 +252,15 @@ int spotflow_ota_state_request_main_firmware_abort(
 
 bool spotflow_ota_state_is_main_firmware_abort_requested(void);
 
-int spotflow_ota_state_begin_main_firmware_upgrade_commit(void);
+int spotflow_ota_state_begin_main_firmware_upgrade_commit(
+	const struct spotflow_ota_operation_token* token);
 
-void spotflow_ota_state_cancel_main_firmware_upgrade_commit(void);
+int spotflow_ota_state_cancel_main_firmware_upgrade_commit(
+	const struct spotflow_ota_operation_token* token);
 
-int spotflow_ota_state_begin_main_firmware_reboot(void);
+int spotflow_ota_state_begin_main_firmware_reboot(const struct spotflow_ota_operation_token* token);
 
-int spotflow_ota_state_get_main_firmware_artifact_index(size_t* artifact_index);
-
-int spotflow_ota_state_resolve_main_firmware_probation(
+int spotflow_ota_state_commit_main_firmware_probation_cleared(
 	const struct spotflow_ota_operation_token* token);
 
 #ifdef __cplusplus

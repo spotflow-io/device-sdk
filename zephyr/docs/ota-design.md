@@ -81,6 +81,10 @@ that probation alone cannot reconstruct the full manifest.
 
 ```mermaid
 stateDiagram-v2
+    state "NOT_RUNNING" as NotRunning
+    state "NOT_RUNNING / FAILED" as Failed
+    state "reconciled result queued" as ReconciledResultQueued
+
     [*] --> Empty
     Empty --> AwaitingManifest: load unfinished persisted attempt
     Empty --> Active: accept UPDATE_ARTIFACTS
@@ -162,30 +166,45 @@ avoids combinations of `upgrade_commit_started`, `reboot_started`, and
 
 ```mermaid
 stateDiagram-v2
-    state "Upgrade state" as upgrade {
-        [*] --> Idle
-        Idle --> HandlerActive: main artifact claimed
-        HandlerActive --> Committing: begin irreversible upgrade commit
-        Committing --> HandlerActive: probation or boot request fails
-        Committing --> RebootReady: probation saved and test upgrade requested
-        RebootReady --> RebootStarted: reboot begins
-        HandlerActive --> Idle: handler fails or is canceled
-    }
+    [*] --> NotRunning
+    NotRunning --> Claimed: claim_main_firmware(job)
+    Claimed --> PendingDownload: main_firmware_download_pending(token)
+    PendingDownload --> Downloading: main_firmware_download_started(token)
+    Downloading --> PendingUpgrade: main_firmware_download_completed(token)
+    PendingUpgrade --> Committing: begin_main_firmware_upgrade_commit(token)
+    Committing --> PendingUpgrade: cancel_main_firmware_upgrade_commit(token)
+    Committing --> PendingReboot: finish_main_firmware_prereboot(token)
+    PendingReboot --> RebootStarted: begin_main_firmware_reboot(token)
+
+    PendingDownload --> Failed: fail_main_firmware(token)
+    Downloading --> Failed: fail_main_firmware(token)
+    PendingUpgrade --> Failed: fail_main_firmware(token)
+    Committing --> Failed: fail_main_firmware(token)
+
+    NotRunning --> Unconfirmed: enter_main_firmware_unconfirmed(attempt, index)
+    Unconfirmed --> ReconciledResultQueued: queue_main_firmware_result(success)
+    NotRunning --> ReconciledResultQueued: queue_main_firmware_result(rollback)
 
     state "Probation state" as probation {
         [*] --> None
         None --> Pending: save/restore probation
         Pending --> CompletionQueued: confirm success or infer rollback
         CompletionQueued --> CompletionClaimed: worker claims reconciled result
-        CompletionClaimed --> None: result durable, then clear probation
+        CompletionClaimed --> None: commit_main_firmware_probation_cleared(token)
     }
 ```
 
-The externally visible phases (`PENDING_DOWNLOAD`, `DOWNLOADING`, `PENDING_UPGRADE`,
-`PENDING_REBOOT`, and `UNCONFIRMED`) remain unchanged. Pause is an orthogonal flag valid
-only in the documented pre-reboot phases. Cancellation and supersession are rejected once
-the upgrade state reaches `Committing` because the persisted attempt must no longer
-change across the irreversible boot transition.
+The diagram labels name the state transition APIs. The internal upgrade states
+`HandlerActive`, `Committing`, `RebootReady`, and `RebootStarted` distinguish ownership
+and the irreversible boundary; the public phases shown above are derived by those
+transitions rather than set arbitrarily. Every pre-reboot transition validates the
+claimed artifact job's attempt ID and generation. Startup reconciliation instead
+validates the persisted probation attempt and artifact index because reboot creates a
+new in-memory generation.
+
+Pause is an orthogonal flag valid only in the documented pre-reboot phases. Cancellation
+and supersession are rejected once the upgrade state reaches `Committing` because the
+persisted attempt must no longer change across the irreversible boot transition.
 
 ### Report request and network outbox
 

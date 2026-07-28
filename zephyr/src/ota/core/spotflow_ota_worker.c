@@ -441,7 +441,7 @@ static struct worker_outcome process_artifact_operation(void)
 				return classify_storage_error(rc, true);
 			}
 
-			rc = spotflow_ota_state_resolve_main_firmware_probation(
+			rc = spotflow_ota_state_commit_main_firmware_probation_cleared(
 				&operation.job.token);
 			if (rc < 0) {
 				return classify_state_error(&operation.job, rc);
@@ -723,8 +723,7 @@ static enum spotflow_ota_result run_artifact_handler(const struct spotflow_ota_w
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
 	if (artifact->is_main) {
 		/* Success reboots before returning; only failure and cancellation return here. */
-		result = spotflow_ota_fw_main_process_artifact(
-			job->token.attempt_id, job->data.process_artifact.artifact_index, artifact);
+		result = spotflow_ota_fw_main_process_artifact(job);
 	} else {
 		result = spotflow_ota_fw_custom_process_artifact(job->token.attempt_id, artifact);
 	}

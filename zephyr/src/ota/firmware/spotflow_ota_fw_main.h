@@ -15,8 +15,7 @@ extern "C" {
 #endif
 
 enum spotflow_ota_result
-spotflow_ota_fw_main_process_artifact(uint64_t attempt_id, size_t artifact_index,
-				      const struct spotflow_ota_artifact* artifact);
+spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job);
 
 int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* probation,
 					   bool has_probation, spotflow_ota_state_effects* effects);

@@ -114,11 +114,13 @@ ZTEST(spotflow_ota_public_api, test_get_main_firmware_update_info_request_outliv
 	};
 	struct spotflow_firmware_info info;
 	struct spotflow_download_request request;
+	struct spotflow_ota_worker_job job;
 
 	update.artifacts[0] = main_artifact;
 
 	zassert_ok(spotflow_ota_state_accept_update(&update, &result));
-	zassert_ok(spotflow_ota_state_store_main_firmware_artifact(42, 0, &main_artifact));
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_ok(spotflow_ota_state_claim_main_firmware(&job, NULL));
 
 	zassert_ok(spotflow_get_main_firmware_update_info(&info, &request));
 
