@@ -22,6 +22,32 @@ void spotflow_ota_main_clear(struct ota_main_firmware_model* main)
 
 bool spotflow_ota_main_is_valid(const struct ota_main_firmware_model* main)
 {
+	if (main->presence > OTA_MAIN_FIRMWARE_PRESENT ||
+	    main->status.phase > SPOTFLOW_OTA_PHASE_UNCONFIRMED ||
+	    main->status.result > SPOTFLOW_OTA_RESULT_CANCELED ||
+	    main->probation.state > OTA_MAIN_PROBATION_COMPLETION_CLAIMED) {
+		return false;
+	}
+	if (main->presence == OTA_MAIN_FIRMWARE_ABSENT &&
+	    (main->status.phase != SPOTFLOW_OTA_PHASE_NOT_RUNNING || main->status.is_paused ||
+	     main->abort_requested || main->upgrade != OTA_MAIN_UPGRADE_IDLE ||
+	     main->probation.state != OTA_MAIN_PROBATION_NONE)) {
+		return false;
+	}
+	if (main->presence == OTA_MAIN_FIRMWARE_PRESENT && !main->artifact.is_main) {
+		return false;
+	}
+	if (main->status.is_paused &&
+	    (!phase_allows_pause(main->status.phase) ||
+	     main->upgrade == OTA_MAIN_UPGRADE_REBOOT_STARTED)) {
+		return false;
+	}
+	if (main->abort_requested &&
+	    (main->upgrade != OTA_MAIN_UPGRADE_HANDLER_ACTIVE ||
+	     !phase_allows_abort(main->status.phase))) {
+		return false;
+	}
+
 	switch (main->upgrade) {
 	case OTA_MAIN_UPGRADE_IDLE:
 		if (main->status.phase == SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD ||
@@ -57,10 +83,17 @@ bool spotflow_ota_main_is_valid(const struct ota_main_firmware_model* main)
 		return false;
 	}
 
+	if ((main->probation.state == OTA_MAIN_PROBATION_NONE ||
+	     main->probation.state == OTA_MAIN_PROBATION_PENDING) &&
+	    main->probation.reconciled_result != SPOTFLOW_OTA_RESULT_PENDING) {
+		return false;
+	}
 	if ((main->probation.state == OTA_MAIN_PROBATION_COMPLETION_QUEUED ||
 	     main->probation.state == OTA_MAIN_PROBATION_COMPLETION_CLAIMED) &&
 	    (main->upgrade != OTA_MAIN_UPGRADE_IDLE ||
 	     main->status.phase != SPOTFLOW_OTA_PHASE_NOT_RUNNING ||
+	     (main->probation.reconciled_result != SPOTFLOW_OTA_RESULT_SUCCEEDED &&
+	      main->probation.reconciled_result != SPOTFLOW_OTA_RESULT_FAILED) ||
 	     (main->status.result != SPOTFLOW_OTA_RESULT_SUCCEEDED &&
 	      main->status.result != SPOTFLOW_OTA_RESULT_FAILED))) {
 		return false;
@@ -220,6 +253,7 @@ int spotflow_ota_main_commit_probation_cleared(struct ota_main_firmware_model* m
 		return -EINVAL;
 	}
 	main->probation.state = OTA_MAIN_PROBATION_NONE;
+	main->probation.reconciled_result = SPOTFLOW_OTA_RESULT_PENDING;
 	main->upgrade = OTA_MAIN_UPGRADE_IDLE;
 	return 0;
 }

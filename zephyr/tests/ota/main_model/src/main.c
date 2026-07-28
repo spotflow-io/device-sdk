@@ -135,4 +135,47 @@ ZTEST(spotflow_ota_main_model, test_handler_failure_resets_active_state)
 	zassert_true(spotflow_ota_main_is_valid(&main));
 }
 
+ZTEST(spotflow_ota_main_model, test_invariant_rejects_cross_machine_drift)
+{
+	struct ota_main_firmware_model valid;
+	struct ota_main_firmware_model invalid;
+	struct spotflow_ota_artifact artifact = make_main_artifact();
+
+	spotflow_ota_main_clear(&valid);
+	zassert_ok(spotflow_ota_main_claim(&valid, 0, &artifact, true, NULL));
+	zassert_ok(spotflow_ota_main_download_pending(&valid, true, NULL));
+	zassert_true(spotflow_ota_main_is_valid(&valid));
+
+	invalid = valid;
+	invalid.artifact.is_main = false;
+	zassert_false(spotflow_ota_main_is_valid(&invalid));
+
+	invalid = valid;
+	invalid.status.phase = SPOTFLOW_OTA_PHASE_UNCONFIRMED;
+	invalid.status.is_paused = true;
+	zassert_false(spotflow_ota_main_is_valid(&invalid));
+
+	invalid = valid;
+	invalid.upgrade = OTA_MAIN_UPGRADE_REBOOT_READY;
+	invalid.status.phase = SPOTFLOW_OTA_PHASE_PENDING_REBOOT;
+	invalid.abort_requested = true;
+	invalid.probation.state = OTA_MAIN_PROBATION_PENDING;
+	zassert_false(spotflow_ota_main_is_valid(&invalid));
+
+	invalid = valid;
+	invalid.upgrade = OTA_MAIN_UPGRADE_IDLE;
+	invalid.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
+	invalid.status.result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
+	invalid.probation.state = OTA_MAIN_PROBATION_COMPLETION_QUEUED;
+	invalid.probation.reconciled_result = SPOTFLOW_OTA_RESULT_PENDING;
+	zassert_false(spotflow_ota_main_is_valid(&invalid));
+
+	invalid = valid;
+	invalid.upgrade = OTA_MAIN_UPGRADE_IDLE;
+	invalid.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
+	invalid.probation.state = OTA_MAIN_PROBATION_NONE;
+	invalid.probation.reconciled_result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
+	zassert_false(spotflow_ota_main_is_valid(&invalid));
+}
+
 ZTEST_SUITE(spotflow_ota_main_model, NULL, NULL, NULL, NULL, NULL);

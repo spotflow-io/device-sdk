@@ -39,7 +39,8 @@ ZTEST(spotflow_ota_attempt_model, test_start_and_rehydrate_are_pure_model_transi
 	zassert_ok(spotflow_ota_attempt_validate_update(&update));
 	spotflow_ota_attempt_start(
 		&update, spotflow_ota_attempt_allocate_generation(&next_generation), &attempt);
-	zassert_true(spotflow_ota_attempt_is_valid(&attempt));
+	zassert_true(
+		spotflow_ota_attempt_is_valid(&attempt, (struct ota_attempt_constraints){ 0 }));
 	zassert_equal(attempt.identity.generation, 1);
 	zassert_equal(attempt.identity.lifecycle, OTA_ATTEMPT_ACTIVE);
 	zassert_equal(attempt.execution.next_index, 0);
@@ -56,7 +57,8 @@ ZTEST(spotflow_ota_attempt_model, test_start_and_rehydrate_are_pure_model_transi
 	zassert_equal(attempt.plan.source, OTA_ARTIFACT_PLAN_FULL_MANIFEST);
 	zassert_false(request_report);
 	zassert_true(wake_worker);
-	zassert_true(spotflow_ota_attempt_is_valid(&attempt));
+	zassert_true(
+		spotflow_ota_attempt_is_valid(&attempt, (struct ota_attempt_constraints){ 0 }));
 }
 
 ZTEST(spotflow_ota_attempt_model, test_pending_attempt_is_a_tagged_union)
@@ -199,6 +201,46 @@ ZTEST(spotflow_ota_attempt_model, test_late_cancellation_advances_staged_revisio
 	zassert_equal(attempt.execution.transaction.mutation_revision, 2);
 	zassert_true(attempt.execution.transaction.mutation.cancel_remaining);
 	zassert_equal(attempt.plan.results[0], SPOTFLOW_OTA_RESULT_PENDING);
+}
+
+ZTEST(spotflow_ota_attempt_model, test_invariant_rejects_cached_state_drift)
+{
+	struct ota_attempt_model valid;
+	struct ota_attempt_model invalid;
+	struct spotflow_ota_update_msg update = make_update(42, 2);
+	struct ota_attempt_constraints constraints = { 0 };
+
+	spotflow_ota_attempt_start(&update, 1, &valid);
+	zassert_true(spotflow_ota_attempt_is_valid(&valid, constraints));
+
+	invalid = valid;
+	invalid.execution.next_index = 1;
+	zassert_false(spotflow_ota_attempt_is_valid(&invalid, constraints));
+
+	invalid = valid;
+	invalid.execution.transaction.mutation_revision = 1;
+	zassert_false(spotflow_ota_attempt_is_valid(&invalid, constraints));
+
+	invalid = valid;
+	invalid.identity.lifecycle = OTA_ATTEMPT_TERMINAL;
+	zassert_false(spotflow_ota_attempt_is_valid(&invalid, constraints));
+
+	invalid = valid;
+	invalid.execution.transaction.state = OTA_ARTIFACT_TRANSACTION_RUNNING;
+	invalid.execution.transaction.artifact_index = 0;
+	invalid.plan.results[0] = SPOTFLOW_OTA_RESULT_SUCCEEDED;
+	invalid.execution.next_index = 1;
+	zassert_false(spotflow_ota_attempt_is_valid(&invalid, constraints));
+
+	invalid = valid;
+	invalid.execution.transaction.state = OTA_ARTIFACT_TRANSACTION_RUNNING;
+	invalid.execution.transaction.artifact_index = 0;
+	spotflow_ota_attempt_stage_result(&invalid, 0, SPOTFLOW_OTA_RESULT_FAILED,
+					  OTA_ARTIFACT_RESULT_HANDLER);
+	spotflow_ota_attempt_refresh_lifecycle(&invalid, constraints);
+	zassert_true(spotflow_ota_attempt_is_valid(&invalid, constraints));
+	invalid.identity.lifecycle = OTA_ATTEMPT_FINALIZATION_CLAIMED;
+	zassert_false(spotflow_ota_attempt_is_valid(&invalid, constraints));
 }
 
 ZTEST_SUITE(spotflow_ota_attempt_model, NULL, NULL, NULL, NULL, NULL);

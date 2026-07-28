@@ -59,7 +59,8 @@ bool spotflow_ota_attempt_exists(const struct ota_attempt_model* attempt);
 bool spotflow_ota_attempt_transaction_is_active(const struct ota_attempt_model* attempt);
 bool spotflow_ota_attempt_result_commit_is_pending(const struct ota_attempt_model* attempt);
 bool spotflow_ota_attempt_is_durably_terminal(const struct ota_attempt_model* attempt);
-bool spotflow_ota_attempt_is_valid(const struct ota_attempt_model* attempt);
+bool spotflow_ota_attempt_is_valid(const struct ota_attempt_model* attempt,
+				   struct ota_attempt_constraints constraints);
 
 int spotflow_ota_attempt_validate_update(const struct spotflow_ota_update_msg* msg);
 int spotflow_ota_attempt_accept_update(struct ota_attempt_model* attempt,

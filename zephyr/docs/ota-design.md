@@ -37,6 +37,7 @@ flowchart TD
     main["main-firmware context\npresence, artifact, status,\nupgrade, probation"]
 
     store --> current
+    store --> main
     store --> pending
     store --> report
     store --> generation
@@ -44,11 +45,11 @@ flowchart TD
     current --> plan
     current --> execution
     current --> failure
-    current --> main
 ```
 
-`pending_attempt` and `report_state` are deliberately not members of
-`current_attempt`. They schedule replacement and report work for the store as a whole.
+The attempt and main-firmware models are siblings. `pending_attempt` and
+`report_state` are deliberately not members of `current_attempt`; they schedule
+replacement and report work for the store as a whole.
 Starting or promoting an attempt resets the report scheduler, so a claimed report for an
 old generation cannot become an obligation of the replacement attempt.
 
@@ -61,6 +62,14 @@ Each attempt substructure has an explicit validity rule:
 | `artifact execution` | `transaction.artifact_index` is valid only in `Running` or `ResultStaged`; the mutation and its revision are valid only in `ResultStaged`; `next_index` identifies the first pending durable result or equals `count`. |
 | `attempt failure` | `error` is meaningful only when failure state is `PRESENT`. |
 | `main-firmware context` | Artifact identity and index are meaningful only when presence is `PRESENT`; the reconciled result is meaningful only while probation completion is queued or claimed. |
+
+Debug invariants also check the relationships between these contexts. The cached attempt
+lifecycle must agree with durable and projected terminality; the artifact cursor must be
+the first durable pending result; running and staged transactions must own a pending
+artifact; finalization claims require terminal durable results; a claimed report records
+and matches the current generation; a pending replacement has a different nonzero
+attempt ID; and public main-firmware phase, pause/abort, upgrade, and probation states
+must form a legal model state.
 
 The artifact plan source replaces ambiguous combinations such as “manifest unavailable,
 but artifact count known”:
@@ -268,6 +277,19 @@ stage mutation → save installed version on success → persist projected attem
                → clear probation when applicable → validate mutation revision
                → commit mutation → request report
 ```
+
+### Event/state coverage
+
+The pure-model suites exercise allowed paths and deliberately corrupted cached states;
+the state and worker suites cover token ownership, persistence, and aggregate scheduling.
+
+| Model | Events covered | Rejected or stale combinations covered |
+|---|---|---|
+| Attempt | start, restore, rehydrate, duplicate/queue, cancel, supersede, promote, reject, finalize | lifecycle/terminality drift, invalid cursor or transaction ownership, stale generation, replacement with reused ID |
+| Artifact transaction | claim, stage, project, revision change, persist, commit, advance | report during staging, mismatched revision/index/source, commit before persistence |
+| Report | request, coalesce, claim, rerun, block, complete, promote pending | non-current attempt, stale job generation, report claim owned by another generation |
+| Main upgrade/control | claim, download phases, pause/resume, abort, commit/cancel commit, prereboot, reboot, fail | illegal phase/upgrade pairs, pause or abort outside allowed phases, stale handler token |
+| Probation | restore, unconfirmed, success/rollback queue, completion claim, durable clear | wrong artifact identity, result-source mismatch, completion without owned artifact transaction |
 
 ## Module map
 
@@ -558,6 +580,21 @@ only **after** the reconciled main-artifact result has been persisted. The accep
 is persisted by the worker before invoking any artifact handler, so the main-firmware
 handler does not write the same unchanged attempt again immediately before reboot.
 
+**Power-loss boundaries**
+
+| Last durable boundary before reset | Reconstructed state and next action |
+|---|---|
+| No attempt record | No current attempt; wait for `UPDATE_ARTIFACTS`. |
+| Accepted attempt saved, no artifact result saved | Restore `AwaitingManifest`; a matching manifest restores descriptors and resumes the pending artifact. |
+| Installed version saved, staged attempt projection not saved | Restore the older attempt result; after manifest rehydration the installed-version check can recover the successful artifact without invoking its handler again. |
+| Staged attempt projection saved, in-memory mutation not committed | Restore the saved result as durable and continue from the first pending artifact after manifest rehydration. |
+| Terminal attempt/finalization record saved, report not prepared or published | Restore `Terminal`/`Rejected`; duplicate manifest or `REPORT_UPDATE_RESULTS` requests another cumulative report. |
+| Probation saved, MCUboot test upgrade not yet requested | Startup reconciliation sees probation and resolves the running image conservatively. |
+| MCUboot test upgrade requested, reboot occurs | Probation correlates the next boot; confirmation queues success and rollback/mismatch queues failure. |
+| Reconciled main result saved, probation not cleared | The main result restores as durable; startup identifies the probation record as stale and clears it without queueing completion again. |
+| Probation cleared, in-memory result not committed | The saved attempt record already contains the result; restore treats it as durable. |
+| D2C result prepared but QoS 0 publish not observed | The cloud can issue `REPORT_UPDATE_RESULTS`; the device rebuilds the current attempt’s report from its durable view. |
+
 **Corruption**
 
 Corrupt records loaded from Settings are ignored.
@@ -571,7 +608,9 @@ Corrupt records loaded from Settings are ignored.
   message before publish.
 - If publish returns `-EAGAIN`, the pending message is retained and retried on the next
   poll.
-- `REPORT_UPDATE_RESULTS` triggers re-send from persisted terminal state.
+- `REPORT_UPDATE_RESULTS` for the current attempt triggers re-send from its durable
+  persisted view. Known partial results may be reported; a staged mutation is never
+  presented as durable.
 - A duplicate `UPDATE_ARTIFACTS` for the current attempt also triggers re-send when at
   least one artifact result (or a whole-attempt error) is already stored, because the
   cloud may resend the manifest until it receives results (for example after MQTT
@@ -646,6 +685,8 @@ west twister -T spotflow/zephyr/tests/ota -p native_sim --inline-logs
 | Area | Test directory | Fakes |
 |---|---|---|
 | CBOR protocol | `cbor/` | — |
+| Pure attempt model | `attempt_model/` | — |
+| Pure main-firmware model | `main_model/` | — |
 | State machine | `state/` | — |
 | Persistence | `persistence/` | Settings test backend |
 | D2C networking | `net/` | MQTT publish |

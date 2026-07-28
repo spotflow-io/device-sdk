@@ -4,6 +4,10 @@
 #include <string.h>
 
 static bool validate_artifact(const struct spotflow_ota_artifact* artifact);
+static bool lifecycle_is_valid(const struct ota_attempt_model* attempt,
+			       struct ota_attempt_constraints constraints);
+static bool transaction_is_valid(const struct ota_attempt_model* attempt);
+static bool results_and_cursor_are_valid(const struct ota_attempt_model* attempt);
 static void cancel_pending_results(const struct ota_attempt_model* attempt,
 				   struct ota_attempt_constraints constraints,
 				   enum spotflow_ota_result* results);
@@ -48,10 +52,16 @@ bool spotflow_ota_attempt_is_durably_terminal(const struct ota_attempt_model* at
 		attempt->identity.lifecycle == OTA_ATTEMPT_REJECTED;
 }
 
-bool spotflow_ota_attempt_is_valid(const struct ota_attempt_model* attempt)
+bool spotflow_ota_attempt_is_valid(const struct ota_attempt_model* attempt,
+				   struct ota_attempt_constraints constraints)
 {
 	if (!spotflow_ota_attempt_exists(attempt)) {
-		return attempt->identity.id == 0;
+		return attempt->identity.id == 0 && attempt->identity.generation == 0 &&
+			attempt->plan.source == OTA_ARTIFACT_PLAN_NONE &&
+			attempt->plan.count == 0 &&
+			attempt->execution.transaction.state == OTA_ARTIFACT_TRANSACTION_IDLE &&
+			attempt->execution.next_index == 0 &&
+			attempt->failure.state == OTA_ATTEMPT_FAILURE_NONE;
 	}
 	if (attempt->identity.id == 0 || attempt->identity.generation == 0 ||
 	    attempt->plan.count > CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS) {
@@ -76,32 +86,12 @@ bool spotflow_ota_attempt_is_valid(const struct ota_attempt_model* attempt)
 		return false;
 	}
 
-	if (spotflow_ota_attempt_transaction_is_active(attempt) &&
-	    attempt->execution.transaction.artifact_index >= attempt->plan.count) {
+	if (!transaction_is_valid(attempt) || !results_and_cursor_are_valid(attempt) ||
+	    !lifecycle_is_valid(attempt, constraints)) {
 		return false;
 	}
-	if (spotflow_ota_attempt_result_commit_is_pending(attempt)) {
-		const struct ota_artifact_transaction* transaction =
-			&attempt->execution.transaction;
-		if (transaction->artifact_index != transaction->mutation.artifact_index ||
-		    transaction->mutation_revision == 0 ||
-		    transaction->mutation.result == SPOTFLOW_OTA_RESULT_PENDING ||
-		    attempt->plan.results[transaction->artifact_index] !=
-			    SPOTFLOW_OTA_RESULT_PENDING ||
-		    (transaction->mutation.source != OTA_ARTIFACT_RESULT_HANDLER &&
-		     transaction->mutation.source != OTA_ARTIFACT_RESULT_MAIN_RECONCILIATION)) {
-			return false;
-		}
-	}
-	if ((attempt->identity.lifecycle == OTA_ATTEMPT_REJECTING ||
-	     attempt->identity.lifecycle == OTA_ATTEMPT_REJECTION_CLAIMED ||
-	     attempt->identity.lifecycle == OTA_ATTEMPT_REJECTED) &&
-	    attempt->failure.state != OTA_ATTEMPT_FAILURE_PRESENT) {
-		return false;
-	}
-	if (attempt->identity.lifecycle == OTA_ATTEMPT_FINALIZATION_CLAIMED &&
-	    (spotflow_ota_attempt_result_commit_is_pending(attempt) ||
-	     !spotflow_ota_attempt_has_terminal_results(attempt))) {
+	if (attempt->execution.sequence_policy != OTA_ARTIFACT_SEQUENCE_CONTINUE &&
+	    attempt->execution.sequence_policy != OTA_ARTIFACT_SEQUENCE_STOP_REMAINING) {
 		return false;
 	}
 	return true;
@@ -355,6 +345,7 @@ spotflow_ota_attempt_accept_cancel(struct ota_attempt_model* attempt, uint64_t a
 	if (spotflow_ota_attempt_result_commit_is_pending(attempt)) {
 		attempt->execution.transaction.mutation.cancel_remaining = true;
 		spotflow_ota_attempt_advance_mutation_revision(attempt);
+		spotflow_ota_attempt_refresh_lifecycle(attempt, constraints);
 	}
 	transition.outcome = OTA_ATTEMPT_CANCEL_ACCEPTED;
 	transition.wake_worker = !spotflow_ota_attempt_transaction_is_active(attempt);
@@ -377,6 +368,7 @@ bool spotflow_ota_attempt_supersede(struct ota_attempt_model* attempt,
 	if (spotflow_ota_attempt_result_commit_is_pending(attempt)) {
 		attempt->execution.transaction.mutation.cancel_remaining = true;
 		spotflow_ota_attempt_advance_mutation_revision(attempt);
+		spotflow_ota_attempt_refresh_lifecycle(attempt, constraints);
 	} else {
 		spotflow_ota_attempt_cancel_pending_artifacts(attempt, constraints);
 	}
@@ -579,6 +571,91 @@ static bool validate_artifact(const struct spotflow_ota_artifact* artifact)
 		return false;
 	}
 	return strchr(artifact->slug, '/') == NULL;
+}
+
+static bool lifecycle_is_valid(const struct ota_attempt_model* attempt,
+			       struct ota_attempt_constraints constraints)
+{
+	bool result_staged = spotflow_ota_attempt_result_commit_is_pending(attempt);
+	bool durable_terminal = spotflow_ota_attempt_has_terminal_results(attempt);
+	bool projected_terminal =
+		spotflow_ota_attempt_has_projected_terminal_results(attempt, constraints);
+
+	switch (attempt->identity.lifecycle) {
+	case OTA_ATTEMPT_AWAITING_MANIFEST:
+		return attempt->failure.state == OTA_ATTEMPT_FAILURE_NONE &&
+			attempt->plan.source != OTA_ARTIFACT_PLAN_FULL_MANIFEST && !result_staged &&
+			!durable_terminal && !projected_terminal;
+	case OTA_ATTEMPT_ACTIVE:
+		return attempt->failure.state == OTA_ATTEMPT_FAILURE_NONE &&
+			(result_staged ||
+			 attempt->plan.source == OTA_ARTIFACT_PLAN_FULL_MANIFEST) &&
+			!durable_terminal && !projected_terminal;
+	case OTA_ATTEMPT_FINALIZING:
+		return attempt->failure.state == OTA_ATTEMPT_FAILURE_NONE &&
+			((result_staged && projected_terminal) ||
+			 (!result_staged && durable_terminal));
+	case OTA_ATTEMPT_FINALIZATION_CLAIMED:
+		return attempt->failure.state == OTA_ATTEMPT_FAILURE_NONE && !result_staged &&
+			durable_terminal;
+	case OTA_ATTEMPT_TERMINAL:
+		return attempt->failure.state == OTA_ATTEMPT_FAILURE_NONE && !result_staged &&
+			durable_terminal;
+	case OTA_ATTEMPT_REJECTING:
+	case OTA_ATTEMPT_REJECTION_CLAIMED:
+	case OTA_ATTEMPT_REJECTED:
+		return attempt->failure.state == OTA_ATTEMPT_FAILURE_PRESENT &&
+			!spotflow_ota_attempt_transaction_is_active(attempt);
+	case OTA_ATTEMPT_EMPTY:
+	default:
+		return false;
+	}
+}
+
+static bool transaction_is_valid(const struct ota_attempt_model* attempt)
+{
+	const struct ota_artifact_transaction* transaction = &attempt->execution.transaction;
+
+	switch (transaction->state) {
+	case OTA_ARTIFACT_TRANSACTION_IDLE:
+		return transaction->artifact_index == 0 && transaction->mutation_revision == 0 &&
+			transaction->mutation.artifact_index == 0 &&
+			transaction->mutation.result == SPOTFLOW_OTA_RESULT_PENDING &&
+			!transaction->mutation.cancel_remaining;
+	case OTA_ARTIFACT_TRANSACTION_RUNNING:
+		return transaction->artifact_index < attempt->plan.count &&
+			transaction->mutation_revision == 0 &&
+			attempt->plan.results[transaction->artifact_index] ==
+			SPOTFLOW_OTA_RESULT_PENDING;
+	case OTA_ARTIFACT_TRANSACTION_RESULT_STAGED:
+		return transaction->artifact_index < attempt->plan.count &&
+			transaction->artifact_index == transaction->mutation.artifact_index &&
+			transaction->mutation_revision != 0 &&
+			transaction->mutation.result != SPOTFLOW_OTA_RESULT_PENDING &&
+			transaction->mutation.result <= SPOTFLOW_OTA_RESULT_CANCELED &&
+			attempt->plan.results[transaction->artifact_index] ==
+			SPOTFLOW_OTA_RESULT_PENDING &&
+			(transaction->mutation.source == OTA_ARTIFACT_RESULT_HANDLER ||
+			 transaction->mutation.source == OTA_ARTIFACT_RESULT_MAIN_RECONCILIATION);
+	default:
+		return false;
+	}
+}
+
+static bool results_and_cursor_are_valid(const struct ota_attempt_model* attempt)
+{
+	size_t first_pending = attempt->plan.count;
+
+	for (size_t i = 0; i < attempt->plan.count; i++) {
+		if (attempt->plan.results[i] > SPOTFLOW_OTA_RESULT_CANCELED) {
+			return false;
+		}
+		if (first_pending == attempt->plan.count &&
+		    attempt->plan.results[i] == SPOTFLOW_OTA_RESULT_PENDING) {
+			first_pending = i;
+		}
+	}
+	return attempt->execution.next_index == first_pending;
 }
 static void cancel_pending_results(const struct ota_attempt_model* attempt,
 				   struct ota_attempt_constraints constraints,
