@@ -1,5 +1,6 @@
 #include "ota/core/spotflow_ota_state.h"
 #include "ota/core/spotflow_ota_attempt_model.h"
+#include "ota/core/spotflow_ota_main_model.h"
 
 #include "ota/persistence/spotflow_ota_records_cbor.h"
 
@@ -13,6 +14,7 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 struct ota_state_store {
 	struct ota_attempt_model current_attempt;
+	struct ota_main_firmware_model main_firmware;
 	struct ota_pending_attempt pending_attempt;
 	enum ota_report_state report_state;
 	uint32_t next_attempt_generation;
@@ -23,21 +25,14 @@ static K_MUTEX_DEFINE(state_mutex);
 
 static void clear_worker_job(struct spotflow_ota_worker_job* job);
 static uint32_t allocate_attempt_generation(void);
-static bool main_probation_is_pending(const struct ota_attempt_model* attempt);
-static bool main_upgrade_is_irreversible(const struct ota_attempt_model* attempt);
-static bool main_firmware_state_is_valid(const struct ota_attempt_model* attempt);
 static struct ota_attempt_constraints attempt_constraints(void);
 static bool state_is_valid(void);
 static void assert_state_locked(void);
 static void request_report(void);
-static void
-restore_main_firmware_artifact_from_probation(const struct spotflow_ota_probation* probation);
 static void clear_pending_attempt(void);
 static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 			      const struct spotflow_ota_artifact* source);
 static spotflow_ota_state_effects artifact_result_effects(void);
-static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase);
-static bool main_firmware_phase_allows_abort(enum spotflow_ota_phase phase);
 static bool operation_token_matches_current(const struct spotflow_ota_operation_token* token);
 static bool main_firmware_handler_is_owned(const struct spotflow_ota_operation_token* token);
 
@@ -45,6 +40,7 @@ void spotflow_ota_state_reset(void)
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);
 	spotflow_ota_attempt_clear(&ota_state.current_attempt);
+	spotflow_ota_main_clear(&ota_state.main_firmware);
 	clear_pending_attempt();
 	ota_state.report_state = OTA_REPORT_IDLE;
 	k_mutex_unlock(&state_mutex);
@@ -57,6 +53,7 @@ int spotflow_ota_state_init_from_persistence(const struct spotflow_ota_persisted
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);
 	spotflow_ota_attempt_clear(&ota_state.current_attempt);
+	spotflow_ota_main_clear(&ota_state.main_firmware);
 	clear_pending_attempt();
 	ota_state.report_state = OTA_REPORT_IDLE;
 
@@ -113,14 +110,12 @@ int spotflow_ota_state_init_from_persistence(const struct spotflow_ota_persisted
 			spotflow_ota_attempt_advance(&ota_state.current_attempt);
 		}
 
-		restore_main_firmware_artifact_from_probation(probation);
-
-		if (probation->artifact_index < ota_state.current_attempt.plan.count &&
-		    ota_state.current_attempt.plan.results[probation->artifact_index] ==
-			    SPOTFLOW_OTA_RESULT_PENDING) {
-			ota_state.current_attempt.main_firmware.probation.state =
-				OTA_MAIN_PROBATION_PENDING;
-		}
+		bool result_pending =
+			probation->artifact_index < ota_state.current_attempt.plan.count &&
+			ota_state.current_attempt.plan.results[probation->artifact_index] ==
+				SPOTFLOW_OTA_RESULT_PENDING;
+		spotflow_ota_main_restore_probation(&ota_state.main_firmware, probation,
+						    result_pending);
 
 		spotflow_ota_attempt_refresh_lifecycle(&ota_state.current_attempt,
 						       attempt_constraints());
@@ -159,6 +154,7 @@ int spotflow_ota_state_accept_update(const struct spotflow_ota_update_msg* msg,
 	switch (transition.outcome) {
 	case OTA_ATTEMPT_UPDATE_STARTED:
 		result->disposition = SPOTFLOW_OTA_UPDATE_STARTED;
+		spotflow_ota_main_clear(&ota_state.main_firmware);
 		ota_state.report_state = OTA_REPORT_IDLE;
 		break;
 	case OTA_ATTEMPT_UPDATE_REHYDRATED:
@@ -211,6 +207,7 @@ int spotflow_ota_state_reject_update(uint64_t attempt_id, enum spotflow_ota_atte
 					   attempt_constraints(), &transition);
 	if (transition.outcome == OTA_ATTEMPT_REJECTION_STARTED) {
 		result->disposition = SPOTFLOW_OTA_REJECTION_STARTED;
+		spotflow_ota_main_clear(&ota_state.main_firmware);
 		ota_state.report_state = OTA_REPORT_IDLE;
 	} else {
 		result->disposition = SPOTFLOW_OTA_REJECTION_QUEUED;
@@ -326,23 +323,20 @@ bool spotflow_ota_state_get_worker_job(struct spotflow_ota_worker_job* job)
 		return true;
 	}
 
-	if (ota_state.current_attempt.main_firmware.probation.state ==
-	    OTA_MAIN_PROBATION_COMPLETION_QUEUED) {
+	struct ota_main_completion_transition completion;
+	if (spotflow_ota_main_claim_completion(&ota_state.main_firmware, &completion)) {
 		job->type = SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE;
 		job->token.attempt_id = ota_state.current_attempt.identity.id;
 		job->token.generation = ota_state.current_attempt.identity.generation;
-		job->data.complete_main_firmware.artifact_index =
-			ota_state.current_attempt.main_firmware.artifact_index;
-		job->data.complete_main_firmware.result =
-			ota_state.current_attempt.main_firmware.probation.reconciled_result;
-		copy_artifact_out(&job->data.complete_main_firmware.artifact,
-				  &ota_state.current_attempt.main_firmware.artifact);
-		ota_state.current_attempt.main_firmware.probation.state =
-			OTA_MAIN_PROBATION_COMPLETION_CLAIMED;
-		ota_state.current_attempt.execution.transaction.state =
-			OTA_ARTIFACT_TRANSACTION_RUNNING;
-		ota_state.current_attempt.execution.transaction.artifact_index =
-			job->data.complete_main_firmware.artifact_index;
+		job->data.complete_main_firmware.artifact_index = completion.artifact_index;
+		job->data.complete_main_firmware.result = completion.result;
+		job->data.complete_main_firmware.artifact = completion.artifact;
+		if (completion.claim_artifact_transaction) {
+			ota_state.current_attempt.execution.transaction.state =
+				OTA_ARTIFACT_TRANSACTION_RUNNING;
+			ota_state.current_attempt.execution.transaction.artifact_index =
+				completion.artifact_index;
+		}
 		k_mutex_unlock(&state_mutex);
 		return true;
 	}
@@ -587,12 +581,7 @@ int spotflow_ota_state_stage_artifact_result(const struct spotflow_ota_worker_jo
 					  source);
 	if (job->type == SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT &&
 	    job->data.process_artifact.artifact.is_main) {
-		ota_state.current_attempt.main_firmware.status.phase =
-			SPOTFLOW_OTA_PHASE_NOT_RUNNING;
-		ota_state.current_attempt.main_firmware.status.is_paused = false;
-		ota_state.current_attempt.main_firmware.status.result = result;
-		ota_state.current_attempt.main_firmware.abort_requested = false;
-		ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_IDLE;
+		spotflow_ota_main_finish_handler(&ota_state.main_firmware, result);
 	}
 	spotflow_ota_attempt_refresh_lifecycle(&ota_state.current_attempt, attempt_constraints());
 	assert_state_locked();
@@ -635,7 +624,7 @@ int spotflow_ota_state_commit_artifact_result(const struct spotflow_ota_worker_j
 		    artifact_index ||
 	    ota_state.current_attempt.execution.transaction.mutation.source != expected_source ||
 	    (expected_source == OTA_ARTIFACT_RESULT_MAIN_RECONCILIATION &&
-	     ota_state.current_attempt.main_firmware.probation.state != OTA_MAIN_PROBATION_NONE)) {
+	     ota_state.main_firmware.probation.state != OTA_MAIN_PROBATION_NONE)) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}
@@ -786,9 +775,6 @@ int spotflow_ota_state_queue_main_firmware_result(
 
 	if (!spotflow_ota_attempt_exists(&ota_state.current_attempt) ||
 	    ota_state.current_attempt.identity.id != attempt_id ||
-	    ota_state.current_attempt.main_firmware.probation.state != OTA_MAIN_PROBATION_PENDING ||
-	    ota_state.current_attempt.main_firmware.presence != OTA_MAIN_FIRMWARE_PRESENT ||
-	    ota_state.current_attempt.main_firmware.artifact_index != artifact_index ||
 	    artifact_index >= ota_state.current_attempt.plan.count ||
 	    ota_state.current_attempt.plan.results[artifact_index] != SPOTFLOW_OTA_RESULT_PENDING ||
 	    spotflow_ota_attempt_transaction_is_active(&ota_state.current_attempt)) {
@@ -796,17 +782,11 @@ int spotflow_ota_state_queue_main_firmware_result(
 		return -EINVAL;
 	}
 
-	ota_state.current_attempt.main_firmware.status.result = result;
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
-	ota_state.current_attempt.main_firmware.status.is_paused = false;
-	ota_state.current_attempt.main_firmware.abort_requested = false;
-	ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_IDLE;
-	ota_state.current_attempt.main_firmware.probation.reconciled_result = result;
-	ota_state.current_attempt.main_firmware.probation.state =
-		OTA_MAIN_PROBATION_COMPLETION_QUEUED;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+	int rc = spotflow_ota_main_queue_reconciled_result(&ota_state.main_firmware, artifact_index,
+							   result, out_state);
+	if (rc < 0) {
+		k_mutex_unlock(&state_mutex);
+		return rc;
 	}
 
 	*effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
@@ -835,11 +815,7 @@ int spotflow_ota_state_fail_worker_operation(const struct spotflow_ota_operation
 	ota_state.current_attempt.failure.state = OTA_ATTEMPT_FAILURE_PRESENT;
 	ota_state.current_attempt.failure.error = SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR;
 	ota_state.report_state = OTA_REPORT_IDLE;
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
-	ota_state.current_attempt.main_firmware.status.is_paused = false;
-	ota_state.current_attempt.main_firmware.status.result = SPOTFLOW_OTA_RESULT_FAILED;
-	ota_state.current_attempt.main_firmware.abort_requested = false;
-	ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_IDLE;
+	spotflow_ota_main_fail_operation(&ota_state.main_firmware);
 	ota_state.current_attempt.identity.lifecycle = OTA_ATTEMPT_REJECTING;
 	assert_state_locked();
 
@@ -874,6 +850,7 @@ int spotflow_ota_state_promote_pending(const struct spotflow_ota_worker_job* rep
 	uint32_t generation = allocate_attempt_generation();
 	(void)spotflow_ota_attempt_promote_pending(&ota_state.current_attempt,
 						   &ota_state.pending_attempt, generation);
+	spotflow_ota_main_clear(&ota_state.main_firmware);
 	ota_state.report_state = OTA_REPORT_IDLE;
 	assert_state_locked();
 
@@ -919,7 +896,7 @@ int spotflow_ota_state_get_main_firmware_view(struct spotflow_ota_main_firmware_
 	k_mutex_lock(&state_mutex, K_FOREVER);
 	view->has_current_attempt = spotflow_ota_attempt_exists(&ota_state.current_attempt);
 	view->attempt_id = ota_state.current_attempt.identity.id;
-	view->state = ota_state.current_attempt.main_firmware.status;
+	view->state = ota_state.main_firmware.status;
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
@@ -977,7 +954,7 @@ void spotflow_ota_state_get_diagnostic(struct spotflow_ota_state_diagnostic* dia
 	diagnostic->has_attempt_error =
 		ota_state.current_attempt.failure.state == OTA_ATTEMPT_FAILURE_PRESENT;
 	diagnostic->attempt_error = ota_state.current_attempt.failure.error;
-	diagnostic->main_firmware_state = ota_state.current_attempt.main_firmware.status;
+	diagnostic->main_firmware_state = ota_state.main_firmware.status;
 	memcpy(diagnostic->artifact_results, ota_state.current_attempt.plan.results,
 	       sizeof(diagnostic->artifact_results));
 	spotflow_ota_attempt_project_results(&ota_state.current_attempt, attempt_constraints(),
@@ -1003,28 +980,20 @@ int spotflow_ota_state_claim_main_firmware(const struct spotflow_ota_worker_job*
 
 	size_t artifact_index = job->data.process_artifact.artifact_index;
 	if (artifact_index >= ota_state.current_attempt.plan.count ||
-	    !ota_state.current_attempt.plan.artifacts[artifact_index].is_main ||
-	    ota_state.current_attempt.execution.transaction.state !=
-		    OTA_ARTIFACT_TRANSACTION_RUNNING ||
-	    ota_state.current_attempt.execution.transaction.artifact_index != artifact_index ||
-	    ota_state.current_attempt.main_firmware.upgrade != OTA_MAIN_UPGRADE_IDLE ||
-	    ota_state.current_attempt.main_firmware.probation.state != OTA_MAIN_PROBATION_NONE) {
+	    !ota_state.current_attempt.plan.artifacts[artifact_index].is_main) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}
 
-	ota_state.current_attempt.main_firmware.presence = OTA_MAIN_FIRMWARE_PRESENT;
-	ota_state.current_attempt.main_firmware.artifact_index = artifact_index;
-	copy_artifact_out(&ota_state.current_attempt.main_firmware.artifact,
-			  &ota_state.current_attempt.plan.artifacts[artifact_index]);
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
-	ota_state.current_attempt.main_firmware.status.result = SPOTFLOW_OTA_RESULT_PENDING;
-	ota_state.current_attempt.main_firmware.status.is_paused = false;
-	ota_state.current_attempt.main_firmware.abort_requested = false;
-	ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_HANDLER_ACTIVE;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+	bool handler_owned = ota_state.current_attempt.execution.transaction.state ==
+			OTA_ARTIFACT_TRANSACTION_RUNNING &&
+		ota_state.current_attempt.execution.transaction.artifact_index == artifact_index;
+	int rc = spotflow_ota_main_claim(&ota_state.main_firmware, artifact_index,
+					 &ota_state.current_attempt.plan.artifacts[artifact_index],
+					 handler_owned, out_state);
+	if (rc < 0) {
+		k_mutex_unlock(&state_mutex);
+		return rc;
 	}
 
 	assert_state_locked();
@@ -1046,18 +1015,11 @@ int spotflow_ota_state_main_firmware_download_pending(
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
-	if (!main_firmware_handler_is_owned(token) ||
-	    ota_state.current_attempt.main_firmware.upgrade != OTA_MAIN_UPGRADE_HANDLER_ACTIVE ||
-	    ota_state.current_attempt.main_firmware.status.phase !=
-		    SPOTFLOW_OTA_PHASE_NOT_RUNNING) {
+	int rc = spotflow_ota_main_download_pending(
+		&ota_state.main_firmware, main_firmware_handler_is_owned(token), out_state);
+	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
-		return -EINVAL;
-	}
-
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+		return rc;
 	}
 
 	assert_state_locked();
@@ -1079,17 +1041,11 @@ int spotflow_ota_state_main_firmware_download_started(
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
-	if (!main_firmware_handler_is_owned(token) ||
-	    ota_state.current_attempt.main_firmware.status.phase !=
-		    SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD) {
+	int rc = spotflow_ota_main_download_started(
+		&ota_state.main_firmware, main_firmware_handler_is_owned(token), out_state);
+	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
-		return -EINVAL;
-	}
-
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_DOWNLOADING;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+		return rc;
 	}
 
 	assert_state_locked();
@@ -1111,17 +1067,11 @@ int spotflow_ota_state_main_firmware_download_completed(
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
-	if (!main_firmware_handler_is_owned(token) ||
-	    ota_state.current_attempt.main_firmware.status.phase !=
-		    SPOTFLOW_OTA_PHASE_DOWNLOADING) {
+	int rc = spotflow_ota_main_download_completed(
+		&ota_state.main_firmware, main_firmware_handler_is_owned(token), out_state);
+	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
-		return -EINVAL;
-	}
-
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_PENDING_UPGRADE;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+		return rc;
 	}
 
 	assert_state_locked();
@@ -1142,22 +1092,10 @@ int spotflow_ota_state_fail_main_firmware(const struct spotflow_ota_operation_to
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
-	if (ota_state.current_attempt.main_firmware.presence != OTA_MAIN_FIRMWARE_PRESENT ||
-	    (ota_state.current_attempt.main_firmware.upgrade != OTA_MAIN_UPGRADE_HANDLER_ACTIVE &&
-	     ota_state.current_attempt.main_firmware.upgrade != OTA_MAIN_UPGRADE_COMMITTING) ||
-	    ota_state.current_attempt.main_firmware.probation.state != OTA_MAIN_PROBATION_NONE) {
+	int rc = spotflow_ota_main_fail_handler(&ota_state.main_firmware, out_state);
+	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
-		return -EINVAL;
-	}
-
-	ota_state.current_attempt.main_firmware.status.result = SPOTFLOW_OTA_RESULT_FAILED;
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
-	ota_state.current_attempt.main_firmware.status.is_paused = false;
-	ota_state.current_attempt.main_firmware.abort_requested = false;
-	ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_IDLE;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+		return rc;
 	}
 
 	assert_state_locked();
@@ -1176,17 +1114,17 @@ int spotflow_ota_state_get_main_firmware_info(struct spotflow_firmware_info* inf
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!spotflow_ota_attempt_exists(&ota_state.current_attempt) ||
-	    ota_state.current_attempt.main_firmware.presence != OTA_MAIN_FIRMWARE_PRESENT) {
+	    ota_state.main_firmware.presence != OTA_MAIN_FIRMWARE_PRESENT) {
 		k_mutex_unlock(&state_mutex);
 		return -ENOENT;
 	}
 
 	info->attempt_id = ota_state.current_attempt.identity.id;
-	info->slug = ota_state.current_attempt.main_firmware.artifact.slug;
-	info->is_main = ota_state.current_attempt.main_firmware.artifact.is_main;
-	info->version = ota_state.current_attempt.main_firmware.artifact.version;
-	request_out->url = ota_state.current_attempt.main_firmware.artifact.url;
-	request_out->secret = ota_state.current_attempt.main_firmware.artifact.secret;
+	info->slug = ota_state.main_firmware.artifact.slug;
+	info->is_main = ota_state.main_firmware.artifact.is_main;
+	info->version = ota_state.main_firmware.artifact.version;
+	request_out->url = ota_state.main_firmware.artifact.url;
+	request_out->secret = ota_state.main_firmware.artifact.secret;
 	info->download_request = request_out;
 
 	k_mutex_unlock(&state_mutex);
@@ -1207,24 +1145,19 @@ int spotflow_ota_state_finish_main_firmware_prereboot(
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
-	if (ota_state.current_attempt.main_firmware.upgrade != OTA_MAIN_UPGRADE_COMMITTING ||
-	    ota_state.current_attempt.main_firmware.status.phase !=
-		    SPOTFLOW_OTA_PHASE_PENDING_UPGRADE ||
-	    ota_state.current_attempt.execution.transaction.state !=
-		    OTA_ARTIFACT_TRANSACTION_RUNNING ||
-	    ota_state.current_attempt.execution.transaction.artifact_index !=
-		    ota_state.current_attempt.main_firmware.artifact_index) {
+	struct ota_main_prereboot_transition transition;
+	int rc = spotflow_ota_main_finish_prereboot(
+		&ota_state.main_firmware, main_firmware_handler_is_owned(token), &transition);
+	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
-		return -EINVAL;
+		return rc;
 	}
 
-	spotflow_ota_attempt_clear_transaction(&ota_state.current_attempt);
-	ota_state.current_attempt.main_firmware.probation.state = OTA_MAIN_PROBATION_PENDING;
-	ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_REBOOT_READY;
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_PENDING_REBOOT;
-
+	if (transition.clear_artifact_transaction) {
+		spotflow_ota_attempt_clear_transaction(&ota_state.current_attempt);
+	}
 	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+		*out_state = transition.state;
 	}
 	assert_state_locked();
 
@@ -1243,22 +1176,16 @@ int spotflow_ota_state_enter_main_firmware_unconfirmed(
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
 	if (!spotflow_ota_attempt_exists(&ota_state.current_attempt) ||
-	    ota_state.current_attempt.identity.id != attempt_id ||
-	    ota_state.current_attempt.main_firmware.probation.state != OTA_MAIN_PROBATION_PENDING ||
-	    ota_state.current_attempt.main_firmware.presence != OTA_MAIN_FIRMWARE_PRESENT ||
-	    ota_state.current_attempt.main_firmware.artifact_index != artifact_index) {
+	    ota_state.current_attempt.identity.id != attempt_id) {
 		k_mutex_unlock(&state_mutex);
 		return -EINVAL;
 	}
 
-	ota_state.current_attempt.main_firmware.status.phase = SPOTFLOW_OTA_PHASE_UNCONFIRMED;
-	ota_state.current_attempt.main_firmware.status.is_paused = false;
-	ota_state.current_attempt.main_firmware.status.result = SPOTFLOW_OTA_RESULT_PENDING;
-	ota_state.current_attempt.main_firmware.abort_requested = false;
-	ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_IDLE;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+	int rc = spotflow_ota_main_enter_unconfirmed(&ota_state.main_firmware, artifact_index,
+						     out_state);
+	if (rc < 0) {
+		k_mutex_unlock(&state_mutex);
+		return rc;
 	}
 
 	assert_state_locked();
@@ -1271,21 +1198,12 @@ int spotflow_ota_state_set_main_firmware_paused(bool paused,
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
-	if (!spotflow_ota_attempt_exists(&ota_state.current_attempt) ||
-	    (paused &&
-	     (!main_firmware_phase_allows_pause(
-		      ota_state.current_attempt.main_firmware.status.phase) ||
-	      ota_state.current_attempt.main_firmware.upgrade ==
-		      OTA_MAIN_UPGRADE_REBOOT_STARTED)) ||
-	    (!paused && !ota_state.current_attempt.main_firmware.status.is_paused)) {
+	int rc = spotflow_ota_main_set_paused(
+		&ota_state.main_firmware, spotflow_ota_attempt_exists(&ota_state.current_attempt),
+		paused, out_state);
+	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
-		return -EINVAL;
-	}
-
-	ota_state.current_attempt.main_firmware.status.is_paused = paused;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+		return rc;
 	}
 
 	assert_state_locked();
@@ -1298,22 +1216,12 @@ int spotflow_ota_state_request_main_firmware_abort(
 {
 	k_mutex_lock(&state_mutex, K_FOREVER);
 
-	if (!spotflow_ota_attempt_exists(&ota_state.current_attempt) ||
-	    !main_firmware_phase_allows_abort(
-		    ota_state.current_attempt.main_firmware.status.phase) ||
-	    ota_state.current_attempt.main_firmware.upgrade != OTA_MAIN_UPGRADE_HANDLER_ACTIVE) {
-		if (out_state != NULL) {
-			*out_state = ota_state.current_attempt.main_firmware.status;
-		}
+	int rc = spotflow_ota_main_request_abort(
+		&ota_state.main_firmware, spotflow_ota_attempt_exists(&ota_state.current_attempt),
+		out_state);
+	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
-		return -EINVAL;
-	}
-
-	ota_state.current_attempt.main_firmware.abort_requested = true;
-	ota_state.current_attempt.main_firmware.status.is_paused = false;
-
-	if (out_state != NULL) {
-		*out_state = ota_state.current_attempt.main_firmware.status;
+		return rc;
 	}
 
 	assert_state_locked();
@@ -1326,8 +1234,8 @@ bool spotflow_ota_state_is_main_firmware_abort_requested(void)
 	bool requested;
 
 	k_mutex_lock(&state_mutex, K_FOREVER);
-	requested = spotflow_ota_attempt_exists(&ota_state.current_attempt) &&
-		ota_state.current_attempt.main_firmware.abort_requested;
+	requested = spotflow_ota_main_is_abort_requested(
+		&ota_state.main_firmware, spotflow_ota_attempt_exists(&ota_state.current_attempt));
 	k_mutex_unlock(&state_mutex);
 
 	return requested;
@@ -1346,20 +1254,13 @@ int spotflow_ota_state_begin_main_firmware_upgrade_commit(
 
 	if (!operation_token_matches_current(token)) {
 		rc = -ESTALE;
-	} else if (!main_firmware_handler_is_owned(token) ||
-		   ota_state.current_attempt.main_firmware.status.phase !=
-			   SPOTFLOW_OTA_PHASE_PENDING_UPGRADE ||
-		   ota_state.current_attempt.main_firmware.upgrade !=
-			   OTA_MAIN_UPGRADE_HANDLER_ACTIVE) {
-		rc = -EINVAL;
-	} else if (ota_state.current_attempt.main_firmware.abort_requested ||
-		   ota_state.current_attempt.execution.cancellation_requested) {
-		rc = -ECANCELED;
-	} else if (ota_state.current_attempt.main_firmware.status.is_paused) {
-		rc = -EAGAIN;
 	} else {
-		ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_COMMITTING;
-		assert_state_locked();
+		rc = spotflow_ota_main_begin_upgrade_commit(
+			&ota_state.main_firmware, main_firmware_handler_is_owned(token),
+			ota_state.current_attempt.execution.cancellation_requested);
+		if (rc == 0) {
+			assert_state_locked();
+		}
 	}
 
 	k_mutex_unlock(&state_mutex);
@@ -1377,13 +1278,11 @@ int spotflow_ota_state_cancel_main_firmware_upgrade_commit(
 	k_mutex_lock(&state_mutex, K_FOREVER);
 	if (!operation_token_matches_current(token)) {
 		rc = -ESTALE;
-	} else if (ota_state.current_attempt.main_firmware.upgrade != OTA_MAIN_UPGRADE_COMMITTING ||
-		   ota_state.current_attempt.main_firmware.status.phase !=
-			   SPOTFLOW_OTA_PHASE_PENDING_UPGRADE) {
-		rc = -EINVAL;
 	} else {
-		ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_HANDLER_ACTIVE;
-		assert_state_locked();
+		rc = spotflow_ota_main_cancel_upgrade_commit(&ota_state.main_firmware);
+		if (rc == 0) {
+			assert_state_locked();
+		}
 	}
 	k_mutex_unlock(&state_mutex);
 	return rc;
@@ -1401,18 +1300,11 @@ int spotflow_ota_state_begin_main_firmware_reboot(const struct spotflow_ota_oper
 
 	if (!operation_token_matches_current(token)) {
 		rc = -ESTALE;
-	} else if (ota_state.current_attempt.main_firmware.status.phase !=
-			   SPOTFLOW_OTA_PHASE_PENDING_REBOOT ||
-		   ota_state.current_attempt.main_firmware.upgrade !=
-			   OTA_MAIN_UPGRADE_REBOOT_READY ||
-		   ota_state.current_attempt.main_firmware.probation.state !=
-			   OTA_MAIN_PROBATION_PENDING) {
-		rc = -EINVAL;
-	} else if (ota_state.current_attempt.main_firmware.status.is_paused) {
-		rc = -EAGAIN;
 	} else {
-		ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_REBOOT_STARTED;
-		assert_state_locked();
+		rc = spotflow_ota_main_begin_reboot(&ota_state.main_firmware);
+		if (rc == 0) {
+			assert_state_locked();
+		}
 	}
 
 	k_mutex_unlock(&state_mutex);
@@ -1435,20 +1327,18 @@ int spotflow_ota_state_commit_main_firmware_probation_cleared(
 		return -ESTALE;
 	}
 
-	if (ota_state.current_attempt.main_firmware.probation.state !=
-		    OTA_MAIN_PROBATION_COMPLETION_CLAIMED ||
-	    ota_state.current_attempt.execution.transaction.state !=
-		    OTA_ARTIFACT_TRANSACTION_RESULT_STAGED ||
-	    ota_state.current_attempt.execution.transaction.mutation.source !=
-		    OTA_ARTIFACT_RESULT_MAIN_RECONCILIATION ||
-	    ota_state.current_attempt.execution.transaction.mutation.artifact_index !=
-		    ota_state.current_attempt.main_firmware.artifact_index) {
+	bool reconciliation_owned = ota_state.current_attempt.execution.transaction.state ==
+			OTA_ARTIFACT_TRANSACTION_RESULT_STAGED &&
+		ota_state.current_attempt.execution.transaction.mutation.source ==
+			OTA_ARTIFACT_RESULT_MAIN_RECONCILIATION &&
+		ota_state.current_attempt.execution.transaction.mutation.artifact_index ==
+			ota_state.main_firmware.artifact_index;
+	int rc = spotflow_ota_main_commit_probation_cleared(&ota_state.main_firmware,
+							    reconciliation_owned);
+	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
-		return -EINVAL;
+		return rc;
 	}
-
-	ota_state.current_attempt.main_firmware.probation.state = OTA_MAIN_PROBATION_NONE;
-	ota_state.current_attempt.main_firmware.upgrade = OTA_MAIN_UPGRADE_IDLE;
 	assert_state_locked();
 	k_mutex_unlock(&state_mutex);
 	return 0;
@@ -1465,25 +1355,14 @@ static uint32_t allocate_attempt_generation(void)
 	return spotflow_ota_attempt_allocate_generation(&ota_state.next_attempt_generation);
 }
 
-static bool main_probation_is_pending(const struct ota_attempt_model* attempt)
-{
-	return attempt->main_firmware.probation.state != OTA_MAIN_PROBATION_NONE;
-}
-
-static bool main_upgrade_is_irreversible(const struct ota_attempt_model* attempt)
-{
-	return attempt->main_firmware.upgrade == OTA_MAIN_UPGRADE_COMMITTING ||
-		attempt->main_firmware.upgrade == OTA_MAIN_UPGRADE_REBOOT_READY ||
-		attempt->main_firmware.upgrade == OTA_MAIN_UPGRADE_REBOOT_STARTED;
-}
-
 static struct ota_attempt_constraints attempt_constraints(void)
 {
 	return (struct ota_attempt_constraints){
 		.main_upgrade_irreversible =
-			main_upgrade_is_irreversible(&ota_state.current_attempt),
-		.probation_artifact_pending = main_probation_is_pending(&ota_state.current_attempt),
-		.probation_artifact_index = ota_state.current_attempt.main_firmware.artifact_index,
+			spotflow_ota_main_upgrade_is_irreversible(&ota_state.main_firmware),
+		.probation_artifact_pending =
+			spotflow_ota_main_probation_is_pending(&ota_state.main_firmware),
+		.probation_artifact_index = ota_state.main_firmware.artifact_index,
 	};
 }
 
@@ -1504,22 +1383,19 @@ static bool state_is_valid(void)
 			&ota_state.current_attempt.execution.transaction;
 
 		if (transaction->mutation.source == OTA_ARTIFACT_RESULT_MAIN_RECONCILIATION &&
-		    (ota_state.current_attempt.main_firmware.presence !=
-			     OTA_MAIN_FIRMWARE_PRESENT ||
-		     ota_state.current_attempt.main_firmware.artifact_index !=
-			     transaction->artifact_index)) {
+		    (ota_state.main_firmware.presence != OTA_MAIN_FIRMWARE_PRESENT ||
+		     ota_state.main_firmware.artifact_index != transaction->artifact_index)) {
 			return false;
 		}
 	}
 
-	if (main_probation_is_pending(&ota_state.current_attempt) &&
-	    (ota_state.current_attempt.main_firmware.presence != OTA_MAIN_FIRMWARE_PRESENT ||
-	     ota_state.current_attempt.main_firmware.artifact_index >=
-		     ota_state.current_attempt.plan.count)) {
+	if (spotflow_ota_main_probation_is_pending(&ota_state.main_firmware) &&
+	    (ota_state.main_firmware.presence != OTA_MAIN_FIRMWARE_PRESENT ||
+	     ota_state.main_firmware.artifact_index >= ota_state.current_attempt.plan.count)) {
 		return false;
 	}
 
-	return main_firmware_state_is_valid(&ota_state.current_attempt) &&
+	return spotflow_ota_main_is_valid(&ota_state.main_firmware) &&
 		(ota_state.pending_attempt.kind == OTA_PENDING_ATTEMPT_NONE ||
 		 spotflow_ota_pending_attempt_id(&ota_state.pending_attempt) != 0);
 }
@@ -1566,82 +1442,6 @@ static spotflow_ota_state_effects artifact_result_effects(void)
 		: 0;
 }
 
-static bool main_firmware_phase_allows_pause(enum spotflow_ota_phase phase)
-{
-	switch (phase) {
-	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
-	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
-	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
-	case SPOTFLOW_OTA_PHASE_PENDING_REBOOT:
-		return true;
-	default:
-		return false;
-	}
-}
-
-static bool main_firmware_phase_allows_abort(enum spotflow_ota_phase phase)
-{
-	switch (phase) {
-	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
-	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
-	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
-		return true;
-	default:
-		return false;
-	}
-}
-
-static bool main_firmware_state_is_valid(const struct ota_attempt_model* attempt)
-{
-	const struct ota_main_firmware_model* main = &attempt->main_firmware;
-
-	switch (main->upgrade) {
-	case OTA_MAIN_UPGRADE_IDLE:
-		if (main->status.phase == SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD ||
-		    main->status.phase == SPOTFLOW_OTA_PHASE_DOWNLOADING ||
-		    main->status.phase == SPOTFLOW_OTA_PHASE_PENDING_UPGRADE ||
-		    main->status.phase == SPOTFLOW_OTA_PHASE_PENDING_REBOOT) {
-			return false;
-		}
-		break;
-	case OTA_MAIN_UPGRADE_HANDLER_ACTIVE:
-		if (main->probation.state != OTA_MAIN_PROBATION_NONE ||
-		    (main->status.phase != SPOTFLOW_OTA_PHASE_NOT_RUNNING &&
-		     main->status.phase != SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD &&
-		     main->status.phase != SPOTFLOW_OTA_PHASE_DOWNLOADING &&
-		     main->status.phase != SPOTFLOW_OTA_PHASE_PENDING_UPGRADE)) {
-			return false;
-		}
-		break;
-	case OTA_MAIN_UPGRADE_COMMITTING:
-		if (main->probation.state != OTA_MAIN_PROBATION_NONE ||
-		    main->status.phase != SPOTFLOW_OTA_PHASE_PENDING_UPGRADE) {
-			return false;
-		}
-		break;
-	case OTA_MAIN_UPGRADE_REBOOT_READY:
-	case OTA_MAIN_UPGRADE_REBOOT_STARTED:
-		if (main->probation.state != OTA_MAIN_PROBATION_PENDING ||
-		    main->status.phase != SPOTFLOW_OTA_PHASE_PENDING_REBOOT) {
-			return false;
-		}
-		break;
-	default:
-		return false;
-	}
-
-	if ((main->probation.state == OTA_MAIN_PROBATION_COMPLETION_QUEUED ||
-	     main->probation.state == OTA_MAIN_PROBATION_COMPLETION_CLAIMED) &&
-	    (main->upgrade != OTA_MAIN_UPGRADE_IDLE ||
-	     main->status.phase != SPOTFLOW_OTA_PHASE_NOT_RUNNING ||
-	     (main->status.result != SPOTFLOW_OTA_RESULT_SUCCEEDED &&
-	      main->status.result != SPOTFLOW_OTA_RESULT_FAILED))) {
-		return false;
-	}
-
-	return true;
-}
-
 static bool operation_token_matches_current(const struct spotflow_ota_operation_token* token)
 {
 	return token != NULL && token->attempt_id != 0 && token->generation != 0 &&
@@ -1653,24 +1453,9 @@ static bool operation_token_matches_current(const struct spotflow_ota_operation_
 static bool main_firmware_handler_is_owned(const struct spotflow_ota_operation_token* token)
 {
 	return operation_token_matches_current(token) &&
-		ota_state.current_attempt.main_firmware.presence == OTA_MAIN_FIRMWARE_PRESENT &&
+		ota_state.main_firmware.presence == OTA_MAIN_FIRMWARE_PRESENT &&
 		ota_state.current_attempt.execution.transaction.state ==
 		OTA_ARTIFACT_TRANSACTION_RUNNING &&
 		ota_state.current_attempt.execution.transaction.artifact_index ==
-		ota_state.current_attempt.main_firmware.artifact_index;
-}
-
-static void
-restore_main_firmware_artifact_from_probation(const struct spotflow_ota_probation* probation)
-{
-	struct spotflow_ota_artifact artifact = {
-		.is_main = true,
-	};
-
-	strncpy(artifact.slug, probation->slug, sizeof(artifact.slug) - 1);
-	strncpy(artifact.version, probation->version, sizeof(artifact.version) - 1);
-
-	ota_state.current_attempt.main_firmware.presence = OTA_MAIN_FIRMWARE_PRESENT;
-	ota_state.current_attempt.main_firmware.artifact_index = probation->artifact_index;
-	copy_artifact_out(&ota_state.current_attempt.main_firmware.artifact, &artifact);
+		ota_state.main_firmware.artifact_index;
 }

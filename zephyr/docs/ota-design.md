@@ -333,6 +333,7 @@ Important files:
 | `core/spotflow_ota_state.c` | Static aggregate store, mutex-protected API wrappers, report state, and aggregate job priority |
 | `core/spotflow_ota_state_model.h` | Private in-memory representation; contains no global store or mutex |
 | `core/spotflow_ota_attempt_model.c` | Pure attempt, plan, pending, cancellation, result-mutation, and lifecycle transitions |
+| `core/spotflow_ota_main_model.c` | Pure main-upgrade, pause/abort, and probation transitions |
 | `core/spotflow_ota_worker.c` | Dedicated worker thread; artifact sequencing and job dispatch |
 | `protocol/spotflow_ota_cbor.c` | C2D decode / D2C encode; protocol limits and attempt errors |
 | `protocol/spotflow_ota_net.c` | Pending D2C merge and MQTT publish wrapper |
@@ -348,6 +349,14 @@ Important files:
 
 MQTT subscription and inbound routing live in `spotflow_mqtt.c` / `spotflow_processor.c`.
 C2D payloads are decoded on the MQTT thread; all durable work is handed to the OTA worker.
+
+The attempt and main-firmware models are sibling values in the aggregate
+store. They receive state explicitly and do not own a mutex or reference the
+global store. Cross-model actions such as claiming reconciled main completion
+or crossing the prereboot boundary return typed transition outputs; the state
+coordinator applies those outputs while holding the aggregate mutex. Aggregate
+job selection remains in the coordinator so its priority is visible in one
+place.
 
 ## Initialization
 

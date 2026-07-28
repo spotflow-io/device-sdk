@@ -16,11 +16,6 @@ void spotflow_ota_attempt_clear(struct ota_attempt_model* attempt)
 	attempt->execution.transaction.state = OTA_ARTIFACT_TRANSACTION_IDLE;
 	attempt->execution.sequence_policy = OTA_ARTIFACT_SEQUENCE_CONTINUE;
 	attempt->failure.state = OTA_ATTEMPT_FAILURE_NONE;
-	attempt->main_firmware.presence = OTA_MAIN_FIRMWARE_ABSENT;
-	attempt->main_firmware.upgrade = OTA_MAIN_UPGRADE_IDLE;
-	attempt->main_firmware.probation.state = OTA_MAIN_PROBATION_NONE;
-	attempt->main_firmware.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
-	attempt->main_firmware.status.result = SPOTFLOW_OTA_RESULT_PENDING;
 }
 
 uint32_t spotflow_ota_attempt_allocate_generation(uint32_t* next_generation)

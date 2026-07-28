@@ -153,7 +153,6 @@ struct ota_attempt_model {
 	struct ota_artifact_plan plan;
 	struct ota_artifact_execution execution;
 	struct ota_attempt_failure failure;
-	struct ota_main_firmware_model main_firmware;
 };
 
 #endif /* SPOTFLOW_OTA_STATE_MODEL_H */
