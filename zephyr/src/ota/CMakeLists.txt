@@ -11,6 +11,7 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
         protocol/spotflow_ota_net.c
         persistence/spotflow_ota_persistence.c
         persistence/spotflow_ota_records_cbor.c
+        core/spotflow_ota_attempt_model.c
         core/spotflow_ota_state.c
         downloader/spotflow_ota_url.c
         core/spotflow_ota_worker.c

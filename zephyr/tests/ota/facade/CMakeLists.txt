@@ -29,6 +29,7 @@ target_sources(app PRIVATE
         ../../../src/ota/firmware/spotflow_ota_fw_custom.c
         ../../../src/ota/core/spotflow_ota_log.c
         ../../../src/ota/core/spotflow_ota_results.c
+        ../../../src/ota/core/spotflow_ota_attempt_model.c
         ../../../src/ota/protocol/spotflow_ota_net.c
         ../../../src/ota/persistence/spotflow_ota_persistence.c
         ../../../src/ota/persistence/spotflow_ota_records_cbor.c

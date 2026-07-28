@@ -330,7 +330,9 @@ Important files:
 | Module | Responsibility |
 |---|---|
 | `spotflow_ota.c` | Public facade; delegates to internal modules; idempotent init |
-| `core/spotflow_ota_state.c` | In-memory attempt/artifact state; mutex-protected transitions |
+| `core/spotflow_ota_state.c` | Static aggregate store, mutex-protected API wrappers, report state, and aggregate job priority |
+| `core/spotflow_ota_state_model.h` | Private in-memory representation; contains no global store or mutex |
+| `core/spotflow_ota_attempt_model.c` | Pure attempt, plan, pending, cancellation, result-mutation, and lifecycle transitions |
 | `core/spotflow_ota_worker.c` | Dedicated worker thread; artifact sequencing and job dispatch |
 | `protocol/spotflow_ota_cbor.c` | C2D decode / D2C encode; protocol limits and attempt errors |
 | `protocol/spotflow_ota_net.c` | Pending D2C merge and MQTT publish wrapper |
@@ -404,6 +406,14 @@ Cancellation uses `sysworkq` because the OTA worker may be blocked inside
 without holding `state_mutex`.
 
 ## Attempt and artifact state model
+
+The attempt model is independent of Zephyr synchronization and external I/O.
+It receives the current attempt, pending slot, generation counter, and relevant
+main-firmware constraints explicitly, then returns typed transition outputs.
+`spotflow_ota_state.c` applies those outputs to report scheduling and public
+effects while holding `state_mutex`. Aggregate job selection remains in that
+coordinator so the priority between rejection, main reconciliation,
+finalization, reporting, and artifact work is visible in one place.
 
 **Attempts**
 
