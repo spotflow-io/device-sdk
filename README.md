@@ -159,6 +159,19 @@ For BLE transport, the device exposes session metadata as a readable GATT charac
 
 #### OTA Updates
 
+Spotflow OTA lets the cloud ask a device to install one or more firmware versions.
+Each device-specific request is an **update attempt** identified by an attempt ID. It
+contains an ordered **manifest** of **artifacts**, where each artifact describes one
+firmware image and the version to install. The SDK processes the artifacts in manifest
+order, persists their results, and reports those results to the Spotflow platform.
+
+An artifact marked as **main firmware** updates the firmware that runs the Spotflow SDK.
+The SDK can handle it automatically using MCUboot: it downloads the image, requests a
+test upgrade, reboots, and waits for the application to confirm that the new image works.
+Other artifacts are **delegated firmware**: the SDK invokes an application callback that
+performs the update, typically for an external MCU. Main firmware can also be delegated
+when automatic handling is disabled.
+
 The implementation is split into the following components:
 
 ```mermaid
@@ -166,10 +179,10 @@ The implementation is split into the following components:
 title: OTA Implementation Responsibilities
 ---
 flowchart TD
-    processor[Processor:<br/>Receiving C2D messages<br/>Sending D2C messages]
+    processor[Processor:<br/>Receiving cloud-to-device messages<br/>Sending device-to-cloud messages]
     facade[Public API]
     core[Core:<br/>State and worker]
-    firmware[Firmware handlers:<br/>Automatic and custom]
+    firmware[Firmware handlers:<br/>Automatic main and delegated]
     downloader["Downloader:<br/>HTTP(S), retrying, pausing, canceling"]
     persistence[Persistence:<br/>State and results]
     platform[Platform wrappers:<br/>MCUboot, flash memory, build ID parsing]
@@ -187,16 +200,20 @@ flowchart TD
     firmware --> persistence
 ```
 
-- *Public API* enables the user code to influence automatic main firmware updates (observing, pausing, aborting) and implement custom firmware updates of external MCUs.
-- *Processor* handles the communication with the Spotflow platform, including cloud-to-device (C2D) and device-to-cloud (D2C) messages of OTA updates.
+- *Public API* enables application code to influence automatic main-firmware updates
+  (observing, pausing, aborting) and implement delegated firmware updates.
+- *Processor* handles communication with the Spotflow platform, including
+  cloud-to-device (C2D) requests and device-to-cloud (D2C) results.
 - *Core* contains the management of the update state and the delegation of complex tasks to a worker thread.
-- *Firmware handlers* run on the worker thread and contain the logic for both automatic and custom firmware updates.
+- *Firmware handlers* run on the worker thread and contain the logic for both automatic
+  main-firmware updates and application-provided delegated updates.
 - *Downloader* provides a resilient download mechanism for firmware updates.
   It is used internally by the automatic firmware update handler and can be used directly by the user code as well.
 - *Platform wrappers* provide an interface for low-level features so that they can be easily faked in tests.
-- *Persistence* of the update OTA state and results is handled by the Zephyr Settings subsystem.
+- *Persistence* of OTA state, results, installed versions, and main-firmware probation is
+  handled by the Zephyr Settings subsystem.
 
-A successful OTA update looks like this:
+A successful automatic main-firmware update looks like this:
 
 ```mermaid
 ---
@@ -206,26 +223,31 @@ sequenceDiagram
     participant Cloud as Spotflow Cloud
     participant Processor
     participant OTA as OTA Update Worker
+    participant Settings as Zephyr Settings
     participant DL as Downloader
     participant Boot as MCUboot
     participant App as Application
 
-    Cloud->>Processor: Request update
-    Processor->>OTA: Enqueue attempt
+    Cloud->>Processor: Send manifest for update attempt
+    Processor->>OTA: Accept attempt
+    OTA->>Settings: Persist accepted attempt
     OTA->>DL: Download image<br />to secondary slot
+    OTA->>Settings: Persist probation
     OTA->>Boot: Request test upgrade
     Note right of OTA: Reboot device, new<br />image is unconfirmed
     App->>OTA: spotflow_confirm_main_firmware_image()
     OTA->>Boot: Confirm image
-    OTA->>Processor: Report success
-    Processor->>Cloud: Report success
+    OTA->>Settings: Persist installed version<br />and successful result
+    OTA->>Processor: Prepare cumulative results
+    Processor->>Cloud: Report attempt results
 ```
 
-More details:
+Choose the next document according to what you want to do:
 
-- [Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr) — integrator guide for the OTA device module
-- [OTA sample](zephyr/samples/ota) — end-to-end sample with MCUboot sysbuild
-- [OTA implementation design notes](zephyr/docs/ota.md) — design and implementation summary for SDK contributors
+- **Integrate OTA:** [Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr)
+- **Try OTA:** [OTA sample](zephyr/samples/ota), an end-to-end application with MCUboot sysbuild
+- **Maintain the SDK:** [OTA implementation design notes](zephyr/docs/ota.md), including
+  state, concurrency, persistence, recovery, and testing rationale
 
 ### Build ID
 
