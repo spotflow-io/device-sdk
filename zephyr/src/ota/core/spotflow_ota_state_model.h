@@ -84,12 +84,16 @@ enum ota_report_state {
 	OTA_REPORT_BLOCKED,
 };
 
-enum ota_main_upgrade_state {
-	OTA_MAIN_UPGRADE_IDLE,
-	OTA_MAIN_UPGRADE_HANDLER_ACTIVE,
-	OTA_MAIN_UPGRADE_COMMITTING,
-	OTA_MAIN_UPGRADE_REBOOT_READY,
-	OTA_MAIN_UPGRADE_REBOOT_STARTED,
+enum ota_main_execution_state {
+	OTA_MAIN_EXECUTION_IDLE,
+	OTA_MAIN_EXECUTION_CLAIMED,
+	OTA_MAIN_EXECUTION_PENDING_DOWNLOAD,
+	OTA_MAIN_EXECUTION_DOWNLOADING,
+	OTA_MAIN_EXECUTION_PENDING_UPGRADE,
+	OTA_MAIN_EXECUTION_COMMITTING,
+	OTA_MAIN_EXECUTION_REBOOT_READY,
+	OTA_MAIN_EXECUTION_REBOOT_STARTED,
+	OTA_MAIN_EXECUTION_UNCONFIRMED,
 };
 
 enum ota_main_probation_state {
@@ -135,16 +139,16 @@ enum ota_main_firmware_presence {
 
 struct ota_main_firmware_probation {
 	enum ota_main_probation_state state;
-	enum spotflow_ota_result reconciled_result;
 };
 
 struct ota_main_firmware_model {
 	enum ota_main_firmware_presence presence;
 	size_t artifact_index;
 	struct spotflow_ota_artifact artifact;
-	struct spotflow_ota_main_firmware_state status;
+	enum ota_main_execution_state execution;
+	enum spotflow_ota_result result;
+	bool is_paused;
 	bool abort_requested;
-	enum ota_main_upgrade_state upgrade;
 	struct ota_main_firmware_probation probation;
 };
 

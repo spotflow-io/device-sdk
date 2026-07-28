@@ -23,6 +23,8 @@ struct ota_main_prereboot_transition {
 
 void spotflow_ota_main_clear(struct ota_main_firmware_model* main);
 bool spotflow_ota_main_is_valid(const struct ota_main_firmware_model* main);
+void spotflow_ota_main_project_state(const struct ota_main_firmware_model* main,
+				     struct spotflow_ota_main_firmware_state* out_state);
 bool spotflow_ota_main_probation_is_pending(const struct ota_main_firmware_model* main);
 bool spotflow_ota_main_upgrade_is_irreversible(const struct ota_main_firmware_model* main);
 

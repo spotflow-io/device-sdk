@@ -34,7 +34,7 @@ flowchart TD
     plan["artifact plan\nsource, count, descriptors, results"]
     execution["artifact execution\nnext index, transaction,\ncancellation, sequence policy"]
     failure["attempt failure\npresence, error"]
-    main["main-firmware context\npresence, artifact, status,\nupgrade, probation"]
+    main["main-firmware context\npresence, artifact, execution,\nresult, pause/abort, probation"]
 
     store --> current
     store --> main
@@ -61,15 +61,16 @@ Each attempt substructure has an explicit validity rule:
 | `artifact plan` | `source` states which other fields can be trusted; `results[0..count)` are valid for every source except `NONE`, while descriptors are valid only for `FULL_MANIFEST`. |
 | `artifact execution` | `transaction.artifact_index` is valid only in `Running` or `ResultStaged`; the mutation and its revision are valid only in `ResultStaged`; `next_index` identifies the first pending durable result or equals `count`. |
 | `attempt failure` | `error` is meaningful only when failure state is `PRESENT`. |
-| `main-firmware context` | Artifact identity and index are meaningful only when presence is `PRESENT`; the reconciled result is meaningful only while probation completion is queued or claimed. |
+| `main-firmware context` | Artifact identity and index are meaningful only when presence is `PRESENT`; execution determines the public phase, result is stored separately, and probation records cross-reboot and completion ownership. |
 
 Debug invariants also check the relationships between these contexts. The cached attempt
 lifecycle must agree with durable and projected terminality; the artifact cursor must be
 the first durable pending result; running and staged transactions must own a pending
 artifact; finalization claims require terminal durable results; a claimed report records
 and matches the current generation; a pending replacement has a different nonzero
-attempt ID; and public main-firmware phase, pause/abort, upgrade, and probation states
-must form a legal model state.
+attempt ID; and main-firmware execution, result, pause/abort, and probation states must
+form a legal model state. Public main-firmware state is projected from those fields, not
+independently cached.
 
 The artifact plan source replaces ambiguous combinations such as “manifest unavailable,
 but artifact count known”:
@@ -169,9 +170,9 @@ be resolved only for a mutation whose source is main reconciliation.
 
 ### Main-firmware upgrade and probation
 
-The pre-reboot upgrade state and the cross-reboot probation state are orthogonal. This
-avoids combinations of `upgrade_commit_started`, `reboot_started`, and
-`probation_pending` booleans.
+The execution state, update result, and cross-reboot probation state are separate. This
+avoids caching the complete public state and combinations of
+`upgrade_commit_started`, `reboot_started`, and `probation_pending` booleans.
 
 ```mermaid
 stateDiagram-v2
@@ -203,16 +204,17 @@ stateDiagram-v2
     }
 ```
 
-The diagram labels name the state transition APIs. The internal upgrade states
-`HandlerActive`, `Committing`, `RebootReady`, and `RebootStarted` distinguish ownership
-and the irreversible boundary; the public phases shown above are derived by those
-transitions rather than set arbitrarily. Every pre-reboot transition validates the
-claimed artifact job's attempt ID and generation. Startup reconciliation instead
-validates the persisted probation attempt and artifact index because reboot creates a
-new in-memory generation.
+The diagram labels name the state transition APIs. The execution enum records ownership,
+progress, and the irreversible boundary. The update result remains a separate field;
+completion returns execution to `Idle` and stores its outcome in that field.
+`spotflow_ota_main_project_state()` is the sole mapping from execution, result, and the
+orthogonal pause flag to public state; the public structure itself is never cached.
+Every pre-reboot transition validates the claimed artifact job's attempt ID and
+generation. Startup reconciliation instead validates the persisted probation attempt
+and artifact index because reboot creates a new in-memory generation.
 
 Pause is an orthogonal flag valid only in the documented pre-reboot phases. Cancellation
-and supersession are rejected once the upgrade state reaches `Committing` because the
+and supersession are rejected once the execution state reaches `Committing` because the
 persisted attempt must no longer change across the irreversible boot transition.
 
 ### Report request and network outbox
@@ -288,7 +290,7 @@ the state and worker suites cover token ownership, persistence, and aggregate sc
 | Attempt | start, restore, rehydrate, duplicate/queue, cancel, supersede, promote, reject, finalize | lifecycle/terminality drift, invalid cursor or transaction ownership, stale generation, replacement with reused ID |
 | Artifact transaction | claim, stage, project, revision change, persist, commit, advance | report during staging, mismatched revision/index/source, commit before persistence |
 | Report | request, coalesce, claim, rerun, block, complete, promote pending | non-current attempt, stale job generation, report claim owned by another generation |
-| Main upgrade/control | claim, download phases, pause/resume, abort, commit/cancel commit, prereboot, reboot, fail | illegal phase/upgrade pairs, pause or abort outside allowed phases, stale handler token |
+| Main execution/control | claim, download phases, pause/resume, abort, commit/cancel commit, prereboot, reboot, fail, public-state projection | illegal execution/probation/control combinations, pause or abort outside allowed states, stale handler token |
 | Probation | restore, unconfirmed, success/rollback queue, completion claim, durable clear | wrong artifact identity, result-source mismatch, completion without owned artifact transaction |
 
 ## Module map
@@ -355,7 +357,7 @@ Important files:
 | `core/spotflow_ota_state.c` | Static aggregate store, mutex-protected API wrappers, report state, and aggregate job priority |
 | `core/spotflow_ota_state_model.h` | Private in-memory representation; contains no global store or mutex |
 | `core/spotflow_ota_attempt_model.c` | Pure attempt, plan, pending, cancellation, result-mutation, and lifecycle transitions |
-| `core/spotflow_ota_main_model.c` | Pure main-upgrade, pause/abort, and probation transitions |
+| `core/spotflow_ota_main_model.c` | Pure canonical main execution, derived public-state projection, pause/abort, and probation transitions |
 | `core/spotflow_ota_worker.c` | Dedicated worker thread; artifact sequencing and job dispatch |
 | `protocol/spotflow_ota_cbor.c` | C2D decode / D2C encode; protocol limits and attempt errors |
 | `protocol/spotflow_ota_net.c` | Pending D2C merge and MQTT publish wrapper |

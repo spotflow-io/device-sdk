@@ -54,27 +54,26 @@ ZTEST(spotflow_ota_main_model, test_upgrade_transition_sequence)
 ZTEST(spotflow_ota_main_model, test_control_transition_table)
 {
 	struct {
-		enum spotflow_ota_phase phase;
-		enum ota_main_upgrade_state upgrade;
+		enum ota_main_execution_state execution;
 		bool pause_allowed;
 		bool abort_allowed;
 	} cases[] = {
-		{ SPOTFLOW_OTA_PHASE_NOT_RUNNING, OTA_MAIN_UPGRADE_IDLE, false, false },
-		{ SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD, OTA_MAIN_UPGRADE_HANDLER_ACTIVE, true,
-		  true },
-		{ SPOTFLOW_OTA_PHASE_DOWNLOADING, OTA_MAIN_UPGRADE_HANDLER_ACTIVE, true, true },
-		{ SPOTFLOW_OTA_PHASE_PENDING_UPGRADE, OTA_MAIN_UPGRADE_HANDLER_ACTIVE, true, true },
-		{ SPOTFLOW_OTA_PHASE_PENDING_REBOOT, OTA_MAIN_UPGRADE_REBOOT_READY, true, false },
-		{ SPOTFLOW_OTA_PHASE_UNCONFIRMED, OTA_MAIN_UPGRADE_IDLE, false, false },
+		{ OTA_MAIN_EXECUTION_IDLE, false, false },
+		{ OTA_MAIN_EXECUTION_PENDING_DOWNLOAD, true, true },
+		{ OTA_MAIN_EXECUTION_DOWNLOADING, true, true },
+		{ OTA_MAIN_EXECUTION_PENDING_UPGRADE, true, true },
+		{ OTA_MAIN_EXECUTION_REBOOT_READY, true, false },
+		{ OTA_MAIN_EXECUTION_UNCONFIRMED, false, false },
 	};
 
 	for (size_t i = 0; i < ARRAY_SIZE(cases); i++) {
 		struct ota_main_firmware_model main;
 		spotflow_ota_main_clear(&main);
 		main.presence = OTA_MAIN_FIRMWARE_PRESENT;
-		main.status.phase = cases[i].phase;
-		main.upgrade = cases[i].upgrade;
-		if (cases[i].upgrade == OTA_MAIN_UPGRADE_REBOOT_READY) {
+		main.artifact = make_main_artifact();
+		main.execution = cases[i].execution;
+		if (cases[i].execution == OTA_MAIN_EXECUTION_REBOOT_READY ||
+		    cases[i].execution == OTA_MAIN_EXECUTION_UNCONFIRMED) {
 			main.probation.state = OTA_MAIN_PROBATION_PENDING;
 		}
 
@@ -88,6 +87,54 @@ ZTEST(spotflow_ota_main_model, test_control_transition_table)
 		zassert_equal(rc == 0, cases[i].abort_allowed, "abort case %zu", i);
 		zassert_equal(spotflow_ota_main_is_abort_requested(&main, true),
 			      cases[i].abort_allowed, "abort query case %zu", i);
+	}
+}
+
+ZTEST(spotflow_ota_main_model, test_public_state_is_projected_from_execution_and_result)
+{
+	struct {
+		enum ota_main_execution_state execution;
+		enum spotflow_ota_phase phase;
+		enum spotflow_ota_result result;
+	} cases[] = {
+		{ OTA_MAIN_EXECUTION_IDLE, SPOTFLOW_OTA_PHASE_NOT_RUNNING,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_CLAIMED, SPOTFLOW_OTA_PHASE_NOT_RUNNING,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_PENDING_DOWNLOAD, SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_DOWNLOADING, SPOTFLOW_OTA_PHASE_DOWNLOADING,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_PENDING_UPGRADE, SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_COMMITTING, SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_REBOOT_READY, SPOTFLOW_OTA_PHASE_PENDING_REBOOT,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_REBOOT_STARTED, SPOTFLOW_OTA_PHASE_PENDING_REBOOT,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_UNCONFIRMED, SPOTFLOW_OTA_PHASE_UNCONFIRMED,
+		  SPOTFLOW_OTA_RESULT_PENDING },
+		{ OTA_MAIN_EXECUTION_IDLE, SPOTFLOW_OTA_PHASE_NOT_RUNNING,
+		  SPOTFLOW_OTA_RESULT_SUCCEEDED },
+		{ OTA_MAIN_EXECUTION_IDLE, SPOTFLOW_OTA_PHASE_NOT_RUNNING,
+		  SPOTFLOW_OTA_RESULT_FAILED },
+		{ OTA_MAIN_EXECUTION_IDLE, SPOTFLOW_OTA_PHASE_NOT_RUNNING,
+		  SPOTFLOW_OTA_RESULT_CANCELED },
+	};
+
+	for (size_t i = 0; i < ARRAY_SIZE(cases); i++) {
+		struct ota_main_firmware_model main;
+		struct spotflow_ota_main_firmware_state state;
+
+		spotflow_ota_main_clear(&main);
+		main.execution = cases[i].execution;
+		main.result = cases[i].result;
+		main.is_paused = cases[i].execution == OTA_MAIN_EXECUTION_PENDING_DOWNLOAD;
+		spotflow_ota_main_project_state(&main, &state);
+		zassert_equal(state.phase, cases[i].phase, "phase case %zu", i);
+		zassert_equal(state.result, cases[i].result, "result case %zu", i);
+		zassert_equal(state.is_paused, main.is_paused, "pause case %zu", i);
 	}
 }
 
@@ -151,30 +198,34 @@ ZTEST(spotflow_ota_main_model, test_invariant_rejects_cross_machine_drift)
 	zassert_false(spotflow_ota_main_is_valid(&invalid));
 
 	invalid = valid;
-	invalid.status.phase = SPOTFLOW_OTA_PHASE_UNCONFIRMED;
-	invalid.status.is_paused = true;
+	invalid.execution = OTA_MAIN_EXECUTION_UNCONFIRMED;
+	invalid.is_paused = true;
+	invalid.probation.state = OTA_MAIN_PROBATION_PENDING;
 	zassert_false(spotflow_ota_main_is_valid(&invalid));
 
 	invalid = valid;
-	invalid.upgrade = OTA_MAIN_UPGRADE_REBOOT_READY;
-	invalid.status.phase = SPOTFLOW_OTA_PHASE_PENDING_REBOOT;
+	invalid.execution = OTA_MAIN_EXECUTION_REBOOT_READY;
 	invalid.abort_requested = true;
 	invalid.probation.state = OTA_MAIN_PROBATION_PENDING;
 	zassert_false(spotflow_ota_main_is_valid(&invalid));
 
 	invalid = valid;
-	invalid.upgrade = OTA_MAIN_UPGRADE_IDLE;
-	invalid.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
-	invalid.status.result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
+	invalid.execution = OTA_MAIN_EXECUTION_PENDING_DOWNLOAD;
 	invalid.probation.state = OTA_MAIN_PROBATION_COMPLETION_QUEUED;
-	invalid.probation.reconciled_result = SPOTFLOW_OTA_RESULT_PENDING;
 	zassert_false(spotflow_ota_main_is_valid(&invalid));
 
 	invalid = valid;
-	invalid.upgrade = OTA_MAIN_UPGRADE_IDLE;
-	invalid.status.phase = SPOTFLOW_OTA_PHASE_NOT_RUNNING;
-	invalid.probation.state = OTA_MAIN_PROBATION_NONE;
-	invalid.probation.reconciled_result = SPOTFLOW_OTA_RESULT_SUCCEEDED;
+	invalid.result = SPOTFLOW_OTA_RESULT_FAILED;
+	zassert_false(spotflow_ota_main_is_valid(&invalid));
+
+	invalid = valid;
+	invalid.execution = OTA_MAIN_EXECUTION_IDLE;
+	invalid.result = SPOTFLOW_OTA_RESULT_CANCELED;
+	invalid.probation.state = OTA_MAIN_PROBATION_COMPLETION_QUEUED;
+	zassert_false(spotflow_ota_main_is_valid(&invalid));
+
+	invalid = valid;
+	invalid.presence = OTA_MAIN_FIRMWARE_ABSENT;
 	zassert_false(spotflow_ota_main_is_valid(&invalid));
 }
 

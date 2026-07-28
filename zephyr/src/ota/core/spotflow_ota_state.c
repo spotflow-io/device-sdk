@@ -922,7 +922,7 @@ int spotflow_ota_state_get_main_firmware_view(struct spotflow_ota_main_firmware_
 	k_mutex_lock(&state_mutex, K_FOREVER);
 	view->has_current_attempt = spotflow_ota_attempt_exists(&ota_state.current_attempt);
 	view->attempt_id = ota_state.current_attempt.identity.id;
-	view->state = ota_state.main_firmware.status;
+	spotflow_ota_main_project_state(&ota_state.main_firmware, &view->state);
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
@@ -980,7 +980,7 @@ void spotflow_ota_state_get_diagnostic(struct spotflow_ota_state_diagnostic* dia
 	diagnostic->has_attempt_error =
 		ota_state.current_attempt.failure.state == OTA_ATTEMPT_FAILURE_PRESENT;
 	diagnostic->attempt_error = ota_state.current_attempt.failure.error;
-	diagnostic->main_firmware_state = ota_state.main_firmware.status;
+	spotflow_ota_main_project_state(&ota_state.main_firmware, &diagnostic->main_firmware_state);
 	memcpy(diagnostic->artifact_results, ota_state.current_attempt.plan.results,
 	       sizeof(diagnostic->artifact_results));
 	spotflow_ota_attempt_project_results(&ota_state.current_attempt, attempt_constraints(),
