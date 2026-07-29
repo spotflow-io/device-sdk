@@ -1,4 +1,4 @@
-# Zephyr over-the-air (OTA) updates — implementation design notes
+# Zephyr over-the-air (OTA) updates
 
 This document explains the architecture and important design decisions behind these
 updates in the Spotflow SDK for Zephyr.
@@ -17,7 +17,7 @@ The MQTT message schemas are documented in the
 Knowing that protocol is not a prerequisite for reading this document: the behavioral
 context and message names used by the implementation are introduced below.
 
-## Update mental model
+## Overview
 
 Spotflow creates an **update attempt** for a device when a deployment requires that
 device to install one or more firmware versions. The cloud sends the attempt in an
@@ -41,9 +41,9 @@ There are two firmware-handling paths:
   Main firmware also uses this path when automatic handling is disabled.
 
 The public API lets the application observe and control the automatic main-firmware path,
-confirm a test image after reboot, handle delegated firmware, and respond to an
-actionable cancellation. The SDK owns manifest processing, artifact sequencing,
-persistence, and result reporting.
+confirm a test image after reboot, handle delegated firmware, and respond to cancellation
+requests that can still be handled safely. The SDK owns manifest processing, artifact
+sequencing, persistence, and result reporting.
 
 ### Terminology
 
@@ -56,18 +56,19 @@ persistence, and result reporting.
 | Main firmware | Firmware that runs the Spotflow SDK on the primary MCU. |
 | Delegated firmware | Firmware whose installation is performed by application code, commonly firmware for an external MCU. |
 | Current attempt | The attempt whose durable results and execution state the SDK currently owns. |
-| Pending attempt | One newer attempt retained in RAM until it is safe to replace the current attempt. |
+| Pending attempt | One newer attempt retained in RAM during the exceptional supersession case, until it is safe to replace the current attempt. |
 | Terminal result | `SUCCEEDED`, `FAILED`, or `CANCELED`; the SDK will not run that artifact again for the same durable attempt state. |
 | Durable state | State successfully stored through Zephyr Settings and recoverable after reset. |
 | Staged result | A prospective terminal artifact result being persisted; it is not durable or reportable until committed. |
 | Rehydration | Restoring RAM-only artifact descriptors when the cloud sends a manifest matching an attempt loaded from persistence. |
 | Probation | Persisted main-firmware context spanning an MCUboot test upgrade and reboot until success or rollback is resolved. |
-| Supersession | Replacement of an unfinished current attempt by a newer attempt. |
+| Actionable cancellation | A cancellation request received before the first artifact finishes and while the update can still be stopped safely. |
+| Supersession | Exceptional replacement of an unfinished current attempt by a newer attempt. |
 | Generation | An in-memory incarnation of an attempt, used with its ID to reject work claimed by older state. |
-| Claim | A state transition that gives the worker exclusive ownership of a specific job and token. |
+| Claim | An internal reservation of a specific operation and token, preventing concurrent execution or completion by stale state. |
 | C2D / D2C | Cloud-to-device requests and device-to-cloud results. |
 
-## End-to-end behavior
+### Basic workflow
 
 The normal device-side flow is:
 
@@ -102,11 +103,9 @@ flowchart TD
     more -- no --> done["Attempt complete"]
 ```
 
-The worker requests a cumulative result report immediately after each artifact result is
-durably committed. A requested report has priority over the next runnable artifact, so
-the worker prepares the report before it starts that artifact. The MQTT processing loop
-publishes the prepared message independently; if a message is still pending, later
-results for the same attempt are merged into it.
+After each artifact result is durably committed, the SDK prepares a cumulative result
+message for publishing; it does not wait for the whole attempt to finish. If a result
+message for the same attempt is still pending, newly known results are merged into it.
 
 The manifest itself is kept only in RAM. After a reset, the SDK restores the attempt ID
 and known durable results, then waits for the cloud to resend the matching manifest.
@@ -117,13 +116,19 @@ The important exceptional flows are:
 
 - **Reset:** restore durable attempt/results and main-firmware probation; rehydrate the
   manifest before resuming ordinary artifacts.
-- **Lost result message:** rebuild a cumulative result from durable state when the cloud
-  sends `REPORT_UPDATE_RESULTS` or repeats the manifest.
-- **Cancellation:** make cancellation actionable only while the first artifact is still
-  running. Once it returns, either it succeeded and the remaining update must not be
-  interrupted, or it failed/canceled and all remaining artifacts are already canceled.
-- **Supersession:** retain one newer attempt and stop the current attempt only at a safe
-  boundary; never let delayed work from the old attempt mutate the replacement.
+- **Lost result message:** result messages use MQTT QoS 0 and can therefore be lost.
+  Until the cloud has all results, it can send `REPORT_UPDATE_RESULTS` or repeat the
+  manifest. In either case, the SDK rebuilds a cumulative message from durable results;
+  it does not rerun completed artifacts.
+- **Cancellation:** when a cancellation is actionable, the SDK exposes it to the running
+  handler or cancels the first artifact before it starts. Once that artifact finishes,
+  either it succeeded and the remaining update must not be interrupted, or it
+  failed/canceled and all remaining artifacts are already canceled.
+- **Supersession:** the cloud normally waits for all artifact results before sending
+  another attempt. Exceptionally, a newer attempt can arrive after the device's current
+  deployment is removed and the device later takes part in another deployment. The SDK
+  retains that attempt and stops the current one only at a safe boundary; delayed work
+  from the old attempt cannot mutate its replacement.
 
 ## Architecture at a glance
 
