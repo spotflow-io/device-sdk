@@ -157,9 +157,9 @@ end
 
 For BLE transport, the device exposes session metadata as a readable GATT characteristic and exchanges configuration data through framed TX and RX stream messages.
 
-#### OTA Updates
+#### Over-the-air (OTA) updates
 
-Spotflow OTA lets the cloud ask a device to install one or more firmware versions.
+Spotflow OTA updates let the cloud ask a device to install one or more firmware versions.
 Each device-specific request is an **update attempt** identified by an attempt ID. It
 contains an ordered **manifest** of **artifacts**, where each artifact describes one
 firmware image and the version to install. The SDK processes the artifacts in manifest
@@ -176,7 +176,7 @@ The implementation is split into the following components:
 
 ```mermaid
 ---
-title: OTA Implementation Responsibilities
+title: Implementation Responsibilities for OTA Updates
 ---
 flowchart TD
     processor[Processor:<br/>Receiving cloud-to-device messages<br/>Sending device-to-cloud messages]
@@ -210,44 +210,45 @@ flowchart TD
 - *Downloader* provides a resilient download mechanism for firmware updates.
   It is used internally by the automatic firmware update handler and can be used directly by the user code as well.
 - *Platform wrappers* provide an interface for low-level features so that they can be easily faked in tests.
-- *Persistence* of OTA state, results, installed versions, and main-firmware probation is
-  handled by the Zephyr Settings subsystem.
+- *Persistence* of update state, results, installed versions, and main-firmware
+  probation is handled by the Zephyr Settings subsystem.
 
 A successful automatic main-firmware update looks like this:
 
 ```mermaid
 ---
-title: Happy Path of Main Firmware OTA Update
+title: Happy Path of a Main-Firmware Update
 ---
 sequenceDiagram
     participant Cloud as Spotflow Cloud
     participant Processor
-    participant OTA as OTA Update Worker
+    participant Worker as Update Worker
     participant Settings as Zephyr Settings
     participant DL as Downloader
     participant Boot as MCUboot
     participant App as Application
 
     Cloud->>Processor: Send manifest for update attempt
-    Processor->>OTA: Accept attempt
-    OTA->>Settings: Persist accepted attempt
-    OTA->>DL: Download image<br />to secondary slot
-    OTA->>Settings: Persist probation
-    OTA->>Boot: Request test upgrade
-    Note right of OTA: Reboot device, new<br />image is unconfirmed
-    App->>OTA: spotflow_confirm_main_firmware_image()
-    OTA->>Boot: Confirm image
-    OTA->>Settings: Persist installed version<br />and successful result
-    OTA->>Processor: Prepare cumulative results
+    Processor->>Worker: Accept attempt
+    Worker->>Settings: Persist accepted attempt
+    Worker->>DL: Download image<br />to secondary slot
+    Worker->>Settings: Persist probation
+    Worker->>Boot: Request test upgrade
+    Note right of Worker: Reboot device, new<br />image is unconfirmed
+    App->>Worker: spotflow_confirm_main_firmware_image()
+    Worker->>Boot: Confirm image
+    Worker->>Settings: Persist installed version<br />and successful result
+    Worker->>Processor: Prepare cumulative results
     Processor->>Cloud: Report attempt results
 ```
 
 Choose the next document according to what you want to do:
 
-- **Integrate OTA:** [Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr)
-- **Try OTA:** [OTA sample](zephyr/samples/ota), an end-to-end application with MCUboot sysbuild
-- **Maintain the SDK:** [OTA implementation design notes](zephyr/docs/ota.md), including
-  state, concurrency, persistence, recovery, and testing rationale
+- **Integrate OTA updates:** [Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr)
+- **Try OTA updates:** [Sample for OTA updates](zephyr/samples/ota), an end-to-end
+  application with MCUboot sysbuild
+- **Maintain the SDK:** [Implementation design notes for OTA updates](zephyr/docs/ota.md),
+  including state, concurrency, persistence, recovery, and testing rationale
 
 ### Build ID
 

@@ -1,22 +1,23 @@
-# Zephyr OTA updates — implementation design notes
+# Zephyr over-the-air (OTA) updates — implementation design notes
 
-This document explains the architecture and important design decisions behind
-over-the-air (OTA) updates in the Spotflow SDK for Zephyr.
+This document explains the architecture and important design decisions behind these
+updates in the Spotflow SDK for Zephyr.
 
 ## Scope and audience
 
 This is a maintainer-facing document for contributors working on the SDK. It explains
 what the implementation must guarantee, why its state is structured as it is, and where
-the relevant code and tests live. Application developers integrating OTA should start
-with the [Zephyr OTA guide](https://docs.spotflow.io/guides/zephyr/ota-zephyr) or the
-[OTA sample](../samples/ota).
+the relevant code and tests live. Application developers integrating OTA updates should
+start with the
+[Zephyr guide for OTA updates](https://docs.spotflow.io/guides/zephyr/ota-zephyr) or the
+[sample for OTA updates](../samples/ota).
 
 The MQTT message schemas are documented in the
-[OTA MQTT guide](https://docs.spotflow.io/guides/mqtt/ota-mqtt). Knowing that protocol is
-not a prerequisite for reading this document: the behavioral context and message names
-used by the implementation are introduced below.
+[MQTT protocol guide for OTA updates](https://docs.spotflow.io/guides/mqtt/ota-mqtt).
+Knowing that protocol is not a prerequisite for reading this document: the behavioral
+context and message names used by the implementation are introduced below.
 
-## OTA mental model
+## Update mental model
 
 Spotflow creates an **update attempt** for a device when a deployment requires that
 device to install one or more firmware versions. The cloud sends the attempt in an
@@ -85,8 +86,8 @@ flowchart TD
     resolve{"New image confirmed?"}
     stage["Stage terminal result"]
     persistResult["Persist installed version when successful<br/>and cumulative attempt results"]
+    report["Prepare cumulative result report<br/>for the MQTT loop"]
     more{"More pending<br/>artifacts?"}
-    report["Report cumulative durable results"]
 
     cloud --> accept --> persistAttempt --> next
     next --> installed
@@ -96,10 +97,16 @@ flowchart TD
     kind -- yes --> main --> reboot --> resolve
     resolve -- yes --> skip
     resolve -- rollback or error --> stage
-    persistResult --> more
+    persistResult --> report --> more
     more -- yes --> next
-    more -- no --> report
+    more -- no --> done["Attempt complete"]
 ```
+
+The worker requests a cumulative result report immediately after each artifact result is
+durably committed. A requested report has priority over the next runnable artifact, so
+the worker prepares the report before it starts that artifact. The MQTT processing loop
+publishes the prepared message independently; if a message is still pending, later
+results for the same attempt are merged into it.
 
 The manifest itself is kept only in RAM. After a reset, the SDK restores the attempt ID
 and known durable results, then waits for the cloud to resend the matching manifest.
@@ -122,8 +129,8 @@ The important exceptional flows are:
 
 | Area | Responsibility |
 |---|---|
-| Facade and public API | Initialize OTA defensively and translate public calls into state transitions and external effects. |
-| Protocol and processor integration | Decode C2D OTA messages and prepare/publish D2C results. |
+| Facade and public API | Initialize update support defensively and translate public calls into state transitions and external effects. |
+| Protocol and processor integration | Decode C2D update messages and prepare/publish D2C results. |
 | Core state models | Represent attempts, artifact transactions, reporting, main-firmware execution, and probation without performing I/O. |
 | Worker | Select and execute one typed job at a time, including persistence and reporting stages. |
 | Firmware handlers | Perform automatic main-firmware updates or dispatch delegated updates to application callbacks. |
@@ -131,7 +138,7 @@ The important exceptional flows are:
 | Persistence | Store the current attempt, terminal results, installed versions, and probation through Zephyr Settings. |
 | Platform wrappers | Isolate MCUboot, flash, reboot, and build-ID operations and make them replaceable in tests. |
 
-Runtime work is divided among the MQTT thread, one OTA worker, the Zephyr system
+Runtime work is divided among the MQTT thread, one update worker, the Zephyr system
 workqueue, and application threads. The state models decide transitions while holding
 `state_mutex`, but callbacks, persistence, networking, downloads, flash operations, and
 other external work always run after the mutex is released.
@@ -146,7 +153,7 @@ other external work always run after the mutex is released.
 | Concurrency safety | State transitions are serialized without running unbounded or external work under the state mutex. | Pure state models return explicit effects that the facade or worker performs after unlock. | `attempt_model/`, `main_model/`, `state/`, `facade/` |
 | Result recovery | A lost QoS 0 result can be reconstructed without rerunning completed artifacts. | Cumulative durable results and cloud-driven report requests. | `net/`, `state/`, `worker/` |
 | Deterministic sequencing | At most one artifact transaction runs and later artifacts do not run after a failure. | Ordered cursor, one owned transaction, and cancellation of the remaining plan. | `attempt_model/`, `worker/` |
-| Testability | Domain transitions and platform-dependent operations can be checked independently. | Pure models plus wrappers/fakes for persistence, MQTT, downloader transport, flash, MCUboot, and identity. | All OTA model and integration suites |
+| Testability | Domain transitions and platform-dependent operations can be checked independently. | Pure models plus wrappers/fakes for persistence, MQTT, downloader transport, flash, MCUboot, and identity. | All update model and integration suites |
 
 These guarantees have deliberate boundaries:
 
@@ -166,7 +173,7 @@ the exact ownership and recovery rules.
 
 ## Detailed state-machine reference
 
-OTA state is modeled as several coordinated state machines rather than one combined
+Update state is modeled as several coordinated state machines rather than one combined
 state. All domain transitions are serialized by `state_mutex`; persistence, networking,
 firmware handlers, callbacks, and platform operations run after the mutex is released.
 The worker receives a job containing the attempt ID and an in-memory generation. Both
@@ -254,10 +261,6 @@ that probation alone cannot reconstruct the full manifest.
 
 ```mermaid
 stateDiagram-v2
-    state "NOT_RUNNING" as NotRunning
-    state "NOT_RUNNING / FAILED" as Failed
-    state "reconciled result queued" as ReconciledResultQueued
-
     [*] --> Empty
     Empty --> AwaitingManifest: load unfinished persisted attempt
     Empty --> Active: accept UPDATE_ARTIFACTS
@@ -266,19 +269,19 @@ stateDiagram-v2
     AwaitingManifest --> Active: receive matching full manifest
     AwaitingManifest --> Finalizing: cancellation makes restored attempt terminal
 
-    Active --> Active: commit partial artifact result
-    Active --> Finalizing: terminal results await persistence
-    Finalizing --> FinalizationClaimed: worker claims finalization
+    Active --> Active: commit nonterminal artifact result
+    Active --> Finalizing: stage terminal artifact results
+    Active --> Finalizing: cancel or supersede between artifacts
+    Finalizing --> Terminal: commit persisted staged result
+    Finalizing --> FinalizationClaimed: claim terminal state without a staged result
     FinalizationClaimed --> FinalizationClaimed: transient persistence failure
     FinalizationClaimed --> Terminal: persist terminal attempt
 
     Rejecting --> RejectionClaimed: worker claims rejection
     RejectionClaimed --> Rejected: persist attempt error
 
-    Terminal --> Active: accept different attempt
-    Rejected --> Active: accept different attempt
-    Terminal --> Terminal: matching update requests report
-    Rejected --> Rejected: matching update requests report
+    Terminal --> Active: accept next valid attempt
+    Rejected --> Active: accept next valid attempt
 ```
 
 An unfinished current attempt has one tagged pending slot: `NONE`, `UPDATE`, or
@@ -290,21 +293,25 @@ upgrade commit boundary stores the pending entry but does not mutate the current
 The full manifest is intentionally RAM-only. Loading an unfinished attempt therefore
 enters `AwaitingManifest`; receiving the matching `UPDATE_ARTIFACTS` rehydrates its
 artifact descriptors, requests a report for any durable results, and resumes remaining
-artifacts.
+artifacts. Committing a partial result leaves the lifecycle `Active`, although it
+requests an immediate report through the separate report scheduler. Matching requests
+for a `Terminal` or `Rejected` attempt also request a report without changing this
+lifecycle.
 
 ### Artifact transaction
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> Running: worker claims artifact
-    Running --> ResultStaged: handler returns terminal result
-    Running --> Idle: main firmware enters reboot probation
-    ResultStaged --> ResultStaged: transient persistence failure / cancellation merge
-    ResultStaged --> ResultStaged: revision changed; persist newer projection
-    ResultStaged --> Idle: persisted revision matches; commit mutation
+flowchart TD
+    idle["Idle"]
+    running["Running"]
+    staged["Result staged"]
 
-    Idle --> Running: worker claims reconciled main result
+    idle -->|"Worker claims an artifact or reconciled main result"| running
+    running -->|"Handler or reconciliation returns a terminal result"| staged
+    running -->|"Main firmware enters reboot probation"| idle
+    staged -->|"Persisted revision matches and mutation commits"| idle
+    staged -->|"Transient persistence failure causes a retry"| staged
+    staged -->|"Cancellation changes the mutation<br/>and its newer revision is persisted"| staged
 ```
 
 Only one artifact transaction exists. It contains its artifact index, and every worker
@@ -340,37 +347,69 @@ reboot. The public state is derived from their legal combinations.
 
 ```mermaid
 stateDiagram-v2
-    [*] --> NotRunning
-    NotRunning --> Claimed: claim_main_firmware(job)
-    Claimed --> PendingDownload: main_firmware_download_pending(token)
-    PendingDownload --> Downloading: main_firmware_download_started(token)
-    Downloading --> PendingUpgrade: main_firmware_download_completed(token)
-    PendingUpgrade --> Committing: begin_main_firmware_upgrade_commit(token)
-    Committing --> PendingUpgrade: cancel_main_firmware_upgrade_commit(token)
-    Committing --> PendingReboot: finish_main_firmware_prereboot(token)
-    PendingReboot --> RebootStarted: begin_main_firmware_reboot(token)
+    state "Idle / NOT_RUNNING" as Idle
+    state "Reboot ready / PENDING_REBOOT" as RebootReady
+    state "Reboot started / PENDING_REBOOT" as RebootStarted
 
-    PendingDownload --> Failed: fail_main_firmware(token)
-    Downloading --> Failed: fail_main_firmware(token)
-    PendingUpgrade --> Failed: fail_main_firmware(token)
-    Committing --> Failed: fail_main_firmware(token)
-
-    NotRunning --> Unconfirmed: enter_main_firmware_unconfirmed(attempt, index)
-    Unconfirmed --> ReconciledResultQueued: queue_main_firmware_result(success)
-    NotRunning --> ReconciledResultQueued: queue_main_firmware_result(rollback)
-
-    state "Probation state" as probation {
-        [*] --> None
-        None --> Pending: save/restore probation
-        Pending --> CompletionQueued: confirm success or infer rollback
-        CompletionQueued --> CompletionClaimed: worker claims reconciled result
-        CompletionClaimed --> None: commit_main_firmware_probation_cleared(token)
-    }
+    [*] --> Idle
+    Idle --> Claimed: worker claims main artifact
+    Claimed --> PendingDownload: announce pending download
+    PendingDownload --> Downloading: start download
+    Downloading --> PendingUpgrade: download completes
+    PendingUpgrade --> Committing: begin upgrade commit
+    Committing --> PendingUpgrade: commit preparation fails
+    Committing --> RebootReady: persist probation and request test upgrade
+    RebootReady --> RebootStarted: begin reboot
+    RebootStarted --> [*]: device reboots
 ```
 
-The diagram labels name the state transition APIs. The execution enum records ownership,
-progress, and the irreversible boundary. The update result remains a separate field;
-completion returns execution to `Idle` and stores its outcome in that field.
+The diagram above shows the normal pre-reboot execution path. A failure from `Claimed`
+through `Committing` returns execution to `Idle` and stores `FAILED` as the separate
+result. `Committing`, `RebootReady`, and `RebootStarted` form the irreversible region for
+cancellation and supersession.
+
+On the next boot, the SDK reconciles the persisted probation record with the running
+image:
+
+```mermaid
+flowchart TD
+    load["Load probation after boot"]
+    identity{"Running build ID available?"}
+    matches{"Running build ID matches<br/>the expected image?"}
+    confirmed{"Image already confirmed?"}
+    unconfirmed["Execution: UNCONFIRMED<br/>wait for application validation"]
+    success["Queue reconciled SUCCEEDED result"]
+    failure["Queue reconciled FAILED result"]
+    reboot["Reboot without confirmation"]
+
+    load --> identity
+    identity -- no --> failure
+    identity -- yes --> matches
+    matches -- no --> failure
+    matches -- yes --> confirmed
+    confirmed -- yes --> success
+    confirmed -- no --> unconfirmed
+    unconfirmed -->|"Application confirms image"| success
+    unconfirmed -->|"Application rejects image or device reboots"| reboot
+    reboot -->|"MCUboot rolls back; reconcile on next boot"| load
+```
+
+Probation is an orthogonal state machine. Queuing a reconciled result returns main
+execution to `Idle`, while probation retains ownership until the result is durably
+committed:
+
+```mermaid
+stateDiagram-v2
+    [*] --> None
+    None --> Pending: persist or restore probation
+    Pending --> CompletionQueued: confirm success or infer failure
+    CompletionQueued --> CompletionClaimed: worker claims reconciled result
+    CompletionClaimed --> None: durable result persisted and probation cleared
+```
+
+The execution enum records ownership, progress, and the irreversible boundary. The
+update result remains a separate field; completion returns execution to `Idle` and
+stores its outcome in that field.
 `spotflow_ota_main_project_state()` is the sole mapping from execution, result, and the
 orthogonal pause flag to public state; the public structure itself is never cached.
 Every pre-reboot transition validates the claimed artifact job's attempt ID and
@@ -384,15 +423,20 @@ persisted attempt must no longer change across the irreversible boot transition.
 ### Report request and network outbox
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Idle
-    Idle --> Requested: durable result / REPORT_UPDATE_RESULTS / matching UPDATE_ARTIFACTS
-    Blocked --> Requested: new report trigger
-    Requested --> Claimed: worker claims report
-    Claimed --> ClaimedRerunRequested: another trigger arrives
-    Claimed --> Idle: message prepared
-    Claimed --> Blocked: permanent preparation error
-    ClaimedRerunRequested --> Requested: current preparation finishes
+flowchart TD
+    idle["Idle"]
+    requested["Requested"]
+    claimed["Claimed"]
+    rerun["Claimed<br/>rerun requested"]
+    blocked["Blocked"]
+
+    idle -->|"Durable result, REPORT_UPDATE_RESULTS,<br/>or matching UPDATE_ARTIFACTS"| requested
+    blocked -->|"New report trigger"| requested
+    requested -->|"Worker claims report"| claimed
+    claimed -->|"Message prepared"| idle
+    claimed -->|"Permanent preparation error"| blocked
+    claimed -->|"Another trigger arrives"| rerun
+    rerun -->|"Current preparation finishes"| requested
 ```
 
 `Requested` is a coalescing obligation, not a delivery acknowledgment. The encoded
@@ -460,14 +504,16 @@ the state and worker suites cover token ownership, persistence, and aggregate sc
 
 ## Module map
 
-The repository [README](../../README.md#ota-updates) provides a high-level overview of the OTA implementation while the text below describes the individual folders and files.
+The repository [README](../../README.md#over-the-air-ota-updates) provides a high-level
+overview of the update implementation while the text below describes the individual
+folders and files.
 The relevant source files are split by responsibility under `spotflow/zephyr/src/ota`:
 
 | Folder | Responsibility |
 |---|---|
-| `.` | Public facade (`spotflow_ota.c` / `.h`), Kconfig, and OTA source list |
+| `.` | Public facade (`spotflow_ota.c` / `.h`), Kconfig, and update source list |
 | `core/` | In-memory attempt/artifact state, worker orchestration, internal shared types, limits, logging |
-| `protocol/` | OTA MQTT protocol encode/decode and pending D2C result publishing |
+| `protocol/` | MQTT protocol encoding/decoding for OTA updates and pending D2C result publishing |
 | `persistence/` | Zephyr Settings load/save and CBOR encoding of persisted records |
 | `downloader/` | Public downloader API, URL parsing, HTTP transport, retry, pause/resume/cancel |
 | `firmware/` | Automatic main-firmware lifecycle and delegated firmware callback dispatch |
@@ -537,7 +583,8 @@ Important files:
 | `firmware/spotflow_ota_fw_custom.c` | Delegated firmware dispatch; weak default callbacks; cancel work item |
 
 MQTT subscription and inbound routing live in `spotflow_mqtt.c` / `spotflow_processor.c`.
-C2D payloads are decoded on the MQTT thread; all durable work is handed to the OTA worker.
+C2D payloads are decoded on the MQTT thread; all durable work is handed to the update
+worker.
 
 The pure attempt and main-firmware models receive state explicitly and do not own a
 mutex or reference the global store. The state coordinator applies their typed outputs
@@ -545,23 +592,24 @@ to the aggregate and selects jobs whose priority spans both models.
 
 ## Initialization
 
-OTA uses a **defensive initialization** model: `spotflow_ota_init()` is idempotent,
-mutex-protected, and safe to call from more than one entry point.
+The update subsystem uses a **defensive initialization** model:
+`spotflow_ota_init()` is idempotent, mutex-protected, and safe to call from more than one
+entry point.
 
 **Primary path (Spotflow processor)**
 
 1. `spotflow_mqtt_thread_entry()` calls `spotflow_ota_init()` once before the first
-   session metadata publish. This loads Settings, restores in-memory state, starts the OTA
-   worker, and (when automatic main-firmware handling is enabled) runs post-reboot
+   session metadata publish. This loads Settings, restores in-memory state, starts the
+   update worker, and (when automatic main-firmware handling is enabled) runs post-reboot
    reconciliation.
 2. After MQTT connects, `spotflow_ota_init_session()` calls `spotflow_ota_init()` again
-   (no-op if already initialized) and registers the OTA C2D subscription.
+   (no-op if already initialized) and registers the C2D subscription for OTA updates.
 
 `spotflow_ota_init()` does not require MQTT to be connected.
 
 **Defensive path (application / public API)**
 
-Every public facade API in `spotflow/ota.h` that reads or changes OTA state calls
+Every public facade API in `spotflow/ota.h` that reads or changes update state calls
 `spotflow_ota_init()` first.
 
 User-implemented callbacks (`spotflow_on_handle_firmware_update`, and so on) are not
@@ -576,15 +624,16 @@ download handler after reboot).
 
 ```
 MQTT thread     → decode C2D, enqueue worker jobs, poll pending D2C send
-OTA worker      → state transitions, artifact handlers, spotflow_download_artifact()
+Update worker     → state transitions, artifact handlers, spotflow_download_artifact()
 sysworkq        → spotflow_on_update_canceled()
 App threads     → public API (pause/resume/fail/confirm/query)
 ```
 
 `spotflow_download_artifact()` is synchronous: it blocks its caller until the download finishes, is canceled, or fails.
-When the main firmware is handled automatically, its download always runs on the OTA worker thread.
+When the main firmware is handled automatically, its download always runs on the update
+worker thread.
 When application code implements a delegated firmware handler, the download also runs on
-the OTA worker thread unless the application explicitly delegates it to another thread.
+the update worker thread unless the application explicitly delegates it to another thread.
 
 **Rules:**
 
@@ -593,10 +642,10 @@ the OTA worker thread unless the application explicitly delegates it to another 
   `state_mutex`.
 - Public API calls update state under the mutex, release it, then perform I/O or wake the
   worker.
-- Main-firmware progress callbacks fire from the OTA worker after state changes, not from
+- Main-firmware progress callbacks fire from the update worker after state changes, not from
   the calling application thread.
 
-Cancellation uses `sysworkq` because the OTA worker may be blocked inside
+Cancellation uses `sysworkq` because the update worker may be blocked inside
 `spotflow_on_handle_firmware_update()`. A work item calls `spotflow_on_update_canceled()`
 without holding `state_mutex`.
 
@@ -649,8 +698,8 @@ build ID does not match the probation record (MCUboot reverted to the previous i
 
 **Pre-reboot (automatic handling)**
 
-The OTA worker streams the image through the public downloader into the MCUboot secondary
-slot, persists probation metadata, requests `BOOT_UPGRADE_TEST`, and reboots. Public
+The update worker streams the image through the public downloader into the MCUboot
+secondary slot, persists probation metadata, requests `BOOT_UPGRADE_TEST`, and reboots. Public
 pause/resume/fail APIs apply only in this phase.
 
 **Probation record**
@@ -800,7 +849,8 @@ Delegated handlers should poll `spotflow_is_update_canceled()` and call
 
 ## Logging
 
-All OTA modules use the `spotflow_ota` log module (`CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL`).
+All update modules use the `spotflow_ota` log module
+(`CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL`).
 Use **DBG** during manual E2E validation; use **INF** or higher in production.
 
 **Never log:** full artifact URLs, OTA secrets, authorization headers, or raw CBOR payloads.
@@ -817,7 +867,8 @@ Use **DBG** during manual E2E validation; use **INF** or higher in production.
 **DBG (diagnostics):** details useful when validating persistence, supersession, and
 download plumbing.
 
-- OTA init and loaded persistence (latest attempt, probation, last received attempt ID).
+- Update initialization and loaded persistence (latest attempt, probation, last
+  received attempt ID).
 - Supersession and deferred promotion (pending attempt IDs, discarded superseded results).
 - HTTP download start, resume offset, byte counts, and connection-lost resume hints
   (host/path are not logged).
