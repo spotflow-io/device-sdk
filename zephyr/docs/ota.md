@@ -100,9 +100,9 @@ flowchart TD
     more -- no --> done["Attempt complete"]
 ```
 
-After each artifact result is durably committed, the SDK prepares a cumulative result
-message for publishing; it does not wait for the whole attempt to finish. If a result
-message for the same attempt is still pending, newly known results are merged into it.
+After each artifact result has been saved to persistent storage, the SDK prepares a
+result message for publishing; it does not wait for the whole attempt to finish. The
+message contains all results saved for that attempt so far.
 
 The manifest itself is kept only in RAM. After a reset, the SDK restores the attempt ID
 and known durable results, then waits for the cloud to resend the matching manifest.
@@ -114,9 +114,10 @@ The important exceptional flows are:
 - **Reset:** restore durable attempt results and main-firmware probation, then rehydrate
   the manifest before resuming ordinary artifacts.
 - **Lost result message:** result messages use MQTT QoS 0 and can therefore be lost.
-  Until the cloud has all results, it can send `REPORT_UPDATE_RESULTS` or repeat the
-  manifest. In either case, the SDK rebuilds a cumulative message from durable results;
-  it does not rerun completed artifacts.
+  While the device remains connected, the cloud can request another cumulative report
+  with `REPORT_UPDATE_RESULTS`. After the device reconnects and subscribes again, the
+  cloud resends the manifest if it is still missing results. In either case, the SDK
+  rebuilds the response from saved results; it does not rerun completed artifacts.
 - **Cancellation:** when a cancellation is actionable, the SDK exposes it to the running
   handler or cancels the first artifact before it starts. Once that artifact finishes,
   either it succeeded and the remaining update must not be interrupted, or it
@@ -161,11 +162,16 @@ the manifest until it receives all results. The SDK can therefore reconstruct th
 descriptions, keep the already durable results, and continue at the first pending
 artifact.
 
-Messages that cannot be decoded are ignored when no trustworthy attempt ID is available.
-When the ID is trustworthy, the SDK records and reports an attempt-level rejection so
-the cloud does not wait indefinitely for artifact results that the device cannot
-produce. Duplicate manifests do not restart completed work; they instead trigger
-another cumulative result report when durable results already exist.
+Messages that cannot be decoded are ignored when no trustworthy attempt ID can be
+extracted from them. When the ID is trustworthy, the SDK records and reports an
+attempt-level rejection so the cloud does not wait indefinitely for artifact results
+that the device cannot produce.
+
+After a reboot or reconnection, subscribing to the update topic causes the cloud to
+resend a manifest whose results are still incomplete. Such a duplicate does not restart
+completed work. It rehydrates an unfinished attempt or triggers another result report
+from saved results. During an uninterrupted connection, the cloud normally requests
+another report with `REPORT_UPDATE_RESULTS` instead of repeating the manifest.
 
 ### Durable progress and power-loss recovery
 
@@ -218,15 +224,19 @@ stateDiagram-v2
     Rebooting --> [*]
 ```
 
-Before requesting the test upgrade, the SDK persists the attempt, artifact identity,
-expected build ID, slug, and version in the probation record. This order matters:
+The SDK persists the attempt, artifact identity, expected build ID, slug, and version in
+the probation record before requesting the test upgrade. This order matters:
 
 - If power is lost before probation is saved, the update remains an ordinary unfinished
   artifact and can resume after the manifest is rehydrated.
 - If probation is saved but the test upgrade has not yet been requested, the next boot
-  still sees the record and resolves the running image conservatively.
-- Once the test upgrade is requested, cancellation and supersession can no longer alter
-  the current attempt because a reboot into the new image may already be unavoidable.
+  reconciles the record instead of blindly resuming the upgrade. The still-running old
+  image will normally have a different build ID, which is recorded as `FAILED`. Success
+  is possible only if the running image actually has the expected build ID and is
+  already confirmed.
+- Once the test upgrade is requested successfully, the SDK proceeds to reboot and
+  MCUboot will select the new image. The request cannot be withdrawn, so cancellation
+  and supersession can no longer alter the current attempt.
 
 On the next boot, the SDK compares the running image with the expected build ID:
 
@@ -249,14 +259,14 @@ flowchart TD
     confirmed -- yes --> success
     confirmed -- no --> unconfirmed
     unconfirmed -->|"Application confirms image"| success
-    unconfirmed -->|"Application rejects image or device reboots"| reboot
+    unconfirmed -->|"Device reboots before confirmation"| reboot
     reboot -->|"MCUboot rolls back<br/>Reconcile on next boot"| load
 ```
 
 A matching but unconfirmed image is not reported as successful. The application must
-first validate and explicitly confirm it through the public API. Rebooting without
-confirmation lets MCUboot roll back; the following boot observes the build-ID mismatch
-and records failure.
+first validate and explicitly confirm it through the public API. There is no separate
+API for rejecting the image: leaving it unconfirmed and rebooting lets MCUboot roll
+back. The following boot observes the build-ID mismatch and records failure.
 
 The resolved artifact result is persisted before probation is cleared. If a reset occurs
 first, the probation record causes reconciliation to run again. If a reset occurs after
@@ -275,16 +285,21 @@ Production devices must use an appropriate private signing key. The Spotflow bui
 used only to correlate the downloaded, expected, and running images across reboot; it is
 not a substitute for signature verification.
 
-Persisted update records are recovery input, not proof of success. Invalid records are
-ignored, and missing or unusable main-firmware identity resolves conservatively as
-failure. This prevents corrupted local state from turning an uncertain upgrade into a
-reported success.
+Persisted state is used only for the claims it can prove. A valid installed-version
+record proves that the requested slug and version were installed, so the SDK can report
+success without running the handler again. A saved terminal attempt result is likewise
+authoritative. A probation record alone does not prove that a main-firmware upgrade
+succeeded: the SDK must also identify the running image and, for the new image, observe
+its confirmation. Invalid records are ignored, while missing or unusable
+main-firmware identity is reported as failure rather than turning an uncertain upgrade
+into success.
 
 ### Result delivery and recovery
 
-Each report contains all durable results currently known for the attempt. Cumulative
-reports make duplicates harmless and allow the cloud to recover from a lost earlier
-message without asking for a particular artifact result.
+The SDK normally prepares a report immediately after saving each artifact result. Each
+such report contains all saved terminal results currently known for the attempt, not
+only the newest one. This makes duplicate reports harmless and lets a later report fill
+in for an earlier one that was lost.
 
 ```mermaid
 flowchart LR
@@ -293,7 +308,7 @@ flowchart LR
     publish["Publish with MQTT QoS 0"]
     received{"Cloud receives it?"}
     complete["Cloud records known results"]
-    retry["Cloud repeats manifest or sends<br/>REPORT_UPDATE_RESULTS"]
+    retry["Cloud sends REPORT_UPDATE_RESULTS,<br/>or resends manifest after subscription"]
 
     durable --> prepare --> publish --> received
     received -- yes --> complete
@@ -301,16 +316,21 @@ flowchart LR
 ```
 
 QoS 0 keeps the device-side publishing path lightweight, but delivery is not
-acknowledged. Recovery therefore relies on the cloud repeating the manifest or sending
-`REPORT_UPDATE_RESULTS`. Because the SDK rebuilds the response from persisted results,
-recovery works across reconnects and device resets. Multiple newly known results are
-merged into an outbound message that has not yet been published.
+acknowledged. If the cloud detects a missing result while the connection continues, it
+sends `REPORT_UPDATE_RESULTS`; the SDK then reconstructs a cumulative report from
+persisted state. After a reboot or reconnection, the device subscribes again and the
+cloud resends the manifest when results are still missing.
 
 ### Cancellation and exceptional supersession
 
 Cancellation is intentionally conservative. It is actionable only before the first
 artifact has finished and while that artifact can still be stopped safely. During that
-window, a delegated handler can stop its work or cancel an active download.
+window, a delegated handler can stop its work or cancel an active download. An
+automatically handled main-firmware update can likewise be stopped while it is being
+downloaded or prepared. Once the SDK has started the final sequence that saves
+probation and requests the MCUboot test upgrade, cancellation is no longer applied.
+This prevents cancellation from interleaving with a boot request that cannot be
+withdrawn.
 
 After the first artifact returns:
 
@@ -326,21 +346,21 @@ boundary, and then promotes the newer one. Results of the superseded attempt are
 locally but are not reported because the cloud has already moved the device to the new
 attempt.
 
-The main-firmware commit boundary is a special safe-boundary rule. Before it, the
-download and preparation can be stopped. At and after it, the current attempt is left
-unchanged across reboot; the cloud must send the newer attempt again after the device
-reconnects.
-
 ### Serialized decisions and stale work
 
-State-changing decisions are serialized, but persistence, networking, downloads, flash
-operations, and application callbacks run outside those short decision sections. This
-keeps slow or user-provided work from blocking state queries and control calls.
+State-changing decisions are serialized: the SDK applies one decision completely before
+applying another, so two concurrent calls cannot interleave partial state changes.
+Persistence, networking, downloads, flash operations, and application callbacks run
+outside these short decision steps. Slow or user-provided work therefore does not block
+state queries and control calls.
 
-Only one artifact operation is owned at a time. Every asynchronous operation is bound to
-the exact attempt instance and artifact for which it was created. If an attempt is
-replaced or reconstructed, delayed work belonging to the older instance is discarded
-rather than applied to the new state. This remains true even if an attempt ID is reused.
+The SDK starts at most one artifact operation at a time and associates it with the exact
+attempt instance and artifact that caused it. Before applying an asynchronous
+completion, the SDK checks that the same instance and artifact are still current.
+Otherwise, the completion is discarded as stale. For example, an operation can start
+for one instance of attempt ID 42, that state can later be reconstructed or replaced,
+and a different instance can also have ID 42. A delayed completion from the first
+instance must not change the second merely because their public attempt IDs match.
 
 ## Implementation
 
@@ -583,9 +603,10 @@ Failure to read the downloaded image identity fails the attempt.
 
 Before reboot, `firmware/spotflow_ota_fw_main.c` streams the image through the downloader
 into the MCUboot secondary slot, saves probation, requests `BOOT_UPGRADE_TEST`, and
-reboots. The public abort control applies only before the upgrade commit begins.
-Pause/resume can also postpone the SDK-initiated reboot after the test upgrade is
-requested, but cannot undo that request or prevent a reboot initiated elsewhere.
+reboots. The public abort control applies only before the SDK starts the final sequence
+of saving probation and requesting the test upgrade. Pause/resume can postpone the
+SDK-initiated reboot after the test upgrade is requested, but cannot undo that request
+or prevent a reboot initiated elsewhere.
 
 Initialization resolves probation as follows:
 
@@ -630,7 +651,8 @@ results are persisted and reported.
 
 For the current attempt, `CANCEL_UPDATE` and `UPDATE_ARTIFACTS` with `isCanceled: true`
 are accepted only while no artifact has succeeded, the attempt is not already terminal,
-and an automatic main-firmware update has not crossed its commit boundary.
+and an automatic main-firmware update has not started the final probation-and-test-upgrade
+sequence.
 
 During actionable cancellation:
 
