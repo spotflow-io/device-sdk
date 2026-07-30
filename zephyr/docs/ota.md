@@ -433,21 +433,19 @@ Important entry points:
 MQTT subscription and inbound routing live outside this directory in
 `spotflow_mqtt.c` and `spotflow_processor.c`.
 
-### Initialization and execution contexts
+### Initialization
 
 `spotflow_ota_init()` is idempotent and safe to reach through more than one entry point.
-The MQTT thread calls it before the first session metadata publish. It loads Settings,
+The MQTT thread calls it before the first session metadata publish. It loads persisted data from Zephyr Settings,
 restores in-memory state, starts the update worker, and performs post-reboot
 main-firmware reconciliation when automatic handling is enabled.
-
-After MQTT connects, `spotflow_ota_init_session()` calls `spotflow_ota_init()` again and
-registers the C2D subscription. The second initialization is a no-op. MQTT does not need
-to be connected for initialization itself.
 
 Every public facade API in `spotflow/ota.h` that reads or changes update state also calls
 `spotflow_ota_init()` first. Application code can therefore confirm an unconfirmed image
 or query cancellation before the MQTT session is established without calling an
 internal initializer.
+
+### Execution contexts
 
 Runtime work is divided as follows:
 
@@ -678,10 +676,10 @@ validation and `INF` or higher in production.
 
 Never log full artifact URLs, OTA secrets, authorization headers, or raw CBOR payloads.
 
+- **DBG:** restored persistence, rehydration, supersession/promotion, retry offsets, and
+  download byte counts.
 - **INF:** accepted/canceled/rejected attempts, artifact start and terminal result, version
   skips, main-firmware phases, confirmation, and rollback.
-- **DBG:** restored persistence, rehydration, supersession/promotion, retry offsets, and
-  download byte counts. Host names and paths are intentionally omitted.
 - **WRN / ERR:** transient retry, decode, persistence, platform, and worker failures.
   Include attempt ID, artifact slug, phase, or errno where applicable.
 
