@@ -336,17 +336,13 @@ spotflow_ota_attempt_accept_cancel(struct ota_attempt_model* attempt, uint64_t a
 	}
 	if (spotflow_ota_attempt_has_terminal_results(attempt) ||
 	    spotflow_ota_attempt_has_succeeded_artifact(attempt) ||
+	    spotflow_ota_attempt_result_commit_is_pending(attempt) ||
 	    constraints.main_upgrade_irreversible) {
 		transition.outcome = OTA_ATTEMPT_CANCEL_IGNORED_LATE;
 		return transition;
 	}
 
 	attempt->execution.cancellation_requested = true;
-	if (spotflow_ota_attempt_result_commit_is_pending(attempt)) {
-		attempt->execution.transaction.mutation.cancel_remaining = true;
-		spotflow_ota_attempt_advance_mutation_revision(attempt);
-		spotflow_ota_attempt_refresh_lifecycle(attempt, constraints);
-	}
 	transition.outcome = OTA_ATTEMPT_CANCEL_ACCEPTED;
 	transition.wake_worker = !spotflow_ota_attempt_transaction_is_active(attempt);
 	if (!spotflow_ota_attempt_transaction_is_active(attempt)) {

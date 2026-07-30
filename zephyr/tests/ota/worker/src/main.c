@@ -446,7 +446,7 @@ ZTEST(spotflow_ota_worker, test_next_artifact_waits_for_previous_result_persiste
 	zassert_equal(fake_callbacks->handle_call_count, 2);
 }
 
-ZTEST(spotflow_ota_worker, test_cancel_after_staging_is_persisted_with_handler_result)
+ZTEST(spotflow_ota_worker, test_cancel_after_staging_is_ignored_and_processing_continues)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
 		spotflow_ota_test_fake_callbacks_get();
@@ -455,7 +455,7 @@ ZTEST(spotflow_ota_worker, test_cancel_after_staging_is_persisted_with_handler_r
 	struct spotflow_ota_state_diagnostic snapshot;
 	const enum spotflow_ota_result expected_results[] = {
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
-		SPOTFLOW_OTA_RESULT_CANCELED,
+		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 	};
 
 	cancel_attempt_after_result_stage = update.attempt_id;
@@ -466,15 +466,15 @@ ZTEST(spotflow_ota_worker, test_cancel_after_staging_is_persisted_with_handler_r
 	spotflow_ota_test_wait_for_persisted_attempt(1, expected_results,
 						     ARRAY_SIZE(expected_results));
 	zassert_ok(staged_cancel_rc);
-	zassert_equal(staged_cancel_result.disposition, SPOTFLOW_OTA_CANCEL_ACCEPTED);
-	zassert_equal(fake_callbacks->handle_call_count, 1);
+	zassert_equal(staged_cancel_result.disposition, SPOTFLOW_OTA_CANCEL_IGNORED_LATE);
+	zassert_equal(fake_callbacks->handle_call_count, 2);
 
 	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
-	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_SUCCEEDED);
 }
 
-ZTEST(spotflow_ota_worker, test_cancel_after_persistence_recaptures_mutation_before_commit)
+ZTEST(spotflow_ota_worker, test_cancel_after_persistence_is_ignored_before_commit)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
 		spotflow_ota_test_fake_callbacks_get();
@@ -486,7 +486,7 @@ ZTEST(spotflow_ota_worker, test_cancel_after_persistence_recaptures_mutation_bef
 	};
 	const enum spotflow_ota_result final_results[] = {
 		SPOTFLOW_OTA_RESULT_SUCCEEDED,
-		SPOTFLOW_OTA_RESULT_CANCELED,
+		SPOTFLOW_OTA_RESULT_SUCCEEDED,
 	};
 
 	cancel_attempt_after_result_persisted = update.attempt_id;
@@ -496,10 +496,10 @@ ZTEST(spotflow_ota_worker, test_cancel_after_persistence_recaptures_mutation_bef
 	zassert_ok(k_sem_take(&fake_callbacks->handle_called_sem, K_SECONDS(1)));
 	spotflow_ota_test_wait_for_persisted_attempt(1, final_results, ARRAY_SIZE(final_results));
 	zassert_ok(staged_cancel_rc);
-	zassert_equal(staged_cancel_result.disposition, SPOTFLOW_OTA_CANCEL_ACCEPTED);
+	zassert_equal(staged_cancel_result.disposition, SPOTFLOW_OTA_CANCEL_IGNORED_LATE);
 	zassert_true(spotflow_ota_test_settings_attempt_was_saved(
 		1, first_persisted_results, ARRAY_SIZE(first_persisted_results)));
-	zassert_equal(fake_callbacks->handle_call_count, 1);
+	zassert_equal(fake_callbacks->handle_call_count, 2);
 }
 
 ZTEST(spotflow_ota_worker, test_terminal_result_is_persisted_before_new_attempt_replaces_it)

@@ -183,7 +183,7 @@ ZTEST(spotflow_ota_attempt_model, test_staged_result_is_projected_before_commit)
 	zassert_false(spotflow_ota_attempt_transaction_is_active(&attempt));
 }
 
-ZTEST(spotflow_ota_attempt_model, test_late_cancellation_advances_staged_revision)
+ZTEST(spotflow_ota_attempt_model, test_cancellation_after_handler_result_is_ignored)
 {
 	struct ota_attempt_model attempt;
 	struct spotflow_ota_update_msg update = make_update(42, 2);
@@ -196,10 +196,10 @@ ZTEST(spotflow_ota_attempt_model, test_late_cancellation_advances_staged_revisio
 
 	struct ota_attempt_cancel_transition transition = spotflow_ota_attempt_accept_cancel(
 		&attempt, 42, (struct ota_attempt_constraints){ 0 });
-	zassert_equal(transition.outcome, OTA_ATTEMPT_CANCEL_ACCEPTED);
+	zassert_equal(transition.outcome, OTA_ATTEMPT_CANCEL_IGNORED_LATE);
 	zassert_false(transition.wake_worker);
-	zassert_equal(attempt.execution.transaction.mutation_revision, 2);
-	zassert_true(attempt.execution.transaction.mutation.cancel_remaining);
+	zassert_equal(attempt.execution.transaction.mutation_revision, 1);
+	zassert_false(attempt.execution.transaction.mutation.cancel_remaining);
 	zassert_equal(attempt.plan.results[0], SPOTFLOW_OTA_RESULT_PENDING);
 }
 
