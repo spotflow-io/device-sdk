@@ -125,8 +125,9 @@ The important exceptional flows are:
 - **Supersession:** the cloud normally waits for all artifact results before sending
   another attempt. Exceptionally, a newer attempt can arrive after the device's current
   deployment is removed and the device later takes part in another deployment. The SDK
-  retains the newer attempt until the current attempt reaches terminal results, then
-  starts it.
+  retains the newer attempt, cancels every artifact from the current attempt that is not
+  already running, and waits for the running artifact to finish updating. Once it does,
+  the SDK starts the newer attempt.
 
 ## Design
 
@@ -346,12 +347,12 @@ After the first artifact returns:
 The cloud normally sends a new attempt only after receiving terminal results for the
 current one. A newer attempt arriving while work is unfinished is therefore exceptional.
 The SDK retains one such attempt in memory. If an artifact handler is running, the SDK
-asks it to stop but keeps its eventual result. A `FAILED` or `CANCELED` result cancels
-the rest of the current attempt; a `SUCCEEDED` result lets the current attempt continue
-so it is not left half-finished. If no handler is running, the remaining artifacts can
-be canceled immediately. Once the current attempt is terminal, the SDK promotes the
-newer one. Results of the superseded attempt are kept locally but are not reported
-because the cloud has already moved the device to the new attempt.
+asks it to stop but keeps its eventual result, including `SUCCEEDED`. Every other
+pending artifact is marked `CANCELED`, so none can start after supersession has been
+accepted. If no handler is running, all pending artifacts can be canceled immediately.
+Once the current attempt is terminal, the SDK promotes the newer one. Results of the
+superseded attempt are kept locally but are not reported because the cloud has already
+moved the device to the new attempt.
 
 ### Serialized decisions and stale work
 
@@ -566,6 +567,10 @@ flowchart TD
 Each mutation has a revision number. If supersession changes the mutation while the
 worker is saving its projection, the revision no longer matches. The worker then
 captures and saves the newer projection without invoking the artifact handler again.
+For example, if a staged projection contains `SUCCEEDED` for the running artifact and
+`PENDING` for the rest, supersession changes the remaining results to `CANCELED` and
+advances the revision. A worker that saved the earlier projection must therefore save
+the superseded projection before committing it in RAM.
 
 Whenever the worker asks for another job, the coordinator chooses in this order:
 
@@ -712,13 +717,14 @@ but is not exposed through the public API.
 
 A different valid attempt or trustworthy rejection occupies the single pending slot.
 Supersession can stop the current attempt only before an automatic main-firmware handler
-has requested the MCUboot test upgrade. It never overwrites the result of a handler that
-is already running: if that handler returns `FAILED` or `CANCELED`, the remaining
-artifacts are canceled; if it returns `SUCCEEDED`, the current attempt continues. When
-no handler is running, its pending artifacts can be marked canceled immediately. After
-the current attempt becomes terminal, pending promotion replaces its ID and generation,
-clears report scheduling for the old incarnation, and wakes the worker for the
-replacement.
+has requested the MCUboot test upgrade. It immediately marks every pending artifact
+other than the active one `CANCELED` and asks the active handler to stop. The handler's
+eventual result is retained, but no subsequent artifact from that attempt can be
+claimed—even if the active handler returns `SUCCEEDED`. If its result was already
+staged, supersession adds cancellation of the remaining artifacts to that mutation and
+advances its revision. After the current attempt becomes terminal, pending promotion
+replaces its ID and generation, clears report scheduling for the old incarnation, and
+wakes the worker for the replacement.
 
 ### Logging and sensitive data
 
