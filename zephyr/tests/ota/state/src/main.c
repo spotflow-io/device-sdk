@@ -498,6 +498,42 @@ ZTEST(spotflow_ota_state, test_cancel_after_handler_result_is_ignored)
 	zassert_false(snapshot.actionable_cancellation);
 }
 
+ZTEST(spotflow_ota_state, test_supersession_after_staged_success_cancels_remaining)
+{
+	struct spotflow_ota_update_msg current = make_update(32, 2);
+	struct spotflow_ota_update_msg newer = make_update(33, 1);
+	struct spotflow_ota_update_result update_result;
+	struct spotflow_ota_state_diagnostic before_supersession;
+	struct spotflow_ota_state_diagnostic after_supersession;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&current, &update_result));
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_ok(spotflow_ota_state_stage_artifact_result(&job, SPOTFLOW_OTA_RESULT_SUCCEEDED));
+	spotflow_ota_state_get_diagnostic(&before_supersession);
+
+	zassert_ok(spotflow_ota_state_accept_update(&newer, &update_result));
+	zassert_equal(update_result.disposition, SPOTFLOW_OTA_UPDATE_QUEUED);
+
+	spotflow_ota_state_get_diagnostic(&after_supersession);
+	zassert_equal(after_supersession.projected_artifact_results[0],
+		      SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(after_supersession.projected_artifact_results[1],
+		      SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_not_equal(after_supersession.artifact_result_mutation_revision,
+			  before_supersession.artifact_result_mutation_revision);
+
+	zassert_equal(spotflow_ota_state_commit_artifact_result(
+			      &job, before_supersession.artifact_result_mutation_revision),
+		      -EAGAIN);
+	zassert_ok(spotflow_ota_state_commit_artifact_result(
+		&job, after_supersession.artifact_result_mutation_revision));
+
+	spotflow_ota_state_get_diagnostic(&after_supersession);
+	zassert_equal(after_supersession.artifact_results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(after_supersession.artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+}
+
 ZTEST(spotflow_ota_state, test_update_artifacts_with_is_canceled_finishes_attempt)
 {
 	struct spotflow_ota_update_msg msg = make_update(4, 2);
