@@ -42,7 +42,7 @@ There are two firmware-handling paths:
 
 The public API lets the application observe and control the automatic main-firmware path,
 confirm a test image after reboot, handle delegated firmware, and respond to cancellation
-requests that can still be handled safely. The SDK owns manifest processing, artifact
+requests. The SDK owns manifest processing, artifact
 sequencing, persistence, and result reporting.
 
 ### Terminology
@@ -56,12 +56,12 @@ sequencing, persistence, and result reporting.
 | Main firmware | Firmware that runs the Spotflow SDK on the primary MCU. |
 | Delegated firmware | Firmware whose installation is performed by application code, commonly firmware for an external MCU. |
 | Current attempt | The attempt whose durable results and execution state the SDK currently owns. |
-| Pending attempt | One newer attempt retained in RAM during the exceptional supersession case, until it is safe to replace the current attempt. |
+| Pending attempt | One newer attempt retained in RAM during the exceptional supersession case, until the current attempt reaches a terminal result. |
 | Terminal result | `SUCCEEDED`, `FAILED`, or `CANCELED`; processing of that artifact is finished. |
 | Durable state | State successfully stored through Zephyr Settings and recoverable after reset. |
 | Rehydration | Restoring RAM-only artifact descriptions when the cloud resends a manifest matching an attempt loaded from persistence. |
 | Probation | Persisted main-firmware context spanning an MCUboot test upgrade and reboot until success or rollback is resolved. |
-| Actionable cancellation | A cancellation request received before the first artifact finishes and while the update can still be stopped safely. |
+| Actionable cancellation | A cancellation request received while the first artifact is still being processed and, for automatic main firmware, before the MCUboot test upgrade is requested. |
 | Supersession | Exceptional replacement of an unfinished current attempt by a newer attempt. |
 | C2D / D2C | Cloud-to-device requests and device-to-cloud results. |
 
@@ -125,7 +125,8 @@ The important exceptional flows are:
 - **Supersession:** the cloud normally waits for all artifact results before sending
   another attempt. Exceptionally, a newer attempt can arrive after the device's current
   deployment is removed and the device later takes part in another deployment. The SDK
-  retains that attempt and stops the current one only at a safe boundary.
+  retains the newer attempt until the current attempt reaches terminal results, then
+  starts it.
 
 ## Design
 
@@ -229,11 +230,14 @@ the probation record before requesting the test upgrade. This order matters:
 
 - If power is lost before probation is saved, the update remains an ordinary unfinished
   artifact and can resume after the manifest is rehydrated.
+- On startup, **reconciliation** compares the saved probation information with the
+  firmware that is actually running and turns that evidence into a result: success,
+  failure, or a wait for application confirmation.
 - If probation is saved but the test upgrade has not yet been requested, the next boot
-  reconciles the record instead of blindly resuming the upgrade. The still-running old
-  image will normally have a different build ID, which is recorded as `FAILED`. Success
-  is possible only if the running image actually has the expected build ID and is
-  already confirmed.
+  performs this reconciliation instead of blindly resuming the upgrade. The
+  still-running old image will normally have a different build ID, which is recorded as
+  `FAILED`. Success is possible only if the running image actually has the expected
+  build ID and is already confirmed.
 - Once the test upgrade is requested successfully, the SDK proceeds to reboot and
   MCUboot will select the new image. The request cannot be withdrawn, so cancellation
   and supersession can no longer alter the current attempt.
@@ -323,14 +327,14 @@ cloud resends the manifest when results are still missing.
 
 ### Cancellation and exceptional supersession
 
-Cancellation is intentionally conservative. It is actionable only before the first
-artifact has finished and while that artifact can still be stopped safely. During that
-window, a delegated handler can stop its work or cancel an active download. An
-automatically handled main-firmware update can likewise be stopped while it is being
-downloaded or prepared. Once the SDK has started the final sequence that saves
-probation and requests the MCUboot test upgrade, cancellation is no longer applied.
-This prevents cancellation from interleaving with a boot request that cannot be
-withdrawn.
+Cancellation is intentionally conservative. It is actionable only while the first
+artifact is still being processed. During that window, a delegated handler can stop its
+work or cancel an active download. An automatically handled main-firmware update can
+likewise be stopped while it is being downloaded or prepared. Once the first artifact
+has produced a terminal result, cancellation is ignored even if that result is still
+being saved. Cancellation is also no longer applied once the SDK has started the final
+sequence that saves probation and requests the MCUboot test upgrade. This prevents
+cancellation from interleaving with a boot request that cannot be withdrawn.
 
 After the first artifact returns:
 
@@ -341,10 +345,13 @@ After the first artifact returns:
 
 The cloud normally sends a new attempt only after receiving terminal results for the
 current one. A newer attempt arriving while work is unfinished is therefore exceptional.
-The SDK retains one such attempt in memory, stops the current attempt at the next safe
-boundary, and then promotes the newer one. Results of the superseded attempt are kept
-locally but are not reported because the cloud has already moved the device to the new
-attempt.
+The SDK retains one such attempt in memory. If an artifact handler is running, the SDK
+asks it to stop but keeps its eventual result. A `FAILED` or `CANCELED` result cancels
+the rest of the current attempt; a `SUCCEEDED` result lets the current attempt continue
+so it is not left half-finished. If no handler is running, the remaining artifacts can
+be canceled immediately. Once the current attempt is terminal, the SDK promotes the
+newer one. Results of the superseded attempt are kept locally but are not reported
+because the cloud has already moved the device to the new attempt.
 
 ### Serialized decisions and stale work
 
@@ -449,12 +456,12 @@ internal initializer.
 
 Runtime work is divided as follows:
 
-```text
-MQTT thread   → decode C2D, enqueue state work, poll pending D2C send
-Update worker → persistence, artifact handlers, downloads, report preparation
-sysworkq      → spotflow_on_update_canceled()
-App threads   → public API (pause/resume/abort/confirm/query)
-```
+| Execution context | Responsibility |
+|---|---|
+| MQTT thread | Decodes cloud-to-device (C2D) messages, submits them to the update state coordinator, and polls the result outbox for device-to-cloud (D2C) messages to publish. |
+| Update worker thread | A dedicated SDK thread that saves state, runs one artifact handler at a time, performs automatic downloads, and prepares result messages. |
+| Zephyr system workqueue (`sysworkq`) | Calls `spotflow_on_update_canceled()` without waiting for a possibly blocked update worker. |
+| Application threads | Call public APIs to pause, resume, abort, confirm, or query an update. |
 
 `spotflow_download_artifact()` is synchronous. Automatic main-firmware downloads and
 delegated handlers therefore run on the update worker unless application code explicitly
@@ -464,7 +471,7 @@ Cancellation notification uses `sysworkq` because the update worker may be block
 inside `spotflow_on_handle_firmware_update()`. The callback must not block unnecessarily
 because it shares the system workqueue with unrelated work.
 
-### State representation and synchronization
+### State coordinator and worker jobs
 
 `state_mutex` protects the in-memory aggregate. No user callback, persistence, network,
 downloader, flash, platform, or MQTT operation runs while it is held. State APIs make a
@@ -493,17 +500,54 @@ flowchart TD
     current --> execution
 ```
 
-The attempt and main-firmware models are pure values: they receive state explicitly,
-return typed transition outputs, and do not own a mutex or perform I/O. The coordinator
-applies their outputs to the aggregate and handles rules that span both models.
+The attempt and main-firmware models are pure values: given their current value and an
+event, they return a new value and a description of any work that must happen. They
+neither lock shared state nor perform I/O.
 
-An attempt ID alone is insufficient to identify in-memory work because an ID can be
-restored or reused. Each accepted or restored attempt therefore receives a nonzero
-generation. Worker jobs and operation tokens carry the attempt ID, generation, job kind,
-and relevant artifact index. Every stage validates that identity before reading or
-committing state; a mismatch produces a stale outcome.
+The functions in `core/spotflow_ota_state.c` form the **state coordinator**. The
+coordinator applies those model transitions to the shared aggregate under
+`state_mutex`, enforces rules that span the two models, and exposes the next unit of
+external work as a worker job. The dedicated update worker wakes when new work is
+available, asks the coordinator for one job, executes it outside `state_mutex`, and
+returns the outcome to the coordinator. Claiming the job changes the state before the
+mutex is released, so a second caller cannot receive the same work.
 
-Only one artifact transaction exists:
+```mermaid
+flowchart LR
+    event["C2D message, API call,<br/>or completed operation"]
+    coordinator["State coordinator<br/>apply one transition"]
+    job["Claim one worker job"]
+    worker["Update worker thread<br/>perform I/O or callback"]
+
+    event --> coordinator
+    coordinator -->|"external work needed"| job
+    job --> worker
+    worker -->|"result or error"| coordinator
+```
+
+The cloud protocol assigns a different attempt ID to every new attempt; the SDK does not
+expect that ID to be reused. The coordinator nevertheless attaches an internal
+**generation** to each in-memory incarnation of an attempt. An incarnation can be
+replaced without changing the public ID—for example, when an active attempt is replaced
+by an attempt-level rejection after a malformed message with the same trustworthy ID.
+Worker jobs carry both ID and generation, so a delayed job from the replaced incarnation
+is rejected as stale instead of modifying its replacement.
+
+### Persisting an artifact result
+
+The worker must not expose a result in RAM as completed before the same result has been
+saved. It therefore uses a three-step transaction:
+
+1. **Stage:** keep the handler result as a proposed change, called a **mutation**, while
+   leaving the last successfully saved results unchanged. The mutation contains the
+   artifact result and whether the remaining pending artifacts must be canceled.
+2. **Project and persist:** make a snapshot, called a **projection**, of how the attempt
+   will look after applying the mutation, then save that snapshot to Zephyr Settings.
+3. **Commit:** if the proposed change has not changed while storage I/O was running,
+   apply it to the main in-memory results and clear the transaction. Here, “commit”
+   means accepting in RAM the exact projection that was already saved.
+
+The coordinator allows only one artifact transaction at a time:
 
 ```mermaid
 flowchart TD
@@ -514,30 +558,27 @@ flowchart TD
     idle -->|"Claim artifact or reconciled main result"| running
     running -->|"Handler or reconciliation returns result"| staged
     running -->|"Main firmware enters reboot probation"| idle
-    staged -->|"Persisted revision matches<br/>Commit mutation"| idle
+    staged -->|"Projection saved and unchanged<br/>Commit to in-memory results"| idle
     staged -->|"Transient storage failure<br/>Retry"| staged
-    staged -->|"Cancellation changes mutation<br/>and advances revision"| staged
+    staged -->|"Supersession changes mutation<br/>Save the new projection"| staged
 ```
 
-While a result is staged, the durable in-memory results remain unchanged. The
-transaction instead owns a projected mutation. The worker captures and persists a copy
-with that mutation overlaid, then commits it to the durable in-memory view only when the
-saved revision still matches. If cancellation or supersession changes the mutation
-during the save, its revision advances and the worker saves the newer projection without
-invoking the handler again.
+Each mutation has a revision number. If supersession changes the mutation while the
+worker is saving its projection, the revision no longer matches. The worker then
+captures and saves the newer projection without invoking the artifact handler again.
 
-The state coordinator is the only source of worker jobs. Its priority is:
+Whenever the worker asks for another job, the coordinator chooses in this order:
 
 1. persist an attempt-level rejection;
 2. complete post-reboot main-firmware reconciliation;
 3. persist terminal results that are not owned by an artifact transaction;
-4. prepare a requested result report;
+4. prepare a cumulative result message that has been scheduled;
 5. process the next artifact.
 
-This ordering ensures that results are durable before reporting and that a report is
-prepared before another artifact adds more work. Report requests coalesce: a trigger
-received during preparation records one rerun obligation rather than creating concurrent
-report jobs.
+This ordering makes results durable before they can be reported and prepares the report
+for one artifact before starting the next artifact. If another reason to prepare a
+report arrives while one is already being prepared, the coordinator records that one
+more pass is needed instead of running two report jobs concurrently.
 
 ### Persisted records
 
@@ -572,9 +613,9 @@ Inbound `UPDATE_ARTIFACTS` handling is:
 | Condition | Behavior |
 |---|---|
 | Same attempt, no results | Ignore the duplicate and continue processing. |
-| Same attempt, durable results exist | Ignore the duplicate manifest and request another cumulative report. |
+| Same attempt, durable results exist | Ignore the duplicate manifest and schedule another cumulative result message for sending. |
 | Different attempt, current attempt terminal | Replace the current attempt and start. |
-| Different attempt, current attempt unfinished | Retain one pending attempt and supersede when safe. |
+| Different attempt, current attempt unfinished | Retain one pending attempt and apply the supersession rules described below. |
 | Malformed message without trustworthy ID | Log and ignore it. |
 | Malformed message with trustworthy ID | Persist and report `updateAttemptError`. |
 
@@ -583,8 +624,9 @@ D2C results are published on `ota-cbor-d2c` at QoS 0. The MQTT loop polls
 merges results for the same attempt. It retains the encoded message when publish returns
 `-EAGAIN` and drops it after a successful publish call.
 
-`REPORT_UPDATE_RESULTS` and a duplicate manifest request a fresh cumulative report from
-the durable attempt view. A staged, not-yet-durable mutation is never included.
+`REPORT_UPDATE_RESULTS` and a duplicate manifest cause the SDK to schedule a fresh
+cumulative result message from the durable attempt view. A staged, not-yet-durable
+mutation is never included.
 
 When a pending superseding attempt exists and the current attempt becomes terminal, the
 report job promotes the pending attempt instead of preparing results for the superseded
@@ -595,9 +637,10 @@ attempt starts.
 
 Automatic handling (`CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE`) requires MCUboot in
 a rollback-capable mode, plus `CONFIG_FLASH`, `CONFIG_FLASH_MAP`, and
-`CONFIG_STREAM_FLASH`. The build ID generated through Zephyr binary descriptors
-(`CONFIG_SPOTFLOW_GENERATE_BUILD_ID`) identifies the running and downloaded images.
-Failure to read the downloaded image identity fails the attempt.
+`CONFIG_STREAM_FLASH`. With `CONFIG_SPOTFLOW_GENERATE_BUILD_ID`, a custom build script
+generates the build ID during the build and patches it into a Zephyr binary descriptor.
+That ID identifies the running and downloaded images. Failure to read the downloaded
+image identity fails the attempt.
 
 Before reboot, `firmware/spotflow_ota_fw_main.c` streams the image through the downloader
 into the MCUboot secondary slot, saves probation, requests `BOOT_UPGRADE_TEST`, and
@@ -627,7 +670,7 @@ flowchart TD
     probation{"Reconciled main result?"}
     clear["Clear probation"]
     commit["Commit result in RAM"]
-    report["Request cumulative report"]
+    report["Schedule cumulative result message"]
 
     source --> stage --> version
     version -- yes --> saveVersion --> saveAttempt
@@ -640,6 +683,8 @@ flowchart TD
 
 The result is already durable when probation is cleared. A reset before that point
 repeats reconciliation; a reset afterward restores the result without repeating it.
+After the result is committed in RAM, the coordinator schedules preparation of the
+cumulative result message, which the MQTT thread later publishes.
 
 ### Cancellation and supersession implementation
 
@@ -656,17 +701,24 @@ During actionable cancellation:
 
 - `spotflow_is_update_canceled()` remains true until the running artifact returns;
 - `spotflow_on_update_canceled()` runs on `sysworkq`;
-- a result already being persisted keeps the handler outcome but is updated to cancel
-  the remaining artifacts.
+- once the handler has returned a result, later cancellation messages are ignored even
+  while that result is still being saved.
 
-If the handler returns `SUCCEEDED`, that result is retained and the cancellation flag is
-cleared so processing can continue. A late cancellation after success is logged but is
-not exposed through the public API.
+If cancellation was accepted while the handler was running and the handler nevertheless
+returns `SUCCEEDED`, that result is retained, the cancellation flag is cleared, and the
+remaining artifacts continue. This prevents a cancellation race from leaving an attempt
+half-finished after an artifact has already succeeded. A later cancellation is logged
+but is not exposed through the public API.
 
 A different valid attempt or trustworthy rejection occupies the single pending slot.
-Supersession marks unfinished results canceled when safe. After the current attempt
-becomes terminal, pending promotion replaces its ID and generation, clears report
-scheduling for the old instance, and wakes the worker for the replacement.
+Supersession can stop the current attempt only before an automatic main-firmware handler
+has requested the MCUboot test upgrade. It never overwrites the result of a handler that
+is already running: if that handler returns `FAILED` or `CANCELED`, the remaining
+artifacts are canceled; if it returns `SUCCEEDED`, the current attempt continues. When
+no handler is running, its pending artifacts can be marked canceled immediately. After
+the current attempt becomes terminal, pending promotion replaces its ID and generation,
+clears report scheduling for the old incarnation, and wakes the worker for the
+replacement.
 
 ### Logging and sensitive data
 
