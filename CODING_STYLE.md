@@ -10,18 +10,17 @@ Code formatting is enforced by `.clang-format`. Run `clang-format` before commit
 
 Source files should follow this order:
 
-1. **Copyright header**
-2. **Includes**
+1. **Includes**
    - Own header first (e.g., `#include "my_module.h"`)
    - Project headers (e.g., `#include "metrics/spotflow_metrics_backend.h"`)
    - Zephyr/system headers (e.g., `#include <zephyr/kernel.h>`)
-3. **LOG_MODULE_REGISTER / LOG_MODULE_DECLARE**
-4. **Defines and macros**
-5. **Type definitions** (structs, enums, typedefs)
-6. **Static variables**
-7. **Forward declarations of static functions**
-8. **Public function implementations**
-9. **Static function implementations**
+2. **LOG_MODULE_REGISTER / LOG_MODULE_DECLARE**
+3. **Defines and macros**
+4. **Type definitions** (structs, enums, typedefs)
+5. **Static variables**
+6. **Forward declarations of static functions**
+7. **Public function implementations**
+8. **Static function implementations**
 
 ### Example
 
