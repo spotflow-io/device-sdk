@@ -21,6 +21,10 @@ static size_t received_bytes;
 static bool received_last_block;
 static SPOTFLOW_DEFINE_DOWNLOADER(static_downloader);
 
+struct final_block_pause_ctx {
+	struct k_sem paused_sem;
+};
+
 static void reset_test_state(void)
 {
 	struct spotflow_ota_downloader_transport_fake* fake =
@@ -39,6 +43,18 @@ static void capture_block_cb(const struct spotflow_artifact_block* block,
 
 	received_bytes += block->data_len;
 	received_last_block = block->is_last;
+}
+
+static void pause_on_final_block_cb(const struct spotflow_artifact_block* block,
+				    struct spotflow_downloader* downloader, void* callback_ctx)
+{
+	struct final_block_pause_ctx* ctx = callback_ctx;
+
+	capture_block_cb(block, downloader, NULL);
+	if (block->is_last) {
+		zassert_ok(spotflow_pause_download(downloader));
+		k_sem_give(&ctx->paused_sem);
+	}
 }
 
 static void cancel_after_delay(void* downloader_ptr, void* arg2, void* arg3)
@@ -271,6 +287,20 @@ static void pause_and_resume_after_delay(void* downloader_ptr, void* arg2, void*
 	k_sleep(K_MSEC(20));
 	zassert_ok(spotflow_pause_download(downloader_ptr));
 	k_sleep(K_MSEC(20));
+	zassert_equal(received_bytes, 0, "download continued while paused");
+	zassert_ok(spotflow_resume_download(downloader_ptr));
+}
+
+static void resume_after_final_block(void* downloader_ptr, void* ctx_ptr, void* arg3)
+{
+	struct final_block_pause_ctx* ctx = ctx_ptr;
+
+	ARG_UNUSED(arg3);
+
+	zassert_ok(k_sem_take(&ctx->paused_sem, K_FOREVER));
+	k_sleep(K_MSEC(20));
+	zassert_equal(spotflow_get_downloader_state(downloader_ptr),
+		      SPOTFLOW_DOWNLOADER_STATE_PAUSED);
 	zassert_ok(spotflow_resume_download(downloader_ptr));
 }
 
@@ -302,7 +332,41 @@ ZTEST(spotflow_ota_downloader, test_pause_and_resume_block_download)
 
 	zassert_equal(download_result, 0);
 	zassert_true(fake->pause_observed);
+	zassert_equal(fake->call_count, 2, "download did not resume in a new transport request");
 	zassert_equal(received_bytes, sizeof(sample_payload));
+	zassert_equal(spotflow_get_downloader_state(&downloader),
+		      SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
+}
+
+ZTEST(spotflow_ota_downloader, test_pause_after_final_block_is_handled_by_main_loop)
+{
+	struct spotflow_ota_downloader_transport_fake* fake =
+		spotflow_ota_downloader_transport_fake_get();
+	struct spotflow_downloader downloader;
+	struct spotflow_download_request request = {
+		.url = "https://example.com/firmware.bin",
+		.secret = "secret",
+	};
+	struct final_block_pause_ctx ctx;
+	struct k_thread control_thread;
+	k_thread_stack_t control_stack[1024];
+
+	zassert_ok(spotflow_init_downloader(&downloader));
+	zassert_ok(k_sem_init(&ctx.paused_sem, 0, 1));
+	fake->payload = sample_payload;
+	fake->payload_len = sizeof(sample_payload);
+
+	k_thread_create(&control_thread, control_stack, K_THREAD_STACK_SIZEOF(control_stack),
+			resume_after_final_block, &downloader, &ctx, NULL, K_PRIO_PREEMPT(0), 0,
+			K_NO_WAIT);
+
+	zassert_ok(
+		spotflow_download_artifact(&downloader, &request, pause_on_final_block_cb, &ctx));
+	k_thread_join(&control_thread, K_FOREVER);
+
+	zassert_equal(fake->call_count, 1);
+	zassert_equal(received_bytes, sizeof(sample_payload));
+	zassert_true(received_last_block);
 	zassert_equal(spotflow_get_downloader_state(&downloader),
 		      SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
 }

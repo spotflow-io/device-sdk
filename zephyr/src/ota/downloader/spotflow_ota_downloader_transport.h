@@ -28,6 +28,8 @@ struct spotflow_ota_downloader_transport_request {
 	 * Ranged responses must report the same total size across retries.
 	 */
 	uint64_t* artifact_size;
+	/** Set when this attempt was interrupted by a pause request. */
+	bool* paused;
 	bool* transient_failure;
 };
 

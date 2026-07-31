@@ -2,6 +2,7 @@
 
 #include <spotflow/downloader.h>
 
+#include "ota/downloader/spotflow_ota_downloader.h"
 #include "ota/downloader/spotflow_ota_downloader_transport_range.h"
 #include "ota/downloader/spotflow_ota_url.h"
 
@@ -29,6 +30,7 @@ struct spotflow_ota_downloader_http_ctx {
 	size_t offset;
 	uint64_t* artifact_size;
 	int callback_err;
+	bool paused;
 	bool transient_failure;
 	bool response_validated;
 };
@@ -36,7 +38,6 @@ struct spotflow_ota_downloader_http_ctx {
 static int connect_socket(const struct spotflow_ota_url* url);
 static int http_response_cb(struct http_response* rsp, enum http_final_call final_data,
 			    void* user_data);
-static bool downloader_is_canceled(struct spotflow_downloader* downloader);
 
 int spotflow_ota_downloader_transport_download(
 	struct spotflow_ota_downloader_transport_request* request)
@@ -44,10 +45,11 @@ int spotflow_ota_downloader_transport_download(
 	if (request == NULL || request->url == NULL || request->authorization_header == NULL ||
 	    request->downloader == NULL || request->callback == NULL ||
 	    request->bytes_downloaded == NULL || request->artifact_size == NULL ||
-	    request->transient_failure == NULL) {
+	    request->paused == NULL || request->transient_failure == NULL) {
 		return -EINVAL;
 	}
 
+	*request->paused = false;
 	*request->transient_failure = false;
 	*request->bytes_downloaded = 0;
 
@@ -108,9 +110,12 @@ int spotflow_ota_downloader_transport_download(
 
 	if (http_ctx.callback_err != 0) {
 		*request->bytes_downloaded = http_ctx.offset - request->range_start;
+		*request->paused = http_ctx.paused;
 		*request->transient_failure = http_ctx.transient_failure;
-		spotflow_ota_downloader_transport_note_error(request, *request->bytes_downloaded,
-							     http_ctx.callback_err);
+		if (!http_ctx.paused) {
+			spotflow_ota_downloader_transport_note_error(
+				request, *request->bytes_downloaded, http_ctx.callback_err);
+		}
 		return http_ctx.callback_err;
 	}
 
@@ -123,17 +128,6 @@ int spotflow_ota_downloader_transport_download(
 
 	*request->bytes_downloaded = http_ctx.offset - request->range_start;
 	return 0;
-}
-
-static bool downloader_is_canceled(struct spotflow_downloader* downloader)
-{
-	bool canceled;
-
-	k_mutex_lock(&downloader->mutex, K_FOREVER);
-	canceled = downloader->cancel_requested;
-	k_mutex_unlock(&downloader->mutex);
-
-	return canceled;
 }
 
 static int connect_socket(const struct spotflow_ota_url* url)
@@ -211,9 +205,12 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 		return ctx->callback_err;
 	}
 
-	if (downloader_is_canceled(ctx->downloader)) {
-		ctx->callback_err = -ECANCELED;
-		return -ECANCELED;
+	int rc = spotflow_ota_downloader_check_state(ctx->downloader);
+
+	if (rc != 0) {
+		ctx->paused = rc == -EAGAIN;
+		ctx->callback_err = rc;
+		return rc;
 	}
 
 	if (rsp->http_status_code != 0) {
@@ -229,7 +226,7 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 	}
 
 	if (ctx->range_start > 0 && !ctx->response_validated) {
-		int rc = spotflow_ota_downloader_transport_validate_range_response(
+		rc = spotflow_ota_downloader_transport_validate_range_response(
 			rsp, ctx->range_start, ctx->artifact_size);
 
 		if (rc != 0) {
@@ -252,10 +249,6 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 		ctx->callback(&block, ctx->downloader, ctx->callback_ctx);
 		ctx->offset += rsp->body_frag_len;
 
-		if (downloader_is_canceled(ctx->downloader)) {
-			ctx->callback_err = -ECANCELED;
-			return -ECANCELED;
-		}
 	} else if (final_data == HTTP_DATA_FINAL) {
 		struct spotflow_artifact_block block = {
 			.offset = ctx->offset,
@@ -265,6 +258,17 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 		};
 
 		ctx->callback(&block, ctx->downloader, ctx->callback_ctx);
+	}
+
+	if (final_data == HTTP_DATA_FINAL) {
+		return 0;
+	}
+
+	rc = spotflow_ota_downloader_check_state(ctx->downloader);
+	if (rc != 0) {
+		ctx->paused = rc == -EAGAIN;
+		ctx->callback_err = rc;
+		return rc;
 	}
 
 	return 0;

@@ -23,6 +23,8 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 				   spotflow_ota_download_started_callback started_callback,
 				   void* started_callback_ctx);
 
+int spotflow_ota_downloader_check_state(struct spotflow_downloader* downloader);
+
 #ifdef __cplusplus
 }
 #endif

@@ -5,6 +5,7 @@
 
 #include <spotflow/downloader.h>
 
+#include "ota/downloader/spotflow_ota_downloader.h"
 #include "ota/downloader/spotflow_ota_downloader_transport.h"
 
 #include "spotflow_ota_downloader_transport_fake.h"
@@ -63,8 +64,11 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 	size_t delivered = 0;
 
 	while (offset < fake->payload_len) {
-		if (request->downloader->cancel_requested) {
-			fake->cancel_observed = true;
+		int rc = spotflow_ota_downloader_check_state(request->downloader);
+
+		if (rc != 0) {
+			*request->paused = rc == -EAGAIN;
+			fake->cancel_observed = rc == -ECANCELED;
 
 			if (request->bytes_downloaded != NULL) {
 				*request->bytes_downloaded = delivered;
@@ -72,7 +76,7 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 
 			fake->bytes_delivered = delivered;
 
-			return -ECANCELED;
+			return rc;
 		}
 
 		size_t deliver_len = fake->payload_len - offset;
@@ -95,16 +99,20 @@ static int deliver_payload(struct spotflow_ota_downloader_transport_request* req
 
 		request->callback(&block, request->downloader, request->callback_ctx);
 
-		if (request->downloader->cancel_requested) {
-			fake->cancel_observed = true;
+		if (!block.is_last) {
+			rc = spotflow_ota_downloader_check_state(request->downloader);
+			if (rc != 0) {
+				*request->paused = rc == -EAGAIN;
+				fake->cancel_observed = rc == -ECANCELED;
 
-			if (request->bytes_downloaded != NULL) {
-				*request->bytes_downloaded = delivered + deliver_len;
+				if (request->bytes_downloaded != NULL) {
+					*request->bytes_downloaded = delivered + deliver_len;
+				}
+
+				fake->bytes_delivered = delivered + deliver_len;
+
+				return rc;
 			}
-
-			fake->bytes_delivered = delivered + deliver_len;
-
-			return -ECANCELED;
 		}
 
 		offset += deliver_len;
@@ -143,6 +151,7 @@ int spotflow_ota_downloader_transport_download(
 	int rc = 0;
 
 	fake->call_count++;
+	*request->paused = false;
 	*request->transient_failure = false;
 	*request->bytes_downloaded = 0;
 
@@ -193,20 +202,7 @@ int spotflow_ota_downloader_transport_download(
 		}
 
 		fake->pause_observed = true;
-
-		while (request->downloader->state == SPOTFLOW_DOWNLOADER_STATE_PAUSED) {
-			if (request->downloader->cancel_requested) {
-				fake->cancel_observed = true;
-
-				if (request->bytes_downloaded != NULL) {
-					*request->bytes_downloaded = 0;
-				}
-
-				return -ECANCELED;
-			}
-
-			k_sleep(K_MSEC(10));
-		}
+		fake->block_until_pause = false;
 	}
 
 	return deliver_payload(request, fake, request->range_start);
