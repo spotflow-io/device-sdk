@@ -1,61 +1,14 @@
-#include <zephyr/kernel.h>
-#include <zephyr/logging/log.h>
+#include "net.h"
 
 #include <spotflow/ota.h>
 
-#include "net.h"
+#include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_REGISTER(ota_sample, LOG_LEVEL_INF);
 
-static const char* ota_phase_name(enum spotflow_ota_phase phase)
-{
-	switch (phase) {
-	case SPOTFLOW_OTA_PHASE_NOT_RUNNING:
-		return "NOT_RUNNING";
-	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
-		return "PENDING_DOWNLOAD";
-	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
-		return "DOWNLOADING";
-	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
-		return "PENDING_UPGRADE";
-	case SPOTFLOW_OTA_PHASE_PENDING_REBOOT:
-		return "PENDING_REBOOT";
-	case SPOTFLOW_OTA_PHASE_UNCONFIRMED:
-		return "UNCONFIRMED";
-	default:
-		return "UNKNOWN";
-	}
-}
-
-static void confirm_unconfirmed_main_firmware(void)
-{
-	struct spotflow_ota_main_firmware_state fw_state;
-	int ret = spotflow_get_main_firmware_update_state(&fw_state);
-
-	if (ret < 0) {
-		LOG_ERR("Failed to query main firmware state: %d", ret);
-		return;
-	}
-
-	if (fw_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
-		LOG_INF("Main firmware state: phase=%s result=%d", ota_phase_name(fw_state.phase),
-			fw_state.result);
-		return;
-	}
-
-	LOG_INF("Unconfirmed main firmware detected (phase=%s), confirming via Spotflow OTA",
-		ota_phase_name(fw_state.phase));
-
-	ret = spotflow_confirm_main_firmware_image(&fw_state);
-	if (ret < 0) {
-		LOG_ERR("Failed to confirm main firmware image: %d (phase=%s result=%d)", ret,
-			ota_phase_name(fw_state.phase), fw_state.result);
-		return;
-	}
-
-	LOG_INF("Main firmware confirmed successfully (phase=%s result=%d)",
-		ota_phase_name(fw_state.phase), fw_state.result);
-}
+static const char* ota_phase_name(enum spotflow_ota_phase phase);
+static void confirm_unconfirmed_main_firmware(void);
 
 void spotflow_on_main_firmware_update_progressed(
 	const struct spotflow_ota_main_firmware_state* state)
@@ -112,4 +65,54 @@ int main(void)
 	LOG_INF("Ready to receive OTA updates");
 
 	return 0;
+}
+
+static const char* ota_phase_name(enum spotflow_ota_phase phase)
+{
+	switch (phase) {
+	case SPOTFLOW_OTA_PHASE_NOT_RUNNING:
+		return "NOT_RUNNING";
+	case SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD:
+		return "PENDING_DOWNLOAD";
+	case SPOTFLOW_OTA_PHASE_DOWNLOADING:
+		return "DOWNLOADING";
+	case SPOTFLOW_OTA_PHASE_PENDING_UPGRADE:
+		return "PENDING_UPGRADE";
+	case SPOTFLOW_OTA_PHASE_PENDING_REBOOT:
+		return "PENDING_REBOOT";
+	case SPOTFLOW_OTA_PHASE_UNCONFIRMED:
+		return "UNCONFIRMED";
+	default:
+		return "UNKNOWN";
+	}
+}
+
+static void confirm_unconfirmed_main_firmware(void)
+{
+	struct spotflow_ota_main_firmware_state fw_state;
+	int ret = spotflow_get_main_firmware_update_state(&fw_state);
+
+	if (ret < 0) {
+		LOG_ERR("Failed to query main firmware state: %d", ret);
+		return;
+	}
+
+	if (fw_state.phase != SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
+		LOG_INF("Main firmware state: phase=%s result=%d", ota_phase_name(fw_state.phase),
+			fw_state.result);
+		return;
+	}
+
+	LOG_INF("Unconfirmed main firmware detected (phase=%s), confirming via Spotflow OTA",
+		ota_phase_name(fw_state.phase));
+
+	ret = spotflow_confirm_main_firmware_image(&fw_state);
+	if (ret < 0) {
+		LOG_ERR("Failed to confirm main firmware image: %d (phase=%s result=%d)", ret,
+			ota_phase_name(fw_state.phase), fw_state.result);
+		return;
+	}
+
+	LOG_INF("Main firmware confirmed successfully (phase=%s result=%d)",
+		ota_phase_name(fw_state.phase), fw_state.result);
 }
