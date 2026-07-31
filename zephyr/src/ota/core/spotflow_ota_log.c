@@ -16,8 +16,10 @@ const char* spotflow_ota_log_result_name(enum spotflow_ota_result result)
 	case SPOTFLOW_OTA_RESULT_CANCELED:
 		return "canceled";
 	case SPOTFLOW_OTA_RESULT_PENDING:
-	default:
 		return "pending";
+	default:
+		LOG_WRN("Unknown OTA result value: %d", result);
+		return "unknown result";
 	}
 }
 
@@ -50,8 +52,10 @@ const char* spotflow_ota_log_phase_name(enum spotflow_ota_phase phase)
 	case SPOTFLOW_OTA_PHASE_UNCONFIRMED:
 		return "unconfirmed";
 	case SPOTFLOW_OTA_PHASE_NOT_RUNNING:
-	default:
 		return "not running";
+	default:
+		LOG_WRN("Unknown OTA phase value: %d", phase);
+		return "unknown phase";
 	}
 }
 
