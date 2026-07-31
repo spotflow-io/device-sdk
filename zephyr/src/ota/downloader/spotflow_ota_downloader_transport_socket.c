@@ -53,6 +53,8 @@ int spotflow_ota_downloader_transport_download(
 	*request->transient_failure = false;
 	*request->bytes_downloaded = 0;
 
+	k_timepoint_t request_deadline =
+		sys_timepoint_calc(K_MSEC(CONFIG_SPOTFLOW_OTA_HTTP_TIMEOUT_MS));
 	int sock = connect_socket(request->url);
 
 	if (sock < 0) {
@@ -104,7 +106,15 @@ int spotflow_ota_downloader_transport_download(
 		.optional_headers = optional_headers,
 	};
 
-	int rc = http_client_req(sock, &req, CONFIG_SPOTFLOW_OTA_HTTP_TIMEOUT_MS, &http_ctx);
+	if (sys_timepoint_expired(request_deadline)) {
+		zsock_close(sock);
+		spotflow_ota_downloader_transport_note_error(request, 0, -ETIMEDOUT);
+		return -ETIMEDOUT;
+	}
+
+	int32_t http_timeout_ms =
+		k_ticks_to_ms_ceil32(sys_timepoint_timeout(request_deadline).ticks);
+	int rc = http_client_req(sock, &req, http_timeout_ms, &http_ctx);
 
 	zsock_close(sock);
 

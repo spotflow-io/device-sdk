@@ -34,10 +34,13 @@ config SPOTFLOW_OTA_THREAD_STACK_SIZE
 	  overflows during TLS or HTTP operations.
 
 config SPOTFLOW_OTA_HTTP_TIMEOUT_MS
-	int "HTTP timeout for artifact downloads in milliseconds"
+	int "Artifact download request timeout in milliseconds"
 	default 120000
 	help
-	  Maximum time allowed for a single artifact download HTTP request.
+	  Maximum time allowed for a single artifact download request, including
+	  DNS resolution, socket connection, TLS handshake, and the HTTP exchange.
+	  Zephyr's blocking DNS, TCP, and TLS operations retain their own timeout
+	  settings and cannot be interrupted when this deadline expires.
 
 config SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE
 	int "Receive buffer size for artifact downloads in bytes"
