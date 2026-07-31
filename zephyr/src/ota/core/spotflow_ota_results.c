@@ -6,7 +6,7 @@
 #include <errno.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 int spotflow_ota_results_persist_attempt(const struct spotflow_ota_persisted_attempt* attempt)
 {

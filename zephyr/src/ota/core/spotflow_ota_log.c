@@ -4,7 +4,7 @@
 
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 const char* spotflow_ota_log_result_name(enum spotflow_ota_result result)
 {

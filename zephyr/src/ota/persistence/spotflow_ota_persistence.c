@@ -6,7 +6,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 #define SPOTFLOW_OTA_SETTINGS_ROOT "spotflow/ota"
 #define SPOTFLOW_OTA_SETTINGS_KEY_ATTEMPT "attempt"

@@ -729,7 +729,8 @@ wakes the worker for the replacement.
 ### Logging and sensitive data
 
 All update modules use the `spotflow_ota` log module
-(`CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL`). Use `DBG` during manual end-to-end
+(`CONFIG_SPOTFLOW_OTA_LOG_LEVEL`, which defaults to
+`CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL`). Use `DBG` during manual end-to-end
 validation and `INF` or higher in production.
 
 Never log full artifact URLs, OTA secrets, authorization headers, or raw CBOR payloads.

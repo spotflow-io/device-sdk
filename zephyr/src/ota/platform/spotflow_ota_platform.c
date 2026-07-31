@@ -11,7 +11,7 @@
 #include <zephyr/storage/flash_map.h>
 #include <zephyr/sys/reboot.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 static struct flash_img_context upload_ctx;
 

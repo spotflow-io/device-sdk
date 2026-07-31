@@ -11,7 +11,7 @@
 #include <zephyr/bindesc.h>
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 #define SPOTFLOW_BINDESC_ID_BUILD_ID 0x5f0
 #define BINDESC_SCAN_CHUNK_SIZE 256

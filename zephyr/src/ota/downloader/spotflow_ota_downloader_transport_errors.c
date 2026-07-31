@@ -5,7 +5,7 @@
 
 #include <zephyr/logging/log.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 static bool transport_error_is_transient(int err, size_t bytes_downloaded);
 

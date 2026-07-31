@@ -23,7 +23,7 @@
 #error "Spotflow OTA requires MQTT transport; BLE does not support OTA updates"
 #endif /* CONFIG_SPOTFLOW_OTA && CONFIG_SPOTFLOW_TRANSPORT_BLE */
 
-LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 static K_MUTEX_DEFINE(ota_mutex);
 static bool ota_initialized;

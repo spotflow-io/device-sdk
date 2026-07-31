@@ -15,7 +15,7 @@
 #include <zephyr/logging/log.h>
 #include <zephyr/sys/iterable_sections.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 #define OTA_AUTHORIZATION_HEADER_PREFIX "Authorization: OtaSecret "
 #define OTA_AUTHORIZATION_HEADER_SUFFIX "\r\n"

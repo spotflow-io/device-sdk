@@ -7,7 +7,7 @@
 #include <zephyr/net/http/parser_url.h>
 #include <zephyr/sys/util.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 int spotflow_ota_parse_url(const char* url, struct spotflow_ota_url* out)
 {

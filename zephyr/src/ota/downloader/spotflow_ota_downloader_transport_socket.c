@@ -17,7 +17,7 @@
 #include <zephyr/net/socket.h>
 #include <zephyr/net/tls_credentials.h>
 
-LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 #define OTA_TLS_SEC_TAG 1
 #define OTA_RANGE_HEADER_MAX_LEN 48
