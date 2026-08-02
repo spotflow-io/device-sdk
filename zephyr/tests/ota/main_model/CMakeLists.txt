@@ -9,6 +9,7 @@ target_include_directories(app PRIVATE
 )
 
 target_compile_definitions(app PRIVATE
+        CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE=512
         CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS=4
 )
 
