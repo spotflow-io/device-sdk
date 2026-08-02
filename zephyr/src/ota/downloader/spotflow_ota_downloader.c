@@ -304,8 +304,7 @@ static void downloader_wake_waiters(struct spotflow_downloader* downloader)
 
 static void downloader_drain_resume_sem(struct spotflow_downloader* downloader)
 {
-	while (k_sem_take(&downloader->resume_sem, K_NO_WAIT) == 0) {
-	}
+	k_sem_take(&downloader->resume_sem, K_NO_WAIT);
 }
 
 static int downloader_wait_if_paused(struct spotflow_downloader* downloader)
