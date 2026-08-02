@@ -37,6 +37,7 @@ struct spotflow_downloader {
 	struct k_mutex mutex;
 	bool cancel_requested;
 	struct k_sem resume_sem;
+	uint8_t recv_buf[CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE];
 };
 
 /**

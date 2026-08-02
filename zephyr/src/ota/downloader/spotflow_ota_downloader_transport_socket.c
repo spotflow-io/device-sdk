@@ -73,7 +73,6 @@ int spotflow_ota_downloader_transport_download(
 		.transient_failure = false,
 	};
 
-	static uint8_t recv_buf[CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE];
 	char range_header[OTA_RANGE_HEADER_MAX_LEN];
 	const char* optional_headers[3];
 	size_t optional_header_count = 0;
@@ -101,8 +100,8 @@ int spotflow_ota_downloader_transport_download(
 		.host = request->url->host,
 		.protocol = "HTTP/1.1",
 		.response = http_response_cb,
-		.recv_buf = recv_buf,
-		.recv_buf_len = sizeof(recv_buf),
+		.recv_buf = request->downloader->recv_buf,
+		.recv_buf_len = sizeof(request->downloader->recv_buf),
 		.optional_headers = optional_headers,
 	};
 
