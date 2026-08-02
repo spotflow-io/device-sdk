@@ -26,7 +26,7 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 static void downloader_wake_waiters(struct spotflow_downloader* downloader);
 static void downloader_drain_resume_sem(struct spotflow_downloader* downloader);
 static int downloader_wait_if_paused(struct spotflow_downloader* downloader);
-static void downloader_finish(struct spotflow_downloader* downloader);
+static int downloader_finish(struct spotflow_downloader* downloader, int result);
 static int init_static_downloaders(void);
 
 SYS_INIT(init_static_downloaders, PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
@@ -213,8 +213,7 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 
 	while (true) {
 		if (downloader_wait_if_paused(downloader) != 0) {
-			downloader_finish(downloader);
-			return -ECANCELED;
+			return downloader_finish(downloader, -ECANCELED);
 		}
 
 		size_t attempt_bytes = 0;
@@ -240,9 +239,8 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 		rc = spotflow_ota_downloader_transport_download(&transport_request);
 		total_bytes_downloaded += attempt_bytes;
 
-		if ((paused || rc == 0) && downloader_wait_if_paused(downloader) != 0) {
-			downloader_finish(downloader);
-			return -ECANCELED;
+		if (paused && downloader_wait_if_paused(downloader) != 0) {
+			return downloader_finish(downloader, -ECANCELED);
 		}
 
 		if (paused) {
@@ -250,15 +248,17 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 		}
 
 		if (rc == 0) {
-			LOG_DBG("Artifact download finished (%zu bytes)", total_bytes_downloaded);
-			downloader_finish(downloader);
-			return 0;
+			rc = downloader_finish(downloader, 0);
+			if (rc == 0) {
+				LOG_DBG("Artifact download finished (%zu bytes)",
+					total_bytes_downloaded);
+			}
+			return rc;
 		}
 
 		if (rc == -ECANCELED || !transient_failure) {
 			LOG_ERR("Artifact download failed: %d", rc);
-			downloader_finish(downloader);
-			return rc;
+			return downloader_finish(downloader, rc);
 		}
 
 		LOG_WRN("Transient artifact download failure (%d) after %zu bytes, retrying with "
@@ -286,12 +286,25 @@ int spotflow_ota_downloader_check_state(struct spotflow_downloader* downloader)
 	return 0;
 }
 
-static void downloader_finish(struct spotflow_downloader* downloader)
+static int downloader_finish(struct spotflow_downloader* downloader, int result)
 {
-	k_mutex_lock(&downloader->mutex, K_FOREVER);
-	downloader->state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE;
-	downloader->cancel_requested = false;
-	k_mutex_unlock(&downloader->mutex);
+	while (true) {
+		k_mutex_lock(&downloader->mutex, K_FOREVER);
+
+		if (downloader->cancel_requested) {
+			result = -ECANCELED;
+		}
+
+		if (downloader->state != SPOTFLOW_DOWNLOADER_STATE_PAUSED) {
+			downloader->state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE;
+			downloader->cancel_requested = false;
+			k_mutex_unlock(&downloader->mutex);
+			return result;
+		}
+
+		k_mutex_unlock(&downloader->mutex);
+		k_sem_take(&downloader->resume_sem, K_FOREVER);
+	}
 }
 
 static void downloader_wake_waiters(struct spotflow_downloader* downloader)
