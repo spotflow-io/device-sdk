@@ -292,9 +292,6 @@ static void downloader_finish(struct spotflow_downloader* downloader)
 	downloader->state = SPOTFLOW_DOWNLOADER_STATE_INACTIVE;
 	downloader->cancel_requested = false;
 	k_mutex_unlock(&downloader->mutex);
-
-	downloader_wake_waiters(downloader);
-	downloader_drain_resume_sem(downloader);
 }
 
 static void downloader_wake_waiters(struct spotflow_downloader* downloader)
