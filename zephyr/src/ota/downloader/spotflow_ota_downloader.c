@@ -75,15 +75,18 @@ int spotflow_init_downloader(struct spotflow_downloader* downloader)
 	return 0;
 }
 
-enum spotflow_downloader_state
-spotflow_get_downloader_state(const struct spotflow_downloader* downloader)
+enum spotflow_downloader_state spotflow_get_downloader_state(struct spotflow_downloader* downloader)
 {
 	if (downloader == NULL) {
 		LOG_ERR("downloader cannot be NULL");
 		return SPOTFLOW_DOWNLOADER_STATE_INACTIVE;
 	}
 
-	return downloader->state;
+	k_mutex_lock(&downloader->mutex, K_FOREVER);
+	enum spotflow_downloader_state state = downloader->state;
+	k_mutex_unlock(&downloader->mutex);
+
+	return state;
 }
 
 int spotflow_pause_download(struct spotflow_downloader* downloader)

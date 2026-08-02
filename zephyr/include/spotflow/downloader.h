@@ -125,7 +125,7 @@ int spotflow_download_artifact(struct spotflow_downloader* downloader,
  *         @c SPOTFLOW_DOWNLOADER_STATE_INACTIVE.
  */
 enum spotflow_downloader_state
-spotflow_get_downloader_state(const struct spotflow_downloader* downloader);
+spotflow_get_downloader_state(struct spotflow_downloader* downloader);
 
 /**
  * @brief Pause an active download.
