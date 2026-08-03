@@ -497,6 +497,9 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 				LOG_ERR("Failed to drain unexpected PUBLISH payload: %d", ret);
 				break;
 			}
+
+			LOG_WRN("Discarding unexpected PUBLISH payload (%u bytes)",
+				(unsigned int)payload_len);
 		}
 
 		/* QoS 1 is acknowledged only after the payload has been fully read. */
@@ -514,7 +517,7 @@ static int read_publish_payload(struct mqtt_client* client, uint8_t* buffer, siz
 				size_t payload_len, size_t* bytes_read, bool* truncated)
 {
 	size_t total_read = 0;
-	uint8_t discard_buffer[64];
+	uint8_t discard_buffer[64]; /* Used when the payload exceeds the buffer size */
 
 	if (bytes_read == NULL || truncated == NULL) {
 		return -EINVAL;
