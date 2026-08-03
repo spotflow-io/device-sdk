@@ -73,8 +73,9 @@ static int spotflow_mqtt_publish_cbor_msg(uint8_t* payload, size_t len, struct m
 static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* evt);
 static bool utf8_starts_with(const struct mqtt_utf8* str, const struct mqtt_utf8* prefix);
 static void clear_fds(void);
-static int read_publish_payload(struct mqtt_client* client, uint8_t* buffer, size_t buffer_len,
-				size_t payload_len, size_t* bytes_read, bool* truncated);
+static int read_publish_payload_and_discard_excess(struct mqtt_client* client, uint8_t* buffer,
+						   size_t buffer_len, size_t payload_len,
+						   size_t* bytes_read, bool* truncated);
 static int acknowledge_publish_if_needed(struct mqtt_client* client,
 					 const struct mqtt_publish_param* publish);
 
@@ -448,9 +449,9 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 				     &spotflow_mqtt_config.config_c2d_topic)) {
 			size_t bytes_read;
 			/* Consume the whole publish so the MQTT stream stays aligned. */
-			ret = read_publish_payload(client, c2d_payload_buffer,
-						   sizeof(c2d_payload_buffer), payload_len,
-						   &bytes_read, &truncated);
+			ret = read_publish_payload_and_discard_excess(
+				client, c2d_payload_buffer, sizeof(c2d_payload_buffer), payload_len,
+				&bytes_read, &truncated);
 			if (ret < 0) {
 				LOG_ERR("Failed to read PUBLISH payload: %d", ret);
 				break;
@@ -470,9 +471,9 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 					  &spotflow_mqtt_config.ota_c2d_topic)) {
 			size_t bytes_read;
 			/* Consume the whole publish so the MQTT stream stays aligned. */
-			ret = read_publish_payload(client, ota_c2d_payload_buffer,
-						   sizeof(ota_c2d_payload_buffer), payload_len,
-						   &bytes_read, &truncated);
+			ret = read_publish_payload_and_discard_excess(
+				client, ota_c2d_payload_buffer, sizeof(ota_c2d_payload_buffer),
+				payload_len, &bytes_read, &truncated);
 			if (ret < 0) {
 				LOG_ERR("Failed to read PUBLISH payload: %d", ret);
 				break;
@@ -491,8 +492,9 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 			uint8_t discard_buffer[64];
 			size_t ignored_bytes_read;
 
-			ret = read_publish_payload(client, discard_buffer, sizeof(discard_buffer),
-						   payload_len, &ignored_bytes_read, &truncated);
+			ret = read_publish_payload_and_discard_excess(
+				client, discard_buffer, sizeof(discard_buffer), payload_len,
+				&ignored_bytes_read, &truncated);
 			if (ret < 0) {
 				LOG_ERR("Failed to drain unexpected PUBLISH payload: %d", ret);
 				break;
@@ -513,8 +515,9 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 	}
 }
 
-static int read_publish_payload(struct mqtt_client* client, uint8_t* buffer, size_t buffer_len,
-				size_t payload_len, size_t* bytes_read, bool* truncated)
+static int read_publish_payload_and_discard_excess(struct mqtt_client* client, uint8_t* buffer,
+						   size_t buffer_len, size_t payload_len,
+						   size_t* bytes_read, bool* truncated)
 {
 	size_t total_read = 0;
 	uint8_t discard_buffer[64]; /* Used when the payload exceeds the buffer size */
