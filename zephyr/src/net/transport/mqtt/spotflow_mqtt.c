@@ -536,7 +536,7 @@ static int read_publish_payload(struct mqtt_client* client, uint8_t* buffer, siz
 		}
 
 		/* MQTT_EVT_PUBLISH provides the length, but the payload must be pulled manually. */
-		int ret = mqtt_read_publish_payload(client, target_buffer, chunk_len);
+		int ret = mqtt_read_publish_payload_blocking(client, target_buffer, chunk_len);
 		if (ret < 0) {
 			return ret;
 		}
