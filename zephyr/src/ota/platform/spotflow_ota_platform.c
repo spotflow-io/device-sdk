@@ -104,6 +104,12 @@ int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
 
 int spotflow_ota_platform_begin_image_write(void)
 {
+	/* An unconfirmed image may still need the upload slot contents for rollback. */
+	if (!boot_is_img_confirmed()) {
+		LOG_ERR("Cannot overwrite the upload slot while the running image is unconfirmed");
+		return -EBUSY;
+	}
+
 	return flash_img_init(&upload_ctx);
 }
 
