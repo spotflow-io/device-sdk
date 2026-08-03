@@ -448,6 +448,11 @@ The MQTT thread calls it before the first session metadata publish. It loads per
 restores in-memory state, starts the update worker, and performs post-reboot
 main-firmware reconciliation when automatic handling is enabled.
 
+Startup reconciliation records any progress notification and worker wakeup as deferred
+effects. Initialization commits its state and releases the initialization mutex before
+dispatching those effects. A progress callback can therefore call any public OTA facade
+API without recursively restarting initialization.
+
 Every public facade API in `spotflow/ota.h` that reads or changes update state also calls
 `spotflow_ota_init()` first. Application code can therefore confirm an unconfirmed image
 or query cancellation before the MQTT session is established without calling an
@@ -462,6 +467,7 @@ Runtime work is divided as follows:
 | MQTT thread | Decodes cloud-to-device (C2D) messages, submits them to the update state coordinator, and polls the result outbox for device-to-cloud (D2C) messages to publish. |
 | Update worker thread | A dedicated SDK thread that saves state, runs one artifact handler at a time, performs automatic downloads, and prepares result messages. |
 | Zephyr system workqueue (`sysworkq`) | Calls `spotflow_on_update_canceled()` without waiting for a possibly blocked update worker. |
+| OTA initialization caller | Calls `spotflow_on_main_firmware_update_progressed()` when startup reconciliation detects an unconfirmed, confirmed, or rolled-back main image. |
 | Application threads | Call public APIs to pause, resume, abort, confirm, or query an update. |
 
 `spotflow_download_artifact()` is synchronous. Automatic main-firmware downloads and

@@ -118,13 +118,15 @@ bool spotflow_is_update_canceled(void);
 /**
  * @brief Report automatic main-firmware progress to application code.
  *
- * Available only when CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
- * is enabled. Invoked from the OTA worker after SDK-driven state changes, such
- * as download completion or entering the unconfirmed phase. Not invoked for
- * changes caused directly by @ref spotflow_pause_main_firmware_update,
- * @ref spotflow_resume_main_firmware_update, or
- * @ref spotflow_abort_main_firmware_update.
- * These control APIs may be called from this callback.
+ * Available only when CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE is enabled.
+ * Normally invoked from the OTA worker after SDK-driven state changes. During
+ * startup reconciliation, it is invoked synchronously from the thread that
+ * initializes OTA after initialization has completed. The callback must not
+ * assume a particular execution context.
+ *
+ * Not invoked for changes caused directly by @ref spotflow_pause_main_firmware_update,
+ * @ref spotflow_resume_main_firmware_update, or @ref spotflow_abort_main_firmware_update.
+ * Public OTA APIs, including these control APIs, may be called from this callback.
  *
  * The default (weak) implementation is a no-op.
  *

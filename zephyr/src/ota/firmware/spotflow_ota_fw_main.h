@@ -17,8 +17,15 @@ extern "C" {
 enum spotflow_ota_result
 spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job);
 
+struct spotflow_ota_fw_main_startup_result {
+	spotflow_ota_state_effects effects;
+	bool has_progress_notification;
+	struct spotflow_ota_main_firmware_state progress_state;
+};
+
 int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* probation,
-					   bool has_probation, spotflow_ota_state_effects* effects);
+					   bool has_probation,
+					   struct spotflow_ota_fw_main_startup_result* result);
 
 int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* out_state,
 				       spotflow_ota_state_effects* effects);

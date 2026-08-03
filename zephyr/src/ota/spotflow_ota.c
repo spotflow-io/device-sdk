@@ -26,28 +26,41 @@
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 static K_MUTEX_DEFINE(ota_mutex);
-static bool ota_initialized;
+
+enum ota_init_state {
+	OTA_INIT_UNINITIALIZED,
+	OTA_INIT_INITIALIZING,
+	OTA_INIT_READY,
+};
+
+static enum ota_init_state ota_init_state;
 static uint64_t last_received_attempt_id;
 
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len);
 static void update_last_received_attempt_id(uint64_t attempt_id);
 static int handle_decoded_c2d_message(const struct spotflow_ota_cbor_c2d_msg* msg);
 static void handle_state_effects(spotflow_ota_state_effects effects);
+static int fail_ota_init(int rc);
 
 int spotflow_ota_init(void)
 {
 	k_mutex_lock(&ota_mutex, K_FOREVER);
 
-	if (ota_initialized) {
+	if (ota_init_state == OTA_INIT_READY) {
 		k_mutex_unlock(&ota_mutex);
 		return 0;
 	}
+	if (ota_init_state == OTA_INIT_INITIALIZING) {
+		k_mutex_unlock(&ota_mutex);
+		return -EINPROGRESS;
+	}
+
+	ota_init_state = OTA_INIT_INITIALIZING;
 
 	int rc = spotflow_ota_persistence_init();
 	if (rc < 0) {
 		LOG_ERR("Failed to initialize OTA persistence: %d", rc);
-		k_mutex_unlock(&ota_mutex);
-		return rc;
+		return fail_ota_init(rc);
 	}
 
 	struct spotflow_ota_persisted_attempt attempt;
@@ -55,8 +68,7 @@ int spotflow_ota_init(void)
 	rc = spotflow_ota_persistence_load_attempt(&attempt, &has_attempt);
 	if (rc < 0) {
 		LOG_ERR("Failed to load persisted OTA attempt: %d", rc);
-		k_mutex_unlock(&ota_mutex);
-		return rc;
+		return fail_ota_init(rc);
 	}
 
 	spotflow_ota_log_loaded_attempt(&attempt, has_attempt);
@@ -66,8 +78,7 @@ int spotflow_ota_init(void)
 	rc = spotflow_ota_persistence_load_probation(&probation, &has_probation);
 	if (rc < 0) {
 		LOG_ERR("Failed to load persisted OTA probation: %d", rc);
-		k_mutex_unlock(&ota_mutex);
-		return rc;
+		return fail_ota_init(rc);
 	}
 
 	spotflow_ota_log_loaded_probation(&probation, has_probation);
@@ -75,37 +86,51 @@ int spotflow_ota_init(void)
 	rc = spotflow_ota_worker_init();
 	if (rc < 0) {
 		LOG_ERR("Failed to initialize OTA worker: %d", rc);
-		k_mutex_unlock(&ota_mutex);
-		return rc;
+		return fail_ota_init(rc);
 	}
 
-	spotflow_ota_state_init_from_persistence(has_attempt ? &attempt : NULL, has_attempt,
-						 has_probation ? &probation : NULL, has_probation);
+	rc = spotflow_ota_state_init_from_persistence(has_attempt ? &attempt : NULL, has_attempt,
+						      has_probation ? &probation : NULL,
+						      has_probation);
+	if (rc < 0) {
+		LOG_ERR("Failed to restore OTA state from persistence: %d", rc);
+		return fail_ota_init(rc);
+	}
 
 #if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
-	{
-		spotflow_ota_state_effects effects;
+	struct spotflow_ota_fw_main_startup_result startup_result;
 
-		rc = spotflow_ota_fw_main_reconcile_startup(has_probation ? &probation : NULL,
-							    has_probation, &effects);
-		if (rc < 0) {
-			LOG_ERR("Failed to reconcile main firmware state at startup: %d", rc);
-			k_mutex_unlock(&ota_mutex);
-			return rc;
-		}
-
-		handle_state_effects(effects);
+	rc = spotflow_ota_fw_main_reconcile_startup(has_probation ? &probation : NULL,
+						    has_probation, &startup_result);
+	if (rc < 0) {
+		LOG_ERR("Failed to reconcile main firmware state at startup: %d", rc);
+		return fail_ota_init(rc);
 	}
 #endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 
 	last_received_attempt_id = has_attempt ? attempt.attempt_id : 0;
-	ota_initialized = true;
+	ota_init_state = OTA_INIT_READY;
 
 	LOG_DBG("OTA initialized (last received attempt %llu)",
 		(unsigned long long)last_received_attempt_id);
 
 	k_mutex_unlock(&ota_mutex);
+
+#if IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE)
+	if (startup_result.has_progress_notification) {
+		spotflow_on_main_firmware_update_progressed(&startup_result.progress_state);
+	}
+	handle_state_effects(startup_result.effects);
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
+
 	return 0;
+}
+
+static int fail_ota_init(int rc)
+{
+	ota_init_state = OTA_INIT_UNINITIALIZED;
+	k_mutex_unlock(&ota_mutex);
+	return rc;
 }
 
 int spotflow_ota_init_session(void)
@@ -143,7 +168,7 @@ uint64_t spotflow_ota_get_last_received_attempt_id(void)
 void spotflow_ota_reset(void)
 {
 	k_mutex_lock(&ota_mutex, K_FOREVER);
-	ota_initialized = false;
+	ota_init_state = OTA_INIT_UNINITIALIZED;
 	last_received_attempt_id = 0;
 	k_mutex_unlock(&ota_mutex);
 

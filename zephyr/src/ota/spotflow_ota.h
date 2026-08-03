@@ -11,7 +11,9 @@ extern "C" {
  * @brief Perform one-time OTA initialization.
  *
  * Loads persisted OTA records, restores in-memory state, starts the OTA worker, and runs
- * main-firmware startup reconciliation when enabled. Idempotent and mutex-protected.
+ * main-firmware startup reconciliation when enabled. Idempotent and mutex-protected. Any
+ * resulting application notification or worker wakeup is dispatched only after initialization
+ * has committed and the initialization mutex has been released.
  *
  * Called by the Spotflow processor before session metadata and defensively from public
  * facade APIs in `spotflow/ota.h` that read or change OTA state.

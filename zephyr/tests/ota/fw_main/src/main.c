@@ -130,6 +130,19 @@ static enum spotflow_ota_result run_main_artifact(void)
 	return spotflow_ota_fw_main_process_artifact(&job);
 }
 
+static int reconcile_startup(const struct spotflow_ota_probation* probation, bool has_probation,
+			     spotflow_ota_state_effects* effects)
+{
+	struct spotflow_ota_fw_main_startup_result result;
+	int rc = spotflow_ota_fw_main_reconcile_startup(probation, has_probation, &result);
+
+	if (rc == 0 && effects != NULL) {
+		*effects = result.effects;
+	}
+
+	return rc;
+}
+
 static void apply_main_result(enum spotflow_ota_result result)
 {
 	spotflow_ota_state_effects effects;
@@ -399,7 +412,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_unconfirmed_match)
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = false;
 
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 	zassert_false(((effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER) != 0));
 
 	spotflow_ota_state_get_diagnostic(&snapshot);
@@ -424,7 +437,7 @@ ZTEST(spotflow_ota_fw_main, test_cancel_does_not_terminalize_probationary_main_a
 	fill_build_id(build_id, 0x11);
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = false;
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 
 	zassert_ok(spotflow_ota_state_accept_cancel(probation.attempt_id, &cancel_result));
 	spotflow_ota_state_get_diagnostic(&snapshot);
@@ -445,7 +458,7 @@ ZTEST(spotflow_ota_fw_main, test_supersession_preserves_probationary_main_artifa
 	fill_build_id(build_id, 0x12);
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = false;
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 
 	newer_update.attempt_id++;
 	zassert_ok(spotflow_ota_state_accept_update(&newer_update, &update_result));
@@ -471,7 +484,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_already_confirmed_match)
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = true;
 
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 	zassert_true(((effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER) != 0));
 
 	spotflow_ota_state_get_diagnostic(&snapshot);
@@ -499,7 +512,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_identity_unavailable_rep
 	setup_post_reboot_context(build_id, &probation);
 	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
 
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 	zassert_true(((effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER) != 0));
 
 	spotflow_ota_state_get_diagnostic(&snapshot);
@@ -526,7 +539,7 @@ ZTEST(spotflow_ota_fw_main, test_startup_reconciliation_mismatch_reports_rollbac
 	setup_post_reboot_context(expected_build_id, &probation);
 	spotflow_ota_build_id_fake_set_running_build_id(running_build_id);
 
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 	zassert_true(((effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER) != 0));
 
 	spotflow_ota_state_get_diagnostic(&snapshot);
@@ -553,7 +566,7 @@ ZTEST(spotflow_ota_fw_main, test_success_completion_defers_attempt_persistence_t
 	platform_fake->image_confirmed = true;
 	spotflow_ota_test_settings_set_save_failure("spotflow/ota/attempt");
 
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 	zassert_true(((effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER) != 0));
 
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
@@ -583,7 +596,7 @@ ZTEST(spotflow_ota_fw_main, test_rollback_completion_defers_attempt_persistence_
 	spotflow_ota_build_id_fake_set_running_build_id(running_build_id);
 	spotflow_ota_test_settings_set_save_failure("spotflow/ota/attempt");
 
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 	zassert_true(((effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER) != 0));
 
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
@@ -608,7 +621,7 @@ ZTEST(spotflow_ota_fw_main, test_confirm_api_queues_successful_completion)
 	fill_build_id(build_id, 0x50);
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = false;
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 
 	zassert_ok(spotflow_ota_fw_main_confirm_image(&state, &effects));
 	zassert_true(((effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER) != 0));
@@ -632,7 +645,7 @@ ZTEST(spotflow_ota_fw_main, test_confirm_idempotent_when_already_succeeded)
 	fill_build_id(build_id, 0x55);
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = true;
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 
 	zassert_ok(spotflow_ota_fw_main_confirm_image(&state, &effects));
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
@@ -824,7 +837,7 @@ ZTEST(spotflow_ota_fw_main, test_pause_invalid_unconfirmed_returns_current_state
 	fill_build_id(build_id, 0x60);
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = false;
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 
 	zassert_equal(spotflow_ota_fw_main_pause_update(&state), -EINVAL);
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
@@ -1011,7 +1024,7 @@ ZTEST(spotflow_ota_fw_main, test_power_loss_while_pending_reboot_paused_recovers
 	spotflow_ota_state_reset();
 	spotflow_ota_fw_main_reset();
 	zassert_ok(spotflow_ota_state_init_from_persistence(&attempt, true, &probation, true));
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 
 	spotflow_ota_state_get_diagnostic(&snapshot);
 	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
@@ -1063,7 +1076,7 @@ ZTEST(spotflow_ota_fw_main, test_fail_invalid_unconfirmed_returns_current_state)
 	fill_build_id(build_id, 0x70);
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = false;
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &effects));
+	zassert_ok(reconcile_startup(&probation, true, &effects));
 
 	zassert_equal(spotflow_ota_fw_main_fail_update(&state), -EINVAL);
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
