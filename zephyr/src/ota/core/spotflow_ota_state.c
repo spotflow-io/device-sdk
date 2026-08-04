@@ -27,14 +27,18 @@ static K_MUTEX_DEFINE(state_mutex);
 static void clear_worker_job(struct spotflow_ota_worker_job* job);
 static uint32_t allocate_attempt_generation(void);
 static struct ota_attempt_constraints attempt_constraints(void);
+#if defined(CONFIG_ASSERT)
 static bool state_is_valid(void);
+#endif /* CONFIG_ASSERT */
 static void assert_state_locked(void);
 static void clear_report_state(void);
 static void request_report(void);
 static void clear_pending_attempt(void);
 static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 			      const struct spotflow_ota_artifact* source);
+#if defined(CONFIG_ZTEST)
 static spotflow_ota_state_effects artifact_result_effects(void);
+#endif /* CONFIG_ZTEST */
 static bool operation_token_matches_current(const struct spotflow_ota_operation_token* token);
 static bool main_firmware_handler_is_owned(const struct spotflow_ota_operation_token* token);
 
@@ -1392,6 +1396,7 @@ static struct ota_attempt_constraints attempt_constraints(void)
 	};
 }
 
+#if defined(CONFIG_ASSERT)
 static bool state_is_valid(void)
 {
 	if (!spotflow_ota_attempt_exists(&ota_state.current_attempt)) {
@@ -1473,6 +1478,7 @@ static bool state_is_valid(void)
 
 	return true;
 }
+#endif /* CONFIG_ASSERT */
 
 static void assert_state_locked(void)
 {
@@ -1514,6 +1520,7 @@ static void copy_artifact_out(struct spotflow_ota_artifact* destination,
 	*destination = *source;
 }
 
+#if defined(CONFIG_ZTEST)
 static spotflow_ota_state_effects artifact_result_effects(void)
 {
 	return !spotflow_ota_attempt_has_terminal_results(&ota_state.current_attempt) &&
@@ -1522,6 +1529,7 @@ static spotflow_ota_state_effects artifact_result_effects(void)
 		? SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER
 		: 0;
 }
+#endif /* CONFIG_ZTEST */
 
 static bool operation_token_matches_current(const struct spotflow_ota_operation_token* token)
 {
