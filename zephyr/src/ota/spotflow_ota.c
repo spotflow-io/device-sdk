@@ -323,7 +323,7 @@ int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state
 static void handle_ota_c2d_msg(uint8_t* payload, size_t len)
 {
 	static struct spotflow_ota_cbor_c2d_msg msg;
-	struct spotflow_ota_cbor_decode_status status;
+	struct spotflow_ota_cbor_decode_status status = { 0 };
 	int rc = spotflow_ota_cbor_decode_c2d(payload, len, &msg, &status);
 
 	if (status.has_trustworthy_attempt_id) {
