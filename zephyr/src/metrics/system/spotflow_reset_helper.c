@@ -10,6 +10,7 @@
 #include <stdio.h>
 
 #include <zephyr/drivers/hwinfo.h>
+#include <zephyr/init.h>
 #include <zephyr/logging/log.h>
 
 LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
@@ -39,12 +40,21 @@ static const struct {
 
 #define RESET_CAUSE_COUNT ARRAY_SIZE(reset_cause_map)
 
+#ifdef CONFIG_MCUBOOT_IMG_MANAGER
+static bool booted_as_test_upgrade;
+#endif /* CONFIG_MCUBOOT_IMG_MANAGER */
+
 static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len);
-
-static bool is_test_firmware_upgrade(void);
-
 static bool append_cause_name(char* buf, size_t buf_len, size_t* used, bool* first,
 			      const char* name);
+static bool is_test_firmware_upgrade(void);
+
+#ifdef CONFIG_MCUBOOT_IMG_MANAGER
+static int capture_mcuboot_state(void);
+
+/* Capture the mutable MCUboot trailer after flash initialization and before main(). */
+SYS_INIT(capture_mcuboot_state, APPLICATION, 0);
+#endif /* CONFIG_MCUBOOT_IMG_MANAGER */
 
 void spotflow_report_reboot_reason(void)
 {
@@ -119,15 +129,6 @@ static void reset_cause_to_string(uint32_t cause, char* buf, size_t buf_len)
 	}
 }
 
-static bool is_test_firmware_upgrade(void)
-{
-#ifdef CONFIG_MCUBOOT_IMG_MANAGER
-	return !boot_is_img_confirmed();
-#else
-	return false;
-#endif /* CONFIG_MCUBOOT_IMG_MANAGER */
-}
-
 static bool append_cause_name(char* buf, size_t buf_len, size_t* used, bool* first,
 			      const char* name)
 {
@@ -141,3 +142,27 @@ static bool append_cause_name(char* buf, size_t buf_len, size_t* used, bool* fir
 	*first = false;
 	return true;
 }
+
+static bool is_test_firmware_upgrade(void)
+{
+#ifdef CONFIG_MCUBOOT_IMG_MANAGER
+	return booted_as_test_upgrade;
+#else
+	return false;
+#endif /* CONFIG_MCUBOOT_IMG_MANAGER */
+}
+
+#ifdef CONFIG_MCUBOOT_IMG_MANAGER
+static int capture_mcuboot_state(void)
+{
+	int swap_type = mcuboot_swap_type();
+
+	if (swap_type < BOOT_SWAP_TYPE_NONE || swap_type > BOOT_SWAP_TYPE_FAIL) {
+		LOG_WRN("Failed to read MCUboot swap type: %d", swap_type);
+		return 0;
+	}
+
+	booted_as_test_upgrade = swap_type == BOOT_SWAP_TYPE_REVERT;
+	return 0;
+}
+#endif /* CONFIG_MCUBOOT_IMG_MANAGER */
