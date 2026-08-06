@@ -8,13 +8,13 @@ menuconfig SPOTFLOW
 
 if SPOTFLOW
 
-rsource "src/net/Kconfig"
-
-rsource "src/logging/KConfig"
+rsource "src/config/Kconfig"
 rsource "src/coredumps/KConfig"
+rsource "src/logging/KConfig"
 rsource "src/metrics/Kconfig"
 rsource "src/metrics/system/Kconfig"
-
+rsource "src/net/Kconfig"
+rsource "src/ota/Kconfig"
 
 config SPOTFLOW_GENERATE_BUILD_ID
 	bool "Generate build ID"
@@ -27,7 +27,8 @@ config SPOTFLOW_GENERATE_BUILD_ID
 		Build ID allows to match core dumps with the original .elf file.
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
-	default 4608 if SPOTFLOW
+	default 16384 if SPOTFLOW_OTA
+	default 4608
 
 if NRF_SECURITY
 configdefault MBEDTLS_MPI_MAX_SIZE
@@ -48,6 +49,7 @@ configdefault MBEDTLS_ENABLE_HEAP
 if MBEDTLS_ENABLE_HEAP
 # Needed to be able to verify the whole Let's Encrypt certificate chain
 configdefault MBEDTLS_HEAP_SIZE
+	default 98304 if SPOTFLOW_OTA
 	default 36864
 endif # MBEDTLS_ENABLE_HEAP
 
@@ -58,6 +60,7 @@ config SPOTFLOW_DEVICE_ID
 		platform. If empty, the hexadecimal representation of the result of
 		hwinfo_get_device_id(...) will be used. You can provide the device ID
 		in the code by defining the function char* spotflow_override_device_id().
+
 config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	int "Spotflow SDK backend level"
 	default LOG_DEFAULT_LEVEL
