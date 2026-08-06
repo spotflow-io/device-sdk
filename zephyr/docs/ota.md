@@ -77,24 +77,32 @@ flowchart TD
     next["Select next pending artifact"]
     installed{"Requested version<br/>already installed?"}
     kind{"Automatic<br/>main firmware?"}
-    skip["Record SUCCEEDED"]
     delegated["Invoke delegated<br/>application handler"]
-    main["Download to MCUboot slot<br/>and persist probation"]
-    reboot["Request test upgrade<br/>and reboot"]
+    delegatedResult{"Handler result"}
+    main["Download to MCUboot slot"]
+    isCanceled{"Received cancellation request?"}
+    reboot["Persist probation,<br/>request test upgrade,<br/>and reboot"]
     resolve{"New image confirmed?"}
-    result["Record SUCCEEDED, FAILED, or CANCELED"]
+    succeeded["Record SUCCEEDED"]
+    failed["Record FAILED"]
+    canceled["Record CANCELED"]
     persistResult["Persist installed version when successful<br/>and cumulative attempt results"]
     report["Prepare cumulative result report<br/>for the MQTT loop"]
     more{"More pending<br/>artifacts?"}
 
     cloud --> accept --> persistAttempt --> next
     next --> installed
-    installed -- yes --> skip --> persistResult
+    installed -- yes --> succeeded
     installed -- no --> kind
-    kind -- no --> delegated --> result --> persistResult
-    kind -- yes --> main --> reboot --> resolve
-    resolve -- yes --> skip
-    resolve -- rollback or error --> result
+    kind -- no --> delegated --> delegatedResult
+    delegatedResult --> succeeded
+    delegatedResult --> failed
+    delegatedResult --> canceled
+    succeeded & failed & canceled --> persistResult
+    kind -- yes --> main --> isCanceled -- no --> reboot --> resolve
+    isCanceled -- yes --> canceled
+    resolve -- yes --> succeeded
+    resolve -- rollback or error --> failed
     persistResult --> report --> more
     more -- yes --> next
     more -- no --> done["Attempt complete"]
