@@ -63,6 +63,7 @@ configdefault NET_SOCKETS_TLS_MAX_CONTEXTS
 
 # Increased default timeout needed on some boards to handle concurrent TLS connections
 configdefault NET_SOCKETS_TLS_CONNECT_TIMEOUT
+	int
 	default 15000
 
 endif # SPOTFLOW_OTA
