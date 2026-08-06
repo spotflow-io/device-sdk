@@ -56,9 +56,15 @@ config SPOTFLOW_INGEST_KEY
 		It can be found in Spotflow observability platform
 
 if SPOTFLOW_OTA
+
 # One socket is needed for the MQTT connection and the other one for downloading artifacts
 configdefault NET_SOCKETS_TLS_MAX_CONTEXTS
 	default 2
+
+# Increased default timeout needed on some boards to handle concurrent TLS connections
+configdefault NET_SOCKETS_TLS_CONNECT_TIMEOUT
+	default 15000
+
 endif # SPOTFLOW_OTA
 
 endif # SPOTFLOW_TRANSPORT_MQTT
