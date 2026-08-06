@@ -82,7 +82,7 @@ flowchart TD
     main["Download to MCUboot slot<br/>and persist probation"]
     reboot["Request test upgrade<br/>and reboot"]
     resolve{"New image confirmed?"}
-    result["Record terminal result"]
+    result["Record SUCCEEDED, FAILED, or CANCELED"]
     persistResult["Persist installed version when successful<br/>and cumulative attempt results"]
     report["Prepare cumulative result report<br/>for the MQTT loop"]
     more{"More pending<br/>artifacts?"}
