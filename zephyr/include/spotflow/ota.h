@@ -115,6 +115,8 @@ void spotflow_on_update_canceled(void);
  */
 bool spotflow_is_update_canceled(void);
 
+#ifdef CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+
 /**
  * @brief Report automatic main-firmware progress to application code.
  *
@@ -197,7 +199,6 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
  * @retval 0 Update paused (or already paused).
  * @retval -EINVAL No active main-firmware update, or phase is
  *         @c SPOTFLOW_OTA_PHASE_NOT_RUNNING or @c SPOTFLOW_OTA_PHASE_UNCONFIRMED.
- * @retval -ENOTSUP Automatic main-firmware handling is disabled.
  * @retval <0 Negative errno when OTA initialization or the underlying download
  *         pause fails.
  */
@@ -218,7 +219,6 @@ int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state*
  *
  * @retval 0 Update resumed.
  * @retval -EINVAL No active main-firmware update, or the update is not paused.
- * @retval -ENOTSUP Automatic main-firmware handling is disabled.
  * @retval <0 Negative errno when OTA initialization or the underlying download
  *         resume fails.
  */
@@ -250,7 +250,6 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
  * @retval -EINVAL No active main-firmware update, or phase is
  *         @c SPOTFLOW_OTA_PHASE_NOT_RUNNING, @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT, or
  *         @c SPOTFLOW_OTA_PHASE_UNCONFIRMED.
- * @retval -ENOTSUP Automatic main-firmware handling is disabled.
  * @retval <0 Negative errno when OTA initialization or persisting the failed
  *         result fails.
  */
@@ -277,11 +276,12 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  * @retval 0 Image confirmed, or already confirmed.
  * @retval -EINVAL No active attempt, wrong phase, or probation metadata does not
  *         match the current attempt.
- * @retval -ENOTSUP Automatic main-firmware handling is disabled.
  * @retval <0 Negative errno when OTA initialization, platform confirmation, or
  *         persistence fails.
  */
 int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state* state);
+
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 
 #ifdef __cplusplus
 }

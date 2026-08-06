@@ -47,11 +47,15 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 
 void __weak spotflow_on_update_canceled(void) {}
 
+#ifdef CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+
 void __weak
 spotflow_on_main_firmware_update_progressed(const struct spotflow_ota_main_firmware_state* state)
 {
 	ARG_UNUSED(state);
 }
+
+#endif /* CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE */
 
 static void canceled_work_handler(struct k_work* work)
 {
