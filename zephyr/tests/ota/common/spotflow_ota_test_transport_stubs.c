@@ -28,7 +28,7 @@ int spotflow_transport_subscribe_ota(spotflow_transport_message_cb callback)
 	fake->ota_callback = callback;
 	fake->ota_subscribe_count++;
 
-	return 0;
+	return fake->ota_subscribe_result;
 }
 
 int spotflow_transport_send_ingest_cbor(uint8_t* payload, size_t len)

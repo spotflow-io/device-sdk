@@ -50,14 +50,18 @@ static void process_mqtt_session(spotflow_mqtt_process_fn process_fn)
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	rc = spotflow_config_init_session();
 	if (rc < 0) {
-		LOG_WRN("Failed to initialize configuration updating: %d", rc);
+		LOG_WRN("Failed to initialize configuration updating, aborting MQTT: %d", rc);
+		spotflow_mqtt_abort_mqtt();
+		return;
 	}
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 
 #ifdef CONFIG_SPOTFLOW_OTA
 	rc = spotflow_ota_init_session();
 	if (rc < 0) {
-		LOG_WRN("Failed to initialize OTA updates: %d", rc);
+		LOG_WRN("Failed to initialize OTA updates, aborting MQTT: %d", rc);
+		spotflow_mqtt_abort_mqtt();
+		return;
 	}
 #endif /* CONFIG_SPOTFLOW_OTA */
 
@@ -88,3 +92,10 @@ static void process_mqtt_session(spotflow_mqtt_process_fn process_fn)
 		}
 	}
 }
+
+#if defined(CONFIG_ZTEST)
+void spotflow_mqtt_session_test_process(spotflow_mqtt_process_fn process_fn)
+{
+	process_mqtt_session(process_fn);
+}
+#endif /* CONFIG_ZTEST */
