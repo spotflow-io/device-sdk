@@ -1,18 +1,40 @@
-#include <errno.h>
+#include "spotflow_mqtt_session.h"
 
-#include <zephyr/logging/log.h>
-
+#include "net/spotflow_session_metadata.h"
+#include "spotflow_connection_helper.h"
+#include "spotflow_mqtt.h"
+#include "spotflow_tls.h"
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config.h"
 #include "config/spotflow_config_net.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
-#include "net/spotflow_session_metadata.h"
-#include "spotflow_connection_helper.h"
-#include "spotflow_mqtt.h"
-#include "spotflow_mqtt_session.h"
-#include "spotflow_tls.h"
+#ifdef CONFIG_SPOTFLOW_OTA
+#include "ota/spotflow_ota.h"
+#endif /* CONFIG_SPOTFLOW_OTA */
+
+#include <errno.h>
+
+#include <zephyr/logging/log.h>
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
+
+static void process_mqtt_session(spotflow_mqtt_process_fn process_fn);
+
+void spotflow_mqtt_session_loop(spotflow_mqtt_process_fn process_fn)
+{
+	wait_for_network();
+
+	spotflow_tls_init();
+
+	LOG_DBG("Spotflow registered TLS credentials");
+
+	/* OUTER LOOP: keep trying until MQTT connects, reconnect if connection failed. */
+	while (true) {
+		spotflow_mqtt_establish_mqtt();
+
+		process_mqtt_session(process_fn);
+	}
+}
 
 static void process_mqtt_session(spotflow_mqtt_process_fn process_fn)
 {
@@ -31,6 +53,13 @@ static void process_mqtt_session(spotflow_mqtt_process_fn process_fn)
 		LOG_WRN("Failed to initialize configuration updating: %d", rc);
 	}
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
+
+#ifdef CONFIG_SPOTFLOW_OTA
+	rc = spotflow_ota_init_session();
+	if (rc < 0) {
+		LOG_WRN("Failed to initialize OTA updates: %d", rc);
+	}
+#endif /* CONFIG_SPOTFLOW_OTA */
 
 	/* INNER LOOP: perform normal MQTT I/O until an error occurs. */
 	while (spotflow_mqtt_is_connected()) {
@@ -57,21 +86,5 @@ static void process_mqtt_session(spotflow_mqtt_process_fn process_fn)
 			spotflow_mqtt_abort_mqtt();
 			break;
 		}
-	}
-}
-
-void spotflow_mqtt_session_loop(spotflow_mqtt_process_fn process_fn)
-{
-	wait_for_network();
-
-	spotflow_tls_init();
-
-	LOG_DBG("Spotflow registered TLS credentials");
-
-	/* OUTER LOOP: keep trying until MQTT connects, reconnect if connection failed. */
-	while (true) {
-		spotflow_mqtt_establish_mqtt();
-
-		process_mqtt_session(process_fn);
 	}
 }

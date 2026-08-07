@@ -1,0 +1,62 @@
+cmake_minimum_required(VERSION 3.20.0)
+
+find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
+project(spotflow_ota_fw_main)
+
+zephyr_linker_sources(
+        DATA_SECTIONS
+        ../../../src/ota/downloader/spotflow_ota_downloader.ld
+)
+zephyr_iterable_section(
+        NAME spotflow_downloader
+        GROUP DATA_REGION
+        ${XIP_ALIGN_WITH_INPUT}
+)
+
+target_include_directories(app PRIVATE
+        ${CMAKE_CURRENT_LIST_DIR}/../../../include
+        ${CMAKE_CURRENT_LIST_DIR}/../../../src
+        ${CMAKE_CURRENT_LIST_DIR}/../common
+        ${CMAKE_CURRENT_LIST_DIR}/../downloader
+)
+
+target_compile_definitions(app PRIVATE
+        CONFIG_SPOTFLOW=1
+        CONFIG_SPOTFLOW_GENERATE_BUILD_ID=1
+        CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL=3
+        CONFIG_SPOTFLOW_OTA_LOG_LEVEL=3
+        CONFIG_SPOTFLOW_OTA=1
+        CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS=4
+        CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE=1
+        CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS=1
+        CONFIG_SPOTFLOW_OTA_HTTP_TIMEOUT_MS=1000
+        CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE=1024
+)
+
+target_sources(app PRIVATE
+        src/main.c
+        ../common/spotflow_ota_bindesc_test_util.c
+        ../common/spotflow_ota_build_id_fake.c
+        ../common/spotflow_ota_platform_fake.c
+        ../common/spotflow_ota_test_fakes.c
+        ../common/spotflow_ota_test_transport_stubs.c
+        ../common/spotflow_ota_test_settings.c
+        ../downloader/spotflow_ota_downloader_transport_fake.c
+        ../../../src/ota/protocol/spotflow_ota_cbor.c
+        ../../../src/ota/downloader/spotflow_ota_downloader.c
+        ../../../src/ota/downloader/spotflow_ota_downloader_transport_errors.c
+        ../../../src/ota/downloader/spotflow_ota_downloader_transport_range.c
+        ../../../src/ota/firmware/spotflow_ota_fw_custom.c
+        ../../../src/ota/firmware/spotflow_ota_fw_main.c
+        ../../../src/ota/core/spotflow_ota_log.c
+        ../../../src/ota/core/spotflow_ota_results.c
+        ../../../src/ota/core/spotflow_ota_attempt_model.c
+        ../../../src/ota/core/spotflow_ota_main_model.c
+        ../../../src/ota/platform/spotflow_ota_identity.c
+        ../../../src/ota/protocol/spotflow_ota_net.c
+        ../../../src/ota/persistence/spotflow_ota_persistence.c
+        ../../../src/ota/persistence/spotflow_ota_records_cbor.c
+        ../../../src/ota/core/spotflow_ota_state.c
+        ../../../src/ota/downloader/spotflow_ota_url.c
+        ${ZEPHYR_BASE}/subsys/net/lib/http/http_parser_url.c
+)

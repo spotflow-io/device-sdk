@@ -166,8 +166,10 @@ jobs:
         working-directory: ${{ steps.module-path.outputs.path }}/zephyr/samples/${{ matrix.sample }}
         run: |
           west build --board ${{ matrix.board }} ${{ matrix.build_extra_args }}
+
   unit-tests:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout manifest
         uses: actions/checkout@v6
