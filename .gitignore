@@ -16,3 +16,4 @@ vscode-workspaces/**
 AGENTS.md
 CLAUDE.md
 **/sdkconfig.local
+MPLABXLog.xml
