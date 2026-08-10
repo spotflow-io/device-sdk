@@ -78,6 +78,20 @@ int spotflow_ota_parse_url(const char* url, struct spotflow_ota_url* out)
 
 		memcpy(out->path, url + path_off, copy_len);
 		out->path[copy_len] = '\0';
+	} else if (parsed.field_set & BIT(UF_QUERY)) {
+		uint16_t query_off = parsed.field_data[UF_QUERY].off;
+		uint16_t query_len = parsed.field_data[UF_QUERY].len;
+		size_t path_len = query_len + 2;
+
+		if (path_len >= sizeof(out->path)) {
+			LOG_ERR("Artifact URL path field too long");
+			return -EINVAL;
+		}
+
+		out->path[0] = '/';
+		out->path[1] = '?';
+		memcpy(out->path + 2, url + query_off, query_len);
+		out->path[path_len] = '\0';
 	} else {
 		out->path[0] = '/';
 		out->path[1] = '\0';

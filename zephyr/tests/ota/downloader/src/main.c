@@ -98,6 +98,21 @@ ZTEST(spotflow_ota_downloader, test_reject_unsupported_url_scheme)
 	zassert_equal(spotflow_ota_parse_url("ftp://example.com/image.bin", &parsed), -EINVAL);
 }
 
+ZTEST(spotflow_ota_downloader, test_query_only_url_is_forwarded_as_request_target)
+{
+	struct spotflow_ota_downloader_transport_fake* fake =
+		spotflow_ota_downloader_transport_fake_get();
+	struct spotflow_downloader downloader;
+	struct spotflow_download_request request = {
+		.url = "https://example.com?token=abc",
+		.secret = "secret",
+	};
+
+	zassert_ok(spotflow_init_downloader(&downloader));
+	zassert_ok(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL));
+	zassert_equal(strcmp(fake->last_path, "/?token=abc"), 0);
+}
+
 ZTEST(spotflow_ota_downloader, test_reject_http_download_request)
 {
 	struct spotflow_downloader downloader;
