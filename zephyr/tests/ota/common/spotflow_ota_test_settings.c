@@ -23,6 +23,10 @@ static bool save_fail_once;
 static int save_fail_error;
 static size_t save_failure_count;
 static int load_fail_once;
+static size_t read_failure_count;
+static int read_failure_error;
+static size_t short_read_count;
+static size_t read_count;
 static struct spotflow_ota_test_settings_attempt_save
 	attempt_save_history[SPOTFLOW_OTA_TEST_SETTINGS_ATTEMPT_HISTORY_MAX];
 static size_t attempt_save_history_count;
@@ -50,9 +54,19 @@ static void record_attempt_save(const void* value, size_t val_len)
 static ssize_t fake_settings_read(void* cb_arg, void* data, size_t len)
 {
 	struct fake_setting_entry* entry = cb_arg;
+	read_count++;
+
+	if (read_failure_count > 0) {
+		read_failure_count--;
+		return read_failure_error;
+	}
 
 	if (len > entry->value_len) {
 		len = entry->value_len;
+	}
+	if (short_read_count > 0 && len > 0) {
+		short_read_count--;
+		len--;
 	}
 
 	memcpy(data, entry->value, len);
@@ -69,6 +83,10 @@ void spotflow_ota_test_settings_reset(void)
 	save_fail_error = -EIO;
 	save_failure_count = 0;
 	load_fail_once = 0;
+	read_failure_count = 0;
+	read_failure_error = -EIO;
+	short_read_count = 0;
+	read_count = 0;
 	attempt_save_history_count = 0;
 }
 
@@ -102,6 +120,22 @@ void spotflow_ota_test_settings_clear_save_failure(void)
 void spotflow_ota_test_settings_set_load_failure_once(int error)
 {
 	load_fail_once = error;
+}
+
+void spotflow_ota_test_settings_set_read_failures(size_t count, int error)
+{
+	read_failure_count = count;
+	read_failure_error = error;
+}
+
+void spotflow_ota_test_settings_set_short_reads(size_t count)
+{
+	short_read_count = count;
+}
+
+size_t spotflow_ota_test_settings_get_read_count(void)
+{
+	return read_count;
 }
 
 size_t spotflow_ota_test_settings_get_save_failure_count(void)

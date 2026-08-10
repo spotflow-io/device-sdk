@@ -34,6 +34,12 @@ void spotflow_ota_test_settings_clear_save_failure(void);
 
 void spotflow_ota_test_settings_set_load_failure_once(int error);
 
+void spotflow_ota_test_settings_set_read_failures(size_t count, int error);
+
+void spotflow_ota_test_settings_set_short_reads(size_t count);
+
+size_t spotflow_ota_test_settings_get_read_count(void);
+
 size_t spotflow_ota_test_settings_get_save_failure_count(void);
 
 const char* spotflow_ota_test_settings_get_last_saved_name(void);
