@@ -216,13 +216,15 @@ static void ota_worker_entry(void* arg1, void* arg2, void* arg3)
 					(unsigned long long)token.attempt_id,
 					current_operation_stage(), outcome.error);
 				int rc = spotflow_ota_state_fail_worker_operation(&token);
-				memset(&operation, 0, sizeof(operation));
-				k_mutex_unlock(&worker_operation_mutex);
 				if (rc == 0 || rc == -ESTALE) {
+					memset(&operation, 0, sizeof(operation));
+					k_mutex_unlock(&worker_operation_mutex);
 					continue;
 				}
 				LOG_ERR("Failed to recover OTA worker state for attempt %llu: %d",
 					(unsigned long long)token.attempt_id, rc);
+				schedule_worker_retry();
+				k_mutex_unlock(&worker_operation_mutex);
 				break;
 			}
 			case WORKER_OUTCOME_INTERNAL_ERROR:
@@ -610,9 +612,11 @@ static struct worker_outcome classify_storage_error(int error, bool can_fail_att
 	case -EAGAIN:
 	case -EBUSY:
 	case -ETIMEDOUT:
+	case -ENOSPC:
+	case -ENOMEM:
 		return retry_operation(error);
 	default:
-		return can_fail_attempt ? fail_attempt(error) : internal_error(error);
+		return can_fail_attempt ? fail_attempt(error) : retry_operation(error);
 	}
 }
 
