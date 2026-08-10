@@ -30,6 +30,7 @@ static size_t read_count;
 static struct spotflow_ota_test_settings_attempt_save
 	attempt_save_history[SPOTFLOW_OTA_TEST_SETTINGS_ATTEMPT_HISTORY_MAX];
 static size_t attempt_save_history_count;
+static int init_result;
 
 static void record_attempt_save(const void* value, size_t val_len)
 {
@@ -88,6 +89,12 @@ void spotflow_ota_test_settings_reset(void)
 	short_read_count = 0;
 	read_count = 0;
 	attempt_save_history_count = 0;
+	init_result = 0;
+}
+
+void spotflow_ota_test_settings_set_init_result(int result)
+{
+	init_result = result;
 }
 
 void spotflow_ota_test_settings_set_save_failure(const char* name)
@@ -186,7 +193,7 @@ bool spotflow_ota_test_settings_attempt_was_saved(uint64_t attempt_id,
 
 int settings_subsys_init(void)
 {
-	return 0;
+	return init_result;
 }
 
 int settings_save_one(const char* name, const void* value, size_t val_len)

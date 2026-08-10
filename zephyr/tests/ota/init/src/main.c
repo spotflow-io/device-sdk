@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <string.h>
 
 #include <zephyr/ztest.h>
@@ -18,6 +19,17 @@ static int callback_get_state_result;
 static int callback_get_info_result;
 static uint64_t callback_last_attempt_id;
 static struct spotflow_ota_main_firmware_state callback_state;
+
+static void fill_state_sentinel(struct spotflow_ota_main_firmware_state* state)
+{
+	memset(state, 0xa5, sizeof(*state));
+}
+
+static void assert_state_unchanged(const struct spotflow_ota_main_firmware_state* state,
+				   const struct spotflow_ota_main_firmware_state* expected)
+{
+	zassert_mem_equal(state, expected, sizeof(*state));
+}
 
 void spotflow_on_main_firmware_update_progressed(
 	const struct spotflow_ota_main_firmware_state* state)
@@ -96,6 +108,57 @@ ZTEST(spotflow_ota_init, test_startup_callback_can_reenter_public_apis)
 	zassert_equal(callback_last_attempt_id, 42);
 	zassert_equal(callback_state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
 	zassert_equal(callback_state.result, SPOTFLOW_OTA_RESULT_PENDING);
+}
+
+ZTEST(spotflow_ota_init, test_control_apis_leave_state_unchanged_on_initialization_error)
+{
+	struct spotflow_ota_main_firmware_state state;
+	struct spotflow_ota_main_firmware_state sentinel;
+
+	fill_state_sentinel(&sentinel);
+	spotflow_ota_test_settings_set_init_result(-EIO);
+
+	state = sentinel;
+	zassert_equal(spotflow_pause_main_firmware_update(&state), -EIO);
+	assert_state_unchanged(&state, &sentinel);
+
+	state = sentinel;
+	zassert_equal(spotflow_resume_main_firmware_update(&state), -EIO);
+	assert_state_unchanged(&state, &sentinel);
+
+	state = sentinel;
+	zassert_equal(spotflow_abort_main_firmware_update(&state), -EIO);
+	assert_state_unchanged(&state, &sentinel);
+
+	state = sentinel;
+	zassert_equal(spotflow_confirm_main_firmware_image(&state), -EIO);
+	assert_state_unchanged(&state, &sentinel);
+}
+
+ZTEST(spotflow_ota_init, test_control_apis_leave_state_unchanged_on_operation_error)
+{
+	struct spotflow_ota_main_firmware_state state;
+	struct spotflow_ota_main_firmware_state sentinel;
+
+	zassert_ok(spotflow_ota_init());
+	fill_state_sentinel(&sentinel);
+
+	state = sentinel;
+	zassert_equal(spotflow_pause_main_firmware_update(&state), -EINVAL);
+	assert_state_unchanged(&state, &sentinel);
+
+	state = sentinel;
+	zassert_equal(spotflow_resume_main_firmware_update(&state), -EINVAL);
+	assert_state_unchanged(&state, &sentinel);
+
+	state = sentinel;
+	zassert_equal(spotflow_abort_main_firmware_update(&state), -EINVAL);
+	assert_state_unchanged(&state, &sentinel);
+
+	state = sentinel;
+	spotflow_ota_platform_fake_get()->confirm_result = -EIO;
+	zassert_equal(spotflow_confirm_main_firmware_image(&state), -EIO);
+	assert_state_unchanged(&state, &sentinel);
 }
 
 ZTEST_SUITE(spotflow_ota_init, NULL, NULL, before_each, NULL, NULL);

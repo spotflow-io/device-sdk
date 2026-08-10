@@ -189,8 +189,8 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
  * initiated by the application, the user, or a power cycle still starts the new
  * image.
  *
- * When @p state is not NULL, the current main-firmware state is written on
- * return, including after errors.
+ * When @p state is not NULL, the resulting main-firmware state is written on
+ * success. On error, @p state is left unchanged.
  *
  * Initializes OTA defensively before changing state.
  *
@@ -210,8 +210,8 @@ int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state*
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. Succeeds
  * only while the update is currently paused.
  *
- * When @p state is not NULL, the current main-firmware state is written on
- * return, including after errors.
+ * When @p state is not NULL, the resulting main-firmware state is written on
+ * success. On error, @p state is left unchanged.
  *
  * Initializes OTA defensively before changing state.
  *
@@ -239,8 +239,8 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
  * returns @c 0 immediately and the aborted update completes asynchronously with
  * a failed result.
  *
- * When @p state is not NULL, the current main-firmware state is written on
- * return, including after errors.
+ * When @p state is not NULL, the resulting main-firmware state is written on
+ * success. On error, @p state is left unchanged.
  *
  * Initializes OTA defensively before changing state.
  *
@@ -266,8 +266,8 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  * @c SPOTFLOW_OTA_RESULT_SUCCEEDED, the call succeeds without doing further
  * work.
  *
- * When @p state is not NULL, the current main-firmware state is written on
- * return, including after errors.
+ * When @p state is not NULL, the resulting main-firmware state is written on
+ * success. On error, @p state is left unchanged.
  *
  * Initializes OTA defensively before changing state.
  *

@@ -22,6 +22,8 @@ struct spotflow_ota_test_settings_attempt_save {
 
 void spotflow_ota_test_settings_reset(void);
 
+void spotflow_ota_test_settings_set_init_result(int result);
+
 void spotflow_ota_test_settings_exhaust_capacity(void);
 
 void spotflow_ota_test_settings_set_save_failure(const char* name);
