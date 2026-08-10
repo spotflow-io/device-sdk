@@ -64,11 +64,23 @@ config SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE
 	  When main-firmware image management is enabled, defaults to the image
 	  writer buffer size so download and flash paths can share the same block size.
 
-config SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS
-	int "Delay between transient artifact download retries in milliseconds"
+config SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS
+	int "Initial artifact download retry delay ceiling in milliseconds"
 	default 5000
+	range 1 3600000
 	help
-	  Delay before retrying an artifact download after a transient failure.
+	  Upper bound of the randomized delay before the first retry after a
+	  transient artifact download failure. The retry delay ceiling doubles
+	  after each subsequent transient failure.
+
+config SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS
+	int "Maximum artifact download retry delay in milliseconds"
+	default 300000
+	range SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS 3600000
+	help
+	  Maximum delay ceiling for artifact download retries. Once this ceiling is
+	  reached, retries continue indefinitely at randomized delays between half
+	  this value and this value.
 
 config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 	bool "Automatically handle main firmware OTA updates"

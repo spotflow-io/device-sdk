@@ -100,7 +100,8 @@ typedef void (*spotflow_download_block_callback)(const struct spotflow_artifact_
  *
  * Blocks the calling thread until the download completes, is canceled, or
  * fails. Transient transport errors are retried automatically using HTTP
- * Range requests to resume from the last received byte.
+ * Range requests to resume from the last received byte. Retries use truncated
+ * exponential backoff with jitter and can be interrupted by cancellation.
  *
  * Only one download may run on a given downloader at a time.
  *

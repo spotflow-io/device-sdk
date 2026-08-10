@@ -13,6 +13,7 @@
 #include <zephyr/init.h>
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/random/random.h>
 #include <zephyr/sys/iterable_sections.h>
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
@@ -26,10 +27,30 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 static void downloader_wake_waiters(struct spotflow_downloader* downloader);
 static void downloader_drain_resume_sem(struct spotflow_downloader* downloader);
 static int downloader_wait_if_paused(struct spotflow_downloader* downloader);
+static int downloader_wait_for_retry(struct spotflow_downloader* downloader, uint32_t delay_ms);
 static int downloader_finish(struct spotflow_downloader* downloader, int result);
 static int init_static_downloaders(void);
 
 SYS_INIT(init_static_downloaders, PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
+
+uint32_t spotflow_ota_downloader_retry_delay_ms(uint32_t retry_ceiling_ms, uint32_t random_value)
+{
+	uint32_t minimum_delay_ms = (retry_ceiling_ms + 1U) / 2U;
+	uint32_t jitter_range_ms = retry_ceiling_ms - minimum_delay_ms + 1U;
+
+	return minimum_delay_ms + random_value % jitter_range_ms;
+}
+
+uint32_t spotflow_ota_downloader_next_retry_ceiling_ms(uint32_t retry_ceiling_ms)
+{
+	const uint32_t max_delay_ms = CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS;
+
+	if (retry_ceiling_ms >= max_delay_ms || retry_ceiling_ms > max_delay_ms / 2U) {
+		return max_delay_ms;
+	}
+
+	return retry_ceiling_ms * 2U;
+}
 
 int spotflow_ota_downloader_build_authorization_header(const char* secret, char* out,
 						       size_t out_len)
@@ -210,6 +231,8 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 
 	size_t total_bytes_downloaded = 0;
 	uint64_t artifact_size = 0;
+	uint32_t retry_count = 0;
+	uint32_t retry_ceiling_ms = CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS;
 
 	while (true) {
 		if (downloader_wait_if_paused(downloader) != 0) {
@@ -261,10 +284,23 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 			return downloader_finish(downloader, rc);
 		}
 
-		LOG_WRN("Transient artifact download failure (%d) after %zu bytes, retrying with "
-			"Range",
-			rc, total_bytes_downloaded);
-		k_sleep(K_MSEC(CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS));
+		uint32_t retry_delay_ms =
+			spotflow_ota_downloader_retry_delay_ms(retry_ceiling_ms, sys_rand32_get());
+
+		if (retry_count < UINT32_MAX) {
+			retry_count++;
+		}
+
+		LOG_WRN("Transient artifact download failure (%d) after %zu bytes; retry %u in "
+			"%u ms using Range",
+			rc, total_bytes_downloaded, retry_count, retry_delay_ms);
+
+		rc = downloader_wait_for_retry(downloader, retry_delay_ms);
+		if (rc != 0) {
+			return downloader_finish(downloader, rc);
+		}
+
+		retry_ceiling_ms = spotflow_ota_downloader_next_retry_ceiling_ms(retry_ceiling_ms);
 	}
 }
 
@@ -327,6 +363,30 @@ static int downloader_wait_if_paused(struct spotflow_downloader* downloader)
 		}
 
 		k_sem_take(&downloader->resume_sem, K_FOREVER);
+	}
+}
+
+static int downloader_wait_for_retry(struct spotflow_downloader* downloader, uint32_t delay_ms)
+{
+	k_timepoint_t deadline = sys_timepoint_calc(K_MSEC(delay_ms));
+
+	while (true) {
+		/* The semaphore only signals a possible state change. Recheck the state and the
+		 * original deadline after every wake so pause/resume cannot shorten the backoff.
+		 */
+		int rc = downloader_wait_if_paused(downloader);
+
+		if (rc != 0) {
+			return rc;
+		}
+
+		k_timeout_t remaining = sys_timepoint_timeout(deadline);
+
+		if (K_TIMEOUT_EQ(remaining, K_NO_WAIT)) {
+			return 0;
+		}
+
+		(void)k_sem_take(&downloader->resume_sem, remaining);
 	}
 }
 
