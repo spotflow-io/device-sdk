@@ -270,7 +270,9 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  *
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. After a
  * successful reboot into an unconfirmed image, confirms the image with MCUboot,
- * reports success to the cloud, and clears probation metadata.
+ * and schedules persistence, probation cleanup, and result reporting on the OTA
+ * worker. A return value of @c 0 does not mean that the result has already been
+ * published or received by Spotflow.
  *
  * If the image is already confirmed and the stored result is
  * @c SPOTFLOW_OTA_RESULT_SUCCEEDED, the call succeeds without doing further
