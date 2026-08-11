@@ -1,4 +1,5 @@
 #include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/persistence/spotflow_ota_records_cbor.h"
 
 #include <errno.h>
 #include <string.h>

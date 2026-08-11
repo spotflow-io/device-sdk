@@ -2,8 +2,6 @@
 #include "ota/core/spotflow_ota_attempt_model.h"
 #include "ota/core/spotflow_ota_main_model.h"
 
-#include "ota/persistence/spotflow_ota_records_cbor.h"
-
 #include <errno.h>
 #include <string.h>
 

@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "ota/persistence/spotflow_ota_records_cbor.h"
+#include "ota/persistence/spotflow_ota_records.h"
 
 static bool validate_artifact(const struct spotflow_ota_artifact* artifact);
 static bool lifecycle_is_valid(const struct ota_attempt_model* attempt,

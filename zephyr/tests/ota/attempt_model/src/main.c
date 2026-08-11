@@ -3,7 +3,7 @@
 #include <zephyr/ztest.h>
 
 #include "ota/core/spotflow_ota_attempt_model.h"
-#include "ota/persistence/spotflow_ota_records_cbor.h"
+#include "ota/persistence/spotflow_ota_records.h"
 
 static struct spotflow_ota_artifact make_artifact(size_t index)
 {
