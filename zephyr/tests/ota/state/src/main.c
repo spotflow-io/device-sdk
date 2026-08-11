@@ -73,6 +73,122 @@ ZTEST(spotflow_ota_state, test_restored_unfinished_attempt_waits_for_manifest)
 		      "restored attempt must not run without artifact descriptors");
 }
 
+ZTEST(spotflow_ota_state, test_restored_attempt_error_is_durably_terminal)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 2,
+		.has_attempt_error = true,
+		.attempt_error = SPOTFLOW_OTA_ATTEMPT_ERROR_CANNOT_PARSE_MESSAGE,
+	};
+	struct spotflow_ota_state_diagnostic snapshot;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, NULL, false));
+	spotflow_ota_state_get_diagnostic(&snapshot);
+	zassert_equal(snapshot.current_attempt_id, persisted.attempt_id);
+	zassert_true(snapshot.has_attempt_error);
+	zassert_equal(snapshot.attempt_error, persisted.attempt_error);
+	zassert_true(snapshot.current_attempt_durable);
+	zassert_equal(snapshot.artifact_count, 0);
+}
+
+ZTEST(spotflow_ota_state, test_restored_terminal_results_remain_durably_terminal)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 3,
+		.artifact_count = 2,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_SUCCEEDED,
+			SPOTFLOW_OTA_RESULT_CANCELED,
+		},
+	};
+	struct spotflow_ota_state_diagnostic snapshot;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, NULL, false));
+	spotflow_ota_state_get_diagnostic(&snapshot);
+	zassert_equal(snapshot.current_attempt_id, persisted.attempt_id);
+	zassert_true(snapshot.current_attempt_terminal);
+	zassert_true(snapshot.current_attempt_durable);
+	zassert_equal(snapshot.current_artifact_index, persisted.artifact_count);
+}
+
+ZTEST(spotflow_ota_state, test_probation_only_restores_synthetic_attempt_prefix)
+{
+	const struct spotflow_ota_probation probation = {
+		.attempt_id = 4,
+		.artifact_index = 2,
+		.slug = "main",
+		.version = "2.0.0",
+	};
+	struct spotflow_ota_state_diagnostic snapshot;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(NULL, false, &probation, true));
+	spotflow_ota_state_get_diagnostic(&snapshot);
+	zassert_equal(snapshot.current_attempt_id, probation.attempt_id);
+	zassert_equal(snapshot.artifact_count, probation.artifact_index + 1);
+	zassert_equal(snapshot.current_artifact_index, 0);
+	for (size_t i = 0; i < snapshot.artifact_count; i++) {
+		zassert_equal(snapshot.artifact_results[i], SPOTFLOW_OTA_RESULT_PENDING);
+	}
+	zassert_true(spotflow_ota_state_is_main_artifact_pending(probation.attempt_id,
+								 probation.artifact_index));
+}
+
+ZTEST(spotflow_ota_state, test_matching_attempt_and_probation_preserve_persisted_results)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 5,
+		.artifact_count = 3,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_SUCCEEDED,
+			SPOTFLOW_OTA_RESULT_PENDING,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+	const struct spotflow_ota_probation probation = {
+		.attempt_id = 5,
+		.artifact_index = 1,
+		.slug = "main",
+		.version = "2.0.0",
+	};
+	struct spotflow_ota_state_diagnostic snapshot;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, &probation, true));
+	spotflow_ota_state_get_diagnostic(&snapshot);
+	zassert_equal(snapshot.current_attempt_id, persisted.attempt_id);
+	zassert_equal(snapshot.artifact_count, persisted.artifact_count);
+	zassert_mem_equal(snapshot.artifact_results, persisted.artifact_results,
+			  sizeof(snapshot.artifact_results));
+	zassert_equal(snapshot.current_artifact_index, 1);
+}
+
+ZTEST(spotflow_ota_state, test_mismatched_probation_replaces_persisted_attempt)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 6,
+		.artifact_count = 2,
+		.actionable_cancellation = true,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_SUCCEEDED,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+	const struct spotflow_ota_probation probation = {
+		.attempt_id = 7,
+		.artifact_index = 1,
+		.slug = "main",
+		.version = "2.0.0",
+	};
+	struct spotflow_ota_state_diagnostic snapshot;
+
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, &probation, true));
+	spotflow_ota_state_get_diagnostic(&snapshot);
+	zassert_equal(snapshot.current_attempt_id, probation.attempt_id);
+	zassert_equal(snapshot.artifact_count, probation.artifact_index + 1);
+	zassert_false(snapshot.actionable_cancellation);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
+}
+
 ZTEST(spotflow_ota_state, test_same_attempt_manifest_rehydrates_restored_attempt)
 {
 	const struct spotflow_ota_persisted_attempt persisted = {

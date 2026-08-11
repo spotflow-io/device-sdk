@@ -64,69 +64,29 @@ int spotflow_ota_state_init_from_persistence(const struct spotflow_ota_persisted
 	clear_report_state();
 
 	if (has_attempt && attempt != NULL && attempt->attempt_id != 0) {
-		ota_state.current_attempt.identity.lifecycle = OTA_ATTEMPT_AWAITING_MANIFEST;
-		ota_state.current_attempt.identity.id = attempt->attempt_id;
-		ota_state.current_attempt.identity.generation = allocate_attempt_generation();
-		ota_state.current_attempt.execution.cancellation_requested =
-			attempt->actionable_cancellation;
-		ota_state.current_attempt.failure.state = attempt->has_attempt_error
-			? OTA_ATTEMPT_FAILURE_PRESENT
-			: OTA_ATTEMPT_FAILURE_NONE;
-		ota_state.current_attempt.failure.error = attempt->attempt_error;
-		if (!attempt->has_attempt_error) {
-			ota_state.current_attempt.plan.source = OTA_ARTIFACT_PLAN_PERSISTED_RESULTS;
-			ota_state.current_attempt.plan.count = attempt->artifact_count;
-			memcpy(ota_state.current_attempt.plan.results, attempt->artifact_results,
-			       sizeof(ota_state.current_attempt.plan.results));
-		}
-		spotflow_ota_attempt_advance(&ota_state.current_attempt);
-		spotflow_ota_attempt_refresh_lifecycle(&ota_state.current_attempt,
-						       attempt_constraints());
+		spotflow_ota_attempt_restore_persisted(attempt, allocate_attempt_generation(),
+						       attempt_constraints(),
+						       &ota_state.current_attempt);
 	}
 
 	if (has_probation && probation != NULL && probation->attempt_id != 0) {
-		if (!spotflow_ota_attempt_exists(&ota_state.current_attempt) ||
-		    ota_state.current_attempt.identity.id != probation->attempt_id) {
-			spotflow_ota_attempt_clear(&ota_state.current_attempt);
-			ota_state.current_attempt.identity.lifecycle =
-				OTA_ATTEMPT_AWAITING_MANIFEST;
-			ota_state.current_attempt.identity.id = probation->attempt_id;
-			ota_state.current_attempt.identity.generation =
-				allocate_attempt_generation();
-
-			if (has_attempt && attempt != NULL &&
-			    attempt->attempt_id == probation->attempt_id) {
-				ota_state.current_attempt.plan.source =
-					OTA_ARTIFACT_PLAN_PERSISTED_RESULTS;
-				ota_state.current_attempt.plan.count = attempt->artifact_count;
-				memcpy(ota_state.current_attempt.plan.results,
-				       attempt->artifact_results,
-				       sizeof(ota_state.current_attempt.plan.results));
-			} else {
-				ota_state.current_attempt.plan.source =
-					OTA_ARTIFACT_PLAN_PROBATION_PREFIX;
-				ota_state.current_attempt.plan.count =
-					probation->artifact_index + 1;
-				for (size_t i = 0; i < ota_state.current_attempt.plan.count; i++) {
-					ota_state.current_attempt.plan.results[i] =
-						SPOTFLOW_OTA_RESULT_PENDING;
-				}
-			}
-
-			spotflow_ota_attempt_advance(&ota_state.current_attempt);
-		}
-
-		bool result_pending =
-			probation->artifact_index < ota_state.current_attempt.plan.count &&
-			ota_state.current_attempt.plan.results[probation->artifact_index] ==
-				SPOTFLOW_OTA_RESULT_PENDING;
+		bool replaces_attempt = !spotflow_ota_attempt_exists(&ota_state.current_attempt) ||
+			ota_state.current_attempt.identity.id != probation->attempt_id;
+		bool result_pending = replaces_attempt ||
+			(probation->artifact_index < ota_state.current_attempt.plan.count &&
+			 ota_state.current_attempt.plan.results[probation->artifact_index] ==
+				 SPOTFLOW_OTA_RESULT_PENDING);
 		spotflow_ota_main_restore_probation(&ota_state.main_firmware, probation,
 						    result_pending);
 
-		spotflow_ota_attempt_refresh_lifecycle(&ota_state.current_attempt,
-						       attempt_constraints());
+		uint32_t replacement_generation =
+			replaces_attempt ? allocate_attempt_generation() : 0;
+		spotflow_ota_attempt_restore_probation(probation, replacement_generation,
+						       attempt_constraints(),
+						       &ota_state.current_attempt);
 	}
 
+	assert_state_locked();
 	k_mutex_unlock(&state_mutex);
 	return 0;
 }
