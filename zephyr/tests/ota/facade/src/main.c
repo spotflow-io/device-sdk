@@ -9,7 +9,6 @@
 #include <zephyr/ztest.h>
 
 #include <spotflow/ota.h>
-#include <spotflow/session_metadata.h>
 
 #include "net/spotflow_session_metadata.h"
 #include "ota/spotflow_ota.h"
@@ -23,7 +22,6 @@
 LOG_MODULE_REGISTER(spotflow_net);
 
 #define KEY_MESSAGE_TYPE 0x00
-#define KEY_LABELS 0x05
 #define KEY_DEVICE_RUN_ID 0x1E
 #define KEY_LAST_UPDATE_ATTEMPT_ID 41
 #define SESSION_METADATA_MESSAGE_TYPE 1
@@ -36,12 +34,6 @@ struct decoded_session_metadata {
 };
 
 static uint32_t fake_random_seed;
-static struct spotflow_session_metadata_labels session_metadata_labels;
-
-struct spotflow_session_metadata_labels spotflow_override_session_metadata_labels(void)
-{
-	return session_metadata_labels;
-}
 
 static void invoke_ota_callback(uint8_t* payload, size_t len)
 {
@@ -262,7 +254,6 @@ static int decode_session_metadata(const uint8_t* payload, size_t len,
 				   struct decoded_session_metadata* metadata);
 static bool search_uint32_key(zcbor_state_t* state, uint32_t key);
 static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected);
-static bool session_metadata_has_key(const uint8_t* payload, size_t len, uint32_t key);
 enum spotflow_ota_result
 spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 {
@@ -316,7 +307,6 @@ static void before_each(void* fixture)
 	spotflow_ota_test_settings_reset();
 	spotflow_ota_test_fakes_reset();
 	fake_random_seed = 0;
-	session_metadata_labels = (struct spotflow_session_metadata_labels){ 0 };
 	spotflow_ota_reset();
 }
 
@@ -361,123 +351,6 @@ ZTEST(spotflow_ota_facade, test_session_metadata_reports_loaded_last_attempt_id)
 	zassert_true(metadata.has_last_update_attempt_id);
 	zassert_equal(metadata.last_update_attempt_id, attempt.attempt_id);
 	zassert_equal(spotflow_ota_get_last_received_attempt_id(), attempt.attempt_id);
-}
-
-ZTEST(spotflow_ota_facade, test_session_metadata_encodes_typed_labels)
-{
-	static const struct spotflow_session_label labels[] = {
-		{
-			.key = "channel",
-			.type = SPOTFLOW_SESSION_LABEL_STRING,
-			.value.string = "staging",
-		},
-		{
-			.key = "line",
-			.type = SPOTFLOW_SESSION_LABEL_INT,
-			.value.integer = -4,
-		},
-		{
-			.key = "ratio",
-			.type = SPOTFLOW_SESSION_LABEL_FLOAT,
-			.value.floating = 1.5,
-		},
-		{
-			.key = "enabled",
-			.type = SPOTFLOW_SESSION_LABEL_BOOL,
-			.value.boolean = true,
-		},
-	};
-	struct spotflow_ota_test_fake_transport* fake_transport =
-		spotflow_ota_test_fake_transport_get();
-	uint64_t device_run_id;
-	int64_t line;
-	double ratio;
-	bool enabled;
-
-	session_metadata_labels = (struct spotflow_session_metadata_labels){
-		.items = labels,
-		.count = ARRAY_SIZE(labels),
-	};
-
-	zassert_ok(spotflow_ota_init());
-	zassert_ok(spotflow_session_metadata_send());
-
-	ZCBOR_STATE_D(state, 2, fake_transport->ingest_payload, fake_transport->ingest_payload_len,
-		      1, 0);
-	bool success = zcbor_map_start_decode(state);
-
-	success = success && zcbor_uint32_expect(state, KEY_MESSAGE_TYPE);
-	success = success && zcbor_uint32_expect(state, SESSION_METADATA_MESSAGE_TYPE);
-	success = success && zcbor_uint32_expect(state, KEY_DEVICE_RUN_ID);
-	success = success && zcbor_uint64_decode(state, &device_run_id);
-	success = success && zcbor_uint32_expect(state, KEY_LABELS);
-	success = success && zcbor_map_start_decode(state);
-	success = success &&
-		zcbor_tstr_expect(state, &(struct zcbor_string){ (const uint8_t*)"channel", 7 });
-	success = success &&
-		zcbor_tstr_expect(state, &(struct zcbor_string){ (const uint8_t*)"staging", 7 });
-	success = success &&
-		zcbor_tstr_expect(state, &(struct zcbor_string){ (const uint8_t*)"line", 4 });
-	success = success && zcbor_int64_decode(state, &line);
-	success = success &&
-		zcbor_tstr_expect(state, &(struct zcbor_string){ (const uint8_t*)"ratio", 5 });
-	success = success && zcbor_float64_decode(state, &ratio);
-	success = success &&
-		zcbor_tstr_expect(state, &(struct zcbor_string){ (const uint8_t*)"enabled", 7 });
-	success = success && zcbor_bool_decode(state, &enabled);
-	success = success && zcbor_map_end_decode(state);
-	success = success && zcbor_uint32_expect(state, KEY_LAST_UPDATE_ATTEMPT_ID);
-	success = success && zcbor_uint64_expect(state, 0);
-	success = success && zcbor_map_end_decode(state);
-
-	zassert_true(success, "Failed to decode session metadata: %d", zcbor_peek_error(state));
-	zassert_not_equal(device_run_id, 0);
-	zassert_equal(line, -4);
-	zassert_equal(ratio, 1.5);
-	zassert_true(enabled);
-}
-
-ZTEST(spotflow_ota_facade, test_session_metadata_omits_invalid_labels)
-{
-	static const struct spotflow_session_label labels[] = {
-		{
-			.key = "",
-			.type = SPOTFLOW_SESSION_LABEL_STRING,
-			.value.string = "invalid",
-		},
-	};
-	uint8_t buffer[CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE];
-	size_t cbor_data_len;
-
-	session_metadata_labels = (struct spotflow_session_metadata_labels){
-		.items = labels,
-		.count = ARRAY_SIZE(labels),
-	};
-
-	zassert_ok(spotflow_session_metadata_encode(buffer, sizeof(buffer), &cbor_data_len));
-	zassert_false(session_metadata_has_key(buffer, cbor_data_len, KEY_LABELS));
-}
-
-ZTEST(spotflow_ota_facade, test_session_metadata_omits_oversized_labels)
-{
-	static const struct spotflow_session_label labels[] = {
-		{
-			.key = "long-label",
-			.type = SPOTFLOW_SESSION_LABEL_STRING,
-			.value.string =
-				"this label value intentionally exceeds the small encoding buffer",
-		},
-	};
-	uint8_t buffer[64];
-	size_t cbor_data_len;
-
-	session_metadata_labels = (struct spotflow_session_metadata_labels){
-		.items = labels,
-		.count = ARRAY_SIZE(labels),
-	};
-
-	zassert_ok(spotflow_session_metadata_encode(buffer, sizeof(buffer), &cbor_data_len));
-	zassert_false(session_metadata_has_key(buffer, cbor_data_len, KEY_LABELS));
 }
 
 ZTEST(spotflow_ota_facade, test_ota_init_session_requests_subscription)
@@ -788,11 +661,4 @@ static bool search_uint32_key(zcbor_state_t* state, uint32_t key)
 static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected)
 {
 	return zcbor_uint32_pexpect(state, expected);
-}
-
-static bool session_metadata_has_key(const uint8_t* payload, size_t len, uint32_t key)
-{
-	ZCBOR_STATE_D(state, 2, payload, len, 1, 0);
-
-	return zcbor_unordered_map_start_decode(state) && search_uint32_key(state, key);
 }

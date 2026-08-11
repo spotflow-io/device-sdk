@@ -41,10 +41,11 @@ struct spotflow_session_metadata_labels {
  * Override this callback in application code to provide session labels. Return
  * an empty structure when no labels should be emitted. The callback runs while
  * the SDK encodes session metadata and must not block or call Spotflow APIs.
- * The returned array, label keys, and string values must remain valid until
- * the SDK has finished encoding the Session Metadata message. Keep the returned
- * labels stable between invocations unless a new session should intentionally
- * use different labels.
+ * The SDK reads the returned data synchronously after this callback returns and
+ * does not invoke the callback again until encoding finishes. Store the array,
+ * keys, and string values in memory that remains valid after return, such as
+ * static storage. Populate or update that storage only from this callback
+ * before returning; do not modify it asynchronously.
  *
  * When count is nonzero, items must be non-NULL. Every key must be a non-NULL,
  * nonempty, NUL-terminated string. String label values must likewise be
