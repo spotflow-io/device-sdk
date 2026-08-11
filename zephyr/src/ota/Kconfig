@@ -50,10 +50,10 @@ config SPOTFLOW_OTA_HTTP_TIMEOUT_MS
 	int "Artifact download request timeout in milliseconds"
 	default 120000
 	help
-	  Maximum time allowed for a single artifact download request, including
-	  DNS resolution, socket connection, TLS handshake, and the HTTP exchange.
-	  Zephyr's blocking DNS, TCP, and TLS operations retain their own timeout
-	  settings and cannot be interrupted when this deadline expires.
+	  Time budget for each download attempt. The budget starts before DNS and
+	  connection setup, and the remaining time is passed to the HTTP client.
+	  Blocking DNS, TCP, and TLS operations use their own timeouts and can cause
+	  an attempt to exceed this value.
 
 config SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE
 	int "Receive buffer size for artifact downloads in bytes"
@@ -71,7 +71,9 @@ config SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS
 	help
 	  Upper bound of the randomized delay before the first retry after a
 	  transient artifact download failure. The retry delay ceiling doubles
-	  after each subsequent transient failure.
+	  after each subsequent transient failure. Transient failures are retried
+	  indefinitely until the download succeeds, is canceled, or encounters a
+	  non-retryable error.
 
 config SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS
 	int "Maximum artifact download retry delay in milliseconds"
@@ -79,8 +81,9 @@ config SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS
 	range SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS 3600000
 	help
 	  Maximum delay ceiling for artifact download retries. Once this ceiling is
-	  reached, retries continue indefinitely at randomized delays between half
-	  this value and this value.
+	  reached, transient failures continue to be retried indefinitely at
+	  randomized delays between half this value and this value, until the
+	  download succeeds, is canceled, or encounters a non-retryable error.
 
 config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 	bool "Automatically handle main firmware OTA updates"
