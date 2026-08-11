@@ -28,6 +28,8 @@ int spotflow_mqtt_send_live();
 struct mqtt_evt;
 void spotflow_mqtt_test_prepare_connected(void);
 void spotflow_mqtt_test_handle_event(const struct mqtt_evt* evt);
+void spotflow_mqtt_test_set_message_callbacks(spotflow_mqtt_message_cb config_callback,
+					      spotflow_mqtt_message_cb ota_callback);
 #endif /* CONFIG_ZTEST */
 
 #ifdef __cplusplus

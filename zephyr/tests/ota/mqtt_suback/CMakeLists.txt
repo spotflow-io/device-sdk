@@ -22,3 +22,8 @@ target_sources(app PRIVATE
         src/main.c
         ../../../src/net/transport/mqtt/spotflow_mqtt.c
 )
+
+zephyr_ld_options(
+        -Wl,--wrap=mqtt_publish_qos1_ack
+        -Wl,--wrap=mqtt_read_publish_payload_blocking
+)
