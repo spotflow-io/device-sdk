@@ -67,7 +67,8 @@ config SPOTFLOW_SESSION_METADATA_BUFFER_SIZE
 	range 64 4096
 	help
 		Maximum encoded size of the Spotflow Session Metadata message. Increase
-		this value when application-provided session labels do not fit.
+		this value when application-provided session labels do not fit. The SDK
+		reserves this amount of static RAM for the encoding workspace.
 
 config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	int "Spotflow SDK backend level"

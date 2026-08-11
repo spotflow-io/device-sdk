@@ -157,17 +157,25 @@ static ssize_t read_device_id(struct bt_conn* conn, const struct bt_gatt_attr* a
 static ssize_t read_session_metadata(struct bt_conn* conn, const struct bt_gatt_attr* attr,
 				     void* buf, uint16_t len, uint16_t offset)
 {
-	uint8_t session_metadata[CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE];
+	/* Serialize encoding and copying because the workspace is shared by all GATT reads. */
+	static uint8_t session_metadata[CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE];
+	static K_MUTEX_DEFINE(session_metadata_lock);
 	size_t session_metadata_len;
+
+	k_mutex_lock(&session_metadata_lock, K_FOREVER);
 	int rc = spotflow_session_metadata_encode(session_metadata, sizeof(session_metadata),
 						  &session_metadata_len);
 
 	if (rc < 0) {
+		k_mutex_unlock(&session_metadata_lock);
 		return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
 	}
 
-	return bt_gatt_attr_read(conn, attr, buf, len, offset, session_metadata,
-				 session_metadata_len);
+	ssize_t read_len = bt_gatt_attr_read(conn, attr, buf, len, offset, session_metadata,
+					     session_metadata_len);
+	k_mutex_unlock(&session_metadata_lock);
+
+	return read_len;
 }
 
 static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* attr,

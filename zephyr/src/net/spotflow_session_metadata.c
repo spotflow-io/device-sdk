@@ -39,7 +39,7 @@ struct spotflow_session_metadata_labels __weak spotflow_override_session_metadat
 
 int spotflow_session_metadata_send(void)
 {
-	uint8_t buffer[CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE];
+	static uint8_t buffer[CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE];
 	size_t cbor_data_len = 0;
 	int rc = spotflow_session_metadata_encode(buffer, sizeof(buffer), &cbor_data_len);
 
