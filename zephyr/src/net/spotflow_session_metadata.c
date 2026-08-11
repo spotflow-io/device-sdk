@@ -56,11 +56,14 @@ int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t*
 	uint16_t build_id_len = 0;
 	bool include_last_update_attempt_id = false;
 	uint64_t last_update_attempt_id = 0;
+	int rc;
 	struct spotflow_session_metadata_labels labels =
 		spotflow_override_session_metadata_labels();
+	const struct spotflow_session_metadata_labels no_labels = { 0 };
 
 	if (labels.items == NULL && labels.count != 0) {
-		return -EINVAL;
+		LOG_WRN("Session metadata labels have no item array; omitting labels");
+		labels = no_labels;
 	}
 
 	for (size_t i = 0; i < labels.count; i++) {
@@ -69,7 +72,9 @@ int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t*
 		     labels.items[i].value.string == NULL) ||
 		    labels.items[i].type < SPOTFLOW_SESSION_LABEL_STRING ||
 		    labels.items[i].type > SPOTFLOW_SESSION_LABEL_BOOL) {
-			return -EINVAL;
+			LOG_WRN("Session metadata label %zu is invalid; omitting labels", i);
+			labels = no_labels;
+			break;
 		}
 	}
 
@@ -82,7 +87,7 @@ int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t*
 	}
 
 #ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
-	int rc = spotflow_build_id_get(&build_id, &build_id_len);
+	rc = spotflow_build_id_get(&build_id, &build_id_len);
 	if (rc != 0) {
 		LOG_DBG("Failed to get build ID for session metadata: %d", rc);
 	}
@@ -93,9 +98,17 @@ int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t*
 	last_update_attempt_id = spotflow_ota_get_last_received_attempt_id();
 #endif /* CONFIG_SPOTFLOW_OTA */
 
-	return cbor_encode_session_metadata(build_id, build_id_len, device_run_id,
-					    include_last_update_attempt_id, last_update_attempt_id,
-					    &labels, buffer, buffer_len, cbor_data_len);
+	rc = cbor_encode_session_metadata(build_id, build_id_len, device_run_id,
+					  include_last_update_attempt_id, last_update_attempt_id,
+					  &labels, buffer, buffer_len, cbor_data_len);
+	if (rc == -EMSGSIZE && labels.count > 0) {
+		LOG_WRN("Session metadata labels exceed the configured buffer; omitting labels");
+		rc = cbor_encode_session_metadata(
+			build_id, build_id_len, device_run_id, include_last_update_attempt_id,
+			last_update_attempt_id, &no_labels, buffer, buffer_len, cbor_data_len);
+	}
+
+	return rc;
 }
 
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,

@@ -42,7 +42,16 @@ struct spotflow_session_metadata_labels {
  * an empty structure when no labels should be emitted. The callback runs while
  * the SDK encodes session metadata and must not block or call Spotflow APIs.
  * The returned array, label keys, and string values must remain valid until
- * the SDK has finished encoding the Session Metadata message.
+ * the SDK has finished encoding the Session Metadata message. Keep the returned
+ * labels stable between invocations unless a new session should intentionally
+ * use different labels.
+ *
+ * When count is nonzero, items must be non-NULL. Every key must be a non-NULL,
+ * nonempty, NUL-terminated string. String label values must likewise be
+ * non-NULL and NUL-terminated, and every label type must be one of the values
+ * defined by enum spotflow_session_label_type. If the labels are invalid or do
+ * not fit CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE, the SDK logs a warning
+ * and sends Session Metadata without application-defined labels.
  *
  * @return Labels to include in the current Session Metadata message.
  */

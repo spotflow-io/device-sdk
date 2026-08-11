@@ -64,11 +64,13 @@ config SPOTFLOW_DEVICE_ID
 config SPOTFLOW_SESSION_METADATA_BUFFER_SIZE
 	int "Session metadata CBOR buffer size"
 	default 256
-	range 64 4096
+	range 64 512 if SPOTFLOW_TRANSPORT_BLE
+	range 64 4096 if SPOTFLOW_TRANSPORT_MQTT
 	help
 		Maximum encoded size of the Spotflow Session Metadata message. Increase
 		this value when application-provided session labels do not fit. The SDK
-		reserves this amount of static RAM for the encoding workspace.
+		reserves this amount of static RAM for the encoding workspace. BLE limits
+		GATT attribute values to 512 bytes.
 
 config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	int "Spotflow SDK backend level"

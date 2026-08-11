@@ -262,6 +262,7 @@ static int decode_session_metadata(const uint8_t* payload, size_t len,
 				   struct decoded_session_metadata* metadata);
 static bool search_uint32_key(zcbor_state_t* state, uint32_t key);
 static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected);
+static bool session_metadata_has_key(const uint8_t* payload, size_t len, uint32_t key);
 enum spotflow_ota_result
 spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info)
 {
@@ -436,7 +437,7 @@ ZTEST(spotflow_ota_facade, test_session_metadata_encodes_typed_labels)
 	zassert_true(enabled);
 }
 
-ZTEST(spotflow_ota_facade, test_session_metadata_rejects_invalid_labels)
+ZTEST(spotflow_ota_facade, test_session_metadata_omits_invalid_labels)
 {
 	static const struct spotflow_session_label labels[] = {
 		{
@@ -453,8 +454,30 @@ ZTEST(spotflow_ota_facade, test_session_metadata_rejects_invalid_labels)
 		.count = ARRAY_SIZE(labels),
 	};
 
-	zassert_equal(spotflow_session_metadata_encode(buffer, sizeof(buffer), &cbor_data_len),
-		      -EINVAL);
+	zassert_ok(spotflow_session_metadata_encode(buffer, sizeof(buffer), &cbor_data_len));
+	zassert_false(session_metadata_has_key(buffer, cbor_data_len, KEY_LABELS));
+}
+
+ZTEST(spotflow_ota_facade, test_session_metadata_omits_oversized_labels)
+{
+	static const struct spotflow_session_label labels[] = {
+		{
+			.key = "long-label",
+			.type = SPOTFLOW_SESSION_LABEL_STRING,
+			.value.string =
+				"this label value intentionally exceeds the small encoding buffer",
+		},
+	};
+	uint8_t buffer[64];
+	size_t cbor_data_len;
+
+	session_metadata_labels = (struct spotflow_session_metadata_labels){
+		.items = labels,
+		.count = ARRAY_SIZE(labels),
+	};
+
+	zassert_ok(spotflow_session_metadata_encode(buffer, sizeof(buffer), &cbor_data_len));
+	zassert_false(session_metadata_has_key(buffer, cbor_data_len, KEY_LABELS));
 }
 
 ZTEST(spotflow_ota_facade, test_ota_init_session_requests_subscription)
@@ -765,4 +788,11 @@ static bool search_uint32_key(zcbor_state_t* state, uint32_t key)
 static bool decode_expected_uint32_key(zcbor_state_t* state, void* expected)
 {
 	return zcbor_uint32_pexpect(state, expected);
+}
+
+static bool session_metadata_has_key(const uint8_t* payload, size_t len, uint32_t key)
+{
+	ZCBOR_STATE_D(state, 2, payload, len, 1, 0);
+
+	return zcbor_unordered_map_start_decode(state) && search_uint32_key(state, key);
 }
