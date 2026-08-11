@@ -157,7 +157,7 @@ static ssize_t read_device_id(struct bt_conn* conn, const struct bt_gatt_attr* a
 static ssize_t read_session_metadata(struct bt_conn* conn, const struct bt_gatt_attr* attr,
 				     void* buf, uint16_t len, uint16_t offset)
 {
-	uint8_t session_metadata[SPOTFLOW_SESSION_METADATA_BUFFER_SIZE];
+	uint8_t session_metadata[CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE];
 	size_t session_metadata_len;
 	int rc = spotflow_session_metadata_encode(session_metadata, sizeof(session_metadata),
 						  &session_metadata_len);

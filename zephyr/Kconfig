@@ -61,6 +61,14 @@ config SPOTFLOW_DEVICE_ID
 		hwinfo_get_device_id(...) will be used. You can provide the device ID
 		in the code by defining the function char* spotflow_override_device_id().
 
+config SPOTFLOW_SESSION_METADATA_BUFFER_SIZE
+	int "Session metadata CBOR buffer size"
+	default 256
+	range 64 4096
+	help
+		Maximum encoded size of the Spotflow Session Metadata message. Increase
+		this value when application-provided session labels do not fit.
+
 config SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL
 	int "Spotflow SDK backend level"
 	default LOG_DEFAULT_LEVEL

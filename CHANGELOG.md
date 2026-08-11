@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## Unreleased
 
+### Added
+* Added application-defined typed labels to Zephyr Session Metadata messages.
+
 ## [0.9.0] - 2026-08-06
 
 ### Added
