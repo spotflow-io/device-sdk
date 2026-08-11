@@ -3,6 +3,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include "ota/persistence/spotflow_ota_records.h"
+
 static bool validate_artifact(const struct spotflow_ota_artifact* artifact);
 static bool lifecycle_is_valid(const struct ota_attempt_model* attempt,
 			       struct ota_attempt_constraints constraints);
@@ -20,6 +22,51 @@ void spotflow_ota_attempt_clear(struct ota_attempt_model* attempt)
 	attempt->execution.transaction.state = OTA_ARTIFACT_TRANSACTION_IDLE;
 	attempt->execution.sequence_policy = OTA_ARTIFACT_SEQUENCE_CONTINUE;
 	attempt->failure.state = OTA_ATTEMPT_FAILURE_NONE;
+}
+
+void spotflow_ota_attempt_restore_persisted(const struct spotflow_ota_persisted_attempt* persisted,
+					    uint32_t generation,
+					    struct ota_attempt_constraints constraints,
+					    struct ota_attempt_model* attempt)
+{
+	spotflow_ota_attempt_clear(attempt);
+	attempt->identity.lifecycle = OTA_ATTEMPT_AWAITING_MANIFEST;
+	attempt->identity.id = persisted->attempt_id;
+	attempt->identity.generation = generation;
+	attempt->execution.cancellation_requested = persisted->actionable_cancellation;
+	attempt->failure.state = persisted->has_attempt_error ? OTA_ATTEMPT_FAILURE_PRESENT
+							      : OTA_ATTEMPT_FAILURE_NONE;
+	attempt->failure.error = persisted->attempt_error;
+	if (!persisted->has_attempt_error) {
+		attempt->plan.source = OTA_ARTIFACT_PLAN_PERSISTED_RESULTS;
+		attempt->plan.count = persisted->artifact_count;
+		memcpy(attempt->plan.results, persisted->artifact_results,
+		       sizeof(attempt->plan.results));
+	}
+	spotflow_ota_attempt_advance(attempt);
+	spotflow_ota_attempt_refresh_lifecycle(attempt, constraints);
+}
+
+void spotflow_ota_attempt_restore_probation(const struct spotflow_ota_probation* probation,
+					    uint32_t replacement_generation,
+					    struct ota_attempt_constraints constraints,
+					    struct ota_attempt_model* attempt)
+{
+	if (!spotflow_ota_attempt_exists(attempt) ||
+	    attempt->identity.id != probation->attempt_id) {
+		spotflow_ota_attempt_clear(attempt);
+		attempt->identity.lifecycle = OTA_ATTEMPT_AWAITING_MANIFEST;
+		attempt->identity.id = probation->attempt_id;
+		attempt->identity.generation = replacement_generation;
+		attempt->plan.source = OTA_ARTIFACT_PLAN_PROBATION_PREFIX;
+		attempt->plan.count = probation->artifact_index + 1;
+		for (size_t i = 0; i < attempt->plan.count; i++) {
+			attempt->plan.results[i] = SPOTFLOW_OTA_RESULT_PENDING;
+		}
+		spotflow_ota_attempt_advance(attempt);
+	}
+
+	spotflow_ota_attempt_refresh_lifecycle(attempt, constraints);
 }
 
 uint32_t spotflow_ota_attempt_allocate_generation(uint32_t* next_generation)
