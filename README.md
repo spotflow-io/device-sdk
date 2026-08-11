@@ -1,3 +1,20 @@
+<p align="center">
+  <a href="https://spotflow.io">
+    <img src="logo.svg" height="93">
+  </a>
+</p>
+
+<p align="center">
+  <strong>Monitor every device in the field.</strong><br /><strong>Fix your firmware in hours, not weeks.</strong>
+</p>
+
+<p align="center">
+  <a href="https://docs.spotflow.io"><strong>Documentation</strong></a> ·
+  <a href="https://spotflow.io"><strong>Website</strong></a> ·
+  <a href="https://app.spotflow.io"><strong>Portal</strong></a> ·
+  <a href="zephyr/samples"><strong>Samples</strong></a>
+</p>
+
 # Spotflow Observability Device SDK
 
 Device SDK for Spotflow embedded observability platform.
