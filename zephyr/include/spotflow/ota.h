@@ -99,8 +99,13 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info);
 /**
  * @brief Notify application code that the current update was canceled from the cloud.
  *
- * Called asynchronously on the system work queue after the SDK accepts a cloud
- * cancellation while no artifact in the attempt has yet succeeded.
+ * Called asynchronously on Zephyr's shared system workqueue after the SDK
+ * accepts a cloud cancellation while no artifact in the attempt has yet
+ * succeeded. Prefer not to perform blocking work in this callback unless you
+ * are sure that it will not negatively affect other work items on the system
+ * workqueue. For example, perform non-blocking signaling here, such as
+ * requesting downloader cancellation, and move longer cleanup to an
+ * application-owned thread or workqueue.
  */
 void spotflow_on_update_canceled(void);
 
