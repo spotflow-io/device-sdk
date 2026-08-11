@@ -142,7 +142,9 @@ bool spotflow_is_update_canceled(void);
  *
  * The default (weak) implementation is a no-op.
  *
- * @param state Current main-firmware state snapshot.
+ * @param state Current state snapshot. The pointer is valid only for the
+ *              duration of this callback; copy the structure if it is needed
+ *              afterward.
  */
 void spotflow_on_main_firmware_update_progressed(
 	const struct spotflow_ota_main_firmware_state* state);
