@@ -84,6 +84,11 @@ struct spotflow_ota_main_firmware_state {
  *
  * The default (weak) implementation returns @c SPOTFLOW_OTA_RESULT_FAILED.
  *
+ * If the device resets before this artifact’s result is saved in persistent
+ * storage, the SDK may invoke the callback again for the same attempt and
+ * artifact after the cloud resends the manifest. The handler must be idempotent
+ * or persist enough application-specific progress to resume safely.
+ *
  * @param info Artifact metadata and download credentials. Must not be NULL.
  *
  * @return Terminal result for this artifact.
