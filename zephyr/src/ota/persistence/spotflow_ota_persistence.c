@@ -1,8 +1,10 @@
 #include "ota/persistence/spotflow_ota_persistence.h"
+#include "ota/persistence/spotflow_ota_records_cbor.h"
 
 #include <errno.h>
 #include <string.h>
 
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/settings/settings.h>
 
@@ -20,15 +22,19 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 	SPOTFLOW_OTA_SETTINGS_ROOT "/" SPOTFLOW_OTA_SETTINGS_KEY_VERSION
 
 #define SPOTFLOW_OTA_MAX_RECORD_SIZE 192
+#define SPOTFLOW_OTA_LOAD_MAX_ATTEMPTS 3U
+#define SPOTFLOW_OTA_LOAD_RETRY_DELAY_MS 20U
 
 struct attempt_load_context {
 	struct spotflow_ota_persisted_attempt* attempt;
 	bool* has_attempt;
+	int error;
 };
 
 struct probation_load_context {
 	struct spotflow_ota_probation* probation;
 	bool* has_probation;
+	int error;
 };
 
 struct version_load_context {
@@ -36,6 +42,7 @@ struct version_load_context {
 	char* version;
 	size_t version_len;
 	bool* has_version;
+	int error;
 };
 
 static K_MUTEX_DEFINE(persistence_mutex);
@@ -46,6 +53,9 @@ static int load_probation_callback(const char* key, size_t len, settings_read_cb
 				   void* cb_arg, void* param);
 static int load_version_callback(const char* key, size_t len, settings_read_cb read_cb,
 				 void* cb_arg, void* param);
+static void load_settings_record_best_effort(settings_load_direct_cb callback, void* context,
+					     int* callback_error, const char* record_name);
+static bool is_transient_load_error(int error);
 static bool validate_settings_slug(const char* slug);
 
 int spotflow_ota_persistence_init(void)
@@ -79,12 +89,9 @@ int spotflow_ota_persistence_load_attempt(struct spotflow_ota_persisted_attempt*
 		.has_attempt = has_attempt,
 	};
 
-	k_mutex_lock(&persistence_mutex, K_FOREVER);
-	int rc = settings_load_subtree_direct(SPOTFLOW_OTA_SETTINGS_ROOT, load_attempt_callback,
-					      &context);
-	k_mutex_unlock(&persistence_mutex);
-
-	return rc;
+	load_settings_record_best_effort(load_attempt_callback, &context, &context.error,
+					 "OTA attempt");
+	return 0;
 }
 
 int spotflow_ota_persistence_save_attempt(const struct spotflow_ota_persisted_attempt* attempt)
@@ -128,12 +135,9 @@ int spotflow_ota_persistence_load_probation(struct spotflow_ota_probation* proba
 		.has_probation = has_probation,
 	};
 
-	k_mutex_lock(&persistence_mutex, K_FOREVER);
-	int rc = settings_load_subtree_direct(SPOTFLOW_OTA_SETTINGS_ROOT, load_probation_callback,
-					      &context);
-	k_mutex_unlock(&persistence_mutex);
-
-	return rc;
+	load_settings_record_best_effort(load_probation_callback, &context, &context.error,
+					 "OTA probation");
+	return 0;
 }
 
 int spotflow_ota_persistence_save_probation(const struct spotflow_ota_probation* probation)
@@ -193,12 +197,9 @@ int spotflow_ota_persistence_load_installed_version(const char* slug, char* vers
 		.has_version = has_version,
 	};
 
-	k_mutex_lock(&persistence_mutex, K_FOREVER);
-	int rc = settings_load_subtree_direct(SPOTFLOW_OTA_SETTINGS_ROOT, load_version_callback,
-					      &context);
-	k_mutex_unlock(&persistence_mutex);
-
-	return rc;
+	load_settings_record_best_effort(load_version_callback, &context, &context.error,
+					 "OTA installed version");
+	return 0;
 }
 
 int spotflow_ota_persistence_save_installed_version(const char* slug, const char* version)
@@ -245,8 +246,8 @@ static int load_attempt_callback(const char* key, size_t len, settings_read_cb r
 	int rc = read_cb(cb_arg, buffer, len);
 
 	if (rc < 0 || (size_t)rc != len) {
-		LOG_ERR("Failed to read OTA attempt record: %d", rc);
-		return 0;
+		context->error = rc < 0 ? rc : -EIO;
+		return context->error;
 	}
 
 	rc = spotflow_ota_records_cbor_decode_attempt(buffer, len, context->attempt);
@@ -282,8 +283,8 @@ static int load_probation_callback(const char* key, size_t len, settings_read_cb
 	int rc = read_cb(cb_arg, buffer, len);
 
 	if (rc < 0 || (size_t)rc != len) {
-		LOG_ERR("Failed to read OTA probation record: %d", rc);
-		return 0;
+		context->error = rc < 0 ? rc : -EIO;
+		return context->error;
 	}
 
 	rc = spotflow_ota_records_cbor_decode_probation(buffer, len, context->probation);
@@ -319,14 +320,70 @@ static int load_version_callback(const char* key, size_t len, settings_read_cb r
 
 	int rc = read_cb(cb_arg, context->version, len);
 
-	if (rc < 0 || (size_t)rc != len || context->version[len - 1] != '\0') {
-		LOG_ERR("Failed to read OTA installed version");
+	if (rc < 0 || (size_t)rc != len) {
+		context->error = rc < 0 ? rc : -EIO;
+		context->version[0] = '\0';
+		return context->error;
+	}
+
+	if (context->version[len - 1] != '\0') {
+		LOG_ERR("Ignoring invalid OTA installed version record");
 		context->version[0] = '\0';
 		return 0;
 	}
 
 	*context->has_version = true;
 	return 0;
+}
+
+static void load_settings_record_best_effort(settings_load_direct_cb callback, void* context,
+					     int* callback_error, const char* record_name)
+{
+	for (size_t attempt = 1; attempt <= SPOTFLOW_OTA_LOAD_MAX_ATTEMPTS; attempt++) {
+		*callback_error = 0;
+
+		k_mutex_lock(&persistence_mutex, K_FOREVER);
+		int rc =
+			settings_load_subtree_direct(SPOTFLOW_OTA_SETTINGS_ROOT, callback, context);
+		k_mutex_unlock(&persistence_mutex);
+
+		/* Zephyr 4.4 does not propagate callback errors from this settings API. */
+		if (rc == 0) {
+			rc = *callback_error;
+		}
+		if (rc == 0) {
+			return;
+		}
+
+		if (!is_transient_load_error(rc)) {
+			LOG_ERR("Failed to load %s record: %d; treating it as absent", record_name,
+				rc);
+			return;
+		}
+
+		if (attempt == SPOTFLOW_OTA_LOAD_MAX_ATTEMPTS) {
+			LOG_ERR("Failed to load %s record after %zu attempts: %d; treating it as "
+				"absent",
+				record_name, attempt, rc);
+			return;
+		}
+
+		LOG_WRN("Failed to load %s record: %d; retrying", record_name, rc);
+		k_msleep(SPOTFLOW_OTA_LOAD_RETRY_DELAY_MS);
+	}
+}
+
+static bool is_transient_load_error(int error)
+{
+	switch (error) {
+	case -EIO:
+	case -EAGAIN:
+	case -EBUSY:
+	case -ETIMEDOUT:
+		return true;
+	default:
+		return false;
+	}
 }
 
 static bool validate_settings_slug(const char* slug)

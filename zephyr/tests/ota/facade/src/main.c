@@ -363,6 +363,16 @@ ZTEST(spotflow_ota_facade, test_ota_init_session_requests_subscription)
 	zassert_not_null(fake_transport->ota_callback);
 }
 
+ZTEST(spotflow_ota_facade, test_ota_init_session_propagates_subscription_failure)
+{
+	struct spotflow_ota_test_fake_transport* fake_transport =
+		spotflow_ota_test_fake_transport_get();
+	fake_transport->ota_subscribe_result = -EAGAIN;
+
+	zassert_equal(spotflow_ota_init_session(), -EAGAIN);
+	zassert_equal(fake_transport->ota_subscribe_count, 1);
+}
+
 ZTEST(spotflow_ota_facade, test_c2d_handler_accepts_valid_update_message)
 {
 	struct spotflow_ota_state_diagnostic snapshot;

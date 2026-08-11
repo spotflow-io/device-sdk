@@ -227,41 +227,64 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
 
 int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
 {
+	struct spotflow_ota_main_firmware_state resulting_state;
 	int rc = spotflow_ota_init();
 	if (rc < 0) {
 		return rc;
 	}
 
-	return spotflow_ota_fw_main_pause_update(state);
+	rc = spotflow_ota_fw_main_pause_update(state != NULL ? &resulting_state : NULL);
+	if (rc < 0) {
+		return rc;
+	}
+
+	if (state != NULL) {
+		*state = resulting_state;
+	}
+	return 0;
 }
 
 int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
 {
+	struct spotflow_ota_main_firmware_state resulting_state;
 	int rc = spotflow_ota_init();
 	if (rc < 0) {
 		return rc;
 	}
 
-	return spotflow_ota_fw_main_resume_update(state);
+	rc = spotflow_ota_fw_main_resume_update(state != NULL ? &resulting_state : NULL);
+	if (rc < 0) {
+		return rc;
+	}
+
+	if (state != NULL) {
+		*state = resulting_state;
+	}
+	return 0;
 }
 
 int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state* state)
 {
+	struct spotflow_ota_main_firmware_state resulting_state;
 	int rc = spotflow_ota_init();
 	if (rc < 0) {
 		return rc;
 	}
 
-	rc = spotflow_ota_fw_main_fail_update(state);
+	rc = spotflow_ota_fw_main_fail_update(state != NULL ? &resulting_state : NULL);
 	if (rc < 0) {
 		return rc;
 	}
 
+	if (state != NULL) {
+		*state = resulting_state;
+	}
 	return 0;
 }
 
 int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state* state)
 {
+	struct spotflow_ota_main_firmware_state resulting_state;
 	spotflow_ota_state_effects effects;
 	int rc;
 
@@ -271,12 +294,15 @@ int spotflow_confirm_main_firmware_image(struct spotflow_ota_main_firmware_state
 		return rc;
 	}
 
-	rc = spotflow_ota_fw_main_confirm_image(state, &effects);
+	rc = spotflow_ota_fw_main_confirm_image(state != NULL ? &resulting_state : NULL, &effects);
 	if (rc < 0) {
 		return rc;
 	}
 
 	handle_state_effects(effects);
+	if (state != NULL) {
+		*state = resulting_state;
+	}
 	return 0;
 }
 

@@ -2,6 +2,7 @@
 #define SPOTFLOW_OTA_DOWNLOADER_H
 
 #include <stddef.h>
+#include <stdint.h>
 
 #include <spotflow/downloader.h>
 
@@ -10,6 +11,11 @@ extern "C" {
 #endif
 
 #define SPOTFLOW_OTA_DOWNLOAD_SECRET_MAX_LENGTH 24
+
+/** Internal retry helpers, exposed for deterministic unit testing. */
+uint32_t spotflow_ota_downloader_retry_delay_ms(uint32_t retry_ceiling_ms, uint32_t random_value);
+
+uint32_t spotflow_ota_downloader_next_retry_ceiling_ms(uint32_t retry_ceiling_ms);
 
 int spotflow_ota_downloader_build_authorization_header(const char* secret, char* out,
 						       size_t out_len);

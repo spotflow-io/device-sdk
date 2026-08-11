@@ -7,6 +7,9 @@
 extern "C" {
 #endif
 
+struct spotflow_ota_persisted_attempt;
+struct spotflow_ota_probation;
+
 struct ota_attempt_constraints {
 	bool main_upgrade_irreversible;
 	bool probation_artifact_pending;
@@ -83,6 +86,14 @@ int spotflow_ota_attempt_rehydrate(const struct spotflow_ota_update_msg* msg,
 				   bool* wake_worker);
 void spotflow_ota_attempt_start_rejected(uint64_t attempt_id, enum spotflow_ota_attempt_error error,
 					 uint32_t generation, struct ota_attempt_model* attempt);
+void spotflow_ota_attempt_restore_persisted(const struct spotflow_ota_persisted_attempt* persisted,
+					    uint32_t generation,
+					    struct ota_attempt_constraints constraints,
+					    struct ota_attempt_model* attempt);
+void spotflow_ota_attempt_restore_probation(const struct spotflow_ota_probation* probation,
+					    uint32_t replacement_generation,
+					    struct ota_attempt_constraints constraints,
+					    struct ota_attempt_model* attempt);
 
 void spotflow_ota_pending_attempt_clear(struct ota_pending_attempt* pending);
 void spotflow_ota_pending_attempt_store_update(struct ota_pending_attempt* pending,

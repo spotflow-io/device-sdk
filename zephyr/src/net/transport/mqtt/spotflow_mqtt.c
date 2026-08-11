@@ -76,8 +76,12 @@ static void clear_fds(void);
 static int read_publish_payload_and_discard_excess(struct mqtt_client* client, uint8_t* buffer,
 						   size_t buffer_len, size_t payload_len,
 						   size_t* bytes_read, bool* truncated);
+static int consume_publish_payload(struct mqtt_client* client, size_t payload_len, uint8_t* buffer,
+				   size_t buffer_len, spotflow_mqtt_message_cb callback,
+				   const char* topic_label);
 static int acknowledge_publish_if_needed(struct mqtt_client* client,
 					 const struct mqtt_publish_param* publish);
+static bool suback_succeeded(const struct mqtt_suback_param* suback);
 
 static struct mqtt_config spotflow_mqtt_config = {
 	.host = CONFIG_SPOTFLOW_SERVER_HOSTNAME,
@@ -373,6 +377,12 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 	switch (evt->type) {
 	case MQTT_EVT_SUBACK:
 		LOG_DBG("SUBACK packet id: %u", evt->param.suback.message_id);
+		if (evt->result != 0 || !suback_succeeded(&evt->param.suback)) {
+			LOG_ERR("MQTT subscription rejected for packet %u, reconnecting",
+				evt->param.suback.message_id);
+			spotflow_mqtt_abort_mqtt();
+			break;
+		}
 		if (evt->param.suback.message_id == mqtt_client_toolset.c2d_sub_message_id) {
 			LOG_DBG("Subscription to desired configuration topic acknowledged");
 		} else if (evt->param.suback.message_id == mqtt_client_toolset.ota_sub_message_id) {
@@ -440,68 +450,36 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 		LOG_DBG("PUBLISH packet id: %u", evt->param.publish.message_id);
 
 		size_t payload_len = evt->param.publish.message.payload.len;
-		bool truncated = false;
-		ret = 0;
+		uint8_t discard_buffer[64];
+		uint8_t* payload_buffer = discard_buffer;
+		size_t payload_buffer_len = sizeof(discard_buffer);
+		spotflow_mqtt_message_cb callback = NULL;
+		const char* topic_label = "unexpected";
 
 		/* The actual topic name is longer to distinguish between different devices */
 		if (mqtt_client_toolset.c2d_message_callback &&
 		    utf8_starts_with(&evt->param.publish.message.topic.topic,
 				     &spotflow_mqtt_config.config_c2d_topic)) {
-			size_t bytes_read;
-			/* Consume the whole publish so the MQTT stream stays aligned. */
-			ret = read_publish_payload_and_discard_excess(
-				client, c2d_payload_buffer, sizeof(c2d_payload_buffer), payload_len,
-				&bytes_read, &truncated);
-			if (ret < 0) {
-				LOG_ERR("Failed to read PUBLISH payload: %d", ret);
-				break;
-			}
-
-			if (!truncated) {
-				mqtt_client_toolset.c2d_message_callback(c2d_payload_buffer,
-									 bytes_read);
-			} else {
-				LOG_WRN("Discarding oversized config C2D payload (%u bytes)",
-					(unsigned int)payload_len);
-			}
+			payload_buffer = c2d_payload_buffer;
+			payload_buffer_len = sizeof(c2d_payload_buffer);
+			callback = mqtt_client_toolset.c2d_message_callback;
+			topic_label = "config C2D";
 		}
 #ifdef CONFIG_SPOTFLOW_OTA
 		else if (mqtt_client_toolset.ota_message_callback &&
 			 utf8_starts_with(&evt->param.publish.message.topic.topic,
 					  &spotflow_mqtt_config.ota_c2d_topic)) {
-			size_t bytes_read;
-			/* Consume the whole publish so the MQTT stream stays aligned. */
-			ret = read_publish_payload_and_discard_excess(
-				client, ota_c2d_payload_buffer, sizeof(ota_c2d_payload_buffer),
-				payload_len, &bytes_read, &truncated);
-			if (ret < 0) {
-				LOG_ERR("Failed to read PUBLISH payload: %d", ret);
-				break;
-			}
-
-			if (!truncated) {
-				mqtt_client_toolset.ota_message_callback(ota_c2d_payload_buffer,
-									 bytes_read);
-			} else {
-				LOG_WRN("Discarding oversized OTA C2D payload (%u bytes)",
-					(unsigned int)payload_len);
-			}
+			payload_buffer = ota_c2d_payload_buffer;
+			payload_buffer_len = sizeof(ota_c2d_payload_buffer);
+			callback = mqtt_client_toolset.ota_message_callback;
+			topic_label = "OTA C2D";
 		}
 #endif /* CONFIG_SPOTFLOW_OTA */
-		else {
-			uint8_t discard_buffer[64];
-			size_t ignored_bytes_read;
 
-			ret = read_publish_payload_and_discard_excess(
-				client, discard_buffer, sizeof(discard_buffer), payload_len,
-				&ignored_bytes_read, &truncated);
-			if (ret < 0) {
-				LOG_ERR("Failed to drain unexpected PUBLISH payload: %d", ret);
-				break;
-			}
-
-			LOG_WRN("Discarding unexpected PUBLISH payload (%u bytes)",
-				(unsigned int)payload_len);
+		ret = consume_publish_payload(client, payload_len, payload_buffer,
+					      payload_buffer_len, callback, topic_label);
+		if (ret < 0) {
+			break;
 		}
 
 		/* QoS 1 is acknowledged only after the payload has been fully read. */
@@ -513,6 +491,34 @@ static void mqtt_evt_handler(struct mqtt_client* client, const struct mqtt_evt* 
 	default:
 		break;
 	}
+}
+
+static int consume_publish_payload(struct mqtt_client* client, size_t payload_len, uint8_t* buffer,
+				   size_t buffer_len, spotflow_mqtt_message_cb callback,
+				   const char* topic_label)
+{
+	size_t bytes_read;
+	bool truncated;
+
+	/* Consume the whole publish so the MQTT stream stays aligned. */
+	int ret = read_publish_payload_and_discard_excess(client, buffer, buffer_len, payload_len,
+							  &bytes_read, &truncated);
+	if (ret < 0) {
+		LOG_ERR("Failed to read %s PUBLISH payload: %d", topic_label, ret);
+		return ret;
+	}
+
+	if (callback == NULL) {
+		LOG_WRN("Discarding unexpected PUBLISH payload (%u bytes)",
+			(unsigned int)payload_len);
+	} else if (truncated) {
+		LOG_WRN("Discarding oversized %s payload (%u bytes)", topic_label,
+			(unsigned int)payload_len);
+	} else {
+		callback(buffer, bytes_read);
+	}
+
+	return 0;
 }
 
 static int read_publish_payload_and_discard_excess(struct mqtt_client* client, uint8_t* buffer,
@@ -575,7 +581,42 @@ static bool utf8_starts_with(const struct mqtt_utf8* str, const struct mqtt_utf8
 	return str->size >= prefix->size && memcmp(str->utf8, prefix->utf8, prefix->size) == 0;
 }
 
+static bool suback_succeeded(const struct mqtt_suback_param* suback)
+{
+	if (suback->return_codes.len == 0 || suback->return_codes.data == NULL) {
+		return false;
+	}
+
+	for (size_t i = 0; i < suback->return_codes.len; i++) {
+		if (suback->return_codes.data[i] > MQTT_SUBACK_SUCCESS_QoS_2) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 static void clear_fds(void)
 {
 	mqtt_client_toolset.nfds = 0;
 }
+
+#if defined(CONFIG_ZTEST)
+void spotflow_mqtt_test_prepare_connected(void)
+{
+	mqtt_client_init(&mqtt_client_toolset.mqtt_client);
+	mqtt_client_toolset.mqtt_connected = true;
+}
+
+void spotflow_mqtt_test_handle_event(const struct mqtt_evt* evt)
+{
+	mqtt_evt_handler(&mqtt_client_toolset.mqtt_client, evt);
+}
+
+void spotflow_mqtt_test_set_message_callbacks(spotflow_mqtt_message_cb config_callback,
+					      spotflow_mqtt_message_cb ota_callback)
+{
+	mqtt_client_toolset.c2d_message_callback = config_callback;
+	mqtt_client_toolset.ota_message_callback = ota_callback;
+}
+#endif /* CONFIG_ZTEST */

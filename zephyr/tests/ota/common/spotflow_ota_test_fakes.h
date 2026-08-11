@@ -21,6 +21,7 @@ struct spotflow_ota_test_fake_transport {
 	size_t last_payload_len;
 	int publish_result;
 	uint32_t ota_subscribe_count;
+	int ota_subscribe_result;
 	void (*ota_callback)(uint8_t* payload, size_t len);
 	uint8_t ingest_payload[SPOTFLOW_OTA_TEST_TRANSPORT_MAX_PAYLOAD];
 	size_t ingest_payload_len;
