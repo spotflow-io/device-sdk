@@ -31,6 +31,8 @@ in the sample.
 ## Requirements
 
 - Board with [partitions needed for MCUboot](https://docs.mcuboot.com/readme-zephyr.html). Tested with FRDM-RW612 and FRDM-MCXN947 from NXP.
+  `cy8cproto_062_4343w` is also supported via sample overlays using RAM load
+  with revert; run `west blobs fetch hal_infineon` once before building it.
 - MCUboot in a **rollback-capable** mode (swap using offset/move/scratch, or direct XIP / RAM load with revert).
 - Network connectivity (Wi-Fi by default; set `CONFIG_SPOTFLOW_USE_ETH=y` for Ethernet).
 
@@ -74,6 +76,22 @@ west build --sysbuild --board frdm_rw612 --pristine
 west flash
 ```
 
+For `cy8cproto_062_4343w`, select its CM4 target:
+
+```bash
+west build --sysbuild --board cy8cproto_062_4343w/cy8c624abzi_s2d44 --pristine
+west flash
+```
+
+> **PSoC6 RAM note:** The board-specific configuration disables the Arm MPU and
+> optional Spotflow metrics so the Wi-Fi sample can execute from RAM. The
+> reference build uses about 98.8% of application SRAM, leaving approximately
+> 13 KiB before the retained boot-information region. MCUboot temporarily uses
+> the top 63 KiB while loading the image; the application reclaims it after
+> handoff. The same signed binary is valid in either slot. Treat this as a
+> constrained board demonstration and check the memory report after every
+> application change.
+
 ## Try an OTA update
 
 After you flash the sample to the board, follow these steps:
@@ -92,7 +110,7 @@ After you flash the sample to the board, follow these steps:
    Main firmware confirmed successfully (phase=NOT_RUNNING result=1)
    ```
 
-7. In the portal deployment view, the device should move to **Succeeded** once results
+6. In the portal deployment view, the device should move to **Succeeded** once results
    are received.
 
 Do not log or share artifact URLs or OTA secrets from serial output. See the
@@ -105,8 +123,13 @@ for logging guidance.
 |---|---|
 | `prj.conf` | Enables Spotflow, OTA, auto main firmware, NVS settings, networking |
 | `sysbuild.conf` | Enables MCUboot (`SB_CONFIG_BOOTLOADER_MCUBOOT=y`); default swap-using-offset mode |
-| `sysbuild/mcuboot.conf` | Optional MCUboot log level |
+| `sysbuild/mcuboot.conf` | MCUboot log level |
+| `sysbuild/mcuboot_cy8cproto_062_4343w.conf` | PSoC6 MCUboot RAM-load and retained-information settings |
 | `boards/frdm_rw612.conf` | Board-specific network buffer tuning |
+| `boards/cy8cproto_062_4343w.overlay` | Application partitions and retained boot information |
+| `boards/cy8cproto_062_4343w_mcuboot.overlay` | MCUboot partitions and private working RAM |
+| `boards/cy8cproto_062_4343w.conf` | RAM, retention, RNG, and PSoC6 imgtool configuration |
+| `sysbuild/cy8cproto_062_4343w.conf` | RAM load with revert for PSoC6 |
 | `credentials-sample.conf` | Template for `credentials.conf` |
 | `src/main.c` | Application callbacks and demo confirmation |
 

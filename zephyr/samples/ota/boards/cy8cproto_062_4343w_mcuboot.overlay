@@ -1,0 +1,17 @@
+/* Application partitions and retained boot information. */
+#include "cy8cproto_062_4343w.overlay"
+
+/*
+ * Keep MCUboot's data above the application bytes copied from flash. The
+ * application reclaims this memory for its runtime data after handoff.
+ */
+/ {
+	mcuboot_sram: memory@80f0000 {
+		compatible = "mmio-sram";
+		reg = <0x080f0000 0xfc00>;
+	};
+
+	chosen {
+		zephyr,sram = &mcuboot_sram;
+	};
+};

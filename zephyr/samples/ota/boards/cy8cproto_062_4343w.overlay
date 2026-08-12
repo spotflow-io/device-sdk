@@ -1,0 +1,74 @@
+/*
+ * MCUboot flash layout for CY8CPROTO-062-4343W (2 MiB internal flash).
+ *
+ * The PSoC6 internal flash uses 512-byte rows, so every partition size is a
+ * multiple of 512 bytes. RAM load lets both slots contain the same image.
+ */
+
+/* MCUboot needs the flash-controller chosen node on this board. */
+flashcontroller0: &{/flash-controller@40240000} {};
+
+/ {
+	retained_ram: memory@80ffc00 {
+		compatible = "zephyr,memory-region", "mmio-sram";
+		reg = <0x080ffc00 0x400>;
+		ranges = <0x0 0x080ffc00 0x400>;
+		zephyr,memory-region = "RetainedMem";
+		status = "okay";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		retainedmem {
+			compatible = "zephyr,retained-ram";
+			status = "okay";
+			ranges;
+			#address-cells = <1>;
+			#size-cells = <1>;
+
+			boot_info0: boot_info@0 {
+				compatible = "zephyr,retention";
+				status = "okay";
+				reg = <0x0 0x100>;
+			};
+		};
+	};
+
+	chosen {
+		zephyr,code-partition = &slot0_partition;
+		zephyr,flash-controller = &flashcontroller0;
+		zephyr,bootloader-info = &boot_info0;
+	};
+};
+
+/* Keep the retained boot information outside the application RAM region. */
+&sram0 {
+	reg = <0x08000000 0xffc00>;
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		boot_partition: partition@0 {
+			label = "mcuboot";
+			reg = <0x00000000 0x20000>;
+		};
+
+		slot0_partition: partition@20000 {
+			label = "image-0";
+			reg = <0x00020000 0xe8000>;
+		};
+
+		slot1_partition: partition@108000 {
+			label = "image-1";
+			reg = <0x00108000 0xe8000>;
+		};
+
+		storage_partition: partition@1f0000 {
+			label = "storage";
+			reg = <0x001f0000 0x10000>;
+		};
+	};
+};
