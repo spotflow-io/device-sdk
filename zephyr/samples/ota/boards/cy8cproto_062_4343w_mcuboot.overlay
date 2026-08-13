@@ -13,5 +13,7 @@
 
 	chosen {
 		zephyr,sram = &mcuboot_sram;
+		/* Application overlay selects slot0; MCUboot must stay in boot. */
+		zephyr,code-partition = &boot_partition;
 	};
 };

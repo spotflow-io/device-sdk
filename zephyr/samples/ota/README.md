@@ -91,6 +91,12 @@ west flash
 > handoff. The same signed binary is valid in either slot. Treat this as a
 > constrained board demonstration and check the memory report after every
 > application change.
+>
+> Flash with `west flash -r pyocd` (OpenOCD lacks the PSoC6 scripts in the
+> Zephyr SDK). Prefer sector erase (default) over `--erase` chip erase when
+> flashing both MCUboot and the app, so the second image does not wipe the
+> first. After a pristine build, confirm `build/ota/zephyr/zephyr.signed.bin`
+> is 950272 bytes with a `0002…` trailer magic (PSoC6 max-align-512 resign).
 
 ## Try an OTA update
 
