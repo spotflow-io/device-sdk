@@ -1,0 +1,14 @@
+/* Reserve the final MiB of external flash for coredumps. */
+&w25q64jvssiq {
+	partitions {
+		storage_partition: partition@0 {
+			label = "storage";
+			reg = <0x0 0x100000>;
+		};
+
+		coredump_partition: partition@700000 {
+			label = "coredump-partition";
+			reg = <0x700000 0x100000>;
+		};
+	};
+};
