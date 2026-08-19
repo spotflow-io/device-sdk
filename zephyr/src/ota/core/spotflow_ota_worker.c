@@ -23,7 +23,8 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 #endif /* CONFIG_SPOTFLOW_OTA_THREAD_STACK_SIZE */
 
 #define OTA_WORKER_RETRY_INITIAL_DELAY_MS 20U
-#define OTA_WORKER_RETRY_MAX_SHIFT 6U
+#define OTA_WORKER_RETRY_MAX_DELAY_MS (5U * 60U * 1000U)
+#define OTA_WORKER_RETRY_MAX_SHIFT 14U
 
 enum worker_operation_type {
 	WORKER_OPERATION_NONE,
@@ -215,13 +216,15 @@ static void ota_worker_entry(void* arg1, void* arg2, void* arg3)
 					(unsigned long long)token.attempt_id,
 					current_operation_stage(), outcome.error);
 				int rc = spotflow_ota_state_fail_worker_operation(&token);
-				memset(&operation, 0, sizeof(operation));
-				k_mutex_unlock(&worker_operation_mutex);
 				if (rc == 0 || rc == -ESTALE) {
+					memset(&operation, 0, sizeof(operation));
+					k_mutex_unlock(&worker_operation_mutex);
 					continue;
 				}
 				LOG_ERR("Failed to recover OTA worker state for attempt %llu: %d",
 					(unsigned long long)token.attempt_id, rc);
+				schedule_worker_retry();
+				k_mutex_unlock(&worker_operation_mutex);
 				break;
 			}
 			case WORKER_OUTCOME_INTERNAL_ERROR:
@@ -609,9 +612,11 @@ static struct worker_outcome classify_storage_error(int error, bool can_fail_att
 	case -EAGAIN:
 	case -EBUSY:
 	case -ETIMEDOUT:
+	case -ENOSPC:
+	case -ENOMEM:
 		return retry_operation(error);
 	default:
-		return can_fail_attempt ? fail_attempt(error) : internal_error(error);
+		return can_fail_attempt ? fail_attempt(error) : retry_operation(error);
 	}
 }
 
@@ -670,7 +675,8 @@ static void advance_report_operation(enum report_operation_stage stage)
 static void schedule_worker_retry(void)
 {
 	uint8_t shift = MIN(operation.retry_count, OTA_WORKER_RETRY_MAX_SHIFT);
-	uint32_t delay_ms = OTA_WORKER_RETRY_INITIAL_DELAY_MS << shift;
+	uint32_t delay_ms =
+		MIN(OTA_WORKER_RETRY_INITIAL_DELAY_MS << shift, OTA_WORKER_RETRY_MAX_DELAY_MS);
 
 	if (operation.retry_count < UINT8_MAX) {
 		operation.retry_count++;

@@ -98,6 +98,21 @@ ZTEST(spotflow_ota_downloader, test_reject_unsupported_url_scheme)
 	zassert_equal(spotflow_ota_parse_url("ftp://example.com/image.bin", &parsed), -EINVAL);
 }
 
+ZTEST(spotflow_ota_downloader, test_query_only_url_is_forwarded_as_request_target)
+{
+	struct spotflow_ota_downloader_transport_fake* fake =
+		spotflow_ota_downloader_transport_fake_get();
+	struct spotflow_downloader downloader;
+	struct spotflow_download_request request = {
+		.url = "https://example.com?token=abc",
+		.secret = "secret",
+	};
+
+	zassert_ok(spotflow_init_downloader(&downloader));
+	zassert_ok(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL));
+	zassert_equal(strcmp(fake->last_path, "/?token=abc"), 0);
+}
+
 ZTEST(spotflow_ota_downloader, test_reject_http_download_request)
 {
 	struct spotflow_downloader downloader;
@@ -277,6 +292,53 @@ ZTEST(spotflow_ota_downloader, test_transient_errors_are_retried)
 	zassert_equal(fake->call_count, 3);
 	zassert_equal(received_bytes, sizeof(sample_payload));
 	zassert_true(received_last_block);
+}
+
+ZTEST(spotflow_ota_downloader, test_retry_delay_uses_equal_jitter)
+{
+	zassert_equal(spotflow_ota_downloader_retry_delay_ms(1, 0), 1);
+	zassert_equal(spotflow_ota_downloader_retry_delay_ms(100, 0), 50);
+	zassert_equal(spotflow_ota_downloader_retry_delay_ms(100, 49), 99);
+	zassert_equal(spotflow_ota_downloader_retry_delay_ms(100, 50), 100);
+	zassert_equal(spotflow_ota_downloader_retry_delay_ms(100, 51), 50);
+}
+
+ZTEST(spotflow_ota_downloader, test_retry_ceiling_grows_and_saturates)
+{
+	zassert_equal(spotflow_ota_downloader_next_retry_ceiling_ms(1), 2);
+	zassert_equal(spotflow_ota_downloader_next_retry_ceiling_ms(50), 100);
+	zassert_equal(spotflow_ota_downloader_next_retry_ceiling_ms(100), 200);
+	zassert_equal(spotflow_ota_downloader_next_retry_ceiling_ms(200), 200);
+}
+
+ZTEST(spotflow_ota_downloader, test_cancel_interrupts_retry_delay)
+{
+	struct spotflow_ota_downloader_transport_fake* fake =
+		spotflow_ota_downloader_transport_fake_get();
+	struct spotflow_downloader downloader;
+	struct spotflow_download_request request = {
+		.url = "https://example.com/firmware.bin",
+		.secret = "secret",
+	};
+	const int transient_results[] = { -EAGAIN, 0 };
+	struct k_thread cancel_thread;
+	k_thread_stack_t cancel_stack[1024];
+
+	zassert_ok(spotflow_init_downloader(&downloader));
+	spotflow_ota_downloader_transport_fake_set_results(fake, transient_results,
+							   ARRAY_SIZE(transient_results));
+
+	k_thread_create(&cancel_thread, cancel_stack, K_THREAD_STACK_SIZEOF(cancel_stack),
+			cancel_after_delay, &downloader, NULL, NULL, K_PRIO_PREEMPT(0), 0,
+			K_NO_WAIT);
+
+	zassert_equal(spotflow_download_artifact(&downloader, &request, capture_block_cb, NULL),
+		      -ECANCELED);
+	k_thread_join(&cancel_thread, K_FOREVER);
+
+	zassert_equal(fake->call_count, 1, "download retried before cancellation was observed");
+	zassert_equal(spotflow_get_downloader_state(&downloader),
+		      SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
 }
 
 static void pause_and_resume_after_delay(void* downloader_ptr, void* arg2, void* arg3)

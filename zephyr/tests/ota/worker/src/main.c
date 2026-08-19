@@ -545,7 +545,36 @@ ZTEST(spotflow_ota_worker, test_invalid_handler_result_is_reported_as_failed)
 	zassert_equal(fake_callbacks->handle_call_count, 1);
 }
 
-ZTEST(spotflow_ota_worker, test_permanent_persistence_error_is_not_retried_forever)
+ZTEST(spotflow_ota_worker, test_capacity_error_preserves_artifact_operation)
+{
+	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
+		spotflow_ota_test_fake_callbacks_get();
+	struct spotflow_ota_update_msg update = make_delegated_update(1, 1);
+	struct spotflow_ota_update_result result;
+	struct spotflow_ota_state_diagnostic snapshot;
+	const enum spotflow_ota_result expected_results[] = {
+		SPOTFLOW_OTA_RESULT_SUCCEEDED,
+	};
+
+	spotflow_ota_test_settings_set_save_failure_error(ATTEMPT_SETTINGS_PATH, -ENOSPC);
+	zassert_ok(spotflow_ota_state_accept_update(&update, &result));
+	wake_worker_from_effects(result.effects);
+	k_msleep(100);
+
+	spotflow_ota_state_get_diagnostic(&snapshot);
+	zassert_false(snapshot.has_attempt_error);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(fake_callbacks->handle_call_count, 0);
+	zassert_true(spotflow_ota_test_settings_get_save_failure_count() > 0);
+
+	spotflow_ota_test_settings_clear_save_failure();
+	spotflow_ota_worker_wake();
+	spotflow_ota_test_wait_for_persisted_attempt(1, expected_results,
+						     ARRAY_SIZE(expected_results));
+	zassert_equal(fake_callbacks->handle_call_count, 1);
+}
+
+ZTEST(spotflow_ota_worker, test_failed_attempt_persistence_remains_retryable)
 {
 	struct spotflow_ota_test_fake_callbacks* fake_callbacks =
 		spotflow_ota_test_fake_callbacks_get();
@@ -562,11 +591,12 @@ ZTEST(spotflow_ota_worker, test_permanent_persistence_error_is_not_retried_forev
 	zassert_true(snapshot.has_attempt_error);
 	zassert_equal(snapshot.attempt_error, SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR);
 	zassert_equal(fake_callbacks->handle_call_count, 0);
-	zassert_equal(spotflow_ota_test_settings_get_save_failure_count(), 2);
+	zassert_true(spotflow_ota_test_settings_get_save_failure_count() >= 2);
 
-	k_msleep(100);
-	zassert_equal(spotflow_ota_test_settings_get_save_failure_count(), 2,
-		      "deterministic validation failures must not schedule retries");
+	spotflow_ota_test_settings_clear_save_failure();
+	spotflow_ota_worker_wake();
+	spotflow_ota_test_wait_for_persisted_attempt_error(
+		1, SPOTFLOW_OTA_ATTEMPT_ERROR_UNKNOWN_ERROR);
 }
 
 ZTEST(spotflow_ota_worker, test_terminal_finalization_retries_storage_failure)

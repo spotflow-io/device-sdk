@@ -3,6 +3,7 @@
 #include <zephyr/ztest.h>
 
 #include "ota/core/spotflow_ota_attempt_model.h"
+#include "ota/persistence/spotflow_ota_records.h"
 
 static struct spotflow_ota_artifact make_artifact(size_t index)
 {
@@ -59,6 +60,81 @@ ZTEST(spotflow_ota_attempt_model, test_start_and_rehydrate_are_pure_model_transi
 	zassert_true(wake_worker);
 	zassert_true(
 		spotflow_ota_attempt_is_valid(&attempt, (struct ota_attempt_constraints){ 0 }));
+}
+
+ZTEST(spotflow_ota_attempt_model, test_restore_persisted_attempt_reconstructs_model)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 42,
+		.artifact_count = 3,
+		.actionable_cancellation = true,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_SUCCEEDED,
+			SPOTFLOW_OTA_RESULT_PENDING,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+	struct ota_attempt_model attempt;
+
+	spotflow_ota_attempt_restore_persisted(&persisted, 7, (struct ota_attempt_constraints){ 0 },
+					       &attempt);
+
+	zassert_equal(attempt.identity.id, persisted.attempt_id);
+	zassert_equal(attempt.identity.generation, 7);
+	zassert_equal(attempt.identity.lifecycle, OTA_ATTEMPT_AWAITING_MANIFEST);
+	zassert_equal(attempt.plan.source, OTA_ARTIFACT_PLAN_PERSISTED_RESULTS);
+	zassert_equal(attempt.plan.count, persisted.artifact_count);
+	zassert_mem_equal(attempt.plan.results, persisted.artifact_results,
+			  sizeof(attempt.plan.results));
+	zassert_equal(attempt.execution.next_index, 1);
+	zassert_true(attempt.execution.cancellation_requested);
+	zassert_true(
+		spotflow_ota_attempt_is_valid(&attempt, (struct ota_attempt_constraints){ 0 }));
+}
+
+ZTEST(spotflow_ota_attempt_model, test_probation_restoration_augments_or_replaces_attempt)
+{
+	const struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 42,
+		.artifact_count = 2,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_SUCCEEDED,
+			SPOTFLOW_OTA_RESULT_PENDING,
+		},
+	};
+	const struct spotflow_ota_probation matching = {
+		.attempt_id = 42,
+		.artifact_index = 1,
+	};
+	const struct spotflow_ota_probation replacement = {
+		.attempt_id = 43,
+		.artifact_index = 2,
+	};
+	struct ota_attempt_model attempt;
+	struct ota_attempt_constraints constraints = {
+		.probation_artifact_pending = true,
+		.probation_artifact_index = 1,
+	};
+
+	spotflow_ota_attempt_restore_persisted(&persisted, 7, constraints, &attempt);
+	spotflow_ota_attempt_restore_probation(&matching, 0, constraints, &attempt);
+	zassert_equal(attempt.identity.id, persisted.attempt_id);
+	zassert_equal(attempt.identity.generation, 7);
+	zassert_equal(attempt.plan.source, OTA_ARTIFACT_PLAN_PERSISTED_RESULTS);
+	zassert_equal(attempt.plan.results[0], SPOTFLOW_OTA_RESULT_SUCCEEDED);
+	zassert_equal(attempt.plan.results[1], SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_true(spotflow_ota_attempt_is_valid(&attempt, constraints));
+
+	constraints.probation_artifact_index = replacement.artifact_index;
+	spotflow_ota_attempt_restore_probation(&replacement, 8, constraints, &attempt);
+	zassert_equal(attempt.identity.id, replacement.attempt_id);
+	zassert_equal(attempt.identity.generation, 8);
+	zassert_equal(attempt.plan.source, OTA_ARTIFACT_PLAN_PROBATION_PREFIX);
+	zassert_equal(attempt.plan.count, replacement.artifact_index + 1);
+	for (size_t i = 0; i < attempt.plan.count; i++) {
+		zassert_equal(attempt.plan.results[i], SPOTFLOW_OTA_RESULT_PENDING);
+	}
+	zassert_true(spotflow_ota_attempt_is_valid(&attempt, constraints));
 }
 
 ZTEST(spotflow_ota_attempt_model, test_pending_attempt_is_a_tagged_union)

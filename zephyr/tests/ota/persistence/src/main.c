@@ -104,4 +104,73 @@ ZTEST(spotflow_ota_persistence, test_save_and_load_installed_version)
 	zassert_str_equal(version, "4.0.1");
 }
 
+ZTEST(spotflow_ota_persistence, test_transient_read_failure_is_retried)
+{
+	struct spotflow_ota_persisted_attempt attempt = {
+		.attempt_id = 203,
+		.artifact_count = 1,
+		.artifact_results = { SPOTFLOW_OTA_RESULT_PENDING },
+	};
+	struct spotflow_ota_persisted_attempt loaded;
+	bool has_attempt;
+
+	zassert_ok(spotflow_ota_persistence_save_attempt(&attempt));
+	spotflow_ota_test_settings_set_read_failures(2, -EIO);
+
+	zassert_ok(spotflow_ota_persistence_load_attempt(&loaded, &has_attempt));
+	zassert_true(has_attempt);
+	zassert_equal(loaded.attempt_id, attempt.attempt_id);
+	zassert_equal(spotflow_ota_test_settings_get_read_count(), 3);
+}
+
+ZTEST(spotflow_ota_persistence, test_short_read_is_retried)
+{
+	struct spotflow_ota_probation probation = {
+		.attempt_id = 204,
+		.artifact_index = 0,
+		.slug = "main",
+		.version = "5.0.0",
+	};
+	struct spotflow_ota_probation loaded;
+	bool has_probation;
+
+	zassert_ok(spotflow_ota_persistence_save_probation(&probation));
+	spotflow_ota_test_settings_set_short_reads(1);
+
+	zassert_ok(spotflow_ota_persistence_load_probation(&loaded, &has_probation));
+	zassert_true(has_probation);
+	zassert_equal(loaded.attempt_id, probation.attempt_id);
+	zassert_equal(spotflow_ota_test_settings_get_read_count(), 2);
+}
+
+ZTEST(spotflow_ota_persistence, test_exhausted_transient_read_is_reported_as_absent)
+{
+	char version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
+	bool has_version;
+
+	zassert_ok(spotflow_ota_persistence_save_installed_version("main", "6.0.0"));
+	spotflow_ota_test_settings_set_read_failures(3, -EBUSY);
+
+	zassert_ok(spotflow_ota_persistence_load_installed_version("main", version, sizeof(version),
+								   &has_version));
+	zassert_false(has_version);
+	zassert_equal(version[0], '\0');
+	zassert_equal(spotflow_ota_test_settings_get_read_count(), 3);
+}
+
+ZTEST(spotflow_ota_persistence, test_nontransient_read_failure_is_not_retried)
+{
+	char version[SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH + 1];
+	bool has_version;
+
+	zassert_ok(spotflow_ota_persistence_save_installed_version("main", "7.0.0"));
+	spotflow_ota_test_settings_set_read_failures(3, -EINVAL);
+
+	zassert_ok(spotflow_ota_persistence_load_installed_version("main", version, sizeof(version),
+								   &has_version));
+	zassert_false(has_version);
+	zassert_equal(version[0], '\0');
+	zassert_equal(spotflow_ota_test_settings_get_read_count(), 1);
+}
+
 ZTEST_SUITE(spotflow_ota_persistence, NULL, NULL, before_each, NULL, NULL);

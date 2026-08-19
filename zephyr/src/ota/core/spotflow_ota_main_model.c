@@ -3,7 +3,7 @@
 #include <errno.h>
 #include <string.h>
 
-#include "ota/persistence/spotflow_ota_records_cbor.h"
+#include "ota/persistence/spotflow_ota_records.h"
 
 static bool execution_allows_pause(enum ota_main_execution_state execution);
 static bool execution_allows_abort(enum ota_main_execution_state execution);

@@ -84,6 +84,11 @@ struct spotflow_ota_main_firmware_state {
  *
  * The default (weak) implementation returns @c SPOTFLOW_OTA_RESULT_FAILED.
  *
+ * If the device resets before this artifact’s result is saved in persistent
+ * storage, the SDK may invoke the callback again for the same attempt and
+ * artifact after the cloud resends the manifest. The handler must be idempotent
+ * or persist enough application-specific progress to resume safely.
+ *
  * @param info Artifact metadata and download credentials. Must not be NULL.
  *
  * @return Terminal result for this artifact.
@@ -94,8 +99,13 @@ spotflow_on_handle_firmware_update(const struct spotflow_firmware_info* info);
 /**
  * @brief Notify application code that the current update was canceled from the cloud.
  *
- * Called asynchronously on the system work queue after the SDK accepts a cloud
- * cancellation while no artifact in the attempt has yet succeeded.
+ * Called asynchronously on Zephyr's shared system workqueue after the SDK
+ * accepts a cloud cancellation while no artifact in the attempt has yet
+ * succeeded. Prefer not to perform blocking work in this callback unless you
+ * are sure that it will not negatively affect other work items on the system
+ * workqueue. For example, perform non-blocking signaling here, such as
+ * requesting downloader cancellation, and move longer cleanup to an
+ * application-owned thread or workqueue.
  */
 void spotflow_on_update_canceled(void);
 
@@ -132,7 +142,9 @@ bool spotflow_is_update_canceled(void);
  *
  * The default (weak) implementation is a no-op.
  *
- * @param state Current main-firmware state snapshot.
+ * @param state Current state snapshot. The pointer is valid only for the
+ *              duration of this callback; copy the structure if it is needed
+ *              afterward.
  */
 void spotflow_on_main_firmware_update_progressed(
 	const struct spotflow_ota_main_firmware_state* state);
@@ -189,8 +201,8 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
  * initiated by the application, the user, or a power cycle still starts the new
  * image.
  *
- * When @p state is not NULL, the current main-firmware state is written on
- * return, including after errors.
+ * When @p state is not NULL, the resulting main-firmware state is written on
+ * success. On error, @p state is left unchanged.
  *
  * Initializes OTA defensively before changing state.
  *
@@ -210,8 +222,8 @@ int spotflow_pause_main_firmware_update(struct spotflow_ota_main_firmware_state*
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. Succeeds
  * only while the update is currently paused.
  *
- * When @p state is not NULL, the current main-firmware state is written on
- * return, including after errors.
+ * When @p state is not NULL, the resulting main-firmware state is written on
+ * success. On error, @p state is left unchanged.
  *
  * Initializes OTA defensively before changing state.
  *
@@ -239,8 +251,8 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
  * returns @c 0 immediately and the aborted update completes asynchronously with
  * a failed result.
  *
- * When @p state is not NULL, the current main-firmware state is written on
- * return, including after errors.
+ * When @p state is not NULL, the resulting main-firmware state is written on
+ * success. On error, @p state is left unchanged.
  *
  * Initializes OTA defensively before changing state.
  *
@@ -260,14 +272,16 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  *
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. After a
  * successful reboot into an unconfirmed image, confirms the image with MCUboot,
- * reports success to the cloud, and clears probation metadata.
+ * and schedules persistence, probation cleanup, and result reporting on the OTA
+ * worker. A return value of @c 0 does not mean that the result has already been
+ * published or received by Spotflow.
  *
  * If the image is already confirmed and the stored result is
  * @c SPOTFLOW_OTA_RESULT_SUCCEEDED, the call succeeds without doing further
  * work.
  *
- * When @p state is not NULL, the current main-firmware state is written on
- * return, including after errors.
+ * When @p state is not NULL, the resulting main-firmware state is written on
+ * success. On error, @p state is left unchanged.
  *
  * Initializes OTA defensively before changing state.
  *

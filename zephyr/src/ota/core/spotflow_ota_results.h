@@ -4,7 +4,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-#include "ota/persistence/spotflow_ota_records_cbor.h"
+#include "ota/persistence/spotflow_ota_records.h"
 
 #ifdef __cplusplus
 extern "C" {
