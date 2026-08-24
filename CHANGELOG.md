@@ -10,6 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 * Added Zephyr BLE sample support for the Silicon Labs xG24 EK2703A
 * Added application-defined typed labels to Zephyr Session Metadata messages.
+* Added Zephyr sample of using all Spotflow features.
+
 ### Changed
 * Replaced Zephyr Kconfig option `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS` by `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS` and `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS`, enabling exponential backoff with jitter.
 
