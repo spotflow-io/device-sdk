@@ -10,7 +10,8 @@ extern "C" {
 /**
  * @brief Register a label-less integer metric
  *
- * @param name Metric name (max 255 chars). The name is normalized before registration:
+ * @param name Metric name (max CONFIG_SPOTFLOW_METRICS_MAX_NAME_LENGTH - 1 chars). The name is
+ *             normalized before registration:
  *             - Alphanumeric characters are converted to lowercase
  *             - Dashes, dots, and spaces are converted to underscores
  *             - Other characters are removed
@@ -31,7 +32,8 @@ int spotflow_register_metric_int(const char* name, enum spotflow_agg_interval ag
 /**
  * @brief Register a label-less float metric
  *
- * @param name Metric name (max 255 chars). The name is normalized before registration:
+ * @param name Metric name (max CONFIG_SPOTFLOW_METRICS_MAX_NAME_LENGTH - 1 chars). The name is
+ *             normalized before registration:
  *             - Alphanumeric characters are converted to lowercase
  *             - Dashes, dots, and spaces are converted to underscores
  *             - Other characters are removed
@@ -52,7 +54,8 @@ int spotflow_register_metric_float(const char* name, enum spotflow_agg_interval 
 /**
  * @brief Register a labeled integer metric
  *
- * @param name Metric name (max 255 chars). The name is normalized before registration:
+ * @param name Metric name (max CONFIG_SPOTFLOW_METRICS_MAX_NAME_LENGTH - 1 chars). The name is
+ *             normalized before registration:
  *             - Alphanumeric characters are converted to lowercase
  *             - Dashes, dots, and spaces are converted to underscores
  *             - Other characters are removed
@@ -78,7 +81,8 @@ int spotflow_register_metric_int_with_labels(const char* name,
 /**
  * @brief Register a labeled float metric
  *
- * @param name Metric name (max 255 chars). The name is normalized before registration:
+ * @param name Metric name (max CONFIG_SPOTFLOW_METRICS_MAX_NAME_LENGTH - 1 chars). The name is
+ *             normalized before registration:
  *             - Alphanumeric characters are converted to lowercase
  *             - Dashes, dots, and spaces are converted to underscores
  *             - Other characters are removed

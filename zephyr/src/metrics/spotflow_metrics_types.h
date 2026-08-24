@@ -83,7 +83,7 @@ struct metric_timeseries_state {
  */
 struct spotflow_metric_base {
 	/* Metric identification */
-	char name[256]; /* Normalized metric name */
+	char name[CONFIG_SPOTFLOW_METRICS_MAX_NAME_LENGTH]; /* Normalized metric name */
 	enum spotflow_metric_type type; /* INT or FLOAT */
 	enum spotflow_agg_interval agg_interval;
 
