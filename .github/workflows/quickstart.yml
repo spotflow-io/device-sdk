@@ -221,7 +221,14 @@ jobs:
     permissions:
       id-token: write
     environment: cdn
-
+    env:
+      RCLONE_CONFIG_R2_TYPE: s3
+      RCLONE_CONFIG_R2_PROVIDER: Cloudflare
+      RCLONE_CONFIG_R2_ACCESS_KEY_ID: ${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}
+      RCLONE_CONFIG_R2_SECRET_ACCESS_KEY: ${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}
+      RCLONE_CONFIG_R2_REGION: auto
+      RCLONE_CONFIG_R2_ENDPOINT: https://${{ secrets.CLOUDFLARE_ACCOUNT_ID }}.eu.r2.cloudflarestorage.com
+      RCLONE_CONFIG_R2_NO_CHECK_BUCKET: "true"
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -232,72 +239,44 @@ jobs:
           name: quickstart-json
           path: ./quickstart-artifact
 
-      - name: Login to Azure
-        uses: azure/login@v3
-        with:
-          client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          subscription-id: ${{ secrets.DOWNLOADS_CDN_SUBSCRIPTION_ID }}
+      - name: Install rclone
+        run: |
+          curl -fsSLo /tmp/rclone.zip 'https://downloads.rclone.org/v1.74.4/rclone-v1.74.4-linux-amd64.zip'
+          unzip -j /tmp/rclone.zip '*/rclone'
+          chmod +x rclone
+          sudo cp ./rclone /usr/local/bin/rclone
 
       - name: Publish quickstart.json
-        run: >
-          az storage blob upload
-          --auth-mode login
-          --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
-          --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
-          --name 'quickstart.json'
-          --file './quickstart-artifact/quickstart.json'
-          --content-type 'application/json'
-          --overwrite
+        run: |
+          rclone copyto \
+            './quickstart-artifact/quickstart.json' \
+            'r2:${{ secrets.CLOUDFLARE_DOWNLOADS_BUCKET_NAME }}/quickstart.json' \
+            --header-upload 'Content-Type: application/json' \
+            --ignore-times \
+            -vv
 
       - name: Publish spotflowup.sh
-        run: >
-          az storage blob upload
-          --auth-mode login
-          --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
-          --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
-          --name 'spotflowup.sh'
-          --file './zephyr/ci/spotflowup.sh'
-          --content-type 'application/x-shellscript'
-          --overwrite
+        run: |
+          rclone copyto \
+            './zephyr/ci/spotflowup.sh' \
+            'r2:${{ secrets.CLOUDFLARE_DOWNLOADS_BUCKET_NAME }}/spotflowup.sh' \
+            --header-upload 'Content-Type: application/x-shellscript' \
+            --ignore-times \
+            -vv
 
       - name: Publish spotflowup.ps1
-        run: >
-          az storage blob upload
-          --auth-mode login
-          --account-name '${{ secrets.DOWNLOADS_CDN_STORAGE_ACCOUNT_NAME }}'
-          --container '${{ secrets.DOWNLOADS_CDN_STORAGE_CONTAINER_NAME }}'
-          --name 'spotflowup.ps1'
-          --file './zephyr/ci/spotflowup.ps1'
-          --content-type 'application/powershell'
-          --overwrite
-
-      - name: Wait before purging Azure Front Door
-        run: sleep 60
-
-      - name: Purge quickstart.json in Azure Front Door
-        run: >
-          az afd endpoint purge
-          --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
-          --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
-          --endpoint-name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
-          --content-paths '/quickstart.json'
-          --no-wait
-
-      - name: Purge spotflowup.sh in Azure Front Door
-        run: >
-          az afd endpoint purge
-          --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
-          --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
-          --endpoint-name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
-          --content-paths '/spotflowup.sh'
-          --no-wait
-
-      - name: Purge spotflowup.ps1 in Azure Front Door
-        run: >
-          az afd endpoint purge
-          --resource-group '${{ secrets.DOWNLOADS_CDN_RESOURCE_GROUP_NAME }}'
-          --profile-name '${{ secrets.DOWNLOADS_CDN_PROFILE_NAME }}'
-          --endpoint-name '${{ secrets.DOWNLOADS_CDN_ENDPOINT_NAME }}'
-          --content-paths '/spotflowup.ps1'
-          --no-wait
+        run: |
+          rclone copyto \
+            './zephyr/ci/spotflowup.ps1' \
+            'r2:${{ secrets.CLOUDFLARE_DOWNLOADS_BUCKET_NAME }}/spotflowup.ps1' \
+            --header-upload 'Content-Type: application/powershell' \
+            --ignore-times \
+            -vv
+            
+      - name: Purge CDN
+        run: |
+          curl https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_DOWNLOADS_ZONE_ID }}/purge_cache \
+            -H 'Content-Type: application/json' \
+            -H 'Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}' \
+            -d '{"hosts": ["${{ secrets.CLOUDFLARE_DOWNLOADS_HOSTNAME }}"]}' \
+            --fail-with-body

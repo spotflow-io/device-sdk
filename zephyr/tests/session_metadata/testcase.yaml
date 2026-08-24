@@ -1,0 +1,10 @@
+tests:
+  spotflow.session_metadata:
+    integration_platforms:
+      - native_sim
+    platform_allow:
+      - native_sim
+    tags:
+      - spotflow
+      - session_metadata
+      - unit

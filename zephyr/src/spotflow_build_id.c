@@ -1,14 +1,19 @@
-#include <zephyr/bindesc.h>
-#include <stdbool.h>
-#include <errno.h>
-
 #include "spotflow_build_id.h"
+
+#include <errno.h>
+#include <stdbool.h>
+
+#include <zephyr/bindesc.h>
 
 #define SPOTFLOW_BINDESC_ID_BUILD_ID 0x5f0
 
 /* The actual build ID will be written to this array in a post-build command */
 #define SPOTFLOW_BINDESC_ID_BUILD_ID_ORIGINAL_CONTENT \
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+
+BUILD_ASSERT(sizeof((uint8_t[]){ SPOTFLOW_BINDESC_ID_BUILD_ID_ORIGINAL_CONTENT }) ==
+		     SPOTFLOW_BUILD_ID_LENGTH,
+	     "Build ID length must match SPOTFLOW_BUILD_ID_LENGTH");
 
 #ifdef CONFIG_BINDESC
 
@@ -28,10 +33,14 @@ BINDESC_BYTES_DEFINE(spotflow_build_id, SPOTFLOW_BINDESC_ID_BUILD_ID,
 const uint8_t bindesc_entry_spotflow_build_id[] = { SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER,
 						    SPOTFLOW_BINDESC_ID_BUILD_ID_ORIGINAL_CONTENT };
 
-#endif
+#endif /* CONFIG_BINDESC */
 
 int spotflow_build_id_get(const uint8_t** build_id, uint16_t* build_id_len)
 {
+	if (build_id == NULL || build_id_len == NULL) {
+		return -EINVAL;
+	}
+
 #ifdef CONFIG_BINDESC
 
 	const uint8_t* id_bytes = BINDESC_GET_BYTES(spotflow_build_id);
@@ -44,7 +53,7 @@ int spotflow_build_id_get(const uint8_t** build_id, uint16_t* build_id_len)
 	const uint16_t id_len = sizeof(bindesc_entry_spotflow_build_id) -
 		SPOTFLOW_BINDESC_BUILD_ID_MOCK_HEADER_SIZE;
 
-#endif
+#endif /* CONFIG_BINDESC */
 
 	bool is_all_zero = true;
 	for (uint16_t i = 0; i < id_len; i++) {

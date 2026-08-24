@@ -15,7 +15,9 @@ int spotflow_transport_start(void);
 bool spotflow_transport_is_ready(void);
 int spotflow_transport_send_ingest_cbor(uint8_t* payload, size_t len);
 int spotflow_transport_send_config_cbor(uint8_t* payload, size_t len);
+int spotflow_transport_send_ota_cbor(uint8_t* payload, size_t len);
 int spotflow_transport_subscribe_config(spotflow_transport_message_cb callback);
+int spotflow_transport_subscribe_ota(spotflow_transport_message_cb callback);
 void spotflow_transport_abort(void);
 
 #ifdef __cplusplus

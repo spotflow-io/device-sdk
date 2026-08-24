@@ -58,46 +58,55 @@ int spotflow_metrics_system_init(void)
 	LOG_DBG("Initializing system metrics auto-collection");
 
 	int registered_count = 0;
-	int rc;
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_HEAP
-	rc = spotflow_metrics_system_heap_init();
-	if (rc < 0) {
-		return rc;
+	{
+		int rc = spotflow_metrics_system_heap_init();
+		if (rc < 0) {
+			return rc;
+		}
+		registered_count += rc;
 	}
-	registered_count += rc;
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_NETWORK
-	rc = spotflow_metrics_system_network_init();
-	if (rc < 0) {
-		return rc;
+	{
+		int rc = spotflow_metrics_system_network_init();
+		if (rc < 0) {
+			return rc;
+		}
+		registered_count += rc;
 	}
-	registered_count += rc;
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CPU
-	rc = spotflow_metrics_system_cpu_init();
-	if (rc < 0) {
-		return rc;
+	{
+		int rc = spotflow_metrics_system_cpu_init();
+		if (rc < 0) {
+			return rc;
+		}
+		registered_count += rc;
 	}
-	registered_count += rc;
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-	rc = spotflow_metrics_system_connection_init();
-	if (rc < 0) {
-		return rc;
+	{
+		int rc = spotflow_metrics_system_connection_init();
+		if (rc < 0) {
+			return rc;
+		}
+		registered_count += rc;
 	}
-	registered_count += rc;
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
-	rc = spotflow_metrics_system_stack_init();
-	if (rc < 0) {
-		return rc;
+	{
+		int rc = spotflow_metrics_system_stack_init();
+		if (rc < 0) {
+			return rc;
+		}
+		registered_count += rc;
 	}
-	registered_count += rc;
 #endif
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_RESET_CAUSE

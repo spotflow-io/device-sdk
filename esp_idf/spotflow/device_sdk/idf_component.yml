@@ -3,7 +3,7 @@ description: "This is a component that makes life easy by uploading the logs to 
 url: "https://spotflow.io"
 documentation: "https://docs.spotflow.io"
 issues: "https://github.com/spotflow-io/device-sdk/issues"
-license: "Custom"
+license: "BUSL-1.1"
 license_file: "LICENSE.MD"
 repository: "https://github.com/spotflow-io/device-sdk.git"
 repository_info:

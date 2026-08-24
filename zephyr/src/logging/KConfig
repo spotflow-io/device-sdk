@@ -10,6 +10,12 @@ config SPOTFLOW_LOG_BACKEND
 
 if SPOTFLOW_LOG_BACKEND
 
+# Spotflow log backend (CBOR encode, and settings/NVS load when enabled) runs
+# on Zephyr's log processing thread; default 768 is too small.
+configdefault LOG_PROCESS_THREAD_STACK_SIZE
+	default 4096 if NO_OPTIMIZATIONS
+	default 2048
+
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_LOGGING
 	int "Additional heap size required by Spotflow"
 	default 6144 if SPOTFLOW_LOG_BACKEND

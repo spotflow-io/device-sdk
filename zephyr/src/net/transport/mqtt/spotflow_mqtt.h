@@ -1,4 +1,4 @@
-﻿#ifndef SPOTFLOW_MQTT_H
+#ifndef SPOTFLOW_MQTT_H
 #define SPOTFLOW_MQTT_H
 
 #include <stdbool.h>
@@ -17,10 +17,20 @@ bool spotflow_mqtt_is_connected();
 
 int spotflow_mqtt_poll();
 int spotflow_mqtt_request_config_subscription(spotflow_mqtt_message_cb callback);
+int spotflow_mqtt_request_ota_subscription(spotflow_mqtt_message_cb callback);
 int spotflow_mqtt_publish_ingest_cbor_msg(uint8_t* payload, size_t len);
 int spotflow_mqtt_publish_config_cbor_msg(uint8_t* payload, size_t len);
+int spotflow_mqtt_publish_ota_cbor_msg(uint8_t* payload, size_t len);
 void spotflow_mqtt_abort_mqtt();
 int spotflow_mqtt_send_live();
+
+#if defined(CONFIG_ZTEST)
+struct mqtt_evt;
+void spotflow_mqtt_test_prepare_connected(void);
+void spotflow_mqtt_test_handle_event(const struct mqtt_evt* evt);
+void spotflow_mqtt_test_set_message_callbacks(spotflow_mqtt_message_cb config_callback,
+					      spotflow_mqtt_message_cb ota_callback);
+#endif /* CONFIG_ZTEST */
 
 #ifdef __cplusplus
 }

@@ -8,8 +8,10 @@ add_subdirectory(src/net)
 add_subdirectory(src/config)
 add_subdirectory(src/coredumps)
 add_subdirectory(src/metrics)
+add_subdirectory(src/ota)
 
 zephyr_include_directories(
+        include
         src
 )
 

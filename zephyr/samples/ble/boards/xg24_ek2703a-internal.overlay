@@ -1,0 +1,5 @@
+/* XG24 EK2703A BLE Radio Configuration for specific testing board */
+&radio {
+	pa-max-power-dbm = <20>;
+	pa-voltage-mv = <3300>;
+};

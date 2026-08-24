@@ -6,13 +6,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+### Added
+* Added Zephyr BLE sample support for the Silicon Labs xG24 EK2703A
+* Added application-defined typed labels to Zephyr Session Metadata messages.
+* Added BLE support for TI LP-EM-CC2340R5
+
+### Changed
+* Replaced Zephyr Kconfig option `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS` by `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS` and `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS`, enabling exponential backoff with jitter.
+
+## [0.9.0] - 2026-08-06
+
 ### Added
 * Added Metrics in ESP IDF
 * Added initial Zephyr BLE transport with a Spotflow GATT service for session metadata, telemetry notifications, and desired/reported configuration exchange. Current BLE support covers logs, metrics, and configuration framing
 * Added Zephyr BLE transport support for coredump telemetry chunks.
 * Added coredump support for siwx917
 * Added coredump support for saving coredump to memory
-* Added BLE support for TI LP-EM-CC2340R5
+* Added implementation of over-the-air (OTA) firmware updates for Zephyr.
+
 
 ### Fixed
 * Fixed ESP-IDF Spotflow log backend parsing for Log V1 prefixes and corrected `va_list` handling in the `esp_log_set_vprintf()` hook.
