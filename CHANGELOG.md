@@ -11,10 +11,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added Zephyr BLE sample support for the Silicon Labs xG24 EK2703A
 * Added application-defined typed labels to Zephyr Session Metadata messages.
 * Added BLE support for TI LP-EM-CC2340R5
+* Added a west manifest for TI's SimpleLink Zephyr downstream.
 
 ### Changed
 * Made Zephyr metric-name storage configurable so constrained applications can reduce per-registry-slot static RAM usage.
 * Replaced Zephyr Kconfig option `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS` by `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS` and `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS`, enabling exponential backoff with jitter.
+* Scoped Zephyr Mbed TLS and socket defaults to the MQTT transport so BLE-only workspaces do not require Mbed TLS.
 
 ### Fixed
 * Fixed Zephyr reset-cause metrics on targets that omit optional bootloader and flash reset flags.

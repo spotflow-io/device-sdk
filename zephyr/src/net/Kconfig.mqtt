@@ -43,6 +43,7 @@ if SPOTFLOW_TRANSPORT_MQTT
 
 
 configdefault MBEDTLS_SSL_MAX_CONTENT_LEN
+	default 16384 if SPOTFLOW_OTA
 	default 4608 if SPOTFLOW
 
 if NRF_SECURITY
@@ -64,6 +65,7 @@ configdefault MBEDTLS_ENABLE_HEAP
 if MBEDTLS_ENABLE_HEAP
 # Needed to be able to verify the whole Let's Encrypt certificate chain
 configdefault MBEDTLS_HEAP_SIZE
+	default 98304 if SPOTFLOW_OTA
 	default 36864
 endif # MBEDTLS_ENABLE_HEAP
 
