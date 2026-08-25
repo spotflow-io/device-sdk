@@ -279,7 +279,7 @@ static int start_advertising(void)
 #ifdef BT_LE_ADV_CONN_FAST_1
 		BT_LE_ADV_CONN_FAST_1;
 #else
-/* to provide backward compatibility fro zephyr 3.7.0 */
+		/* to provide backward compatibility fro zephyr 3.7.0 */
 		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_FAST_INT_MIN_1,
 				BT_GAP_ADV_FAST_INT_MAX_1, NULL);
 #endif
