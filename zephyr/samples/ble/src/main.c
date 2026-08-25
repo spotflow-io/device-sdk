@@ -102,7 +102,7 @@ static void telemetry_thread_entry(void* arg1, void* arg2, void* arg3)
 		LOG_ERR("Failed to register accelerometer magnitude metric: %d", rc);
 	}
 #if defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK) && \
-!defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS)
+	!defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS)
 	enable_thread_stack_metric();
 #endif
 
@@ -177,8 +177,6 @@ static int prepare_button(void)
 	LOG_INF("Set up interrupt button at %s pin %d", button.port->name, button.pin);
 	return 0;
 }
-
-
 
 int main(void)
 {
