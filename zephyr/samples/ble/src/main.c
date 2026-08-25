@@ -10,7 +10,8 @@
 #include "metrics/spotflow_metrics_registry.h"
 #endif
 
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
+#if defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK) && \
+	!defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS)
 #include "metrics/system/spotflow_metrics_system.h"
 #endif
 
@@ -92,7 +93,8 @@ static int prepare_button(void)
 	return 0;
 }
 
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
+#if defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK) && \
+	!defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS)
 static void enable_main_stack_metric(void)
 {
 	for (int attempt = 0; attempt < 20; ++attempt) {
@@ -134,7 +136,8 @@ int main(void)
 		return rc;
 	}
 
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
+#if defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK) && \
+	!defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS)
 	enable_main_stack_metric();
 #endif
 
