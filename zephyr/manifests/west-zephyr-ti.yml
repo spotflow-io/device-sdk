@@ -9,6 +9,7 @@ manifest:
           - cmsis
           - mcuboot
           - simplelink-hal_ti
+          - tinycrypt
           - zcbor
 
   self:
