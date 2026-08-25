@@ -15,15 +15,13 @@ LOG_MODULE_REGISTER(spotflow_coredump, CONFIG_SPOTFLOW_COREDUMPS_PROCESSING_LOG_
 K_MSGQ_DEFINE(g_spotflow_core_dumps_msgq, sizeof(struct spotflow_coredump_msg*),
 	      CONFIG_SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE, 1);
 
-/*expected stack size should be under 200B, therefore 1024 should be safe*/
-#define STACK_SIZE 1024
 /*same priority as mqtt processing thread*/
 #define THREAD_PRIO SPOTFLOW_THREAD_PRIORITY
 
 static void spotflow_coredumps_thread_entry(void);
 
-K_THREAD_DEFINE(spotflow_coredumps_thread, STACK_SIZE, spotflow_coredumps_thread_entry, NULL, NULL,
-		NULL, THREAD_PRIO, 0, 0);
+K_THREAD_DEFINE(spotflow_coredumps_thread, CONFIG_SPOTFLOW_COREDUMPS_THREAD_STACK_SIZE,
+		spotflow_coredumps_thread_entry, NULL, NULL, NULL, THREAD_PRIO, 0, 0);
 
 void spotflow_coredump_sent()
 {

@@ -35,6 +35,15 @@ config SPOTFLOW_METRICS_MAX_REGISTERED
 	  Maximum number of metrics that can be registered simultaneously.
 	  Each metric consumes heap memory for aggregation context and time series storage.
 
+config SPOTFLOW_METRICS_MAX_NAME_LENGTH
+	int "Maximum metric name length including terminator"
+	range 16 256
+	default 256
+	help
+	  Maximum storage reserved for each normalized metric name, including the
+	  terminating null byte. Lowering this saves static RAM for every registry
+	  slot. Metric names that do not fit are rejected during registration.
+
 config SPOTFLOW_METRICS_DEFAULT_AGGREGATION_INTERVAL
 	int "Default aggregation interval (seconds)"
 	default 60

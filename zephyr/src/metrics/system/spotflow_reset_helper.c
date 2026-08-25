@@ -34,8 +34,12 @@ static const struct {
 	{ RESET_HARDWARE, "HARDWARE" },
 	{ RESET_USER, "USER" },
 	{ RESET_TEMPERATURE, "TEMPERATURE" },
+#ifdef RESET_BOOTLOADER
 	{ RESET_BOOTLOADER, "BOOTLOADER" },
+#endif
+#ifdef RESET_FLASH
 	{ RESET_FLASH, "FLASH" },
+#endif
 };
 
 #define RESET_CAUSE_COUNT ARRAY_SIZE(reset_cause_map)
