@@ -10,6 +10,10 @@
 #include "metrics/spotflow_metrics_registry.h"
 #endif
 
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
+#include "metrics/system/spotflow_metrics_system.h"
+#endif
+
 LOG_MODULE_REGISTER(spotflow_ble_sample, LOG_LEVEL_INF);
 
 #define SW0_NODE DT_ALIAS(sw0)
@@ -88,6 +92,25 @@ static int prepare_button(void)
 	return 0;
 }
 
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
+static void enable_main_stack_metric(void)
+{
+	for (int attempt = 0; attempt < 20; ++attempt) {
+		int rc = spotflow_metrics_system_enable_thread_stack(NULL);
+		if (rc == 0 || rc == -EEXIST) {
+			return;
+		}
+		if (rc != -EINVAL) {
+			LOG_WRN("Failed to enable main stack metric: %d", rc);
+			return;
+		}
+		k_sleep(K_MSEC(100));
+	}
+
+	LOG_WRN("System stack metrics were not ready");
+}
+#endif
+
 int main(void)
 {
 	uint32_t log_counter = 0;
@@ -110,6 +133,10 @@ int main(void)
 		LOG_ERR("Failed to prepare button, exiting");
 		return rc;
 	}
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK
+	enable_main_stack_metric();
+#endif
 
 	while (true) {
 		log_counter++;
