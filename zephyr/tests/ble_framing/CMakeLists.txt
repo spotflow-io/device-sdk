@@ -7,7 +7,10 @@ target_include_directories(app PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/../../src
 )
 
-target_compile_definitions(app PRIVATE CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL=4)
+target_compile_definitions(app PRIVATE
+        CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL=4
+        CONFIG_BT_L2CAP_TX_MTU=23
+)
 
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE ../../src/net/transport/ble/spotflow_ble_framing.c)
