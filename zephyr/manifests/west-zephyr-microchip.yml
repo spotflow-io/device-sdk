@@ -1,18 +1,29 @@
 manifest:
   projects:
     - name: zephyr
-      url: https://github.com/zephyrproject-rtos/zephyr
-      revision: v4.4.0
+      url: https://github.com/Zephyr4Microchip/microchip-zephyr
+      revision: 9a1043c48f8529275207e05d70d4e585c00e8cfe
       clone-depth: 1
       import:
         name-allowlist:
           - cmsis
-          - hal_microchip
-          - mbedtls
+          - cmsis-dsp
+          - cmsis-nn
+          - cmsis_6
+          - fatfs
+          - littlefs
+          - lvgl
           - mcuboot
-          - mldsa-native
+          - mbedtls
+          - picolibc
+          - segger
           - tf-psa-crypto
           - zcbor
+          - hal_atmel
+    - name: hal_microchip
+      url: https://github.com/Zephyr4Microchip/microchip-hal
+      revision: 85397d493b827496d0a0107ed22f3d5d179fef9c
+      path: modules/hal/microchip
 
   self:
     path: modules/lib/spotflow
