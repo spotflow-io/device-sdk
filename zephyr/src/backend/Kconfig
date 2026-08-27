@@ -1,0 +1,40 @@
+choice SPOTFLOW_TELEMETRY_BACKEND
+	prompt "Spotflow telemetry backend"
+	default SPOTFLOW_TELEMETRY_BACKEND_QUEUED
+
+config SPOTFLOW_TELEMETRY_BACKEND_QUEUED
+	bool "Queued telemetry backend"
+	help
+		Use the general-purpose backend with independently allocated and queued
+		telemetry messages. This remains the default for MQTT and larger devices.
+
+config SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
+	bool "Minimal static telemetry backend"
+	depends on SPOTFLOW_TRANSPORT_BLE
+	help
+		Use the BLE-only backend with fixed storage, coalesced metrics, pull-based
+		coredumps, and no telemetry heap allocations. This backend is intended for
+		RAM-constrained devices such as the CC2340R5.
+
+endchoice
+
+if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
+
+config SPOTFLOW_TELEMETRY_CBOR_BUFFER_SIZE
+	int "Shared telemetry CBOR workspace size"
+	range 192 2048
+	default 256
+	help
+		Size of the single CBOR workspace owned by the Spotflow processor. It must
+		fit the largest enabled log, metric, heartbeat, or coredump chunk message.
+
+config SPOTFLOW_METRICS_MAX_TIMESERIES
+	int "Maximum total metric time series"
+	depends on SPOTFLOW_METRICS
+	range 1 128
+	default 16
+	help
+		Total number of statically reserved metric series across all registered
+		metrics. Stack metrics reserve one series per tracked thread and metric.
+
+endif

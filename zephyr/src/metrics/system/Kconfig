@@ -19,6 +19,7 @@ config SPOTFLOW_METRICS_SYSTEM_HEAP
 config SPOTFLOW_METRICS_SYSTEM_NETWORK
 	bool "Enable network metrics"
 	depends on NETWORKING
+	depends on SPOTFLOW_TELEMETRY_BACKEND_QUEUED
 	select NET_STATISTICS
 	default n if SPOTFLOW_TRANSPORT_BLE
 	default y
@@ -82,6 +83,7 @@ if SPOTFLOW_METRICS_SYSTEM_STACK
 
 config SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 	bool "Automatically track all threads"
+	depends on SPOTFLOW_TELEMETRY_BACKEND_QUEUED
 	default y
 	select THREAD_MONITOR
 	help
@@ -92,6 +94,7 @@ config SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS
 config SPOTFLOW_METRICS_SYSTEM_STACK_MAX_THREADS
 	int "Maximum number of tracked threads"
 	range 1 128
+	default 4 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
 	default 32
 	help
 	  Maximum number of threads for stack metrics.
@@ -126,8 +129,9 @@ config SPOTFLOW_METRICS_SYSTEM_AGGREGATION_INTERVAL
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS_SYSTEM
 	int "Additional heap memory pool size for system metrics (bytes)"
+	default 0 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
 	default 20480
-	range 8192 65536
+	range 0 65536
 	help
 	  System metrics heap depends on timeseries size (~230 bytes with
 	  MAX_LABELS=4) and number of concurrent timeseries per metric.

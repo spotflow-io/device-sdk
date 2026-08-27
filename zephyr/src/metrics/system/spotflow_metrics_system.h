@@ -70,6 +70,17 @@ void spotflow_metrics_system_report_connection_state(bool connected);
  *         -EEXIST: Thread already tracked
  */
 int spotflow_metrics_system_enable_thread_stack(struct k_thread* thread);
+
+/**
+ * @brief Enable stack metrics with a caller-owned static label
+ *
+ * The label must remain valid and unchanged, and the thread object must remain
+ * allocated, for the application lifetime. Labels must be shorter than
+ * SPOTFLOW_MAX_LABEL_VALUE_LEN. This API is supported by the minimal telemetry
+ * backend.
+ */
+int spotflow_metrics_system_enable_thread_stack_with_label(struct k_thread* thread,
+							   const char* static_thread_label);
 #endif
 
 #ifdef __cplusplus

@@ -31,6 +31,7 @@ config SPOTFLOW_COREDUMPS_PROCESSING_LOG_LEVEL
 
 config SPOTFLOW_COREDUMPS_THREAD_STACK_SIZE
 	int "Spotflow coredumps processing thread stack size"
+	depends on SPOTFLOW_TELEMETRY_BACKEND_QUEUED
 	default 1024
 	help
 		Size of the stack used by the thread preparing stored coredumps
@@ -39,7 +40,9 @@ config SPOTFLOW_COREDUMPS_THREAD_STACK_SIZE
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_COREDUMPS
 	int "Additional heap size required by Spotflow"
-	default 18432 if SPOTFLOW_COREDUMPS
+	default 0 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
+	default 18432
+	range 0 1048576
 	help
 		Additional heap size required by Spotflow coredumps backend.
 		Increase this value if you experience issues with allocation of
@@ -47,8 +50,10 @@ config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_COREDUMPS
 		Default SPOTFLOW_COREDUMPS_CHUNK_SIZE*SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE+2KiB.
 config SPOTFLOW_COREDUMPS_CHUNK_SIZE
 	int "Size of Spotflow coredump chunk"
+	default 128 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
 	default 1024
-	range 128 921600
+	range 128 1984 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
+	range 128 921600 if SPOTFLOW_TELEMETRY_BACKEND_QUEUED
 	help
 		Size of the coredump chunk used by Spotflow Coredump backend.
 		Should not be larger than 900 KiB because Spotflow cloud backend
@@ -56,6 +61,7 @@ config SPOTFLOW_COREDUMPS_CHUNK_SIZE
 
 config SPOTFLOW_COREDUMPS_BACKEND_QUEUE_SIZE
 	int "Size of Spotflow coredump backend queue"
+	depends on SPOTFLOW_TELEMETRY_BACKEND_QUEUED
 	default 16
 	help
 		Size of the queue used by Spotflow Coredump backend to store coredump

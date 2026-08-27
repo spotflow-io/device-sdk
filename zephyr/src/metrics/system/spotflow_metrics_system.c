@@ -166,4 +166,12 @@ int spotflow_metrics_system_enable_thread_stack(struct k_thread* thread)
 {
 	return spotflow_metrics_system_stack_enable_thread(thread);
 }
+
+int spotflow_metrics_system_enable_thread_stack_with_label(struct k_thread* thread,
+							   const char* static_thread_label)
+{
+	ARG_UNUSED(thread);
+	ARG_UNUSED(static_thread_label);
+	return -ENOTSUP;
+}
 #endif

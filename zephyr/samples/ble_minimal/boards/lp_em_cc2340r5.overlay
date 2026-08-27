@@ -1,0 +1,15 @@
+/delete-node/ &storage_partition;
+
+&flash0 {
+	partitions {
+		storage_partition: partition@7c000 {
+			label = "storage";
+			reg = <0x0007c000 0x00001000>;
+		};
+
+		coredump_partition: partition@7d000 {
+			label = "coredump-partition";
+			reg = <0x0007d000 0x00003000>;
+		};
+	};
+};

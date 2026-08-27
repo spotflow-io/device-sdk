@@ -14,6 +14,7 @@ rsource "src/logging/KConfig"
 rsource "src/metrics/Kconfig"
 rsource "src/metrics/system/Kconfig"
 rsource "src/net/Kconfig"
+rsource "src/backend/Kconfig"
 rsource "src/ota/Kconfig"
 
 config SPOTFLOW_GENERATE_BUILD_ID
