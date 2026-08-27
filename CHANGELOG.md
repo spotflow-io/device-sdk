@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added a BLE-only minimal Zephyr telemetry backend and `ble_minimal` sample with fixed log slots, static metric state, specialized static stack labels, and pull-based coredump upload.
 * Added generated battery-level and accelerometer-magnitude metrics to the Zephyr BLE sample.
 * Added Zephyr BLE sample support for the Silicon Labs xG24 EK2703A
 * Added application-defined typed labels to Zephyr Session Metadata messages.
@@ -15,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added a west manifest for TI's SimpleLink Zephyr downstream.
 
 ### Changed
+* Added compile-time selection between the existing queued Zephyr telemetry backend and the minimal static backend.
 * Made Zephyr metric-name storage configurable so constrained applications can reduce per-registry-slot static RAM usage.
 * Treated a full Zephyr metrics queue as expected backpressure instead of logging each dropped metric as a warning and error.
 * Replaced Zephyr Kconfig option `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_DELAY_MS` by `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_INITIAL_DELAY_MS` and `CONFIG_SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS`, enabling exponential backoff with jitter.

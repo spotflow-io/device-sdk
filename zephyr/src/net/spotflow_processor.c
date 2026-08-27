@@ -1,26 +1,33 @@
 #include "net/spotflow_processor.h"
 
 #include "net/spotflow_transport.h"
+#ifdef CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
+#include "backend/minimal/spotflow_minimal_backend.h"
+#endif
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config_net.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 #if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 #include "net/transport/mqtt/spotflow_mqtt_session.h"
 #endif /* CONFIG_SPOTFLOW_TRANSPORT_MQTT */
-#ifdef CONFIG_SPOTFLOW_COREDUMPS
+#if defined(CONFIG_SPOTFLOW_COREDUMPS) && !defined(CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL)
 #include "coredumps/spotflow_coredumps_net.h"
-#endif /* CONFIG_SPOTFLOW_COREDUMPS */
-#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+#endif
+#if defined(CONFIG_SPOTFLOW_LOG_BACKEND) && !defined(CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL)
 #include "logging/spotflow_log_processor.h"
-#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
-#ifdef CONFIG_SPOTFLOW_METRICS
+#endif
+#if defined(CONFIG_SPOTFLOW_METRICS) && !defined(CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL)
 #include "metrics/spotflow_metrics_net.h"
+#endif
+#ifdef CONFIG_SPOTFLOW_METRICS
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM
 #include "metrics/system/spotflow_metrics_system.h"
 #endif /* CONFIG_SPOTFLOW_METRICS_SYSTEM */
+#ifndef CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 #include "metrics/spotflow_metrics_heartbeat.h"
 #endif /* CONFIG_SPOTFLOW_METRICS_HEARTBEAT */
+#endif
 #endif /* CONFIG_SPOTFLOW_METRICS */
 #ifdef CONFIG_SPOTFLOW_OTA
 #include "ota/spotflow_ota.h"
@@ -69,10 +76,14 @@ static void spotflow_processing_thread_entry(void)
 	}
 
 #ifdef CONFIG_SPOTFLOW_METRICS
+#ifdef CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
+	spotflow_minimal_backend_init();
+#else
 	spotflow_metrics_net_init();
 #ifdef CONFIG_SPOTFLOW_METRICS_HEARTBEAT
 	spotflow_metrics_heartbeat_init();
 #endif /* CONFIG_SPOTFLOW_METRICS_HEARTBEAT */
+#endif
 #endif /* CONFIG_SPOTFLOW_METRICS */
 
 #ifdef CONFIG_SPOTFLOW_OTA
@@ -109,6 +120,9 @@ static int process_config_coredumps_metrics_or_logs(void)
 		return rc;
 	}
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
+#ifdef CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
+	return spotflow_minimal_backend_process_one();
+#else
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 	rc = spotflow_poll_and_process_enqueued_coredump_chunks();
 	if (rc < 0) {
@@ -140,6 +154,7 @@ static int process_config_coredumps_metrics_or_logs(void)
 	}
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 	return rc;
+#endif /* CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL */
 }
 
 #if !CONFIG_SPOTFLOW_TRANSPORT_MQTT

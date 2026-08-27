@@ -10,6 +10,7 @@ if SPOTFLOW_METRICS
 
 config SPOTFLOW_METRICS_QUEUE_SIZE
 	int "Metrics message queue size"
+	depends on SPOTFLOW_TELEMETRY_BACKEND_QUEUED
 	range 4 128
 	default 64 if SPOTFLOW_METRICS_SYSTEM
 	default 16
@@ -20,6 +21,7 @@ config SPOTFLOW_METRICS_QUEUE_SIZE
 
 config SPOTFLOW_METRICS_CBOR_BUFFER_SIZE
 	int "CBOR encoding buffer size (bytes)"
+	depends on SPOTFLOW_TELEMETRY_BACKEND_QUEUED
 	range 256 2048
 	default 512
 	help
@@ -38,6 +40,7 @@ config SPOTFLOW_METRICS_MAX_REGISTERED
 config SPOTFLOW_METRICS_MAX_NAME_LENGTH
 	int "Maximum metric name length including terminator"
 	range 16 256
+	default 32 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
 	default 256
 	help
 	  Maximum storage reserved for each normalized metric name, including the
@@ -67,8 +70,9 @@ config SPOTFLOW_METRICS_MAX_LABELS_PER_METRIC
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_METRICS
 	int "Additional heap memory pool size for metrics (bytes)"
+	default 0 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
 	default 8192
-	range 4096 65536
+	range 0 65536
 	help
 	  Heap memory for application metrics depends on two factors:
 	  1. Timeseries size = ~36 + (48 x MAX_LABELS_PER_METRIC) bytes
