@@ -18,13 +18,16 @@ configdefault LOG_PROCESS_THREAD_STACK_SIZE
 
 config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_LOGGING
 	int "Additional heap size required by Spotflow"
-	default 6144 if SPOTFLOW_LOG_BACKEND
+	default 0 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
+	default 6144
+	range 0 65536
 	help
 		Additional heap size required by Spotflow logging backend.
 		Increase this value if you experience issues with logs being sent.
 
 config SPOTFLOW_LOG_BACKEND_QUEUE_SIZE
 	int "Size of Spotflow log backend queue"
+	range 1 128
 	default 16
 	help
 		Size of the queue used by Spotflow logging backend to store logs
@@ -33,6 +36,7 @@ config SPOTFLOW_LOG_BACKEND_QUEUE_SIZE
 
 config SPOTFLOW_LOG_BUFFER_SIZE
 	int "Size of Spotflow log buffer"
+	default 96 if SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
 	default 512
 	help
 		Size of the buffer used by Spotflow logging backend to store logs before serialization.
@@ -48,6 +52,7 @@ config SPOTFLOW_CBOR_LOG_MAX_LEN
 
 config SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
 	bool "Include log body template in sent logs"
+	depends on !SPOTFLOW_TELEMETRY_BACKEND_MINIMAL
 	default y
 	help
 		If enabled, logs sent to Spotflow include both the interpolated log message body and the

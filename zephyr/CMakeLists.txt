@@ -3,11 +3,15 @@ if(NOT CONFIG_SPOTFLOW)
 endif()
 
 add_subdirectory(src)
-add_subdirectory(src/logging)
 add_subdirectory(src/net)
 add_subdirectory(src/config)
-add_subdirectory(src/coredumps)
-add_subdirectory(src/metrics)
+if(CONFIG_SPOTFLOW_TELEMETRY_BACKEND_MINIMAL)
+    add_subdirectory(src/backend/minimal)
+else()
+    add_subdirectory(src/logging)
+    add_subdirectory(src/coredumps)
+    add_subdirectory(src/metrics)
+endif()
 add_subdirectory(src/ota)
 
 zephyr_include_directories(
