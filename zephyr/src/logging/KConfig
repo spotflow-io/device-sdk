@@ -10,6 +10,17 @@ config SPOTFLOW_LOG_BACKEND
 
 if SPOTFLOW_LOG_BACKEND
 
+config SPOTFLOW_COMPACT_LOGS
+	bool "Enable Spotflow compact logs"
+	default n
+	select LOG_DICTIONARY_SUPPORT
+	help
+		Enable dictionary-based logging to send format-string addresses and raw
+		argument bytes instead of formatted log messages. Spotflow resolves strings
+		from the firmware ELF and formats logs in the cloud, reducing device-side
+		work and message size. Requires uploading the matching firmware ELF to
+		Spotflow.
+
 # Spotflow log backend (CBOR encode, and settings/NVS load when enabled) runs
 # on Zephyr's log processing thread; default 768 is too small.
 configdefault LOG_PROCESS_THREAD_STACK_SIZE
