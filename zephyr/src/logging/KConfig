@@ -14,6 +14,7 @@ config SPOTFLOW_COMPACT_LOGS
 	bool "Enable Spotflow compact logs"
 	default n
 	select LOG_DICTIONARY_SUPPORT
+	depends on !CBPRINTF_PACKAGE_SUPPORT_TAGGED_ARGUMENTS
 	help
 		Enable dictionary-based logging to send format-string addresses and raw
 		argument bytes instead of formatted log messages. Spotflow resolves strings
