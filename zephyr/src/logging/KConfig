@@ -65,6 +65,7 @@ config SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
 		If enabled, logs sent to Spotflow include both the interpolated log message body and the
 		original format template.
 		If disabled, only the interpolated body is sent, reducing CBOR payload size.
+		This option does not affect compact log messages.
 
 config SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL
 	int "Spotflow SDK log component log level"
