@@ -87,8 +87,10 @@ def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
     hash_builder = hashlib.sha1()
 
     for section in elffile.iter_sections():
-        # Only include sections that will be loaded to the device memory
-        if section["sh_flags"] & SH_FLAGS.SHF_ALLOC == 0:
+        # Stripped log strings remain in the ELF as a non-allocated section.
+        # They must affect the ID so the cloud selects the matching dictionary.
+        is_allocated = bool(section["sh_flags"] & SH_FLAGS.SHF_ALLOC)
+        if not is_allocated and section.name != "log_strings":
             continue
 
         data = section.data()
@@ -96,10 +98,11 @@ def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
         section_end_vaddr = section_start_vaddr + section["sh_size"]
 
         # The section address is included in the hash because loading the same data into a
-        # different memory address would yield a different memory content
+        # different memory address would yield a different memory content.
+        # For log_strings, the address also determines dictionary lookup keys.
         hash_builder.update(section_start_vaddr.to_bytes(8, byteorder="little"))
 
-        if section_start_vaddr <= bindesc_symbol_vaddr < section_end_vaddr:
+        if is_allocated and section_start_vaddr <= bindesc_symbol_vaddr < section_end_vaddr:
             symbol_section_offset = bindesc_symbol_vaddr - section_start_vaddr
             build_id_section_start_offset = symbol_section_offset + BUILD_ID_HEADER_SIZE
             build_id_section_end_offset = build_id_section_start_offset + BUILD_ID_VALUE_SIZE
