@@ -21,8 +21,9 @@ LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 #define KEY_LABELS 0x05
 #define KEY_DEVICE_UPTIME_MS 0x06
 #define KEY_SEQUENCE_NUMBER 0x0D
-
-#define ZCBOR_STATE_DEPTH 2
+#define KEY_COMPACT_BODY_TEMPLATE 46
+#define KEY_COMPACT_BODY_TEMPLATE_VALUES 47
+#define KEY_COMPACT_EMBEDDED_STRINGS 48
 
 struct message_metadata {
 	uint32_t severity;
@@ -33,11 +34,17 @@ struct message_metadata {
 
 static int encode_cbor_spotflow(const struct message_metadata* metadata,
 				const char* formatted_message, const char* message_template,
-				uint8_t buf[], size_t* encoded_len);
+				const uint8_t* compact_package, size_t package_len, uint8_t buf[],
+				size_t* encoded_len);
 static int get_formatted_message(struct spotflow_cbor_output_context* output_context,
 				 uint8_t* package);
 static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg,
 			     size_t sequence_number);
+
+#ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
+static int validate_compact_package(const uint8_t* package, size_t package_len);
+static bool encode_compact_body(zcbor_state_t* state, const uint8_t* package, size_t package_len);
+#endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */
 
 int spotflow_cbor_encode_log(struct log_msg* log_msg, size_t sequence_number,
 			     struct spotflow_cbor_output_context* output_context,
@@ -55,10 +62,21 @@ int spotflow_cbor_encode_log(struct log_msg* log_msg, size_t sequence_number,
 	https://docs.zephyrproject.org/latest/services/formatted_output.html#cbprintf-package-format */
 	size_t plen;
 	uint8_t* package = log_msg_get_package(log_msg, &plen);
-	int rc = get_formatted_message(output_context, package);
+	const uint8_t* compact_package = NULL;
+	int rc;
+#ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
+	rc = validate_compact_package(package, plen);
 	if (rc < 0) {
-		LOG_DBG("Failed to get formatted message: %d", rc);
 		return rc;
+	}
+	compact_package = package;
+#endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */
+	if (compact_package == NULL) {
+		rc = get_formatted_message(output_context, package);
+		if (rc < 0) {
+			LOG_DBG("Failed to get formatted message: %d", rc);
+			return rc;
+		}
 	}
 
 	/* get message template */
@@ -67,7 +85,7 @@ int spotflow_cbor_encode_log(struct log_msg* log_msg, size_t sequence_number,
 
 	size_t cbor_len;
 	rc = encode_cbor_spotflow(&metadata, output_context->log_msg, message_template,
-				  output_context->cbor_buf, &cbor_len);
+				  compact_package, plen, output_context->cbor_buf, &cbor_len);
 	if (rc < 0) {
 		LOG_DBG("Failed to encode spotflow log message %d", rc);
 		return rc;
@@ -210,22 +228,17 @@ static int encode_message_metadata_to_cbor(const struct message_metadata* metada
 
 static int encode_cbor_spotflow(const struct message_metadata* metadata,
 				const char* formatted_message, const char* message_template,
-				uint8_t buf[], size_t* encoded_len)
+				const uint8_t* compact_package, size_t package_len, uint8_t buf[],
+				size_t* encoded_len)
 {
-#if CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
-	const size_t map_key_value_pairs = 6;
-#else
-	const size_t map_key_value_pairs = 5;
-#endif
+	/* Five metadata entries, plus up to three compact body entries. */
+	const size_t map_key_value_pairs =
+		compact_package ? 8 : (6 + IS_ENABLED(CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE));
 
-	/* zcbor supports state arrays; we need 2 states for nested array */
-	zcbor_state_t state[ZCBOR_STATE_DEPTH];
+	/* Root map and nested maps require two backups in canonical mode. */
+	ZCBOR_STATE_E(state, 2, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1);
 
 	bool succ;
-
-	/* init for encode: 1 root item */
-	/* using instead of ZCBOR_STATE_E because we need multiple state because of nested array */
-	zcbor_new_encode_state(state, ZCBOR_STATE_DEPTH, buf, CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN, 1);
 
 	/* start outer map */
 	succ = zcbor_map_start_encode(state, map_key_value_pairs);
@@ -241,15 +254,24 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 		return rc;
 	}
 
-	/* body */
-	succ = succ && zcbor_uint32_put(state, KEY_BODY);
-	succ = succ && zcbor_tstr_put_term(state, formatted_message, SIZE_MAX);
+#ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
+	if (compact_package != NULL) {
+		succ = succ && encode_compact_body(state, compact_package, package_len);
+	}
+#else
+	ARG_UNUSED(package_len);
+#endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */
+	if (compact_package == NULL) {
+		/* body */
+		succ = succ && zcbor_uint32_put(state, KEY_BODY);
+		succ = succ && zcbor_tstr_put_term(state, formatted_message, SIZE_MAX);
 
 #if CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
-	/* bodyTemplate */
-	succ = succ && zcbor_uint32_put(state, KEY_BODY_TEMPLATE);
-	succ = succ && zcbor_tstr_put_term(state, message_template, SIZE_MAX);
+		/* bodyTemplate */
+		succ = succ && zcbor_uint32_put(state, KEY_BODY_TEMPLATE);
+		succ = succ && zcbor_tstr_put_term(state, message_template, SIZE_MAX);
 #endif
+	}
 
 	/* finish cbor */
 	succ = succ && zcbor_map_end_encode(state, map_key_value_pairs);
@@ -264,3 +286,107 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 	*encoded_len = state->payload - buf;
 	return 0;
 }
+
+#ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
+/* Validate before encoding: string positions are word offsets
+ * from the package base, while CBOR uses byte offsets after the header.
+ * Deferred Zephyr messages have already copied all transient strings.
+ */
+static int validate_compact_package(const uint8_t* package, size_t package_len)
+{
+	if (package_len < sizeof(struct cbprintf_package_hdr_ext)) {
+		return -EINVAL;
+	}
+	struct cbprintf_package_hdr_ext hdr;
+	memcpy(&hdr, package, sizeof(hdr));
+	size_t args_end = hdr.hdr.desc.len * sizeof(int);
+	size_t strings_start = args_end + hdr.hdr.desc.ro_str_cnt;
+	if (args_end < sizeof(hdr) || strings_start > package_len || hdr.hdr.desc.rw_str_cnt) {
+		return -EINVAL;
+	}
+	const uint8_t* cursor = package + strings_start;
+	const uint8_t* end = package + package_len;
+	/* One bit for each possible eight-bit string-slot index. */
+	uint8_t seen[32] = { 0 };
+	for (size_t i = 0; i < hdr.hdr.desc.str_cnt; ++i) {
+		if (cursor == end) {
+			return -EINVAL;
+		}
+		uint8_t index = *cursor++;
+		size_t offset = index * sizeof(int);
+		/* Reject duplicate slots, which would produce duplicate CBOR map keys. */
+		if (seen[index / 8] & BIT(index % 8)) {
+			return -EINVAL;
+		}
+		seen[index / 8] |= BIT(index % 8);
+		/* The format-pointer slot is allowed; it supplies bodyTemplate as text. */
+		if (offset != offsetof(struct cbprintf_package_hdr_ext, fmt) &&
+		    (offset < sizeof(hdr) || offset > args_end - sizeof(char*))) {
+			/* Other slots must fit a complete pointer within the argument bytes. */
+			return -EINVAL;
+		}
+		const uint8_t* terminator = memchr(cursor, '\0', end - cursor);
+		if (terminator == NULL) {
+			return -EINVAL;
+		}
+		cursor = terminator + 1;
+	}
+	if (cursor != end) {
+		return -EINVAL;
+	}
+	return 0;
+}
+
+static bool encode_compact_body(zcbor_state_t* state, const uint8_t* package, size_t package_len)
+{
+	struct cbprintf_package_hdr_ext hdr;
+	memcpy(&hdr, package, sizeof(hdr));
+	size_t args_end = hdr.hdr.desc.len * sizeof(int);
+	const uint8_t* strings = package + args_end + hdr.hdr.desc.ro_str_cnt;
+	const uint8_t* cursor = strings;
+	struct zcbor_string format = { 0 };
+	size_t argument_strings = hdr.hdr.desc.str_cnt;
+	/* Embedded format strings have no stable ELF address. Send their text,
+	 * but retain the same raw argument layout and embedded argument strings.
+	 */
+	for (size_t i = 0; i < hdr.hdr.desc.str_cnt; ++i) {
+		size_t offset = *cursor++ * sizeof(int);
+		const uint8_t* terminator = memchr(cursor, '\0', package + package_len - cursor);
+		if (offset == offsetof(struct cbprintf_package_hdr_ext, fmt)) {
+			format.value = cursor;
+			format.len = terminator - cursor;
+			argument_strings--;
+		}
+		cursor = terminator + 1;
+	}
+	bool succ;
+	if (format.value != NULL) {
+		succ = zcbor_uint32_put(state, KEY_BODY_TEMPLATE) &&
+			zcbor_tstr_encode(state, &format);
+	} else {
+		succ = zcbor_uint32_put(state, KEY_COMPACT_BODY_TEMPLATE) &&
+			zcbor_uint64_put(state, (uint64_t)(uintptr_t)hdr.fmt);
+	}
+	if (args_end > sizeof(hdr)) {
+		succ = succ && zcbor_uint32_put(state, KEY_COMPACT_BODY_TEMPLATE_VALUES) &&
+			zcbor_bstr_encode_ptr(state, package + sizeof(hdr), args_end - sizeof(hdr));
+	}
+	if (argument_strings) {
+		succ = succ && zcbor_uint32_put(state, KEY_COMPACT_EMBEDDED_STRINGS) &&
+			zcbor_map_start_encode(state, argument_strings);
+		cursor = strings;
+		for (size_t i = 0; succ && i < hdr.hdr.desc.str_cnt; ++i) {
+			size_t offset = *cursor++ * sizeof(int);
+			const uint8_t* terminator =
+				memchr(cursor, '\0', package + package_len - cursor);
+			if (offset != offsetof(struct cbprintf_package_hdr_ext, fmt)) {
+				succ = zcbor_uint32_put(state, offset - sizeof(hdr)) &&
+					zcbor_tstr_encode_ptr(state, cursor, terminator - cursor);
+			}
+			cursor = terminator + 1;
+		}
+		succ = succ && zcbor_map_end_encode(state, argument_strings);
+	}
+	return succ;
+}
+#endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */

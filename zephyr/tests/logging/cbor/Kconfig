@@ -1,0 +1,9 @@
+mainmenu "Spotflow log CBOR tests"
+config TEST_LOG_BACKEND
+    def_bool y
+    select LOG_OUTPUT
+config TEST_COMPACT_LOGS
+    bool "Test compact logging"
+    default y
+    select LOG_DICTIONARY_SUPPORT
+source "Kconfig.zephyr"

@@ -1,0 +1,22 @@
+common:
+  tags:
+    - spotflow
+    - logging
+  integration_platforms:
+    - native_sim/native/64
+    - qemu_cortex_m3
+  platform_allow:
+    - native_sim/native/64
+    - qemu_cortex_m3
+tests:
+  spotflow.logging.cbor.compact: {}
+  spotflow.logging.cbor.compact_canonical:
+    extra_configs:
+      - CONFIG_ZCBOR_CANONICAL=y
+  spotflow.logging.cbor.text:
+    extra_configs:
+      - CONFIG_TEST_COMPACT_LOGS=n
+  spotflow.logging.cbor.text_canonical:
+    extra_configs:
+      - CONFIG_TEST_COMPACT_LOGS=n
+      - CONFIG_ZCBOR_CANONICAL=y
