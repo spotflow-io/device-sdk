@@ -181,15 +181,6 @@ static int prepare_button(void)
 int main(void)
 {
 	uint32_t log_counter = 0;
-#ifdef CONFIG_SPOTFLOW_METRICS
-	int metric_rc = spotflow_register_metric_int("sample_counter", SPOTFLOW_AGG_INTERVAL_NONE,
-						     &sample_counter_metric);
-	if (metric_rc < 0) {
-		LOG_ERR("Failed to register sample metric: %d", metric_rc);
-	} else {
-		LOG_INF("Registered sample metric");
-	}
-#endif
 	int rc;
 
 	LOG_INF("Starting Spotflow BLE sample");
@@ -205,18 +196,8 @@ int main(void)
 	!defined(CONFIG_SPOTFLOW_METRICS_SYSTEM_STACK_ALL_THREADS)
 	enable_thread_stack_metric();
 #endif
-
 	while (true) {
 		log_counter++;
-
-#ifdef CONFIG_SPOTFLOW_METRICS
-		if (sample_counter_metric != NULL) {
-			rc = spotflow_report_metric_int(sample_counter_metric, log_counter);
-			if (rc < 0) {
-				LOG_WRN("Failed to report sample metric: %d", rc);
-			}
-		}
-#endif
 
 		if ((log_counter % 10U) == 0U) {
 			LOG_WRN("Spotflow BLE framing test %u: %s", log_counter,
