@@ -171,9 +171,12 @@ static int flush_no_aggregation_metric(struct spotflow_metric_base* metric,
 	/* Enqueue message */
 	rc = enqueue_metric_message(cbor_data, cbor_len);
 	if (rc < 0) {
-		/* enqueue_metric_message does NOT free payload on failure */
-		/* We must free it here */
+		/* The caller retains payload ownership when enqueueing fails. */
 		k_free(cbor_data);
+		if (rc == -ENOBUFS) {
+			/* Queue saturation is expected backpressure: drop the newest sample. */
+			return 0;
+		}
 		LOG_WRN("Failed to enqueue metric '%s': %d", metric->name, rc);
 		return rc;
 	}
@@ -240,9 +243,13 @@ static int flush_timeseries(struct spotflow_metric_base* metric, struct metric_t
 	/* Enqueue message */
 	rc = enqueue_metric_message(cbor_data, cbor_len);
 	if (rc < 0) {
-		/* enqueue_metric_message does NOT free payload on failure */
-		/* We must free it here */
+		/* The caller retains payload ownership when enqueueing fails. */
 		k_free(cbor_data);
+		if (rc == -ENOBUFS) {
+			/* Drop this window but advance aggregation instead of retrying stale data. */
+			reset_timeseries_state(metric, ts);
+			return 0;
+		}
 		LOG_WRN("Failed to enqueue metric '%s': %d", metric->name, rc);
 		reset_timeseries_state(metric, ts);
 		return rc;
@@ -506,10 +513,10 @@ static int enqueue_metric_message(uint8_t* payload, size_t len)
 	/* Enqueue message (non-blocking) */
 	int rc = k_msgq_put(&g_spotflow_metrics_msgq, &msg, K_NO_WAIT);
 	if (rc != 0) {
-		/* Queue full - free message structure only, caller frees payload */
+		/* Free message structure only; caller frees payload on failure. */
 		k_free(msg);
-		LOG_WRN("Metrics queue full, dropping message (%zu bytes)", len);
-		return -ENOBUFS;
+		/* Zephyr reports a full non-blocking message queue as -ENOMSG. */
+		return rc == -ENOMSG ? -ENOBUFS : rc;
 	}
 
 	LOG_DBG("Enqueued metric message (%zu bytes)", len);
