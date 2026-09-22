@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added a CC2340R5 BLE sample that logs BMI270 accelerometer and gyroscope readings.
 * Added generated battery-level and accelerometer-magnitude metrics to the Zephyr BLE sample.
 * Added Zephyr BLE sample support for the Silicon Labs xG24 EK2703A
 * Added application-defined typed labels to Zephyr Session Metadata messages.
