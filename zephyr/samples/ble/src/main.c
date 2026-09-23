@@ -47,9 +47,9 @@ static const char* const long_warning_message =
 #endif
 
 static const struct gpio_dt_spec button = GPIO_DT_SPEC_GET_OR(SW0_NODE, gpios, { 0 });
-static struct spotflow_metric_int* sample_counter_metric;
 
 #ifdef CONFIG_SPOTFLOW_METRICS
+static struct spotflow_metric_int* sample_counter_metric;
 static struct spotflow_metric_int* battery_level_metric;
 static struct spotflow_metric_float* accelerometer_magnitude_metric;
 
