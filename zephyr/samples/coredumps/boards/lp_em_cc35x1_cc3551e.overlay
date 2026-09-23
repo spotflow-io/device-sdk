@@ -1,0 +1,19 @@
+/delete-node/ &storage_partition;
+
+&wlan0 {
+	status = "okay";
+};
+
+&flash2 {
+	partitions {
+		storage_partition: partition@8000 {
+			label = "storage";
+			reg = <0x00008000 0x00004000>;
+		};
+
+		coredump_partition: partition@c000 {
+			label = "coredump-partition";
+			reg = <0x0000c000 0x0001f000>;
+		};
+	};
+};
