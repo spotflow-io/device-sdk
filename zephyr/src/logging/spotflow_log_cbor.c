@@ -7,6 +7,11 @@
 #include "zephyr/logging/log.h"
 #include "zephyr/logging/log_core.h"
 #include "zephyr/logging/log_ctrl.h"
+#include <zephyr/sys/time_units.h>
+
+#ifdef CONFIG_LOG_OUTPUT
+#include <zephyr/logging/log_output.h>
+#endif /* CONFIG_LOG_OUTPUT */
 
 LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
@@ -40,6 +45,7 @@ static int get_formatted_message(struct spotflow_cbor_output_context* output_con
 				 uint8_t* package);
 static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg,
 			     size_t sequence_number);
+static uint64_t timestamp_to_us(log_timestamp_t timestamp);
 
 #ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
 static int validate_compact_package(const uint8_t* package, size_t package_len);
@@ -177,6 +183,26 @@ uint8_t spotflow_cbor_convert_severity_to_log_level(uint32_t severity)
 	}
 }
 
+static uint64_t timestamp_to_us(log_timestamp_t timestamp)
+{
+#ifdef CONFIG_LOG_OUTPUT
+	return log_output_timestamp_to_us(timestamp);
+#else
+	/* Mirror log_core_init() in Zephyr 3.7 and 4.1-4.4 (also NCS 3.0/3.1).
+	 * The logging core does not expose the active timestamp frequency, so
+	 * this fallback supports only its default timestamp sources.
+	 */
+	if (IS_ENABLED(CONFIG_LOG_TIMESTAMP_USE_REALTIME) ||
+	    sys_clock_hw_cycles_per_sec() > 1000000U) {
+		return (uint64_t)timestamp * 1000U;
+	}
+	if (IS_ENABLED(CONFIG_LOG_TIMESTAMP_64BIT)) {
+		return k_ticks_to_us_floor64(timestamp);
+	}
+	return k_cyc_to_us_floor64(timestamp);
+#endif /* CONFIG_LOG_OUTPUT */
+}
+
 static void extract_metadata(struct message_metadata* metadata, struct log_msg* log_msg,
 			     size_t sequence_number)
 {
@@ -185,7 +211,7 @@ static void extract_metadata(struct message_metadata* metadata, struct log_msg* 
 	/* get seconds from the start */
 	log_timestamp_t timestamp = log_msg_get_timestamp(log_msg);
 	/* convert ticks → microseconds since boot */
-	uint32_t us_since_boot = log_output_timestamp_to_us(timestamp);
+	uint32_t us_since_boot = timestamp_to_us(timestamp);
 	metadata->uptime_ms = us_since_boot / 1000U;
 
 	/* log level */

@@ -18,6 +18,7 @@ static uint8_t original[1024];
 static size_t original_len;
 
 struct decoded_log {
+	uint32_t uptime_ms;
 	uint64_t address;
 	struct zcbor_string args;
 	struct zcbor_string body;
@@ -109,8 +110,10 @@ static struct decoded_log decode(void)
 			}
 			zassert_true(zcbor_map_end_decode(state));
 			break;
-		case 5: /* labels */
 		case 6: /* deviceUptimeMs */
+			zassert_true(zcbor_uint32_decode(state, &result.uptime_ms));
+			break;
+		case 5: /* labels */
 			zassert_true(zcbor_any_skip(state, NULL));
 			break;
 		default:
@@ -132,6 +135,19 @@ static struct decoded_log decode(void)
 		zassert_is_null(result.body_template.value);
 	}
 	return result;
+}
+
+ZTEST(log_cbor, test_timestamp)
+{
+	/* Deferred processing must preserve the time of message creation. */
+	k_sleep(K_MSEC(100));
+	uint32_t start = k_uptime_get_32();
+	LOG_INF("timestamp");
+	uint32_t end = k_uptime_get_32();
+	k_sleep(K_MSEC(100));
+	struct decoded_log result = decode();
+	zassert_true(result.uptime_ms >= start);
+	zassert_true(result.uptime_ms <= end);
 }
 
 ZTEST(log_cbor, test_no_arguments)
