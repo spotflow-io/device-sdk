@@ -208,10 +208,9 @@ static void extract_metadata(struct message_metadata* metadata, struct log_msg* 
 {
 	metadata->sequence_number = sequence_number;
 
-	/* get seconds from the start */
+	/* Convert timestamp to milliseconds since boot. */
 	log_timestamp_t timestamp = log_msg_get_timestamp(log_msg);
-	/* convert ticks → microseconds since boot */
-	uint32_t us_since_boot = timestamp_to_us(timestamp);
+	uint64_t us_since_boot = timestamp_to_us(timestamp);
 	metadata->uptime_ms = us_since_boot / 1000U;
 
 	/* log level */
