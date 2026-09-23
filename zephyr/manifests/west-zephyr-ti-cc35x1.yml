@@ -1,0 +1,18 @@
+manifest:
+  projects:
+    - name: zephyr
+      url: https://github.com/TexasInstruments/simplelink-zephyr
+      revision: v4.4.0-ti-10.10.00
+      clone-depth: 1
+      import:
+        name-allowlist:
+          - cmsis_6
+          - mbedtls
+          - mcuboot
+          - mldsa-native
+          - simplelink-hal_ti
+          - tf-psa-crypto
+          - zcbor
+
+  self:
+    path: modules/lib/spotflow
