@@ -2,13 +2,30 @@ config SPOTFLOW_LOG_BACKEND
 	bool "Spotflow logging backend"
 	default y if SPOTFLOW
 	depends on LOG
-	select LOG_OUTPUT
-
+	imply LOG_OUTPUT
 	help
 		Enable sending logs to Spotflow cloud.
 
+		When LOG_OUTPUT is disabled (such as due to LOG_FMT_SECTION_STRIP), Zephyr's default timestamp
+		source is used and custom sources set with log_set_timestamp_func() are ignored.
 
 if SPOTFLOW_LOG_BACKEND
+
+config SPOTFLOW_COMPACT_LOGS
+	bool "Enable Spotflow compact logs"
+	default n
+	select LOG_DICTIONARY_SUPPORT
+	depends on !CBPRINTF_PACKAGE_SUPPORT_TAGGED_ARGUMENTS
+	depends on !LOG_MULTIDOMAIN
+	help
+		With compact logs enabled, only format-string addresses and raw argument bytes
+		are sent to Spotflow, instead of fully formatted log messages. Spotflow resolves
+		the format strings from the firmware ELF and formats the logs in the cloud,
+		reducing device-side work and message size. Requires uploading the matching
+		firmware ELF to Spotflow.
+
+		Multi-domain logging is not supported with compact logs, because Spotflow currently
+		resolves strings only from one ELF file per connected device.
 
 # Spotflow log backend (CBOR encode, and settings/NVS load when enabled) runs
 # on Zephyr's log processing thread; default 768 is too small.
@@ -53,6 +70,7 @@ config SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE
 		If enabled, logs sent to Spotflow include both the interpolated log message body and the
 		original format template.
 		If disabled, only the interpolated body is sent, reducing CBOR payload size.
+		This option does not affect compact log messages.
 
 config SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL
 	int "Spotflow SDK log component log level"

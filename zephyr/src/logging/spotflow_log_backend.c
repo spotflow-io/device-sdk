@@ -7,7 +7,7 @@
 #include <zephyr/kernel.h>
 
 #include "logging/spotflow_log_cbor.h"
-#include "logging/spotflow_cbor_output_context.h"
+#include "logging/spotflow_log_message.h"
 #include "config/spotflow_config.h"
 #include "config/spotflow_config_options.h"
 #include "net/spotflow_processor.h"
@@ -21,7 +21,8 @@ K_MSGQ_DEFINE(g_spotflow_logs_msgq, sizeof(struct spotflow_log_msg*),
 	      CONFIG_SPOTFLOW_LOG_BACKEND_QUEUE_SIZE, 1);
 
 struct spotflow_log_context {
-	struct spotflow_cbor_output_context cbor_output_context;
+	uint8_t cbor_buf[CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN];
+	char formatted[CONFIG_SPOTFLOW_LOG_BUFFER_SIZE];
 	size_t dropped_backend_count;
 	size_t message_index;
 };
@@ -76,8 +77,6 @@ static void init(const struct log_backend* const backend)
 
 	__ASSERT(backend->cb->ctx != NULL, "Spotflow log backend context is NULL");
 	struct spotflow_log_context* ctx = backend->cb->ctx;
-	ctx->cbor_output_context.cbor_len = 0;
-	ctx->cbor_output_context.log_msg_ctr = 0;
 	ctx->dropped_backend_count = 0;
 	ctx->message_index = 0;
 
@@ -103,14 +102,27 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 
 	uint8_t* cbor_data = NULL;
 	size_t cbor_data_len = 0;
-	int rc = spotflow_cbor_encode_log(log_msg, ctx->message_index, &ctx->cbor_output_context,
-					  &cbor_data, &cbor_data_len);
+	struct spotflow_log_message message;
+	int rc = spotflow_log_message_prepare(log_msg, ctx->message_index, &message, ctx->formatted,
+					      sizeof(ctx->formatted));
+	if (rc == 0) {
+		rc = spotflow_log_cbor_encode(&message.cbor, ctx->cbor_buf, sizeof(ctx->cbor_buf),
+					      &cbor_data_len);
+	}
 
 	if (rc < 0) {
 		LOG_DBG("Failed to encode message: %d", rc);
 		process_single_message_stats_update(ctx, true /* dropped */);
 		return;
 	}
+
+	cbor_data = k_malloc(cbor_data_len);
+	if (cbor_data == NULL) {
+		LOG_DBG("Failed to allocate memory for CBOR data");
+		process_single_message_stats_update(ctx, true /* dropped */);
+		return;
+	}
+	memcpy(cbor_data, ctx->cbor_buf, cbor_data_len);
 
 	/* Allocate memory for the message structure */
 	struct spotflow_log_msg* queued_msg = k_malloc(sizeof(struct spotflow_log_msg));
