@@ -5,7 +5,7 @@ config SPOTFLOW_LOG_BACKEND
 	imply LOG_OUTPUT
 	help
 		Enable sending logs to Spotflow cloud.
-		
+
 		When LOG_OUTPUT is disabled (such as due to LOG_FMT_SECTION_STRIP), Zephyr's default timestamp
 		source is used and custom sources set with log_set_timestamp_func() are ignored.
 

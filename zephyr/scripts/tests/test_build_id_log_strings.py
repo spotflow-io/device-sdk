@@ -12,7 +12,7 @@ import patch_build_id
 class ElfSection(dict):
     def __init__(self, name, address, data, allocated=False):
         super().__init__(sh_addr=address, sh_size=len(data),
-                         sh_flags=SH_FLAGS.SHF_ALLOC if allocated else 0)
+            sh_flags=SH_FLAGS.SHF_ALLOC if allocated else 0)
         self.name = name
         self.contents = data
 
