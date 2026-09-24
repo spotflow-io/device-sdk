@@ -9,4 +9,5 @@ target_compile_definitions(app PRIVATE
     CONFIG_SPOTFLOW_LOG_INCLUDE_BODY_TEMPLATE=1
     $<$<BOOL:${CONFIG_TEST_COMPACT_LOGS}>:CONFIG_SPOTFLOW_COMPACT_LOGS=1>
 )
-target_sources(app PRIVATE src/main.c ../../../src/logging/spotflow_log_cbor.c)
+target_sources(app PRIVATE src/main.c ../../../src/logging/spotflow_log_cbor.c
+    ../../../src/logging/spotflow_log_message.c ../../../src/logging/spotflow_log_level.c)

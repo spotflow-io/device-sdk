@@ -1,6 +1,8 @@
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_LOG_BACKEND
         spotflow_log_backend.c
         spotflow_log_cbor.c
+        spotflow_log_message.c
+        spotflow_log_level.c
         spotflow_log_processor.c
 )
 

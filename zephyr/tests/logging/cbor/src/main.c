@@ -1,6 +1,8 @@
 #include "logging/spotflow_log_cbor.h"
+#include "logging/spotflow_log_message.h"
 
 #include <zephyr/kernel.h>
+#include <zephyr/logging/log.h>
 #include <zephyr/logging/log_backend.h>
 #include <zephyr/logging/log_ctrl.h>
 #include <zephyr/sys/cbprintf.h>
@@ -9,7 +11,8 @@
 
 LOG_MODULE_REGISTER(spotflow_logging, LOG_LEVEL_INF);
 
-static struct spotflow_cbor_output_context context;
+static char formatted[CONFIG_SPOTFLOW_LOG_BUFFER_SIZE];
+static uint8_t cbor_buf[CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN];
 static uint8_t* encoded;
 static size_t encoded_len;
 static int encode_result;
@@ -29,6 +32,25 @@ struct decoded_log {
 	bool compact;
 };
 
+static int prepare_and_encode(struct log_msg* log_msg, uint8_t** data, size_t* len)
+{
+	struct spotflow_log_message message;
+	int rc = spotflow_log_message_prepare(log_msg, 42, &message, formatted, sizeof(formatted));
+	if (rc < 0) {
+		return rc;
+	}
+	rc = spotflow_log_cbor_encode(&message.cbor, cbor_buf, sizeof(cbor_buf), len);
+	if (rc < 0) {
+		return rc;
+	}
+	*data = k_malloc(*len);
+	if (*data == NULL) {
+		return -ENOMEM;
+	}
+	memcpy(*data, cbor_buf, *len);
+	return 0;
+}
+
 static void capture(const struct log_backend* backend, union log_msg_generic* msg)
 {
 	ARG_UNUSED(backend);
@@ -38,7 +60,7 @@ static void capture(const struct log_backend* backend, union log_msg_generic* ms
 	zassert_true(original_len <= sizeof(original));
 	memcpy(original, package, original_len);
 	/* Use a fixed sequence number to check that it is preserved in the payload. */
-	encode_result = spotflow_cbor_encode_log(&msg->log, 42, &context, &encoded, &encoded_len);
+	encode_result = prepare_and_encode(&msg->log, &encoded, &encoded_len);
 	captures++;
 }
 
@@ -65,13 +87,9 @@ static void expect_string(struct zcbor_string value, const char* expected)
 	zassert_mem_equal(value.value, expected, value.len);
 }
 
-static struct decoded_log decode(void)
+static struct decoded_log decode_payload(const uint8_t* data, size_t len)
 {
-	while (log_process()) {
-	}
-	zassert_equal(captures, 1);
-	zassert_ok(encode_result);
-	ZCBOR_STATE_D(state, 4, encoded, encoded_len, 1, 0);
+	ZCBOR_STATE_D(state, 4, data, len, 1, 0);
 	struct decoded_log result = { 0 };
 	zassert_true(zcbor_map_start_decode(state));
 	while (!zcbor_array_at_end(state)) {
@@ -121,7 +139,17 @@ static struct decoded_log decode(void)
 		}
 	}
 	zassert_true(zcbor_map_end_decode(state));
-	zassert_equal(state->payload, encoded + encoded_len);
+	zassert_equal(state->payload, data + len);
+	return result;
+}
+
+static struct decoded_log decode(void)
+{
+	while (log_process()) {
+	}
+	zassert_equal(captures, 1);
+	zassert_ok(encode_result);
+	struct decoded_log result = decode_payload(encoded, encoded_len);
 	if (result.compact) {
 		struct cbprintf_package_hdr_ext hdr;
 		memcpy(&hdr, original, sizeof(hdr));
@@ -304,18 +332,15 @@ ZTEST(log_cbor, test_cbor_buffer_overflow)
 }
 
 #ifdef CONFIG_TEST_COMPACT_LOGS
-static int encode_package_for_test(const uint8_t* package, size_t size)
+static int prepare_package_for_test(const uint8_t* package, size_t size)
 {
 	uint8_t storage[sizeof(struct log_msg) + 128] __aligned(Z_LOG_MSG_ALIGNMENT) = { 0 };
 	struct log_msg* msg = (struct log_msg*)storage;
 	msg->hdr.desc.package_len = size;
 	msg->hdr.desc.level = LOG_LEVEL_INF;
 	memcpy(msg->data, package, size);
-	uint8_t* result = NULL;
-	size_t result_len = 0;
-	int rc = spotflow_cbor_encode_log(msg, 42, &context, &result, &result_len);
-	k_free(result);
-	return rc;
+	struct spotflow_log_message message;
+	return spotflow_log_message_prepare(msg, 42, &message, NULL, 0);
 }
 
 ZTEST(log_cbor, test_invalid_packages)
@@ -327,29 +352,29 @@ ZTEST(log_cbor, test_invalid_packages)
 	hdr->hdr.desc.len = (prefix + sizeof(char*)) / sizeof(int);
 	const size_t args_end = hdr->hdr.desc.len * sizeof(int);
 
-	zassert_equal(encode_package_for_test(package, prefix - 1), -EINVAL);
-	zassert_equal(encode_package_for_test(package, args_end - 1), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, prefix - 1), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, args_end - 1), -EINVAL);
 	hdr->hdr.desc.ro_str_cnt = 1;
-	zassert_equal(encode_package_for_test(package, args_end), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, args_end), -EINVAL);
 	hdr->hdr.desc.ro_str_cnt = 0;
 	hdr->hdr.desc.rw_str_cnt = 1;
-	zassert_equal(encode_package_for_test(package, args_end), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, args_end), -EINVAL);
 	hdr->hdr.desc.rw_str_cnt = 0;
 	hdr->hdr.desc.str_cnt = 1;
-	zassert_equal(encode_package_for_test(package, args_end), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, args_end), -EINVAL);
 	package[args_end] = prefix / sizeof(int);
 	package[args_end + 1] = 'X';
-	zassert_equal(encode_package_for_test(package, args_end + 2), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, args_end + 2), -EINVAL);
 	package[args_end + 1] = 0;
 	package[args_end] = 0; /* Header slot, not an argument or format pointer. */
-	zassert_equal(encode_package_for_test(package, args_end + 2), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, args_end + 2), -EINVAL);
 	package[args_end] = args_end / sizeof(int); /* Beyond argument bytes. */
-	zassert_equal(encode_package_for_test(package, args_end + 2), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, args_end + 2), -EINVAL);
 	package[args_end] = prefix / sizeof(int);
 	package[args_end + 2] = prefix / sizeof(int);
 	package[args_end + 3] = 0;
 	hdr->hdr.desc.str_cnt = 2;
-	zassert_equal(encode_package_for_test(package, args_end + 4), -EINVAL);
+	zassert_equal(prepare_package_for_test(package, args_end + 4), -EINVAL);
 }
 
 ZTEST(log_cbor, test_non_dereferenceable_format_address)
@@ -359,8 +384,113 @@ ZTEST(log_cbor, test_non_dereferenceable_format_address)
 	hdr.fmt = (char*)(uintptr_t)0x12345678;
 	hdr.hdr.desc.len = sizeof(hdr) / sizeof(int);
 	memcpy(package, &hdr, sizeof(hdr));
-	zassert_ok(encode_package_for_test(package, sizeof(package)));
+	zassert_ok(prepare_package_for_test(package, sizeof(package)));
 }
 #endif /* CONFIG_TEST_COMPACT_LOGS */
+
+/* Exercise the protocol boundary without a Zephyr package or formatting. */
+static int test_next_string(const void* context, size_t* cursor,
+			    struct spotflow_log_embedded_string* string)
+{
+	const struct spotflow_log_embedded_string* entries = context;
+	if (*cursor == 2) {
+		return 0;
+	}
+	*string = entries[(*cursor)++];
+	return 1;
+}
+
+static int failing_next_string(const void* context, size_t* cursor,
+			       struct spotflow_log_embedded_string* string)
+{
+	ARG_UNUSED(context);
+	ARG_UNUSED(cursor);
+	ARG_UNUSED(string);
+	return -EIO;
+}
+
+ZTEST(log_cbor, test_prepared_text)
+{
+	struct spotflow_log_cbor_msg msg = {
+		.severity = 40,
+		.sequence_number = 42,
+		.uptime_ms = 123,
+		.source = "test",
+		.body_type = SPOTFLOW_LOG_BODY_TEXT,
+		.body.text = { .text = "value 5", .body_template = "value %u" },
+	};
+	uint8_t buffer[128];
+	size_t len;
+	zassert_ok(spotflow_log_cbor_encode(&msg, buffer, sizeof(buffer), &len));
+	struct decoded_log result = decode_payload(buffer, len);
+	expect_string(result.body, "value 5");
+	expect_string(result.body_template, "value %u");
+	zassert_equal(result.uptime_ms, 123);
+	zassert_false(result.compact);
+
+	msg.body.text.body_template = NULL;
+	zassert_ok(spotflow_log_cbor_encode(&msg, buffer, sizeof(buffer), &len));
+	result = decode_payload(buffer, len);
+	expect_string(result.body, "value 5");
+	zassert_is_null(result.body_template.value);
+
+	len = SIZE_MAX;
+	zassert_equal(spotflow_log_cbor_encode(&msg, buffer, 1, &len), -EINVAL);
+	zassert_equal(len, SIZE_MAX);
+}
+
+ZTEST(log_cbor, test_prepared_compact_iterator)
+{
+	/* Explicit lengths: these strings need not be NUL-terminated. */
+	const struct spotflow_log_embedded_string strings[] = {
+		{ .argument_offset = 0, .value = "first!", .len = 5 },
+		{ .argument_offset = 8, .value = "", .len = 0 },
+	};
+	const uint8_t arguments[16] = { 0x12, 0x34 };
+	struct spotflow_log_cbor_msg msg = {
+        .severity = 40, .sequence_number = 42, .source = "test",
+        .body_type = SPOTFLOW_LOG_BODY_COMPACT,
+        .body.compact = {
+            .template_address = UINT64_C(0x123456789abcdef0),
+            .argument_data = arguments, .argument_len = sizeof(arguments),
+            .string_count = 2, .next_string = test_next_string, .string_context = strings,
+        },
+    };
+	uint8_t first[128], second[128];
+	size_t first_len, second_len;
+	zassert_ok(spotflow_log_cbor_encode(&msg, first, sizeof(first), &first_len));
+	zassert_ok(spotflow_log_cbor_encode(&msg, second, sizeof(second), &second_len));
+	zassert_equal(first_len, second_len);
+	zassert_mem_equal(first, second, first_len);
+	struct decoded_log result = decode_payload(first, first_len);
+	zassert_true(result.compact);
+	zassert_equal(result.address, msg.body.compact.template_address);
+	zassert_equal(result.args.len, sizeof(arguments));
+	zassert_mem_equal(result.args.value, arguments, sizeof(arguments));
+	zassert_equal(result.string_count, 2);
+	zassert_equal(result.offsets[0], 0);
+	zassert_equal(result.offsets[1], 8);
+	expect_string(result.strings[0], "first");
+	expect_string(result.strings[1], "");
+	zassert_is_null(result.body.value);
+	zassert_is_null(result.body_template.value);
+
+	msg.body.compact.string_count = 3;
+	zassert_equal(spotflow_log_cbor_encode(&msg, first, sizeof(first), &first_len), -EINVAL);
+	msg.body.compact.string_count = 1;
+	zassert_equal(spotflow_log_cbor_encode(&msg, first, sizeof(first), &first_len), -EINVAL);
+	msg.body.compact.next_string = failing_next_string;
+	zassert_equal(spotflow_log_cbor_encode(&msg, first, sizeof(first), &first_len), -EIO);
+
+	msg.body.compact.string_count = 0;
+	msg.body.compact.argument_len = 0;
+	msg.body.compact.argument_data = NULL;
+	msg.body.compact.next_string = NULL;
+	msg.body.compact.string_context = NULL;
+	zassert_ok(spotflow_log_cbor_encode(&msg, first, sizeof(first), &first_len));
+	result = decode_payload(first, first_len);
+	zassert_is_null(result.args.value);
+	zassert_equal(result.string_count, 0);
+}
 
 ZTEST_SUITE(log_cbor, NULL, NULL, before, NULL, NULL);
