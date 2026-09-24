@@ -232,6 +232,11 @@ static int validate_metric_params(const char* name, uint16_t max_timeseries, uin
 static int normalize_and_validate_metric_name(const char* name, char* out_normalized,
 					      size_t out_size)
 {
+	if (strlen(name) >= out_size) {
+		LOG_ERR("Metric name '%s' is too long (max %zu characters)", name, out_size - 1);
+		return -EINVAL;
+	}
+
 	normalize_metric_name(name, out_normalized, out_size);
 
 	if (strcmp(name, out_normalized) != 0) {
@@ -278,7 +283,7 @@ static int register_metric_common(const char* name, enum spotflow_metric_type ty
 		return rc;
 	}
 
-	char normalized_name[256];
+	char normalized_name[CONFIG_SPOTFLOW_METRICS_MAX_NAME_LENGTH];
 	rc = normalize_and_validate_metric_name(name, normalized_name, sizeof(normalized_name));
 	if (rc < 0) {
 		return rc;

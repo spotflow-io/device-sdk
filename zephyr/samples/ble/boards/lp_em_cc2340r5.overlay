@@ -1,0 +1,21 @@
+/delete-node/ &storage_partition;
+
+&flash0 {
+	partitions {
+		/* Keep the board's MCUboot/dual-slot OTA layout. Split the original
+		 * 16 KiB storage partition into 4 KiB storage and 12 KiB coredump.
+		 */
+		storage_partition: partition@7c000 {
+			label = "storage";
+			reg = <0x0007c000 0x00001000>;
+		};
+
+		/* 12 KiB is intended for DEBUG_COREDUMP_MEMORY_DUMP_MIN. A full RAM
+		 * coredump would need a larger partition and is not practical here.
+		 */
+		coredump_partition: partition@7d000 {
+			label = "coredump-partition";
+			reg = <0x0007d000 0x00003000>;
+		};
+	};
+};

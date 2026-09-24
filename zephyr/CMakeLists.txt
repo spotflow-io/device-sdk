@@ -15,7 +15,7 @@ zephyr_include_directories(
         src
 )
 
-if (CONFIG_MBEDTLS_MPI_MAX_SIZE LESS 512)
+if (CONFIG_SPOTFLOW_TRANSPORT_MQTT AND CONFIG_MBEDTLS_MPI_MAX_SIZE LESS 512)
     message(WARNING "CONFIG_MBEDTLS_MPI_MAX_SIZE must be at least 512 for Spotflow to "
                     "connect to the MQTT broker. Add CONFIG_MBEDTLS_MPI_MAX_SIZE=512 to "
                     "your prj.conf file.")
