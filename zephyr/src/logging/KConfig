@@ -16,12 +16,16 @@ config SPOTFLOW_COMPACT_LOGS
 	default n
 	select LOG_DICTIONARY_SUPPORT
 	depends on !CBPRINTF_PACKAGE_SUPPORT_TAGGED_ARGUMENTS
+	depends on !LOG_MULTIDOMAIN
 	help
-		Enable dictionary-based logging to send format-string addresses and raw
-		argument bytes instead of formatted log messages. Spotflow resolves strings
-		from the firmware ELF and formats logs in the cloud, reducing device-side
-		work and message size. Requires uploading the matching firmware ELF to
-		Spotflow.
+		With compact logs enabled, only format-string addresses and raw argument bytes
+		are sent to Spotflow, instead of fully formatted log messages. Spotflow resolves
+		the format strings from the firmware ELF and formats the logs in the cloud,
+		reducing device-side work and message size. Requires uploading the matching
+		firmware ELF to Spotflow.
+
+		Multi-domain logging is not supported with compact logs, because Spotflow currently
+		resolves strings only from one ELF file per connected device.
 
 # Spotflow log backend (CBOR encode, and settings/NVS load when enabled) runs
 # on Zephyr's log processing thread; default 768 is too small.

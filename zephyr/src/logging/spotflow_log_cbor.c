@@ -315,7 +315,7 @@ static int encode_cbor_spotflow(const struct message_metadata* metadata,
 #ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
 /* Validate before encoding: string positions are word offsets
  * from the package base, while CBOR uses byte offsets after the header.
- * Deferred Zephyr messages have already copied all transient strings.
+ * Deferred Zephyr messages have already copied all transient argument strings.
  */
 static int validate_compact_package(const uint8_t* package, size_t package_len)
 {
@@ -344,10 +344,8 @@ static int validate_compact_package(const uint8_t* package, size_t package_len)
 			return -EINVAL;
 		}
 		seen[index / 8] |= BIT(index % 8);
-		/* The format-pointer slot is allowed; it supplies bodyTemplate as text. */
-		if (offset != offsetof(struct cbprintf_package_hdr_ext, fmt) &&
-		    (offset < sizeof(hdr) || offset > args_end - sizeof(char*))) {
-			/* Other slots must fit a complete pointer within the argument bytes. */
+		/* Only argument slots are supported; embedded format strings are rejected. */
+		if (offset < sizeof(hdr) || offset > args_end - sizeof(char*)) {
 			return -EINVAL;
 		}
 		const uint8_t* terminator = memchr(cursor, '\0', end - cursor);
@@ -369,48 +367,24 @@ static bool encode_compact_body(zcbor_state_t* state, const uint8_t* package, si
 	size_t args_end = hdr.hdr.desc.len * sizeof(int);
 	const uint8_t* strings = package + args_end + hdr.hdr.desc.ro_str_cnt;
 	const uint8_t* cursor = strings;
-	struct zcbor_string format = { 0 };
-	size_t argument_strings = hdr.hdr.desc.str_cnt;
-	/* Embedded format strings have no stable ELF address. Send their text,
-	 * but retain the same raw argument layout and embedded argument strings.
-	 */
-	for (size_t i = 0; i < hdr.hdr.desc.str_cnt; ++i) {
-		size_t offset = *cursor++ * sizeof(int);
-		const uint8_t* terminator = memchr(cursor, '\0', package + package_len - cursor);
-		if (offset == offsetof(struct cbprintf_package_hdr_ext, fmt)) {
-			format.value = cursor;
-			format.len = terminator - cursor;
-			argument_strings--;
-		}
-		cursor = terminator + 1;
-	}
-	bool succ;
-	if (format.value != NULL) {
-		succ = zcbor_uint32_put(state, KEY_BODY_TEMPLATE) &&
-			zcbor_tstr_encode(state, &format);
-	} else {
-		succ = zcbor_uint32_put(state, KEY_COMPACT_BODY_TEMPLATE) &&
-			zcbor_uint64_put(state, (uint64_t)(uintptr_t)hdr.fmt);
-	}
+	bool succ = zcbor_uint32_put(state, KEY_COMPACT_BODY_TEMPLATE) &&
+		zcbor_uint64_put(state, (uint64_t)(uintptr_t)hdr.fmt);
 	if (args_end > sizeof(hdr)) {
 		succ = succ && zcbor_uint32_put(state, KEY_COMPACT_BODY_TEMPLATE_VALUES) &&
 			zcbor_bstr_encode_ptr(state, package + sizeof(hdr), args_end - sizeof(hdr));
 	}
-	if (argument_strings) {
+	if (hdr.hdr.desc.str_cnt) {
 		succ = succ && zcbor_uint32_put(state, KEY_COMPACT_EMBEDDED_STRINGS) &&
-			zcbor_map_start_encode(state, argument_strings);
-		cursor = strings;
+			zcbor_map_start_encode(state, hdr.hdr.desc.str_cnt);
 		for (size_t i = 0; succ && i < hdr.hdr.desc.str_cnt; ++i) {
 			size_t offset = *cursor++ * sizeof(int);
 			const uint8_t* terminator =
 				memchr(cursor, '\0', package + package_len - cursor);
-			if (offset != offsetof(struct cbprintf_package_hdr_ext, fmt)) {
-				succ = zcbor_uint32_put(state, offset - sizeof(hdr)) &&
-					zcbor_tstr_encode_ptr(state, cursor, terminator - cursor);
-			}
+			succ = zcbor_uint32_put(state, offset - sizeof(hdr)) &&
+				zcbor_tstr_encode_ptr(state, cursor, terminator - cursor);
 			cursor = terminator + 1;
 		}
-		succ = succ && zcbor_map_end_encode(state, argument_strings);
+		succ = succ && zcbor_map_end_encode(state, hdr.hdr.desc.str_cnt);
 	}
 	return succ;
 }

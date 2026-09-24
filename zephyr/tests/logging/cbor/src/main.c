@@ -226,7 +226,7 @@ static void runtime_log(const char* fmt, ...)
  * packaging. Use its packager for arguments, then append the format ourselves
  * to exercise packages that carry the format as an embedded string.
  */
-static struct decoded_log embedded_format_log(const char* format, ...)
+static void embedded_format_log(const char* format, ...)
 {
 	uint8_t storage[sizeof(struct log_msg) + 256] __aligned(Z_LOG_MSG_ALIGNMENT) = { 0 };
 	struct log_msg* msg = (void*)storage;
@@ -246,27 +246,17 @@ static struct decoded_log embedded_format_log(const char* format, ...)
 	msg->hdr.desc.package_len = len + format_len;
 	msg->hdr.desc.level = LOG_LEVEL_INF;
 	capture(NULL, (union log_msg_generic*)msg);
-	return decode();
-}
-
-static void expect_raw_arguments(struct decoded_log result)
-{
-	struct cbprintf_package_hdr_ext hdr;
-	memcpy(&hdr, original, sizeof(hdr));
-	zassert_equal(result.args.len, hdr.hdr.desc.len * sizeof(int) - sizeof(hdr));
-	zassert_mem_equal(result.args.value, original + sizeof(hdr), result.args.len);
 }
 
 ZTEST(log_cbor, test_embedded_format)
 {
-	struct decoded_log result = embedded_format_log("runtime %u", 19u);
-	zassert_false(result.compact); /* No compactBodyTemplate address. */
-	expect_string(result.body_template, "runtime %u");
+	embedded_format_log("runtime %u", 19u);
 	if (IS_ENABLED(CONFIG_TEST_COMPACT_LOGS)) {
-		zassert_is_null(result.body.value);
-		zassert_equal(result.string_count, 0);
-		expect_raw_arguments(result);
+		zassert_equal(encode_result, -EINVAL);
+		zassert_is_null(encoded);
 	} else {
+		struct decoded_log result = decode();
+		expect_string(result.body_template, "runtime %u");
 		expect_string(result.body, "runtime 19");
 	}
 }
@@ -275,27 +265,16 @@ ZTEST(log_cbor, test_embedded_format)
 ZTEST(log_cbor, test_embedded_format_with_transient_argument)
 {
 	char text[] = "transient";
-	struct decoded_log result = embedded_format_log("%200u %s", 19u, text);
-	zassert_false(result.compact);
-	zassert_is_null(result.body.value); /* Formatting would overflow the body buffer. */
-	expect_string(result.body_template, "%200u %s");
-	zassert_equal(result.string_count, 1);
-	expect_string(result.strings[0], "transient");
-	size_t prefix = sizeof(struct cbprintf_package_hdr_ext);
-	size_t pointer_offset = ROUND_UP(prefix, VA_STACK_ALIGN(unsigned int));
-	pointer_offset = ROUND_UP(pointer_offset + sizeof(unsigned int), VA_STACK_ALIGN(char*));
-	zassert_equal(result.offsets[0], pointer_offset - prefix);
-	expect_raw_arguments(result);
+	embedded_format_log("%200u %s", 19u, text);
+	zassert_equal(encode_result, -EINVAL);
+	zassert_is_null(encoded);
 }
 
 ZTEST(log_cbor, test_embedded_format_without_arguments)
 {
-	struct decoded_log result = embedded_format_log("literal %%");
-	zassert_false(result.compact);
-	zassert_is_null(result.body.value);
-	zassert_is_null(result.args.value);
-	zassert_equal(result.string_count, 0);
-	expect_string(result.body_template, "literal %%");
+	embedded_format_log("literal %%");
+	zassert_equal(encode_result, -EINVAL);
+	zassert_is_null(encoded);
 }
 #endif /* CONFIG_TEST_COMPACT_LOGS */
 
