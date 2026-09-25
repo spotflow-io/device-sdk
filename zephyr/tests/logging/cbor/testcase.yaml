@@ -2,9 +2,6 @@ common:
   tags:
     - spotflow
     - logging
-  integration_platforms:
-    - native_sim/native/64
-    - qemu_cortex_m3
   platform_allow:
     - native_sim/native/64
     - qemu_cortex_m3
