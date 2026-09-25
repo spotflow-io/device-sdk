@@ -46,6 +46,16 @@ def test_log_strings_are_hashed_exactly_once(allocated):
     assert build_id(section) == expected
 
 
+def test_compact_log_profile_affects_build_id():
+    code = ElfSection(".text", 0x2000, b"same firmware", allocated=True)
+    first = ElfSection(".spotflow.compact_logs", 0, b"profile A")
+    second = ElfSection(".spotflow.compact_logs", 0, b"profile B")
+    relocated = ElfSection(".spotflow.compact_logs", 0x100, b"profile A")
+    assert build_id(code, first) != build_id(code, second)
+    assert build_id(code, first) != build_id(code, relocated)
+    assert build_id(code, first) != build_id(code)
+
+
 def test_unrelated_nonallocated_sections_do_not_affect_build_id():
     code = ElfSection(".text", 0x2000, b"same firmware", allocated=True)
     debug = ElfSection(".debug_info", 0, b"debug information")
