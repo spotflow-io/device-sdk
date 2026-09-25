@@ -22,7 +22,9 @@ K_MSGQ_DEFINE(g_spotflow_logs_msgq, sizeof(struct spotflow_log_msg*),
 
 struct spotflow_log_context {
 	uint8_t cbor_buf[CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN];
+#ifndef CONFIG_SPOTFLOW_COMPACT_LOGS
 	char formatted[CONFIG_SPOTFLOW_LOG_BUFFER_SIZE];
+#endif /* !CONFIG_SPOTFLOW_COMPACT_LOGS */
 	size_t dropped_backend_count;
 	size_t message_index;
 };
@@ -103,8 +105,12 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 	uint8_t* cbor_data = NULL;
 	size_t cbor_data_len = 0;
 	struct spotflow_log_message message;
+#ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
+	int rc = spotflow_log_message_prepare(log_msg, ctx->message_index, &message, NULL, 0);
+#else
 	int rc = spotflow_log_message_prepare(log_msg, ctx->message_index, &message, ctx->formatted,
 					      sizeof(ctx->formatted));
+#endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */
 	if (rc == 0) {
 		rc = spotflow_log_cbor_encode(&message.cbor, ctx->cbor_buf, sizeof(ctx->cbor_buf),
 					      &cbor_data_len);
