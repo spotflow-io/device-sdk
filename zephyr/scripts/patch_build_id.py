@@ -100,7 +100,6 @@ def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
         # The section address is included in the hash because loading the same data into a
         # different memory address would yield a different memory content.
         # For log_strings, the address also determines dictionary lookup keys.
-        # For the compact-log profile, hash its address along with its contents.
         hash_builder.update(section_start_vaddr.to_bytes(8, byteorder="little"))
 
         if is_allocated and section_start_vaddr <= bindesc_symbol_vaddr < section_end_vaddr:
