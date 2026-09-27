@@ -96,7 +96,3 @@ config SPOTFLOW_SETTINGS
 		only after the connection to the cloud is established.
 
 endif #SPOTFLOW
-
-# Text logging needs the format strings at runtime.
-config LOG_FMT_SECTION_STRIP
-	depends on !SPOTFLOW_LOG_BACKEND || SPOTFLOW_COMPACT_LOGS
