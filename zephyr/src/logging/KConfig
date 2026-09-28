@@ -54,10 +54,15 @@ config SPOTFLOW_LOG_BACKEND_QUEUE_SIZE
 config SPOTFLOW_LOG_BUFFER_SIZE
 	int "Size of Spotflow log buffer"
 	default 512
+	depends on !SPOTFLOW_COMPACT_LOGS
 	help
-		Size of the buffer used by Spotflow logging backend to store logs before serialization.
-		Make this at least as big as your longest expected log line.
-		Increase this value if you experience issues with logs being dropped because of buffer overflow.
+		Size of the buffer used by Spotflow logging backend to store formatted log
+		messages before serialization. Make this at least as big as your longest
+		expected log message. Increase this value if you experience issues with logs
+		being dropped because of buffer overflow.
+
+		This option is not applied when compact logs are used, as messages are then
+		not formatted on the device.
 
 config SPOTFLOW_CBOR_LOG_MAX_LEN
 	int "Size of Spotflow CBOR log buffer"
