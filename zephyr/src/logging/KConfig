@@ -18,6 +18,7 @@ config SPOTFLOW_COMPACT_LOGS
 	depends on SPOTFLOW_GENERATE_BUILD_ID
 	depends on !CBPRINTF_PACKAGE_SUPPORT_TAGGED_ARGUMENTS
 	depends on !LOG_MULTIDOMAIN
+	depends on !CBPRINTF_PACKAGE_LONGDOUBLE
 	help
 		With compact logs enabled, only format-string addresses and raw argument bytes
 		are sent to Spotflow, instead of fully formatted log messages. Spotflow resolves
@@ -26,7 +27,8 @@ config SPOTFLOW_COMPACT_LOGS
 		the matching build ID to Spotflow.
 
 		Multi-domain logging is not supported with compact logs, because Spotflow currently
-		resolves strings only from one ELF file per connected device.
+		resolves strings only from one ELF file per connected device. Long doubles cannot be
+		enabled, because Spotflow does not support them.
 
 # Spotflow log backend (CBOR encode, and settings/NVS load when enabled) runs
 # on Zephyr's log processing thread; default 768 is too small.
