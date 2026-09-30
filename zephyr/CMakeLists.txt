@@ -2,6 +2,13 @@ if(NOT CONFIG_SPOTFLOW)
     return()
 endif()
 
+if(CONFIG_SPOTFLOW_LOG_BACKEND AND CONFIG_LOG_FMT_SECTION_STRIP AND
+    NOT CONFIG_SPOTFLOW_COMPACT_LOGS)
+    message(FATAL_ERROR
+        "Spotflow text logging requires format strings at runtime. "
+        "Enable CONFIG_SPOTFLOW_COMPACT_LOGS or disable CONFIG_LOG_FMT_SECTION_STRIP.")
+endif()
+
 add_subdirectory(src)
 add_subdirectory(src/logging)
 add_subdirectory(src/net)

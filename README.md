@@ -270,7 +270,7 @@ Choose the next document according to what you want to do:
 ### Build ID
 
 In order to match core dumps with symbol files, our Zephyr module provides a piece of information called build ID.
-The build ID is computed as a hash of the bytes loaded to the device; therefore, it uniquely identifies the firmware image.
+The build ID is computed as a hash of the bytes loaded to the device and their addresses. It also includes the `log_strings` section and its address when format strings are retained only in the ELF, so changes to those strings produce a different build ID.
 Our Zephyr module adds a build command that computes the build ID and patches it into the `.elf` file as the following [binary descriptor](https://docs.zephyrproject.org/latest/services/binary_descriptors/index.html):
 
 - **ID**: `0x5f0` (`5f` resembles `sf` - **S**pot**f**low, `0` stands for our first binary descriptor ID)
