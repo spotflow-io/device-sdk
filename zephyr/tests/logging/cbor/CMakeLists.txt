@@ -11,3 +11,8 @@ target_compile_definitions(app PRIVATE
 )
 target_sources(app PRIVATE src/main.c ../../../src/logging/spotflow_log_cbor.c
     ../../../src/logging/spotflow_log_message.c ../../../src/logging/spotflow_log_level.c)
+
+if(TEST_LEGACY_SOURCE_REGISTRATION)
+    # Exercise the Zephyr 3.7 compatibility registration on the current toolchain.
+    include(../../../src/logging/spotflow_log_source_compat.cmake)
+endif()
