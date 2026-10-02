@@ -27,7 +27,8 @@ config SPOTFLOW_COMPACT_LOGS
 		the matching build ID to Spotflow.
 
 		The source label key and value are also sent as ELF string addresses in
-		compactLabels.
+		compactLabels. The source label is omitted when the source name is unavailable,
+		including module logs on Zephyr 3.7 with LOG_FMT_SECTION_STRIP enabled.
 
 		Multi-domain logging is not supported with compact logs, because Spotflow currently
 		resolves strings only from one ELF file per connected device. Long doubles cannot be

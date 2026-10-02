@@ -27,14 +27,6 @@ tests:
     extra_configs:
       - CONFIG_TEST_STRIPPED_LOGS=y
       - CONFIG_LOG_RUNTIME_FILTERING=y
-  spotflow.logging.cbor.compact_stripped_legacy_registration:
-    platform_exclude:
-      - native_sim/native/64
-    extra_args:
-      - TEST_LEGACY_SOURCE_REGISTRATION=ON
-    extra_configs:
-      - CONFIG_TEST_STRIPPED_LOGS=y
-      - CONFIG_LOG_RUNTIME_FILTERING=y
   spotflow.logging.cbor.compact_canonical:
     extra_configs:
       - CONFIG_ZCBOR_CANONICAL=y

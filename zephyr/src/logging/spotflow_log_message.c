@@ -162,33 +162,34 @@ static const char* get_source_name(struct log_msg* log_msg)
 {
 	/* Raw/printk messages reuse the source field for flags rather than source data. */
 	if (log_msg_get_level(log_msg) == LOG_LEVEL_NONE) {
-		return "unknown";
+		return NULL;
 	}
 
 	uint8_t domain_id = log_msg_get_domain(log_msg);
 #ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
 	/* Compact logs support only the local domain. */
 	if (domain_id != Z_LOG_LOCAL_DOMAIN_ID) {
-		return "unknown";
+		return NULL;
 	}
 #endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */
 
 	int16_t source_id = log_msg_get_source_id(log_msg);
 	if (source_id < 0 || source_id >= log_src_cnt_get(domain_id)) {
-		return "unknown";
+		return NULL;
 	}
 
 #ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
 	/* log_source_name_get() returns "unknown" when strings are stripped, but
-	 * log_const still retains their addresses. The ID indexes this table even
-	 * when runtime filtering makes the message point to dynamic source data.
+	 * newer Zephyr versions retain their addresses in log_const. Zephyr 3.7
+	 * instead stores NULL for stripped module names, so their labels are omitted.
+	 * The ID indexes this table even when runtime filtering makes the message
+	 * point to dynamic source data.
 	 * Read only the pointer; the string itself may exist only in the ELF.
 	 */
-	const char* name = TYPE_SECTION_START(log_const)[source_id].name;
+	return TYPE_SECTION_START(log_const)[source_id].name;
 #else
-	const char* name = log_source_name_get(domain_id, source_id);
+	return log_source_name_get(domain_id, source_id);
 #endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */
-	return name != NULL ? name : "unknown";
 }
 
 #ifdef CONFIG_SPOTFLOW_COMPACT_LOGS

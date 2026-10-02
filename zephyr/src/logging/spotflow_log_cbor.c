@@ -30,12 +30,11 @@ static int encode_compact_body(zcbor_state_t* state, const struct spotflow_log_c
 int spotflow_log_cbor_encode(const struct spotflow_log_cbor_msg* msg, uint8_t* buffer, size_t len,
 			     size_t* encoded_len)
 {
-	if (msg == NULL || buffer == NULL || len == 0 || encoded_len == NULL ||
-	    msg->source == NULL) {
+	if (msg == NULL || buffer == NULL || len == 0 || encoded_len == NULL) {
 		LOG_ERR("Invalid log encoding arguments");
 		return -EINVAL;
 	}
-	size_t pairs = 5;
+	size_t pairs = 4 + (msg->source != NULL);
 	switch (msg->body_type) {
 	case SPOTFLOW_LOG_BODY_TEXT:
 		if (msg->body.text.text == NULL) {
@@ -97,6 +96,9 @@ static bool encode_metadata(zcbor_state_t* state, const struct spotflow_log_cbor
 
 static bool encode_source_label(zcbor_state_t* state, const struct spotflow_log_cbor_msg* msg)
 {
+	if (msg->source == NULL) {
+		return true;
+	}
 	if (msg->body_type == SPOTFLOW_LOG_BODY_COMPACT) {
 		/* Untagged unsigned integers in compactLabels are ELF string addresses.
 		 * The source name may have been stripped from the device image.
