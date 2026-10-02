@@ -19,8 +19,12 @@ LOG_MODULE_DECLARE(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 #define KEY_COMPACT_BODY_TEMPLATE 46
 #define KEY_COMPACT_BODY_TEMPLATE_VALUES 47
 #define KEY_COMPACT_EMBEDDED_STRINGS 48
+#define KEY_COMPACT_LABELS 49
+
+static const char source_label_key[] = "source";
 
 static bool encode_metadata(zcbor_state_t* state, const struct spotflow_log_cbor_msg* msg);
+static bool encode_source_label(zcbor_state_t* state, const struct spotflow_log_cbor_msg* msg);
 static int encode_compact_body(zcbor_state_t* state, const struct spotflow_log_compact_body* body);
 
 int spotflow_log_cbor_encode(const struct spotflow_log_cbor_msg* msg, uint8_t* buffer, size_t len,
@@ -88,8 +92,23 @@ static bool encode_metadata(zcbor_state_t* state, const struct spotflow_log_cbor
 		zcbor_uint32_put(state, msg->sequence_number) &&
 		zcbor_uint32_put(state, KEY_SEVERITY) && zcbor_uint32_put(state, msg->severity) &&
 		zcbor_uint32_put(state, KEY_DEVICE_UPTIME_MS) &&
-		zcbor_uint32_put(state, msg->uptime_ms) && zcbor_uint32_put(state, KEY_LABELS) &&
-		zcbor_map_start_encode(state, 1) && zcbor_tstr_put_lit(state, "source") &&
+		zcbor_uint32_put(state, msg->uptime_ms) && encode_source_label(state, msg);
+}
+
+static bool encode_source_label(zcbor_state_t* state, const struct spotflow_log_cbor_msg* msg)
+{
+	if (msg->body_type == SPOTFLOW_LOG_BODY_COMPACT) {
+		/* Untagged unsigned integers in compactLabels are ELF string addresses.
+		 * The source name may have been stripped from the device image.
+		 */
+		return zcbor_uint32_put(state, KEY_COMPACT_LABELS) &&
+			zcbor_map_start_encode(state, 1) &&
+			zcbor_uint64_put(state, (uint64_t)(uintptr_t)source_label_key) &&
+			zcbor_uint64_put(state, (uint64_t)(uintptr_t)msg->source) &&
+			zcbor_map_end_encode(state, 1);
+	}
+	return zcbor_uint32_put(state, KEY_LABELS) && zcbor_map_start_encode(state, 1) &&
+		zcbor_tstr_put_term(state, source_label_key, SIZE_MAX) &&
 		zcbor_tstr_put_term(state, msg->source, SIZE_MAX) && zcbor_map_end_encode(state, 1);
 }
 
