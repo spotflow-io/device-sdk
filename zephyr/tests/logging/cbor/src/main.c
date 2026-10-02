@@ -10,6 +10,7 @@
 #include <zcbor_decode.h>
 
 LOG_MODULE_REGISTER(spotflow_logging, LOG_LEVEL_INF);
+LOG_INSTANCE_REGISTER(compact_labels, sensor, LOG_LEVEL_INF);
 
 static char formatted[CONFIG_SPOTFLOW_LOG_BUFFER_SIZE];
 static uint8_t cbor_buf[CONFIG_SPOTFLOW_CBOR_LOG_MAX_LEN];
@@ -23,6 +24,9 @@ static size_t original_len;
 struct decoded_log {
 	uint32_t uptime_ms;
 	uint64_t address;
+	uint64_t source_key_address;
+	uint64_t source_address;
+	struct zcbor_string source;
 	struct zcbor_string args;
 	struct zcbor_string body;
 	struct zcbor_string body_template;
@@ -30,6 +34,8 @@ struct decoded_log {
 	uint32_t offsets[8];
 	size_t string_count;
 	bool compact;
+	bool labels;
+	bool compact_labels;
 };
 
 static int prepare_and_encode(struct log_msg* log_msg, uint8_t** data, size_t* len)
@@ -132,7 +138,19 @@ static struct decoded_log decode_payload(const uint8_t* data, size_t len)
 			zassert_true(zcbor_uint32_decode(state, &result.uptime_ms));
 			break;
 		case 5: /* labels */
-			zassert_true(zcbor_any_skip(state, NULL));
+			result.labels = true;
+			zassert_true(zcbor_map_start_decode(state));
+			zassert_true(zcbor_tstr_expect_lit(state, "source"));
+			zassert_true(zcbor_tstr_decode(state, &result.source));
+			zassert_true(zcbor_map_end_decode(state));
+			break;
+		case 49: /* compactLabels: one constant key and one constant string value. */
+			result.compact_labels = true;
+			zassert_true(zcbor_map_start_decode(state));
+			/* Decoding directly as uint also rejects a runtime tag (15). */
+			zassert_true(zcbor_uint64_decode(state, &result.source_key_address));
+			zassert_true(zcbor_uint64_decode(state, &result.source_address));
+			zassert_true(zcbor_map_end_decode(state));
 			break;
 		default:
 			zassert_unreachable("Unexpected CBOR key %u", key);
@@ -140,6 +158,16 @@ static struct decoded_log decode_payload(const uint8_t* data, size_t len)
 	}
 	zassert_true(zcbor_map_end_decode(state));
 	zassert_equal(state->payload, data + len);
+	zassert_false(result.labels && result.compact_labels);
+	if (result.labels) {
+		zassert_false(result.compact);
+	}
+	if (result.compact_labels) {
+		zassert_true(result.compact);
+		/* The key is retained in rodata even when log_strings is ELF-only. */
+		zassert_equal(strcmp((const char*)(uintptr_t)result.source_key_address, "source"),
+			      0);
+	}
 	return result;
 }
 
@@ -189,6 +217,55 @@ ZTEST(log_cbor, test_no_arguments)
 		expect_string(result.body, "literal %");
 		expect_string(result.body_template, "literal %%");
 	}
+}
+
+ZTEST(log_cbor, test_module_source_label)
+{
+	LOG_INF("module source");
+	struct decoded_log result = decode();
+	if (result.compact) {
+		zassert_equal(result.compact_labels, log_const_spotflow_logging.name != NULL);
+		zassert_equal(result.source_address, (uintptr_t)log_const_spotflow_logging.name);
+	} else {
+		zassert_true(result.labels);
+		expect_string(result.source, "spotflow_logging");
+	}
+}
+
+ZTEST(log_cbor, test_instance_source_label)
+{
+	LOG_INST_INF(LOG_INSTANCE_PTR(compact_labels, sensor), "instance source");
+	struct decoded_log result = decode();
+	if (result.compact) {
+		zassert_true(result.compact_labels);
+		zassert_equal(result.source_address,
+			      (uintptr_t)log_const_compact_labels_sensor.name);
+	} else {
+		zassert_true(result.labels);
+		expect_string(result.source, "compact_labels.sensor");
+	}
+}
+
+ZTEST(log_cbor, test_source_without_module)
+{
+	uint8_t storage[sizeof(struct log_msg) + sizeof(struct cbprintf_package_hdr_ext)] __aligned(
+		Z_LOG_MSG_ALIGNMENT) = { 0 };
+	struct log_msg* msg = (void*)storage;
+	struct cbprintf_package_hdr_ext hdr = { 0 };
+	hdr.fmt = "source fallback";
+	hdr.hdr.desc.len = sizeof(hdr) / sizeof(int);
+	memcpy(msg->data, &hdr, sizeof(hdr));
+	msg->hdr.desc.package_len = sizeof(hdr);
+	msg->hdr.desc.level = LOG_LEVEL_INF;
+	struct spotflow_log_message message;
+	zassert_ok(spotflow_log_message_prepare(msg, 42, &message, formatted, sizeof(formatted)));
+	zassert_is_null(message.cbor.source);
+
+	/* A raw message's source can be a flag, not a source-data pointer. */
+	msg->hdr.desc.level = LOG_LEVEL_NONE;
+	msg->hdr.source = (void*)(uintptr_t)1;
+	zassert_ok(spotflow_log_message_prepare(msg, 42, &message, formatted, sizeof(formatted)));
+	zassert_is_null(message.cbor.source);
 }
 
 ZTEST(log_cbor, test_mixed_arguments_and_padding)
@@ -427,12 +504,21 @@ ZTEST(log_cbor, test_prepared_text)
 	expect_string(result.body_template, "value %u");
 	zassert_equal(result.uptime_ms, 123);
 	zassert_false(result.compact);
+	expect_string(result.source, "test");
+	zassert_true(result.labels);
 
 	msg.body.text.body_template = NULL;
 	zassert_ok(spotflow_log_cbor_encode(&msg, buffer, sizeof(buffer), &len));
 	result = decode_payload(buffer, len);
 	expect_string(result.body, "value 5");
 	zassert_is_null(result.body_template.value);
+
+	msg.source = NULL;
+	zassert_ok(spotflow_log_cbor_encode(&msg, buffer, sizeof(buffer), &len));
+	result = decode_payload(buffer, len);
+	zassert_false(result.labels);
+	zassert_false(result.compact_labels);
+	expect_string(result.body, "value 5");
 
 	len = SIZE_MAX;
 	zassert_equal(spotflow_log_cbor_encode(&msg, buffer, 1, &len), -EINVAL);
@@ -491,6 +577,31 @@ ZTEST(log_cbor, test_prepared_compact_iterator)
 	result = decode_payload(first, first_len);
 	zassert_is_null(result.args.value);
 	zassert_equal(result.string_count, 0);
+
+	msg.source = NULL;
+	zassert_ok(spotflow_log_cbor_encode(&msg, first, sizeof(first), &first_len));
+	result = decode_payload(first, first_len);
+	zassert_false(result.labels);
+	zassert_false(result.compact_labels);
+	zassert_equal(result.address, msg.body.compact.template_address);
+}
+
+ZTEST(log_cbor, test_non_dereferenceable_source_address)
+{
+	/* A compact source may exist only in the ELF. Preserve the full pointer width. */
+	uintptr_t address = UINTPTR_MAX - 15;
+	struct spotflow_log_cbor_msg msg = {
+		.severity = 40,
+		.sequence_number = 42,
+		.source = (const char*)address,
+		.body_type = SPOTFLOW_LOG_BODY_COMPACT,
+		.body.compact = { .template_address = 0x12345678 },
+	};
+	uint8_t buffer[128];
+	size_t len;
+	zassert_ok(spotflow_log_cbor_encode(&msg, buffer, sizeof(buffer), &len));
+	struct decoded_log result = decode_payload(buffer, len);
+	zassert_equal(result.source_address, (uint64_t)address);
 }
 
 ZTEST_SUITE(log_cbor, NULL, NULL, before, NULL, NULL);

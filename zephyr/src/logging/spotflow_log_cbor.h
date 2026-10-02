@@ -52,6 +52,7 @@ struct spotflow_log_cbor_msg {
 	uint32_t severity;
 	uint32_t uptime_ms;
 	uint32_t sequence_number;
+	/** Source name, or NULL to omit the label; compact bodies encode only its ELF address. */
 	const char* source;
 	enum spotflow_log_body_type body_type;
 	union {
