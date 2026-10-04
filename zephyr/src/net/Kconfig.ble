@@ -27,4 +27,47 @@ configdefault BT_BUF_ACL_RX_SIZE
 		247-byte ATT MTU case so incoming Spotflow control/config traffic is not
 		artificially constrained by smaller host receive buffers.
 
+config SPOTFLOW_BLE_ADV_BACKOFF
+	bool "Back off BLE advertising while no gateway connects"
+	default y
+	help
+		Advertise at the fast interval (30-60 ms) after the transport starts and
+		after every disconnect, so a gateway in range (re)connects quickly, then
+		slow down in steps while nobody connects: to
+		SPOTFLOW_BLE_ADV_SLOW_INTERVAL_MS after SPOTFLOW_BLE_ADV_FAST_DURATION,
+		and to SPOTFLOW_BLE_ADV_IDLE_INTERVAL_MS after a further
+		SPOTFLOW_BLE_ADV_SLOW_DURATION. Without it, a battery-powered device
+		advertises at the fast interval for as long as the gateway is gone.
+
+if SPOTFLOW_BLE_ADV_BACKOFF
+
+config SPOTFLOW_BLE_ADV_FAST_DURATION
+	int "Fast advertising duration (seconds)"
+	default 30
+	range 1 3600
+
+config SPOTFLOW_BLE_ADV_SLOW_INTERVAL_MS
+	int "Slow advertising interval (ms)"
+	default 1000
+	range 20 10240
+
+config SPOTFLOW_BLE_ADV_SLOW_DURATION
+	int "Slow advertising duration (seconds)"
+	default 300
+	range 1 86400
+	help
+		After this, advertising continues at SPOTFLOW_BLE_ADV_IDLE_INTERVAL_MS
+		until a gateway connects.
+
+config SPOTFLOW_BLE_ADV_IDLE_INTERVAL_MS
+	int "Idle advertising interval (ms)"
+	default 10000
+	range 20 10240
+	help
+		The longest legacy advertising interval allowed by the Bluetooth
+		specification is 10.24 s. A gateway scanning with a low duty cycle
+		may take several intervals to discover the device.
+
+endif # SPOTFLOW_BLE_ADV_BACKOFF
+
 endif # SPOTFLOW_TRANSPORT_BLE

@@ -1,0 +1,14 @@
+common:
+  integration_platforms:
+    - native_sim
+  platform_allow:
+    - native_sim
+  tags:
+    - spotflow
+    - bluetooth
+    - unit
+tests:
+  spotflow.ble_advertising.backoff: {}
+  spotflow.ble_advertising.no_backoff:
+    extra_args:
+      - SPOTFLOW_TEST_NO_ADV_BACKOFF=1
