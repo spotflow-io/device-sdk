@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added BLE advertising backoff to the Zephyr BLE transport (`CONFIG_SPOTFLOW_BLE_ADV_BACKOFF`, on by default): advertising stays fast (30-60 ms) for `CONFIG_SPOTFLOW_BLE_ADV_FAST_DURATION` after start and after every disconnect, then slows to `CONFIG_SPOTFLOW_BLE_ADV_SLOW_INTERVAL_MS` and finally `CONFIG_SPOTFLOW_BLE_ADV_IDLE_INTERVAL_MS` while no gateway connects, so battery-powered devices don't drain while the gateway is away.
 * Added TI LP-EM-CC35X1 support to the Zephyr logs, metrics, coredumps, and BLE samples.
 * Added a west manifest for TI CC35X1 using SimpleLink Zephyr v4.4.0-ti-10.10.00.
 * Added generated battery-level and accelerometer-magnitude metrics to the Zephyr BLE sample.
@@ -17,6 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added a west manifest for TI's SimpleLink Zephyr downstream.
 
 ### Changed
+* Made Zephyr 3.7 BLE advertising one-time (`BT_LE_ADV_OPT_ONE_TIME`), matching `BT_LE_ADV_OPT_CONN` on Zephyr 4.x: the transport restarts advertising itself after a disconnect instead of the host resuming it with the previous parameters.
 * Made Zephyr metric-name storage configurable so constrained applications can reduce per-registry-slot static RAM usage.
 * Added manifest for Microchip zephyr downstream
 * Treated a full Zephyr metrics queue as expected backpressure instead of logging each dropped metric as a warning and error.
