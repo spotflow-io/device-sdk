@@ -2,6 +2,7 @@
 
 #include <spotflow/downloader.h>
 
+#include "net/transport/mqtt/spotflow_tls.h"
 #include "ota/downloader/spotflow_ota_downloader.h"
 #include "ota/downloader/spotflow_ota_downloader_transport_range.h"
 #include "ota/downloader/spotflow_ota_url.h"
@@ -19,7 +20,6 @@
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
-#define OTA_TLS_SEC_TAG 1
 #define OTA_RANGE_HEADER_MAX_LEN 48
 
 struct spotflow_ota_downloader_http_ctx {
@@ -141,6 +141,15 @@ int spotflow_ota_downloader_transport_download(
 
 static int connect_socket(const struct spotflow_ota_url* url)
 {
+	/* HTTPS downloads must not depend on the MQTT session having registered the CA. */
+	if (url->tls) {
+		int rc = spotflow_tls_init();
+		if (rc < 0) {
+			LOG_ERR("Failed to register artifact download TLS credential: %d", rc);
+			return rc;
+		}
+	}
+
 	struct zsock_addrinfo hints = {
 		.ai_socktype = SOCK_STREAM,
 		.ai_family = AF_INET,
@@ -173,7 +182,7 @@ static int connect_socket(const struct spotflow_ota_url* url)
 	}
 
 	if (url->tls) {
-		sec_tag_t sec_tags[] = { OTA_TLS_SEC_TAG };
+		sec_tag_t sec_tags[] = { SPOTFLOW_TLS_SEC_TAG };
 
 		rc = zsock_setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tags, sizeof(sec_tags));
 		if (rc < 0) {
