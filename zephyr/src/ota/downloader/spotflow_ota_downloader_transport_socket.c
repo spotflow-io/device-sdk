@@ -166,9 +166,10 @@ static int connect_socket(const struct spotflow_ota_url* url)
 	}
 
 	if (sock < 0) {
-		LOG_ERR("Failed to create download socket: %d", errno);
+		int err = errno;
+		LOG_ERR("Failed to create download socket: %d", err);
 		zsock_freeaddrinfo(res);
-		return -errno;
+		return -err;
 	}
 
 	if (url->tls) {
@@ -176,30 +177,35 @@ static int connect_socket(const struct spotflow_ota_url* url)
 
 		rc = zsock_setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tags, sizeof(sec_tags));
 		if (rc < 0) {
-			LOG_ERR("Failed to set TLS sec tag: %d", errno);
+			int err = errno;
+			LOG_ERR("Failed to set TLS sec tag: %d", err);
 			zsock_close(sock);
 			zsock_freeaddrinfo(res);
-			return -errno;
+			return -err;
 		}
 
 		rc = zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, url->host,
 				      strlen(url->host) + 1);
 		if (rc < 0) {
-			LOG_ERR("Failed to set TLS hostname: %d", errno);
+			int err = errno;
+			LOG_ERR("Failed to set TLS hostname: %d", err);
 			zsock_close(sock);
 			zsock_freeaddrinfo(res);
-			return -errno;
+			return -err;
 		}
 	}
 
 	rc = zsock_connect(sock, res->ai_addr, res->ai_addrlen);
+	if (rc < 0) {
+		rc = -errno;
+	}
 	zsock_freeaddrinfo(res);
 
 	if (rc < 0) {
 		LOG_ERR("Failed to connect to artifact download endpoint on port %u: %d", url->port,
-			errno);
+			-rc);
 		zsock_close(sock);
-		return -errno;
+		return rc;
 	}
 
 	return sock;
