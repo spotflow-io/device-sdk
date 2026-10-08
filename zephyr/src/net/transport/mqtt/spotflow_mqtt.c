@@ -2,6 +2,7 @@
 
 #include "spotflow_connection_helper.h"
 #include "net/spotflow_device_id.h"
+#include "net/spotflow_ingest_key.h"
 #include "spotflow_tls.h"
 #ifdef CONFIG_SPOTFLOW_OTA
 #include "ota/protocol/spotflow_ota_cbor.h"
@@ -88,7 +89,7 @@ static struct mqtt_config spotflow_mqtt_config = {
 	.port = CONFIG_SPOTFLOW_SERVER_PORT,
 	.server_addr = NULL,
 	.username = { 0 },
-	.password = MQTT_UTF8_LITERAL(CONFIG_SPOTFLOW_INGEST_KEY),
+	.password = { 0 },
 	.ingest_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_INGEST_CBOR_TOPIC),
 	.config_d2c_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CONFIG_CBOR_D2C_TOPIC),
 	.config_c2d_topic = MQTT_UTF8_LITERAL(SPOTFLOW_MQTT_CONFIG_CBOR_C2D_TOPIC),
@@ -301,6 +302,15 @@ static int prepare_fds()
 static int client_init(struct mqtt_client* client)
 {
 	mqtt_client_init(client);
+
+	const char* ingest_key = spotflow_get_ingest_key();
+	if (ingest_key == NULL) {
+		LOG_ERR("No Spotflow ingest key configured; provide it via Kconfig or "
+			"spotflow_override_ingest_key()");
+		return -EINVAL;
+	}
+	spotflow_mqtt_config.password =
+		(struct mqtt_utf8){ .utf8 = ingest_key, .size = strlen(ingest_key) };
 
 	LOG_DBG("Resolving DNS");
 	int rc = spotflow_conn_helper_resolve_hostname(spotflow_mqtt_config.host,

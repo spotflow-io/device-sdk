@@ -1,0 +1,34 @@
+common:
+  tags:
+    - spotflow
+  platform_allow:
+    - native_sim
+    - qemu_cortex_m3
+  integration_platforms:
+    - native_sim
+tests:
+  spotflow.ingest_key.override:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=override
+      - SPOTFLOW_TEST_CONFIG_KEY=config-key
+  spotflow.ingest_key.fallback:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=fallback
+      - SPOTFLOW_TEST_CONFIG_KEY=config-key
+  spotflow.ingest_key.missing:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=missing
+  spotflow.ingest_key.empty_override:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=empty_override
+      - SPOTFLOW_TEST_CONFIG_KEY=config-key
+  spotflow.ingest_key.empty_override_without_config:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=empty_override
+  spotflow.ingest_key.weak_fallback:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=weak_fallback
+      - SPOTFLOW_TEST_CONFIG_KEY=config-key
+  spotflow.ingest_key.weak_missing:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=weak_missing

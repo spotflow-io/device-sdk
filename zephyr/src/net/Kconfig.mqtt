@@ -81,8 +81,12 @@ config SPOTFLOW_SERVER_PORT
 config SPOTFLOW_INGEST_KEY
 	string "Password device will use to connect to Spotflow observability platform"
 	help
-		Ingest key is a secret key used to authenticate your device
-		It can be found in Spotflow observability platform
+		The ingest key authenticates your device with Spotflow. You can manage
+		ingest keys in the Spotflow portal.
+
+		Alternatively to this Kconfig option, provide it at runtime by defining
+		const char* spotflow_override_ingest_key(void). A non-NULL callback result
+		takes precedence over this option.
 
 if SPOTFLOW_OTA
 
