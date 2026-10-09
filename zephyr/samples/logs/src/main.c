@@ -15,8 +15,9 @@ LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 	return "my_nrf7002dk_test";
 }*/
 
-/* Uncomment this function to provide your own ingest key in runtime */
-/*const char* spotflow_override_ingest_key(void)
+/* Enable CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC, remove CONFIG_SPOTFLOW_INGEST_KEY from
+ * your configuration, and uncomment this callback to provide the ingest key at runtime. */
+/*const char* spotflow_on_ingest_key_requested(void)
 {
 	return "sf_ikv1_...";
 }*/

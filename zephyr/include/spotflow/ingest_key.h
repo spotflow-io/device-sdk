@@ -8,20 +8,19 @@ extern "C" {
 /**
  * @brief Provide the ingest key for the MQTT transport from application code.
  *
- * Override this weak callback to supply a provisioned ingest key at runtime.
- * The SDK calls it from its processing thread when preparing an MQTT connection.
- * If this function returns NULL, the SDK falls back to using CONFIG_SPOTFLOW_INGEST_KEY.
+ * Enable CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC and implement this callback in your
+ * application. CONFIG_SPOTFLOW_INGEST_KEY is unavailable in this mode.
  *
- * When CONFIG_SPOTFLOW_INGEST_KEY is empty, the SDK will call this callback repeatedly
- * until it returns a non-NULL value. This ensures that a valid ingest key is eventually
- * obtained even in the case of transient issues during its reading.
+ * The SDK calls this callback from its processing thread when preparing an MQTT
+ * connection. If it returns NULL, the SDK skips the connection attempt and retries
+ * later, calling the callback again until it returns a non-NULL value.
  *
- * The SDK retains the returned pointer without copying the string, so keep it valid and
- * unchanged until reboot.
+ * The SDK caches the first non-NULL pointer (including an empty string) until reboot
+ * without copying the string, so do not change the string contents.
  *
- * @return A NUL-terminated ingest key, or NULL to use CONFIG_SPOTFLOW_INGEST_KEY.
+ * @return A NUL-terminated ingest key, or NULL if the key is not available yet.
  */
-const char* spotflow_override_ingest_key(void);
+const char* spotflow_on_ingest_key_requested(void);
 
 #ifdef __cplusplus
 }

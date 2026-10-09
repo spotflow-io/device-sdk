@@ -305,8 +305,8 @@ static int client_init(struct mqtt_client* client)
 
 	const char* ingest_key = spotflow_get_ingest_key();
 	if (ingest_key == NULL) {
-		LOG_ERR("No Spotflow ingest key configured; provide it via Kconfig or "
-			"spotflow_override_ingest_key()");
+		LOG_ERR("Spotflow ingest key is not available yet; "
+			"spotflow_on_ingest_key_requested() returned NULL");
 		return -EINVAL;
 	}
 	spotflow_mqtt_config.password =

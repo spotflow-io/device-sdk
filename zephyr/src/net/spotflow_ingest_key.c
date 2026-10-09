@@ -3,31 +3,26 @@
 #include <spotflow/ingest_key.h>
 
 #include <stddef.h>
-#include <string.h>
-#include <zephyr/toolchain.h>
+#include <zephyr/sys/util.h>
 
+#ifdef CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC
 static const char* cached_ingest_key;
-
-const char* __weak spotflow_override_ingest_key(void)
-{
-	return NULL;
-}
 
 const char* spotflow_get_ingest_key(void)
 {
-	if (cached_ingest_key != NULL) {
-		return cached_ingest_key;
+	if (cached_ingest_key == NULL) {
+		cached_ingest_key = spotflow_on_ingest_key_requested();
 	}
 
-	const char* ingest_key = spotflow_override_ingest_key();
-	if (ingest_key == NULL) {
-		if (strlen(CONFIG_SPOTFLOW_INGEST_KEY) > 0) {
-			ingest_key = CONFIG_SPOTFLOW_INGEST_KEY;
-		} else {
-			return NULL;
-		}
-	}
-
-	cached_ingest_key = ingest_key;
 	return cached_ingest_key;
 }
+#else
+BUILD_ASSERT(sizeof(CONFIG_SPOTFLOW_INGEST_KEY) > 1,
+	     "Spotflow ingest key must not be empty; set CONFIG_SPOTFLOW_INGEST_KEY or enable "
+	     "CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC and implement spotflow_on_ingest_key_requested()");
+
+const char* spotflow_get_ingest_key(void)
+{
+	return CONFIG_SPOTFLOW_INGEST_KEY;
+}
+#endif /* CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC */

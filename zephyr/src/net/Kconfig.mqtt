@@ -78,15 +78,24 @@ config SPOTFLOW_SERVER_PORT
 	int "Port of Spotflow observability platform"
 	default 8883
 
+config SPOTFLOW_INGEST_KEY_DYNAMIC
+	bool "Provide the ingest key from application code"
+	help
+		Obtain the ingest key at runtime by implementing
+		const char* spotflow_on_ingest_key_requested(void) in your application.
+		A NULL result delays the MQTT connection and is retried later.
+		The first non-NULL result is cached until reboot.
+
 config SPOTFLOW_INGEST_KEY
 	string "Password device will use to connect to Spotflow observability platform"
+	depends on !SPOTFLOW_INGEST_KEY_DYNAMIC
 	help
 		The ingest key authenticates your device with Spotflow. You can manage
-		ingest keys in the Spotflow portal.
+		ingest keys in the Spotflow portal. This value must not be empty;
+		an empty value causes a compile-time error.
 
-		Alternatively to this Kconfig option, provide it at runtime by defining
-		const char* spotflow_override_ingest_key(void). A non-NULL callback result
-		takes precedence over this option.
+		To provide the key at runtime instead, enable SPOTFLOW_INGEST_KEY_DYNAMIC
+		and implement spotflow_on_ingest_key_requested().
 
 if SPOTFLOW_OTA
 

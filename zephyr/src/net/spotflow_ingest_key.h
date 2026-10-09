@@ -8,8 +8,8 @@ extern "C" {
 /**
  * @brief Resolve and cache the ingest key for the MQTT transport.
  *
- * @return The non-NULL application-provided key (including an empty string),
- *         or a nonempty Kconfig key. Returns NULL if neither is available.
+ * @return The Kconfig key in static mode, or the cached application-provided key in
+ *         dynamic mode. Returns NULL while the dynamic callback has not provided a key.
  */
 const char* spotflow_get_ingest_key(void);
 
