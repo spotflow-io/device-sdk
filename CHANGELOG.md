@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added `spotflow_override_ingest_key()` to the Zephyr module so that an application can provide the ingest key at run time.
 * Added TI LP-EM-CC35X1 support to the Zephyr logs, metrics, coredumps, and BLE samples.
 * Added a west manifest for TI CC35X1 using SimpleLink Zephyr v4.4.0-ti-10.10.00.
 * Added generated battery-level and accelerometer-magnitude metrics to the Zephyr BLE sample.

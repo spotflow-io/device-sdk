@@ -83,6 +83,15 @@ static int acknowledge_publish_if_needed(struct mqtt_client* client,
 					 const struct mqtt_publish_param* publish);
 static bool suback_succeeded(const struct mqtt_suback_param* suback);
 
+/* Define this function in the application to provide the ingest key at run time,
+ * for example when it is provisioned at manufacturing instead of at build time.
+ * Returning NULL keeps CONFIG_SPOTFLOW_INGEST_KEY.
+ */
+__attribute__((weak)) const char* spotflow_override_ingest_key()
+{
+	return NULL;
+}
+
 static struct mqtt_config spotflow_mqtt_config = {
 	.host = CONFIG_SPOTFLOW_SERVER_HOSTNAME,
 	.port = CONFIG_SPOTFLOW_SERVER_PORT,
@@ -321,6 +330,12 @@ static int client_init(struct mqtt_client* client)
 	/* MQTT client configuration (client ID is assigned by the broker) */
 	client->broker = &mqtt_client_toolset.broker;
 	client->evt_cb = mqtt_evt_handler;
+	const char* ingest_key = spotflow_override_ingest_key();
+	if (ingest_key != NULL) {
+		spotflow_mqtt_config.password =
+			(struct mqtt_utf8){ .utf8 = ingest_key, .size = strlen(ingest_key) };
+	}
+
 	client->client_id = MQTT_UTF8_LITERAL("");
 	client->password = &spotflow_mqtt_config.password;
 	client->user_name = &spotflow_mqtt_config.username;
