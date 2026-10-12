@@ -1,0 +1,15 @@
+mainmenu "Spotflow log CBOR tests"
+config TEST_LOG_BACKEND
+	def_bool y
+	select LOG_OUTPUT if !TEST_COMPACT_LOGS
+config TEST_COMPACT_LOGS
+	bool "Test compact logging"
+	default y
+	select LOG_DICTIONARY_SUPPORT
+config TEST_STRIPPED_LOGS
+	bool "Test stripped log format strings"
+	depends on TEST_COMPACT_LOGS && LINKER_DEVNULL_SUPPORT
+	select LOG_DICTIONARY_DB
+	select LOG_FMT_SECTION
+	select LOG_FMT_SECTION_STRIP
+source "Kconfig.zephyr"

@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added opt-in Zephyr compact logs, which send format-string addresses and raw arguments for cloud formatting.
 * Added TI LP-EM-CC35X1 support to the Zephyr logs, metrics, coredumps, and BLE samples.
 * Added a west manifest for TI CC35X1 using SimpleLink Zephyr v4.4.0-ti-10.10.00.
 * Added generated battery-level and accelerometer-magnitude metrics to the Zephyr BLE sample.
