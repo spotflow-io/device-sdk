@@ -2,6 +2,7 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
+#include <spotflow/ingest_key.h>
 #include <spotflow/session_metadata.h>
 
 #include "net.h"
@@ -12,6 +13,13 @@ LOG_MODULE_REGISTER(MAIN, LOG_LEVEL_INF);
 /*const char* spotflow_override_device_id()
 {
 	return "my_nrf7002dk_test";
+}*/
+
+/* Enable CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC, remove CONFIG_SPOTFLOW_INGEST_KEY from
+ * your configuration, and uncomment this callback to provide the ingest key at runtime. */
+/*const char* spotflow_on_ingest_key_requested(void)
+{
+	return "sf_ikv1_...";
 }*/
 
 /* Uncomment this callback to attach labels to all telemetry in a session. */

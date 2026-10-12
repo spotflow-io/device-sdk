@@ -1,0 +1,22 @@
+common:
+  tags:
+    - spotflow
+  platform_allow:
+    - native_sim
+    - qemu_cortex_m3
+  integration_platforms:
+    - native_sim
+tests:
+  spotflow.ingest_key.dynamic:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=dynamic
+  spotflow.ingest_key.dynamic_retry:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=dynamic_retry
+  spotflow.ingest_key.dynamic_empty:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=dynamic_empty
+  spotflow.ingest_key.static:
+    extra_args:
+      - SPOTFLOW_TEST_SCENARIO=static
+      - SPOTFLOW_TEST_CONFIG_KEY=config-key

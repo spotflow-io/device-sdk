@@ -6,6 +6,7 @@ zephyr_library_sources(
 )
 
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_MQTT
+        spotflow_ingest_key.c
         transport/mqtt/spotflow_connection_helper.c
         transport/mqtt/spotflow_mqtt.c
         transport/mqtt/spotflow_mqtt_session.c
@@ -21,10 +22,3 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_BLE
         transport/ble/spotflow_ble_gatt.c
         transport/ble/spotflow_ble_framing.c
 )
-
-if(CONFIG_SPOTFLOW_TRANSPORT_MQTT)
-    if (NOT CONFIG_SPOTFLOW_INGEST_KEY)
-        message(FATAL_ERROR "CONFIG_SPOTFLOW_INGEST_KEY must be specified "
-        "when CONFIG_SPOTFLOW_TRANSPORT_MQTT is enabled")
-    endif()
-endif()
