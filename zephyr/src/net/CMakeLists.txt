@@ -21,4 +21,5 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_BLE
         transport/ble/spotflow_ble_transport.c
         transport/ble/spotflow_ble_gatt.c
         transport/ble/spotflow_ble_framing.c
+        transport/ble/spotflow_ble_advertising.c
 )

@@ -40,6 +40,18 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 #define SPOTFLOW_BLE_ENABLE_RETRY_COUNT 3
 #define SPOTFLOW_BLE_ENABLE_RETRY_DELAY K_MSEC(200)
 
+/* Connectable advertising that is not resumed automatically by the host after a connection:
+ * the transport restarts it itself on disconnect, at the fast interval. Zephyr 4.0 made this the
+ * meaning of BT_LE_ADV_OPT_CONN (introduced together with BT_LE_ADV_CONN_FAST_1); Zephyr 3.7
+ * needs ONE_TIME spelled out, or the host would resume advertising with stale backoff
+ * parameters.
+ */
+#ifdef BT_LE_ADV_CONN_FAST_1
+#define SPOTFLOW_BLE_ADV_OPT_CONN BT_LE_ADV_OPT_CONN
+#else
+#define SPOTFLOW_BLE_ADV_OPT_CONN (BT_LE_ADV_OPT_CONNECTABLE | BT_LE_ADV_OPT_ONE_TIME)
+#endif
+
 static const struct bt_uuid_128 spotflow_service_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_SERVICE_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_capabilities_uuid =
@@ -83,6 +95,8 @@ static int enable_bluetooth(void);
 static int start_advertising(void);
 static void schedule_advertising_retry(void);
 static void restart_advertising_work_handler(struct k_work* work);
+static void schedule_advertising_backoff(void);
+static void advertising_backoff_work_handler(struct k_work* work);
 static void connected(struct bt_conn* conn, uint8_t err);
 static void disconnected(struct bt_conn* conn, uint8_t reason);
 
@@ -112,6 +126,9 @@ int spotflow_ble_transport_start_impl(void)
 		k_mutex_init(&g_spotflow_ble_transport_state.lock);
 		k_work_init_delayable(&g_spotflow_ble_transport_state.restart_advertising_work,
 				      restart_advertising_work_handler);
+		k_work_init_delayable(&g_spotflow_ble_transport_state.adv_backoff_work,
+				      advertising_backoff_work_handler);
+		g_spotflow_ble_transport_state.adv_stage = SPOTFLOW_BLE_ADV_STAGE_FAST;
 		g_spotflow_ble_transport_state.initialized = true;
 	}
 
@@ -126,6 +143,8 @@ int spotflow_ble_transport_start_impl(void)
 	if (rc != 0) {
 		LOG_WRN("Failed to start BLE advertising: %d", rc);
 		schedule_advertising_retry();
+	} else {
+		schedule_advertising_backoff();
 	}
 
 	return 0;
@@ -275,22 +294,23 @@ static int enable_bluetooth(void)
 
 static int start_advertising(void)
 {
-	const struct bt_le_adv_param* conn_mode =
-#ifdef BT_LE_ADV_CONN_FAST_1
-		BT_LE_ADV_CONN_FAST_1;
-#else
-		/* to provide backward compatibility fro zephyr 3.7.0 */
-		BT_LE_ADV_PARAM(BT_LE_ADV_OPT_CONNECTABLE, BT_GAP_ADV_FAST_INT_MIN_1,
-				BT_GAP_ADV_FAST_INT_MAX_1, NULL);
-#endif
-	int rc = bt_le_adv_start(conn_mode, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
+	struct spotflow_ble_adv_params params;
+
+	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
+	spotflow_ble_adv_stage_params_get(g_spotflow_ble_transport_state.adv_stage, &params);
+	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+
+	const struct bt_le_adv_param adv_param = BT_LE_ADV_PARAM_INIT(
+		SPOTFLOW_BLE_ADV_OPT_CONN, params.interval_min, params.interval_max, NULL);
+	int rc = bt_le_adv_start(&adv_param, ad, ARRAY_SIZE(ad), sd, ARRAY_SIZE(sd));
 
 	if (rc == -EALREADY) {
 		return 0;
 	}
 
 	if (rc == 0) {
-		LOG_INF("BLE advertising started as %s", SPOTFLOW_BLE_DEVICE_NAME);
+		LOG_INF("BLE advertising started as %s (interval %u ms)", SPOTFLOW_BLE_DEVICE_NAME,
+			(params.interval_min * 5U) / 8U);
 	}
 
 	return rc;
@@ -318,7 +338,65 @@ static void restart_advertising_work_handler(struct k_work* work)
 	if (rc != 0) {
 		LOG_WRN("Failed to restart BLE advertising: %d", rc);
 		schedule_advertising_retry();
+		return;
 	}
+
+	schedule_advertising_backoff();
+}
+
+/* Arms the timer that moves advertising to the next (slower) stage, unless the current stage
+ * lasts until a gateway connects.
+ */
+static void schedule_advertising_backoff(void)
+{
+	struct spotflow_ble_adv_params params;
+
+	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
+	spotflow_ble_adv_stage_params_get(g_spotflow_ble_transport_state.adv_stage, &params);
+	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+
+	if (params.duration_s > 0) {
+		(void)k_work_reschedule(&g_spotflow_ble_transport_state.adv_backoff_work,
+					K_SECONDS(params.duration_s));
+	}
+}
+
+static void advertising_backoff_work_handler(struct k_work* work)
+{
+	ARG_UNUSED(work);
+
+	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
+	bool connected = g_spotflow_ble_transport_state.tx.conn != NULL;
+	enum spotflow_ble_adv_stage current = g_spotflow_ble_transport_state.adv_stage;
+	enum spotflow_ble_adv_stage next = spotflow_ble_adv_next_stage(current);
+
+	if (!connected) {
+		g_spotflow_ble_transport_state.adv_stage = next;
+	}
+	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+
+	if (connected || next == current) {
+		return;
+	}
+
+	/* The advertising interval can't be changed in place: restart with the slower one. Bluetooth
+	 * calls are made without holding the transport lock, because the connection callbacks take
+	 * it. If a gateway connects in between, starting fails and the retry work sees the
+	 * connection and stops.
+	 */
+	int rc = bt_le_adv_stop();
+	if (rc != 0) {
+		LOG_WRN("Failed to stop BLE advertising: %d", rc);
+	}
+
+	rc = start_advertising();
+	if (rc != 0) {
+		LOG_WRN("Failed to restart BLE advertising: %d", rc);
+		schedule_advertising_retry();
+		return;
+	}
+
+	schedule_advertising_backoff();
 }
 
 static void connected(struct bt_conn* conn, uint8_t err)
@@ -334,6 +412,9 @@ static void connected(struct bt_conn* conn, uint8_t err)
 	}
 	g_spotflow_ble_transport_state.tx.conn = bt_conn_ref(conn);
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+
+	/* Connectable advertising stops once a central connects; nothing left to slow down. */
+	(void)k_work_cancel_delayable(&g_spotflow_ble_transport_state.adv_backoff_work);
 
 	LOG_INF("BLE central connected");
 }
@@ -355,7 +436,11 @@ static void disconnected(struct bt_conn* conn, uint8_t reason)
 	g_spotflow_ble_transport_state.config_rx.sequence = 0;
 	g_spotflow_ble_transport_state.config_rx.total_len = 0;
 	g_spotflow_ble_transport_state.config_rx.received_len = 0;
+	/* Advertise fast again so the gateway can reconnect quickly. */
+	g_spotflow_ble_transport_state.adv_stage = SPOTFLOW_BLE_ADV_STAGE_FAST;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+
+	(void)k_work_cancel_delayable(&g_spotflow_ble_transport_state.adv_backoff_work);
 
 	LOG_INF("BLE central disconnected: 0x%02x", reason);
 

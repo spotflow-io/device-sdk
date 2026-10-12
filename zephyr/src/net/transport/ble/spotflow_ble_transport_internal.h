@@ -64,11 +64,28 @@ struct spotflow_ble_config_rx_state {
 	uint8_t buffer[SPOTFLOW_CONFIG_RX_BUFFER_SIZE];
 };
 
+/* Advertising backoff stages; see CONFIG_SPOTFLOW_BLE_ADV_BACKOFF. */
+enum spotflow_ble_adv_stage {
+	SPOTFLOW_BLE_ADV_STAGE_FAST,
+	SPOTFLOW_BLE_ADV_STAGE_SLOW,
+	SPOTFLOW_BLE_ADV_STAGE_IDLE,
+};
+
+struct spotflow_ble_adv_params {
+	/* Advertising interval in 0.625 ms units. */
+	uint16_t interval_min;
+	uint16_t interval_max;
+	/* Seconds before moving to the next stage; 0 = stay until a gateway connects. */
+	uint32_t duration_s;
+};
+
 struct spotflow_ble_transport_state {
 	struct k_mutex lock;
 	bool initialized;
 	bool bluetooth_enabled;
 	struct k_work_delayable restart_advertising_work;
+	struct k_work_delayable adv_backoff_work;
+	enum spotflow_ble_adv_stage adv_stage;
 	struct spotflow_ble_tx_state tx;
 	struct spotflow_ble_config_rx_state config_rx;
 };
@@ -85,5 +102,8 @@ int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t seque
 int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* sequence_counter,
 					       uint8_t* payload, size_t len);
 int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len, uint8_t flags);
+void spotflow_ble_adv_stage_params_get(enum spotflow_ble_adv_stage stage,
+				       struct spotflow_ble_adv_params* params);
+enum spotflow_ble_adv_stage spotflow_ble_adv_next_stage(enum spotflow_ble_adv_stage stage);
 
 #endif /* SPOTFLOW_BLE_TRANSPORT_INTERNAL_H */
