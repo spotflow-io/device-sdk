@@ -1,17 +1,17 @@
-﻿#include <zephyr/kernel.h>
+﻿#include "spotflow_tls.h"
+
+#include "net/spotflow_certs.h"
+
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/net/mqtt.h>
 #include <zephyr/net/socket.h>
 
-#include "net/spotflow_certs.h"
-
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
-
-#define APP_CA_ISGROOTX1_CERT_TAG 1
 
 static int tls_certificate_add(const unsigned char* cert, size_t cert_len, int tag);
 
-static sec_tag_t m_sec_tags[] = { APP_CA_ISGROOTX1_CERT_TAG };
+static sec_tag_t m_sec_tags[] = { SPOTFLOW_TLS_SEC_TAG };
 
 void spotflow_tls_configure(const char* hostname, struct mqtt_sec_config* tls_config)
 {
@@ -26,7 +26,7 @@ int spotflow_tls_init(void)
 {
 	LOG_DBG("TLS init");
 	int err = tls_certificate_add(spotflow_isrgrootx1_der, sizeof(spotflow_isrgrootx1_der),
-				      APP_CA_ISGROOTX1_CERT_TAG);
+				      SPOTFLOW_TLS_SEC_TAG);
 	if (err < 0) {
 		LOG_ERR("Failed to register public certificate spotflow_isrgrootx1_der: %d", err);
 		return err;

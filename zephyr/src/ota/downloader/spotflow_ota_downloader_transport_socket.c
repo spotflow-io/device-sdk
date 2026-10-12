@@ -2,6 +2,7 @@
 
 #include <spotflow/downloader.h>
 
+#include "net/transport/mqtt/spotflow_tls.h"
 #include "ota/downloader/spotflow_ota_downloader.h"
 #include "ota/downloader/spotflow_ota_downloader_transport_range.h"
 #include "ota/downloader/spotflow_ota_url.h"
@@ -19,7 +20,6 @@
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
-#define OTA_TLS_SEC_TAG 1
 #define OTA_RANGE_HEADER_MAX_LEN 48
 
 struct spotflow_ota_downloader_http_ctx {
@@ -141,6 +141,15 @@ int spotflow_ota_downloader_transport_download(
 
 static int connect_socket(const struct spotflow_ota_url* url)
 {
+	/* HTTPS downloads must not depend on the MQTT session having registered the CA. */
+	if (url->tls) {
+		int rc = spotflow_tls_init();
+		if (rc < 0) {
+			LOG_ERR("Failed to register artifact download TLS credential: %d", rc);
+			return rc;
+		}
+	}
+
 	struct zsock_addrinfo hints = {
 		.ai_socktype = SOCK_STREAM,
 		.ai_family = AF_INET,
@@ -166,40 +175,46 @@ static int connect_socket(const struct spotflow_ota_url* url)
 	}
 
 	if (sock < 0) {
-		LOG_ERR("Failed to create download socket: %d", errno);
+		int err = errno;
+		LOG_ERR("Failed to create download socket: %d", err);
 		zsock_freeaddrinfo(res);
-		return -errno;
+		return -err;
 	}
 
 	if (url->tls) {
-		sec_tag_t sec_tags[] = { OTA_TLS_SEC_TAG };
+		sec_tag_t sec_tags[] = { SPOTFLOW_TLS_SEC_TAG };
 
 		rc = zsock_setsockopt(sock, SOL_TLS, TLS_SEC_TAG_LIST, sec_tags, sizeof(sec_tags));
 		if (rc < 0) {
-			LOG_ERR("Failed to set TLS sec tag: %d", errno);
+			int err = errno;
+			LOG_ERR("Failed to set TLS sec tag: %d", err);
 			zsock_close(sock);
 			zsock_freeaddrinfo(res);
-			return -errno;
+			return -err;
 		}
 
 		rc = zsock_setsockopt(sock, SOL_TLS, TLS_HOSTNAME, url->host,
 				      strlen(url->host) + 1);
 		if (rc < 0) {
-			LOG_ERR("Failed to set TLS hostname: %d", errno);
+			int err = errno;
+			LOG_ERR("Failed to set TLS hostname: %d", err);
 			zsock_close(sock);
 			zsock_freeaddrinfo(res);
-			return -errno;
+			return -err;
 		}
 	}
 
 	rc = zsock_connect(sock, res->ai_addr, res->ai_addrlen);
+	if (rc < 0) {
+		rc = -errno;
+	}
 	zsock_freeaddrinfo(res);
 
 	if (rc < 0) {
 		LOG_ERR("Failed to connect to artifact download endpoint on port %u: %d", url->port,
-			errno);
+			-rc);
 		zsock_close(sock);
-		return -errno;
+		return rc;
 	}
 
 	return sock;
