@@ -42,6 +42,12 @@ config SPOTFLOW_USE_ETH
 
 endchoice
 
+# On nRF7002 DK with NCS 3.2.4, WMM can leave the RPU unresponsive during
+# the WPA2 handshake with some APs. Disabling WMM avoids this interoperability
+# failure. Applications can explicitly enable it after validating their APs.
+configdefault NRF_WIFI_FEAT_WMM
+	default n if BOARD_NRF7002DK && SPOTFLOW_USE_WIFI
+
 # If selected, fulfills SPOTFLOW_SETTINGS dependencies by storing Zephyr settings on flash
 config SPOTFLOW_SAMPLE_CONFIG_PERSISTENCE_FLASH
 	bool "Enable configuration persistence on flash"

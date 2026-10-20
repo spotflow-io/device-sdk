@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added application-defined typed labels to Zephyr Session Metadata messages.
 * Added BLE support for TI LP-EM-CC2340R5
 * Added a west manifest for TI's SimpleLink Zephyr downstream.
+* Added runtime ingest keys for Zephyr via `CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC` and the required `spotflow_on_ingest_key_requested()` callback, while retaining compile-time validation of static ingest keys.
 
 ### Changed
 * Made Zephyr metric-name storage configurable so constrained applications can reduce per-registry-slot static RAM usage.
@@ -26,7 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 * Fixed Zephyr reset-cause metrics on targets that omit optional bootloader and flash reset flags.
-
+* Fixed TLS certificate parsing failures in the Zephyr TI CC35X1 MQTT samples.
+* Fixed nRF7002 DK Wi-Fi connection issue on nRF Connect SDK 3.2.4 when WMM is used.
 
 ## [0.9.0] - 2026-08-06
 
