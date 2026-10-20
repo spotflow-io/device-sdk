@@ -7,6 +7,9 @@ common:
     - qemu_cortex_m3
 tests:
   spotflow.logging.cbor.compact: {}
+  spotflow.logging.cbor.compact_runtime_filtering:
+    extra_configs:
+      - CONFIG_LOG_RUNTIME_FILTERING=y
   spotflow.logging.cbor.compact_timestamp_64bit:
     extra_configs:
       - CONFIG_LOG_TIMESTAMP_64BIT=y
@@ -18,6 +21,12 @@ tests:
       - native_sim/native/64
     extra_configs:
       - CONFIG_TEST_STRIPPED_LOGS=y
+  spotflow.logging.cbor.compact_stripped_runtime_filtering:
+    platform_exclude:
+      - native_sim/native/64
+    extra_configs:
+      - CONFIG_TEST_STRIPPED_LOGS=y
+      - CONFIG_LOG_RUNTIME_FILTERING=y
   spotflow.logging.cbor.compact_canonical:
     extra_configs:
       - CONFIG_ZCBOR_CANONICAL=y

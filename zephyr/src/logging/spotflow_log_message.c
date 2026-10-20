@@ -29,6 +29,7 @@ static int get_formatted_message(char* buffer, size_t len, uint8_t* package);
 static void extract_metadata(struct spotflow_log_cbor_msg* metadata, struct log_msg* log_msg,
 			     size_t sequence_number);
 static uint64_t timestamp_to_us(log_timestamp_t timestamp);
+static const char* get_source_name(struct log_msg* log_msg);
 #ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
 static int validate_compact_package(const uint8_t* package, size_t package_len);
 static int next_embedded_string(const void* context, size_t* cursor,
@@ -154,10 +155,41 @@ static void extract_metadata(struct spotflow_log_cbor_msg* metadata, struct log_
 	metadata->severity = spotflow_log_level_to_severity(level);
 
 	/* source name */
+	metadata->source = get_source_name(log_msg);
+}
+
+static const char* get_source_name(struct log_msg* log_msg)
+{
+	/* Raw/printk messages reuse the source field for flags rather than source data. */
+	if (log_msg_get_level(log_msg) == LOG_LEVEL_NONE) {
+		return NULL;
+	}
+
 	uint8_t domain_id = log_msg_get_domain(log_msg);
+#ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
+	/* Compact logs support only the local domain. */
+	if (domain_id != Z_LOG_LOCAL_DOMAIN_ID) {
+		return NULL;
+	}
+#endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */
+
 	int16_t source_id = log_msg_get_source_id(log_msg);
-	const char* sname = source_id >= 0 ? log_source_name_get(domain_id, source_id) : "unknown";
-	metadata->source = sname;
+	if (source_id < 0 || source_id >= log_src_cnt_get(domain_id)) {
+		return NULL;
+	}
+
+#ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
+	/* log_source_name_get() returns "unknown" when strings are stripped, but
+	 * newer Zephyr versions retain their addresses in log_const. Zephyr 3.7
+	 * instead stores NULL for stripped module names, so their labels are omitted.
+	 * The ID indexes this table even when runtime filtering makes the message
+	 * point to dynamic source data.
+	 * Read only the pointer; the string itself may exist only in the ELF.
+	 */
+	return TYPE_SECTION_START(log_const)[source_id].name;
+#else
+	return log_source_name_get(domain_id, source_id);
+#endif /* CONFIG_SPOTFLOW_COMPACT_LOGS */
 }
 
 #ifdef CONFIG_SPOTFLOW_COMPACT_LOGS
