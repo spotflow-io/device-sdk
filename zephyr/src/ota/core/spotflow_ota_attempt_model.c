@@ -293,11 +293,11 @@ int spotflow_ota_attempt_rehydrate(const struct spotflow_ota_update_msg* msg,
 		attempt->plan.results[i] = SPOTFLOW_OTA_RESULT_PENDING;
 	}
 	spotflow_ota_attempt_advance(attempt);
-	*request_report = spotflow_ota_attempt_has_reportable_results(attempt);
 	if (msg->is_canceled && !spotflow_ota_attempt_has_succeeded_artifact(attempt)) {
 		attempt->execution.cancellation_requested = true;
 		spotflow_ota_attempt_cancel_pending_artifacts(attempt, constraints);
 	}
+	*request_report = spotflow_ota_attempt_has_reportable_results(attempt);
 	*wake_worker = spotflow_ota_attempt_has_terminal_results(attempt) ||
 		spotflow_ota_attempt_has_runnable_artifact(attempt, constraints);
 	spotflow_ota_attempt_refresh_lifecycle(attempt, constraints);
