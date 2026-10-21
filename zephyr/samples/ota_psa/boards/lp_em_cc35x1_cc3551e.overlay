@@ -1,0 +1,56 @@
+/* is25wj032f/ota: fixed factory layout; firmware OTA cannot migrate it.
+ * PSA owns vendor-slot writes and logical mapping across slot changes.
+ */
+&flash0 {
+	reg = <0x14000000 0x111000>, <0x1dd000 0x111000>;
+};
+&vendor_image_partition {
+	reg = <0x0 0x111000>;
+};
+
+&flash1 {
+	reg = <0xa0000000 0x1b2000>, <0x0 0x1b2000>;
+	partitions {
+		/delete-node/ partition@68000;
+		/delete-node/ partition@da000;
+		wifi_fw_slot1_partition: partition@ce000 {
+			label = "wifi-fw-1";
+			reg = <0xce000 0x72000>;
+		};
+		wifi_fw_slot2_partition: partition@140000 {
+			label = "wifi-fw-2";
+			reg = <0x140000 0x72000>;
+		};
+	};
+};
+
+/* Starts after the protected-storage header and ends before ITS keys. */
+/delete-node/ &flash2;
+/ {
+	soc {
+		flash2: flash@a01b3000 {
+			compatible = "ti,cc35xx-nv-flash";
+			reg = <0xa01b3000 0x22000>, <0x1b3000 0x22000>;
+			erase-block-size = <4096>;
+			write-block-size = <4>;
+			status = "okay";
+			partitions {
+				compatible = "fixed-partitions";
+				#address-cells = <1>;
+				#size-cells = <1>;
+				wifi_nvs_partition: partition@0 {
+					label = "wifi-nvs";
+					reg = <0x0 0x8000>;
+				};
+				storage_partition: partition@8000 {
+					label = "storage";
+					reg = <0x8000 0x1a000>;
+				};
+			};
+		};
+	};
+};
+
+&wlan0 {
+	status = "okay";
+};

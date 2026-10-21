@@ -1,0 +1,11 @@
+sample:
+  name: Spotflow OTA through TI PSA Firmware Update
+  description: Native signed vendor-image updates on CC35X1 with application-controlled commitment.
+common:
+  tags: [spotflow, ota, wifi]
+  platform_allow: [lp_em_cc35x1/cc3551e]
+tests:
+  sample.spotflow.ota_psa:
+    build_only: true
+    extra_args: EXTRA_CONF_FILE=credentials-sample.conf
+    integration_platforms: [lp_em_cc35x1/cc3551e]

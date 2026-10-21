@@ -48,11 +48,11 @@ enum spotflow_ota_phase {
 	SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD,
 	/** Main firmware image is downloading. */
 	SPOTFLOW_OTA_PHASE_DOWNLOADING,
-	/** Download finished; preparing MCUboot test upgrade. */
+	/** Download finished; preparing trial installation. */
 	SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
 	/** Test upgrade requested; device is about to reboot. */
 	SPOTFLOW_OTA_PHASE_PENDING_REBOOT,
-	/** Device rebooted into the new image and awaits confirmation. */
+	/** New image is not committed; acceptance may still require a reboot. */
 	SPOTFLOW_OTA_PHASE_UNCONFIRMED,
 };
 
@@ -197,9 +197,10 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
  * and leaves the update paused.
  *
  * Pausing in @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT delays the reboot initiated by
- * the SDK. The MCUboot test upgrade has already been requested, so any reboot
- * initiated by the application, the user, or a power cycle still starts the new
- * image.
+ * the SDK. Installation has already been requested and cannot be aborted through
+ * Spotflow. MCUboot persists its test-upgrade request, so another reboot still
+ * selects the new image. TI PSA FWU requires psa_fwu_request_reboot() to transfer
+ * its pending installation request to the bootloader.
  *
  * When @p state is not NULL, the resulting main-firmware state is written on
  * success. On error, @p state is left unchanged.
@@ -243,7 +244,7 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
  * only while the phase is @c SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD,
  * @c SPOTFLOW_OTA_PHASE_DOWNLOADING, or @c SPOTFLOW_OTA_PHASE_PENDING_UPGRADE.
  * Cannot abort an update in @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT because the
- * MCUboot test upgrade has already been requested, or in
+ * trial installation has already been requested, or in
  * @c SPOTFLOW_OTA_PHASE_UNCONFIRMED; use @ref spotflow_confirm_main_firmware_image
  * after reboot or allow rollback handling on the next boot.
  *
@@ -271,9 +272,14 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  * @brief Confirm the running main-firmware image after a test upgrade.
  *
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. After a
- * successful reboot into an unconfirmed image, confirms the image with MCUboot,
- * and schedules persistence, probation cleanup, and result reporting on the OTA
- * worker. A return value of @c 0 does not mean that the result has already been
+ * successful reboot into an unconfirmed image, requests acceptance through the
+ * selected firmware backend. This function does not reboot. For TI PSA FWU, the
+ * application must subsequently call psa_fwu_request_reboot() to commit the image;
+ * state remains UNCONFIRMED and the result remains PENDING until startup verifies
+ * commitment. A plain system reboot does not persist TI's acceptance request.
+ *
+ * Once committed, persistence, probation cleanup, and result reporting run on the
+ * OTA worker. A return value of @c 0 does not mean that the result has already been
  * published or received by Spotflow.
  *
  * If the image is already confirmed and the stored result is
@@ -287,7 +293,7 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  *
  * @param state Optional out parameter for the resulting snapshot.
  *
- * @retval 0 Image confirmed, or already confirmed.
+ * @retval 0 Confirmation accepted, or image already committed.
  * @retval -EINVAL No active attempt, wrong phase, or probation metadata does not
  *         match the current attempt.
  * @retval <0 Negative errno when OTA initialization, platform confirmation, or

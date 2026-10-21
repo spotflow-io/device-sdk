@@ -28,7 +28,20 @@ if(CONFIG_SPOTFLOW_OTA)
 endif()
 
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+        firmware/spotflow_ota_fw_main_common.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
         firmware/spotflow_ota_fw_main.c
         platform/spotflow_ota_identity.c
         platform/spotflow_ota_platform.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU
+        firmware/spotflow_ota_fw_main_psa.c
+        firmware/spotflow_ota_psa_identity.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_PSA_FWU_TI_CC35XX
+        firmware/spotflow_ota_psa_ti.c
 )
