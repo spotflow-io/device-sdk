@@ -32,7 +32,6 @@ static int complete_main_firmware_rollback(const struct spotflow_ota_probation* 
 					   spotflow_ota_state_effects* effects);
 static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation);
 
-
 enum spotflow_ota_result
 spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 {
@@ -127,6 +126,15 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 	rc = spotflow_ota_identity_get_downloaded_build_id(expected_build_id);
 	if (rc < 0) {
 		LOG_ERR("Failed to read downloaded main firmware build ID: %d", rc);
+		return fail_main_firmware(token);
+	}
+
+	/* The probation record cannot distinguish an interrupted installation from
+	 * the already-running image when both carry the same build ID.
+	 */
+	if (spotflow_ota_identity_compare_probation(expected_build_id) ==
+	    SPOTFLOW_OTA_IDENTITY_MATCH) {
+		LOG_ERR("Downloaded main firmware has the running build ID");
 		return fail_main_firmware(token);
 	}
 
