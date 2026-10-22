@@ -87,3 +87,11 @@ differ from TI's physical-slot components and prefix. A future TF-M provider mus
 post-boot `READY` and failed-update reporting explicitly and correlate the exact running
 identity. It must not assume every `READY` state proves success. No TF-M provider is
 implemented or claimed tested by this change.
+
+## CC35XX flash prerequisites
+
+The validated CC3551E setup requires the TI HAL clock/flash corrections described
+in the [startup investigation](ota-psa-startup-investigation.md). In particular,
+SYSTIM must be clocked before ITS initialization, and flash errors must restore XIP
+before returning to code in external flash. These corrections live in
+`modules/hal/ti`, separately from the Spotflow provider and coordinator.

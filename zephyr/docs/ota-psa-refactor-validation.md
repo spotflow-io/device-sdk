@@ -1,12 +1,15 @@
 # PSA OTA refactor validation - 2026-10-22
 
-The connected `lp_em_cc35x1/cc3551e` development board completed updates in both physical
-vendor slots and is confirmed on `0.0.8.0`, build ID
+At the end of refactor validation, the connected `lp_em_cc35x1/cc3551e` development
+board had completed updates in both physical
+vendor slots and was confirmed on `0.0.8.0`, build ID
 `f7161884da1a9161c52b57cb4df935a4b59d2998`. Each version's first trial boot stalled at
 Wi-Fi initialization before `main`. Hardware reset caused rollback and failure reporting;
 retrying the identical signed artifact succeeded. This repeats the startup symptom in
 the earlier implementation's validation. Its root cause remains unresolved, and this
-run does not establish unattended boot reliability.
+run does not establish unattended boot reliability. The subsequent
+[startup investigation](ota-psa-startup-investigation.md) isolated the missing TI
+SYSTIM clock initialization and fixed the associated flash-driver defects.
 
 ## Automated checks
 
@@ -71,7 +74,8 @@ boot markers, startup reconciliation and final cloud results provide the evidenc
 
 Recovery pulsed the hardware reset line through the XDS110/CMSIS-DAP adapter. An attempt
 to inspect stalled CPU registers found debug access locked; debug security settings were
-preserved. Investigation of the Wi-Fi startup stall is separate from this refactor.
+preserved. The subsequent [startup investigation](ota-psa-startup-investigation.md) established
+that Wi-Fi initialization completed and the stall was in TI ITS flash initialization.
 
 ## Local evidence
 
@@ -83,6 +87,8 @@ Workspace-relative evidence is under `analysis/psa-fwu/`:
 - `image-0.0.7.0/` and `image-0.0.8.0/`: signed artifacts, ELF files and build logs.
 - `deployment-5Z4EjXvIEllG.json` and `deployment-0RNSEQ5TEd9f.json`: final cloud counts.
 
-`b-psa` contains the tested `0.0.8.0` build and its cached numeric-version override.
-The sample default remains `0.0.1.0`; future board updates must use a newer numeric
-version than the installed `0.0.8.0`.
+At this checkpoint, `b-psa` contained the tested `0.0.8.0` build and its cached
+numeric-version override. The startup investigation records the later final build.
+The sample default remains `0.0.1.0`. Future board updates must use a numeric
+version newer than the version actually installed; see the startup investigation
+for the later board state.
