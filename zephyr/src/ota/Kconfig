@@ -121,8 +121,6 @@ config SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
 	select IMG_MANAGER
 	select IMG_ERASE_PROGRESSIVELY
 	select REBOOT
-	select BINDESC_READ
-	select BINDESC_READ_FLASH
 	help
 	  Use a rollback-capable MCUboot mode and a secondary flash slot.
 
