@@ -1,6 +1,7 @@
 /* is25wj032f/ota: fixed factory layout; firmware OTA cannot migrate it.
  * PSA owns vendor-slot writes and logical mapping across slot changes.
  */
+/* TI maps either physical vendor slot into this execution window when running. */
 &flash0 {
 	reg = <0x14000000 0x111000>, <0x1dd000 0x111000>;
 };
@@ -8,6 +9,7 @@
 	reg = <0x0 0x111000>;
 };
 
+/* The Wi-Fi driver reads connectivity firmware from the selected wireless slot. */
 &flash1 {
 	reg = <0xa0000000 0x1b2000>, <0x0 0x1b2000>;
 	partitions {
