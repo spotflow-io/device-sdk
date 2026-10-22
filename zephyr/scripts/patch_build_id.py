@@ -5,7 +5,7 @@ import os
 import hashlib
 from pathlib import Path
 from elftools.elf.elffile import ELFFile
-from elftools.elf.sections import Section, Symbol
+from elftools.elf.sections import Section
 from elftools.elf.constants import SH_FLAGS
 from intelhex import IntelHex
 
@@ -43,15 +43,23 @@ def generate_and_patch_build_id(
             ):
                 patch_build_id_elf(filepath, bindesc_symbol_vaddr, build_id)
             elif filepath.endswith(".hex"):
-                patch_build_id_hex(filepath, bindesc_symbol_paddr, build_id)
+                patch_build_id_hex(
+                    filepath, bindesc_symbol_paddr, build_id, build_id_header_value(elffile)
+                )
             elif filepath.endswith(".bin"):
                 patch_build_id_bin(filepath, elffile, bindesc_symbol_paddr, build_id)
             else:
                 raise Exception(f"Unsupported file type: {filepath}")
 
 
+def build_id_header_value(elffile: ELFFile) -> bytes:
+    # Zephyr binary descriptors use the executable's native byte order.
+    byteorder = "little" if elffile.little_endian else "big"
+    return (0x25F0).to_bytes(2, byteorder) + BUILD_ID_VALUE_SIZE.to_bytes(2, byteorder)
+
+
 def find_bindesc_build_id_symbol_vaddr(elffile: ELFFile) -> int:
-    symbol = None
+    symbols = None
 
     symbol_table = elffile.get_section_by_name(".symtab")
     if symbol_table is None:
@@ -152,7 +160,7 @@ def patch_build_id_parsed_elf(
 
     elffile.stream.seek(symbol_file_offset)
     header = elffile.stream.read(BUILD_ID_HEADER_SIZE)
-    if header != BUILD_ID_HEADER_VALUE:
+    if header != build_id_header_value(elffile):
         raise Exception(
             f"Invalid build ID binary descriptor header at offset "
             f"0x{symbol_file_offset:08x}: {header.hex()}"
@@ -186,6 +194,7 @@ def patch_build_id_hex(
     hex_filepath: str,
     bindesc_symbol_paddr: int,
     build_id: bytes,
+    expected_header: bytes = BUILD_ID_HEADER_VALUE,
 ):
     intel_hex = IntelHex(hex_filepath)
 
@@ -194,7 +203,7 @@ def patch_build_id_hex(
         .tobinarray()
         .tobytes()
     )
-    if header != BUILD_ID_HEADER_VALUE:
+    if header != expected_header:
         raise Exception(
             f"Invalid build ID binary descriptor header at address "
             f"0x{bindesc_symbol_paddr:08x}: {header.hex()}"
@@ -226,7 +235,7 @@ def patch_build_id_bin(
         symbol_file_offset = bindesc_symbol_paddr - base_address
         bin_file.seek(symbol_file_offset)
         header = bin_file.read(BUILD_ID_HEADER_SIZE)
-        if header != BUILD_ID_HEADER_VALUE:
+        if header != build_id_header_value(elffile):
             raise Exception(
                 f"Invalid build ID binary descriptor header at offset "
                 f"0x{symbol_file_offset:08x}: {header.hex()}"

@@ -97,3 +97,25 @@ def test_extra_input_has_stable_utf8_encoding_and_framing():
         + encoded
     ).digest()
     assert patch_build_id.generate_build_id(elf, 0x1000, value) == expected
+
+
+@pytest.mark.parametrize("little_endian", [False, True])
+def test_descriptor_patching_respects_elf_endianness(little_endian, tmp_path):
+    import io
+
+    byteorder = "little" if little_endian else "big"
+    header = (0x25F0).to_bytes(2, byteorder) + (20).to_bytes(2, byteorder)
+    stream = io.BytesIO(header + bytes(20))
+    section = {"sh_addr": 0x1000, "sh_size": 24, "sh_offset": 0}
+    elf = SimpleNamespace(little_endian=little_endian, stream=stream,
+                          iter_sections=lambda: iter([section]))
+    identity = bytes(range(20))
+    patch_build_id.patch_build_id_parsed_elf(elf, "test.elf", 0x1000, identity)
+    assert stream.getvalue() == header + identity
+    bin_path = tmp_path / "test.bin"
+    bin_path.write_bytes(header + bytes(20))
+    elf.iter_segments = lambda: iter([{
+        "p_type": "PT_LOAD", "p_paddr": 0x1000, "p_filesz": 24,
+    }])
+    patch_build_id.patch_build_id_bin(str(bin_path), elf, 0x1000, identity)
+    assert bin_path.read_bytes() == header + identity

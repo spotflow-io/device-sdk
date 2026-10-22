@@ -163,3 +163,24 @@ def test_metadata_file_preserves_shell_metacharacters_and_unicode(tmp_path, monk
                                       str(metadata_path), str(elf_path)])
     patch_build_id.main()
     assert get_build_id_from_elf(elf_path) == expected
+
+
+def test_extra_input_is_patched_consistently_and_repatching_is_idempotent():
+    with tempfile.TemporaryDirectory() as temp_dir_str:
+        temp_dir = Path(temp_dir_str)
+        inputs = Path(__file__).parent / "patch_build_id" / "inputs"
+        paths = [temp_dir / ("zephyr." + suffix) for suffix in ["elf", "bin", "hex", "strip", "exe"]]
+        for path in paths:
+            shutil.copyfile(inputs / path.name, path)
+        elf_path, *others = paths
+        patch_build_id.generate_and_patch_build_id(str(elf_path), list(map(str, others)), "0.0.7.0")
+        first = get_build_id_from_elf(elf_path)
+        contents = [path.read_bytes() for path in paths]
+        patch_build_id.generate_and_patch_build_id(str(elf_path), list(map(str, others)), "0.0.7.0")
+        assert contents == [path.read_bytes() for path in paths]
+        assert paths[1].read_bytes()[0x160:0x174] == first
+        assert IntelHex(str(paths[2])).tobinstr()[0x160:0x174] == first
+        assert paths[3].read_bytes()[0x260:0x274] == first
+        assert paths[4].read_bytes()[0x260:0x274] == first
+        patch_build_id.generate_and_patch_build_id(str(elf_path), list(map(str, others)), "0.0.8.0")
+        assert get_build_id_from_elf(elf_path) != first
