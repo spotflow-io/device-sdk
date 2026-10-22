@@ -115,18 +115,19 @@ static void confirm_unconfirmed_main_firmware(void)
 	}
 
 	/* Demo only: replace immediate acceptance with application health checks.
-	 * TI acceptance is not durable until this provider-specific commit reboot.
+	 * TI acceptance is not durable until this PSA reboot to make confirmation durable.
 	 * Spotflow confirmation itself never requests a reboot.
 	 */
 	if (fw_state.phase == SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
-		LOG_INF("Acceptance requested; rebooting through TI PSA FWU to commit");
+		LOG_INF("Acceptance requested; rebooting through TI PSA FWU to confirm the image");
 		psa_status_t status = psa_fwu_request_reboot();
 
 		if (status != PSA_SUCCESS) {
-			LOG_ERR("Commit reboot request failed: %d; update remains pending", status);
+			LOG_ERR("Confirmation reboot request failed: %d; update remains pending",
+				status);
 		}
 	} else {
-		LOG_INF("Main firmware committed (phase=%s result=%d)",
+		LOG_INF("Main firmware confirmed (phase=%s result=%d)",
 			ota_phase_name(fw_state.phase), fw_state.result);
 	}
 }

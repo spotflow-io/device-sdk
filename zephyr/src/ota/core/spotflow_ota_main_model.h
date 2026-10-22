@@ -66,9 +66,9 @@ int spotflow_ota_main_request_abort(struct ota_main_firmware_model* main, bool h
 				    struct spotflow_ota_main_firmware_state* out_state);
 bool spotflow_ota_main_is_abort_requested(const struct ota_main_firmware_model* main,
 					  bool has_attempt);
-int spotflow_ota_main_begin_upgrade_commit(struct ota_main_firmware_model* main, bool handler_owned,
-					   bool attempt_canceled);
-int spotflow_ota_main_cancel_upgrade_commit(struct ota_main_firmware_model* main);
+int spotflow_ota_main_begin_installation(struct ota_main_firmware_model* main, bool handler_owned,
+					 bool attempt_canceled);
+int spotflow_ota_main_cancel_installation(struct ota_main_firmware_model* main);
 int spotflow_ota_main_begin_reboot(struct ota_main_firmware_model* main);
 
 #ifdef __cplusplus

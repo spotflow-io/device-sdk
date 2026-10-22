@@ -97,13 +97,20 @@ config SPOTFLOW_OTA_MCUBOOT_AVAILABLE
 	depends on ARCH_SUPPORTS_ROM_START || ARCH_POSIX
 	depends on FLASH && FLASH_MAP && STREAM_FLASH
 
+config SPOTFLOW_OTA_PSA_FWU_AVAILABLE
+	bool
+	default y if CC35XXE_FWU
+	help
+	  A PSA FWU implementation supported by Spotflow is available on this target.
+	  Extend this condition when adding another provider implementation.
+
 config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 	bool "Automatically handle main firmware OTA updates"
 	depends on SPOTFLOW_GENERATE_BUILD_ID
-	depends on SPOTFLOW_OTA_MCUBOOT_AVAILABLE || CC35XXE_FWU
+	depends on SPOTFLOW_OTA_MCUBOOT_AVAILABLE || SPOTFLOW_OTA_PSA_FWU_AVAILABLE
 	default y
 	help
-	  Download main firmware artifacts, install them for trial execution, and
+	  Download main firmware artifacts, install them for unconfirmed execution, and
 	  reconcile the persisted probation record after reboot. The application
 	  confirms the new image after its health checks. Requires an available
 	  firmware update provider and embedded build IDs in both images.
@@ -112,7 +119,7 @@ if SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 
 choice SPOTFLOW_OTA_MAIN_FIRMWARE_BACKEND
 	prompt "Main firmware update backend"
-	default SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU if CC35XXE_FWU && !BOOTLOADER_MCUBOOT
+	default SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU if SPOTFLOW_OTA_PSA_FWU_AVAILABLE && !BOOTLOADER_MCUBOOT
 	default SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
 
 config SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
@@ -126,12 +133,12 @@ config SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
 
 config SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU
 	bool "PSA Firmware Update"
-	depends on CC35XXE_FWU
+	depends on SPOTFLOW_OTA_PSA_FWU_AVAILABLE
 	help
-	  Use the PSA Firmware Update lifecycle. Component selection and artifact
-	  preparation are supplied by a private provider adapter; currently TI
-	  CC35XX is supported. Confirmation does not reboot. If acceptance needs
-	  a reboot, the application must use the provider's reboot mechanism.
+	  Use the PSA Firmware Update lifecycle. The TI CC35xx implementation
+	  currently supplies component selection and signed-image preparation.
+	  Confirmation does not reboot. If the platform requires a reboot to make
+	  confirmation durable, the application must request it through PSA FWU.
 
 endchoice
 

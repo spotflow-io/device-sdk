@@ -48,11 +48,11 @@ enum spotflow_ota_phase {
 	SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD,
 	/** Main firmware image is downloading. */
 	SPOTFLOW_OTA_PHASE_DOWNLOADING,
-	/** Download finished; preparing trial installation. */
+	/** Download finished; preparing installation with rollback enabled. */
 	SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
 	/** Test upgrade requested; device is about to reboot. */
 	SPOTFLOW_OTA_PHASE_PENDING_REBOOT,
-	/** New image is not committed; acceptance may still require a reboot. */
+	/** New image is not yet confirmed; acceptance may still require a reboot. */
 	SPOTFLOW_OTA_PHASE_UNCONFIRMED,
 };
 
@@ -244,7 +244,7 @@ int spotflow_resume_main_firmware_update(struct spotflow_ota_main_firmware_state
  * only while the phase is @c SPOTFLOW_OTA_PHASE_PENDING_DOWNLOAD,
  * @c SPOTFLOW_OTA_PHASE_DOWNLOADING, or @c SPOTFLOW_OTA_PHASE_PENDING_UPGRADE.
  * Cannot abort an update in @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT because the
- * trial installation has already been requested, or in
+ * installation has already been requested, or in
  * @c SPOTFLOW_OTA_PHASE_UNCONFIRMED; use @ref spotflow_confirm_main_firmware_image
  * after reboot or allow rollback handling on the next boot.
  *
@@ -276,9 +276,9 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  * selected firmware backend. This function does not reboot. For TI PSA FWU, the
  * application must subsequently call psa_fwu_request_reboot() to commit the image;
  * state remains UNCONFIRMED and the result remains PENDING until startup verifies
- * commitment. A plain system reboot does not persist TI's acceptance request.
+ * durable confirmation. A plain system reboot does not persist TI's acceptance request.
  *
- * Once committed, persistence, probation cleanup, and result reporting run on the
+ * Once confirmed, persistence, probation cleanup, and result reporting run on the
  * OTA worker. A return value of @c 0 does not mean that the result has already been
  * published or received by Spotflow.
  *
@@ -293,7 +293,7 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  *
  * @param state Optional out parameter for the resulting snapshot.
  *
- * @retval 0 Confirmation accepted, or image already committed.
+ * @retval 0 Confirmation accepted, or image already confirmed.
  * @retval -EINVAL No active attempt, wrong phase, or probation metadata does not
  *         match the current attempt.
  * @retval <0 Negative errno when OTA initialization, platform confirmation, or

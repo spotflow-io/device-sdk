@@ -38,11 +38,11 @@ ZTEST(spotflow_ota_main_model, test_upgrade_transition_sequence)
 	claim_and_download(&main);
 	zassert_true(spotflow_ota_main_is_valid(&main));
 
-	zassert_ok(spotflow_ota_main_begin_upgrade_commit(&main, true, false));
+	zassert_ok(spotflow_ota_main_begin_installation(&main, true, false));
 	zassert_true(spotflow_ota_main_upgrade_is_irreversible(&main));
-	zassert_ok(spotflow_ota_main_cancel_upgrade_commit(&main));
+	zassert_ok(spotflow_ota_main_cancel_installation(&main));
 	zassert_false(spotflow_ota_main_upgrade_is_irreversible(&main));
-	zassert_ok(spotflow_ota_main_begin_upgrade_commit(&main, true, false));
+	zassert_ok(spotflow_ota_main_begin_installation(&main, true, false));
 	zassert_ok(spotflow_ota_main_finish_prereboot(&main, true, &transition));
 	zassert_true(transition.clear_artifact_transaction);
 	zassert_equal(transition.state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
@@ -107,7 +107,7 @@ ZTEST(spotflow_ota_main_model, test_public_state_is_projected_from_execution_and
 		  SPOTFLOW_OTA_RESULT_PENDING },
 		{ OTA_MAIN_EXECUTION_PENDING_UPGRADE, SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
 		  SPOTFLOW_OTA_RESULT_PENDING },
-		{ OTA_MAIN_EXECUTION_COMMITTING, SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
+		{ OTA_MAIN_EXECUTION_INSTALLING, SPOTFLOW_OTA_PHASE_PENDING_UPGRADE,
 		  SPOTFLOW_OTA_RESULT_PENDING },
 		{ OTA_MAIN_EXECUTION_REBOOT_READY, SPOTFLOW_OTA_PHASE_PENDING_REBOOT,
 		  SPOTFLOW_OTA_RESULT_PENDING },

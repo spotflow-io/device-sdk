@@ -11,7 +11,7 @@ enum spotflow_ota_result fail_main_firmware(const struct spotflow_ota_operation_
 int main_firmware_control_checkpoint(void);
 enum spotflow_ota_result
 interrupted_main_firmware_result(const struct spotflow_ota_operation_token* token);
-int begin_main_firmware_upgrade_commit(const struct spotflow_ota_operation_token* token);
+int begin_main_firmware_installation(const struct spotflow_ota_operation_token* token);
 int begin_main_firmware_reboot(const struct spotflow_ota_operation_token* token);
 void download_started_cb(struct spotflow_downloader* downloader, void* callback_ctx);
 

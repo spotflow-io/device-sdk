@@ -161,7 +161,7 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 	strncpy(probation.version, artifact->version, sizeof(probation.version) - 1);
 	memcpy(probation.expected_build_id, expected_build_id, sizeof(probation.expected_build_id));
 
-	rc = begin_main_firmware_upgrade_commit(token);
+	rc = begin_main_firmware_installation(token);
 	if (rc < 0) {
 		goto failed;
 	}
@@ -195,7 +195,7 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 	return SPOTFLOW_OTA_RESULT_PENDING;
 
 cancel_installation:
-	(void)spotflow_ota_state_cancel_main_firmware_upgrade_commit(token);
+	(void)spotflow_ota_state_cancel_main_firmware_installation(token);
 failed:
 	abort_image_write();
 	if (rc == -ECANCELED) {

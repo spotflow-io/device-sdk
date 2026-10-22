@@ -1041,7 +1041,7 @@ ZTEST(spotflow_ota_state, test_supersede_unfinished_attempt_and_promote_pending)
 	zassert_equal(job.data.process_artifact.artifact_index, 0);
 }
 
-ZTEST(spotflow_ota_state, test_cancel_is_ignored_after_main_upgrade_commit_starts)
+ZTEST(spotflow_ota_state, test_cancel_is_ignored_after_main_installation_starts)
 {
 	struct spotflow_ota_update_msg update = make_update(30, 2);
 	struct spotflow_ota_update_result update_result;
@@ -1055,7 +1055,7 @@ ZTEST(spotflow_ota_state, test_cancel_is_ignored_after_main_upgrade_commit_start
 	zassert_ok(spotflow_ota_state_main_firmware_download_pending(&job.token, NULL));
 	zassert_ok(spotflow_ota_state_main_firmware_download_started(&job.token, NULL));
 	zassert_ok(spotflow_ota_state_main_firmware_download_completed(&job.token, NULL));
-	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit(&job.token));
+	zassert_ok(spotflow_ota_state_begin_main_firmware_installation(&job.token));
 
 	zassert_ok(spotflow_ota_state_accept_cancel(update.attempt_id, &cancel_result));
 	zassert_equal(cancel_result.disposition, SPOTFLOW_OTA_CANCEL_IGNORED_LATE);
@@ -1067,7 +1067,7 @@ ZTEST(spotflow_ota_state, test_cancel_is_ignored_after_main_upgrade_commit_start
 	zassert_equal(snapshot.artifact_results[1], SPOTFLOW_OTA_RESULT_PENDING);
 }
 
-ZTEST(spotflow_ota_state, test_supersession_does_not_mutate_attempt_after_upgrade_commit)
+ZTEST(spotflow_ota_state, test_supersession_does_not_mutate_attempt_after_installation)
 {
 	struct spotflow_ota_update_msg current = make_update(30, 2);
 	struct spotflow_ota_update_msg newer = make_update(31, 1);
@@ -1081,7 +1081,7 @@ ZTEST(spotflow_ota_state, test_supersession_does_not_mutate_attempt_after_upgrad
 	zassert_ok(spotflow_ota_state_main_firmware_download_pending(&job.token, NULL));
 	zassert_ok(spotflow_ota_state_main_firmware_download_started(&job.token, NULL));
 	zassert_ok(spotflow_ota_state_main_firmware_download_completed(&job.token, NULL));
-	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit(&job.token));
+	zassert_ok(spotflow_ota_state_begin_main_firmware_installation(&job.token));
 
 	zassert_ok(spotflow_ota_state_accept_update(&newer, &result));
 	zassert_equal(result.disposition, SPOTFLOW_OTA_UPDATE_QUEUED);
@@ -1120,18 +1120,18 @@ ZTEST(spotflow_ota_state, test_main_firmware_semantic_transition_sequence)
 	zassert_ok(spotflow_ota_state_main_firmware_download_started(&job.token, &state));
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_DOWNLOADING);
 	zassert_equal(spotflow_ota_state_main_firmware_download_started(&job.token, NULL), -EINVAL);
-	zassert_equal(spotflow_ota_state_begin_main_firmware_upgrade_commit(&job.token), -EINVAL);
+	zassert_equal(spotflow_ota_state_begin_main_firmware_installation(&job.token), -EINVAL);
 
 	zassert_ok(spotflow_ota_state_main_firmware_download_completed(&job.token, &state));
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_UPGRADE);
 	zassert_equal(spotflow_ota_state_main_firmware_download_completed(&job.token, NULL),
 		      -EINVAL);
 
-	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit(&job.token));
-	zassert_equal(spotflow_ota_state_begin_main_firmware_upgrade_commit(&job.token), -EINVAL);
-	zassert_ok(spotflow_ota_state_cancel_main_firmware_upgrade_commit(&job.token));
-	zassert_equal(spotflow_ota_state_cancel_main_firmware_upgrade_commit(&job.token), -EINVAL);
-	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit(&job.token));
+	zassert_ok(spotflow_ota_state_begin_main_firmware_installation(&job.token));
+	zassert_equal(spotflow_ota_state_begin_main_firmware_installation(&job.token), -EINVAL);
+	zassert_ok(spotflow_ota_state_cancel_main_firmware_installation(&job.token));
+	zassert_equal(spotflow_ota_state_cancel_main_firmware_installation(&job.token), -EINVAL);
+	zassert_ok(spotflow_ota_state_begin_main_firmware_installation(&job.token));
 
 	zassert_ok(spotflow_ota_state_finish_main_firmware_prereboot(&job.token, &state));
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
@@ -1166,9 +1166,9 @@ ZTEST(spotflow_ota_state, test_stale_main_handler_token_rejects_all_transitions)
 		      -ESTALE);
 	zassert_equal(spotflow_ota_state_main_firmware_download_completed(&stale_job.token, NULL),
 		      -ESTALE);
-	zassert_equal(spotflow_ota_state_begin_main_firmware_upgrade_commit(&stale_job.token),
+	zassert_equal(spotflow_ota_state_begin_main_firmware_installation(&stale_job.token),
 		      -ESTALE);
-	zassert_equal(spotflow_ota_state_cancel_main_firmware_upgrade_commit(&stale_job.token),
+	zassert_equal(spotflow_ota_state_cancel_main_firmware_installation(&stale_job.token),
 		      -ESTALE);
 	zassert_equal(spotflow_ota_state_finish_main_firmware_prereboot(&stale_job.token, NULL),
 		      -ESTALE);

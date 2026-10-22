@@ -202,7 +202,7 @@ interrupted_main_firmware_result(const struct spotflow_ota_operation_token* toke
 	return SPOTFLOW_OTA_RESULT_CANCELED;
 }
 
-int begin_main_firmware_upgrade_commit(const struct spotflow_ota_operation_token* token)
+int begin_main_firmware_installation(const struct spotflow_ota_operation_token* token)
 {
 	for (;;) {
 		int rc = main_firmware_control_checkpoint();
@@ -211,7 +211,7 @@ int begin_main_firmware_upgrade_commit(const struct spotflow_ota_operation_token
 			return rc;
 		}
 
-		rc = spotflow_ota_state_begin_main_firmware_upgrade_commit(token);
+		rc = spotflow_ota_state_begin_main_firmware_installation(token);
 		if (rc != -EAGAIN) {
 			return rc;
 		}

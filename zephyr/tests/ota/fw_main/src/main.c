@@ -390,7 +390,7 @@ ZTEST(spotflow_ota_fw_main, test_finish_prereboot_keeps_main_artifact_pending)
 	zassert_ok(spotflow_ota_state_main_firmware_download_pending(&job.token, NULL));
 	zassert_ok(spotflow_ota_state_main_firmware_download_started(&job.token, NULL));
 	zassert_ok(spotflow_ota_state_main_firmware_download_completed(&job.token, NULL));
-	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit(&job.token));
+	zassert_ok(spotflow_ota_state_begin_main_firmware_installation(&job.token));
 	zassert_ok(spotflow_ota_state_finish_main_firmware_prereboot(&job.token, NULL));
 
 	spotflow_ota_state_get_diagnostic(&snapshot);
@@ -686,7 +686,7 @@ static void setup_pre_reboot_main_update(enum spotflow_ota_phase phase)
 	}
 
 	zassert_equal(phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
-	zassert_ok(spotflow_ota_state_begin_main_firmware_upgrade_commit(&job.token));
+	zassert_ok(spotflow_ota_state_begin_main_firmware_installation(&job.token));
 	zassert_ok(spotflow_ota_state_finish_main_firmware_prereboot(&job.token, NULL));
 }
 
@@ -926,7 +926,7 @@ ZTEST(spotflow_ota_fw_main, test_progress_callback_cannot_abort_pending_reboot)
 	zassert_equal(platform_fake->reboot_count, 1);
 }
 
-ZTEST(spotflow_ota_fw_main, test_upgrade_commit_wins_race_with_abort)
+ZTEST(spotflow_ota_fw_main, test_installation_wins_race_with_abort)
 {
 	struct spotflow_ota_main_firmware_state state;
 	struct k_thread process_thread;
@@ -950,7 +950,7 @@ ZTEST(spotflow_ota_fw_main, test_upgrade_commit_wins_race_with_abort)
 	zassert_equal(platform_fake->reboot_count, 1);
 }
 
-ZTEST(spotflow_ota_fw_main, test_pause_racing_upgrade_commit_defers_reboot)
+ZTEST(spotflow_ota_fw_main, test_pause_racing_installation_defers_reboot)
 {
 	struct spotflow_ota_main_firmware_state state;
 	struct k_thread process_thread;
