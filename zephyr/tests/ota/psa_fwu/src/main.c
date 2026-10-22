@@ -454,3 +454,57 @@ ZTEST(spotflow_ota_psa, test_restored_cancellation_queues_result_report)
 }
 
 ZTEST_SUITE(spotflow_ota_psa, NULL, NULL, before_each, NULL, NULL);
+
+ZTEST(spotflow_ota_psa, test_large_blocks_preserve_prefix_and_bound_psa_writes)
+{
+	uint8_t artifact[1024];
+
+	memset(artifact, 0xff, sizeof(artifact));
+	memcpy(artifact, image, 176);
+	PSA_FWU_GPESlot_t prefix;
+
+	memcpy(&prefix, artifact, sizeof(prefix));
+
+	prefix.Manifest.GPE_Header.ih_img_size = 964;
+	prefix.Manifest.GPE_Header.ih_protect_tlv_size = 4;
+	memcpy(artifact, &prefix, sizeof(prefix));
+	sys_put_le16(0x6908, artifact + 1012);
+	sys_put_le16(4, artifact + 1014);
+	sys_put_le16(0x6907, artifact + 1016);
+	sys_put_le16(8, artifact + 1018);
+	transport->payload = artifact;
+	transport->payload_len = sizeof(artifact);
+	transport->chunk_size = sizeof(artifact);
+	zassert_equal(process(), SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(fake.start_count, 1);
+	zassert_equal(fake.max_block_size, 256);
+	zassert_mem_equal(fake.image, artifact, sizeof(artifact));
+}
+
+ZTEST(spotflow_ota_psa, test_signature_trailer_cannot_supply_executable_identity)
+{
+	uint8_t artifact[224];
+
+	memset(artifact, 0xff, sizeof(artifact));
+	memcpy(artifact, image, sizeof(image));
+	memset(artifact + 48, 0xff, 128);
+	sys_put_le16(44, artifact + 182);
+	zassert_true(spotflow_ota_test_bindesc_write_build_id(artifact, sizeof(artifact), 188,
+							      build_id));
+	transport->payload = artifact;
+	transport->payload_len = sizeof(artifact);
+	transport->chunk_size = sizeof(artifact);
+	zassert_equal(process(), SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(fake.finish_count, 0);
+	zassert_equal(fake.install_count, 0);
+}
+
+ZTEST(spotflow_ota_psa, test_unexpected_running_state_fails_startup_without_probation)
+{
+	struct spotflow_ota_fw_main_startup_result startup;
+
+	fake.slots[4].state = PSA_FWU_READY;
+	zassert_equal(spotflow_ota_fw_main_reconcile_startup(NULL, false, &startup), -EIO);
+	zassert_equal(fake.accept_count, 0);
+	zassert_equal(fake.reboot_count, 0);
+}

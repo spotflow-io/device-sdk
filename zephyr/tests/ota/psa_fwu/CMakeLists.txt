@@ -62,6 +62,7 @@ target_sources(app PRIVATE
         ../../../src/ota/core/spotflow_ota_main_model.c
         ../../../src/ota/platform/spotflow_ota_identity_stream.c
         ../../../src/ota/platform/psa/spotflow_ota_psa_ti_cc35xx.c
+        ../../../src/ota/platform/psa/spotflow_ota_psa_ti_container.c
         ../../../src/ota/protocol/spotflow_ota_net.c
         ../../../src/ota/persistence/spotflow_ota_persistence.c
         ../../../src/ota/persistence/spotflow_ota_records_cbor.c

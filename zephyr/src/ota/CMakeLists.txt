@@ -45,4 +45,5 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU
 
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_PSA_FWU_TI_CC35XX
         platform/psa/spotflow_ota_psa_ti_cc35xx.c
+        platform/psa/spotflow_ota_psa_ti_container.c
 )
