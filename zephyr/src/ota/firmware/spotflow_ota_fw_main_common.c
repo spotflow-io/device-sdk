@@ -15,6 +15,7 @@ static void fill_main_firmware_state_output(struct spotflow_ota_main_firmware_st
 static void main_firmware_wake_paused_worker(void);
 static void main_firmware_drain_resume_sem(void);
 static void wait_while_paused(bool honor_interruptions);
+
 void spotflow_ota_fw_main_reset(void)
 {
 	k_mutex_lock(&main_firmware_downloader.mutex, K_FOREVER);

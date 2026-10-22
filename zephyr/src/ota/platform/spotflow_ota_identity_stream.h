@@ -1,10 +1,10 @@
 #ifndef SPOTFLOW_OTA_IDENTITY_STREAM_H
 #define SPOTFLOW_OTA_IDENTITY_STREAM_H
 
-#include <stdbool.h>
+#include "spotflow_build_id.h"
+
 #include <stddef.h>
 #include <stdint.h>
-#include "spotflow_build_id.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -27,11 +27,22 @@ struct spotflow_ota_identity_stream {
 	int error;
 };
 
-/** @brief Consume executable payload bytes in order; NULL data requires zero length. */
+/**
+ * @brief Consume executable payload bytes in order.
+ * @param ctx Zero-initialized parser context; NULL is ignored.
+ * @param data Payload bytes, or NULL when len is zero.
+ * @param len Number of bytes to consume.
+ * @note Errors are retained in the context and returned by the identity getter.
+ */
 void spotflow_ota_identity_stream_feed(struct spotflow_ota_identity_stream* ctx,
 				       const uint8_t* data, size_t len);
-/** @brief Copy the parsed ID; return -ENOENT if incomplete, -EINVAL for a bad size,
- * or -ENOSYS for an unpatched all-zero ID.
+
+/**
+ * @brief Copy the parsed executable build ID.
+ * @param ctx Parser context.
+ * @param build_id Receives the build ID.
+ * @return Zero on success, -ENOENT if incomplete or missing, -EINVAL for an invalid
+ * argument or descriptor size, or -ENOSYS for an unpatched all-zero ID.
  */
 int spotflow_ota_identity_stream_get(const struct spotflow_ota_identity_stream* ctx,
 				     uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);

@@ -274,7 +274,7 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. After a
  * successful reboot into an unconfirmed image, requests acceptance through the
  * selected firmware backend. This function does not reboot. For TI PSA FWU, the
- * application must subsequently call psa_fwu_request_reboot() to commit the image;
+ * application must subsequently call psa_fwu_request_reboot() to make confirmation durable;
  * state remains UNCONFIRMED and the result remains PENDING until startup verifies
  * durable confirmation. A plain system reboot does not persist TI's acceptance request.
  *

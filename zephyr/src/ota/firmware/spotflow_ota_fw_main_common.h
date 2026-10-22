@@ -4,7 +4,7 @@
 #include "ota/firmware/spotflow_ota_fw_main.h"
 #include "ota/downloader/spotflow_ota_downloader.h"
 
-/* Download controls shared by the compile-time selected firmware handler. */
+/* Internal download controls used by the main-firmware coordinator. */
 extern struct spotflow_downloader main_firmware_downloader;
 void notify_main_firmware_state(const struct spotflow_ota_main_firmware_state* state);
 enum spotflow_ota_result fail_main_firmware(const struct spotflow_ota_operation_token* token);

@@ -276,7 +276,9 @@ def main():
     parser = argparse.ArgumentParser(description="Generate and embed a Spotflow build ID")
     metadata = parser.add_mutually_exclusive_group()
     metadata.add_argument("--extra-input", default="", help="Additional deterministic hash input")
-    metadata.add_argument("--extra-input-file", type=Path, help="UTF-8 file with the exact hash input")
+    metadata.add_argument(
+        "--extra-input-file", type=Path, help="UTF-8 file with the exact hash input"
+    )
     parser.add_argument("elf_file")
     parser.add_argument("other_files", nargs="*", help="Related ELF, HEX, BIN or stripped files")
     args = parser.parse_args()

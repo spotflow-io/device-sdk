@@ -829,6 +829,6 @@ west twister -T spotflow/zephyr/tests/ota -p native_sim --inline-logs
 | Facade and routing | `facade/` | C2D routing, public effects, cancellation threading |
 | Worker | `worker/` | Durable ordering, retries, promotion, multi-artifact chains |
 | Downloader | `downloader/` | Faked transport, retry, pause, resume, cancellation |
-| Platform and identity | `platform/` | Faked MCUboot, flash, and build IDs |
+| Platform and identity | `platform_identity/` | MCUboot framing, descriptor boundaries, and build-ID fakes |
 | Main firmware | `fw_main/` | Shared coordinator, controls, persistence, reconciliation |
 | PSA firmware | `psa_fwu/` | TI stream adapter, slot ownership, acceptance, confirmation reboot and rollback |

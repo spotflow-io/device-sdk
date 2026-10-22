@@ -1,11 +1,10 @@
-#include "ota/firmware/spotflow_ota_fw_main_common.h"
+#include "spotflow_ota_fw_main.h"
 
-#include <spotflow/downloader.h>
-
+#include "spotflow_ota_fw_main_common.h"
 #include "ota/downloader/spotflow_ota_downloader.h"
 #include "ota/firmware/spotflow_ota_fw_custom.h"
-#include "ota/platform/spotflow_ota_identity.h"
 #include "ota/core/spotflow_ota_log.h"
+#include "ota/platform/spotflow_ota_identity.h"
 #include "ota/persistence/spotflow_ota_persistence.h"
 #include "ota/platform/spotflow_ota_platform.h"
 #include "ota/core/spotflow_ota_state.h"
@@ -18,9 +17,11 @@
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
-struct main_firmware_download_context {
+struct spotflow_ota_main_firmware_download_context {
 	int write_error;
 };
+
+static K_MUTEX_DEFINE(confirmation_mutex);
 
 static void download_block_cb(const struct spotflow_artifact_block* block,
 			      struct spotflow_downloader* downloader, void* callback_ctx);
@@ -32,8 +33,6 @@ static int complete_main_firmware_rollback(const struct spotflow_ota_probation* 
 					   spotflow_ota_state_effects* effects);
 static bool main_artifact_is_pending(const struct spotflow_ota_probation* probation);
 static void abort_image_write(void);
-
-static K_MUTEX_DEFINE(confirmation_mutex);
 
 enum spotflow_ota_result
 spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
@@ -82,7 +81,7 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 		.url = artifact->url,
 		.secret = artifact->secret,
 	};
-	struct main_firmware_download_context download_context = {
+	struct spotflow_ota_main_firmware_download_context download_context = {
 		.write_error = 0,
 	};
 	int rc = spotflow_ota_platform_begin_image_write();
@@ -363,7 +362,7 @@ done:
 static void download_block_cb(const struct spotflow_artifact_block* block,
 			      struct spotflow_downloader* downloader, void* callback_ctx)
 {
-	struct main_firmware_download_context* ctx = callback_ctx;
+	struct spotflow_ota_main_firmware_download_context* ctx = callback_ctx;
 
 	if (ctx->write_error != 0) {
 		return;

@@ -169,7 +169,10 @@ def test_extra_input_is_patched_consistently_and_repatching_is_idempotent():
     with tempfile.TemporaryDirectory() as temp_dir_str:
         temp_dir = Path(temp_dir_str)
         inputs = Path(__file__).parent / "patch_build_id" / "inputs"
-        paths = [temp_dir / ("zephyr." + suffix) for suffix in ["elf", "bin", "hex", "strip", "exe"]]
+        paths = [
+            temp_dir / ("zephyr." + suffix)
+            for suffix in ["elf", "bin", "hex", "strip", "exe"]
+        ]
         for path in paths:
             shutil.copyfile(inputs / path.name, path)
         elf_path, *others = paths
