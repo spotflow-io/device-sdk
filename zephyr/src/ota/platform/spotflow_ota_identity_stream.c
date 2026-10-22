@@ -1,4 +1,4 @@
-#include "ota/firmware/spotflow_ota_psa_identity.h"
+#include "ota/platform/spotflow_ota_identity_stream.h"
 
 #include <errno.h>
 #include <string.h>
@@ -7,11 +7,25 @@
 
 #define BUILD_ID_TAG BINDESC_TAG(BYTES, 0x5f0)
 
-enum parser_phase { FIND_MAGIC, READ_HEADER, READ_ID, SKIP_ENTRY, FOUND_ID };
+enum parser_phase {
+	FIND_MAGIC,
+	READ_HEADER,
+	READ_ID,
+	SKIP_ENTRY,
+	FOUND_ID,
+};
 
-void spotflow_ota_psa_identity_feed(struct spotflow_ota_psa_identity* ctx,
-				   const uint8_t* data, size_t len)
+void spotflow_ota_identity_stream_feed(struct spotflow_ota_identity_stream* ctx,
+				       const uint8_t* data, size_t len)
 {
+	if (ctx == NULL) {
+		return;
+	}
+	if (data == NULL && len != 0) {
+		ctx->error = -EINVAL;
+		return;
+	}
+
 	for (size_t i = 0; i < len && ctx->error == 0 && ctx->phase != FOUND_ID; i++) {
 		uint8_t byte = data[i];
 
@@ -20,15 +34,20 @@ void spotflow_ota_psa_identity_feed(struct spotflow_ota_psa_identity* ctx,
 		case FIND_MAGIC:
 			ctx->magic = (ctx->magic >> 8) | ((uint64_t)byte << 56);
 			if (ctx->offset >= sizeof(ctx->magic) &&
-			    ctx->offset % BINDESC_ALIGNMENT == 0 && ctx->magic == BINDESC_MAGIC) {
+			    ctx->offset % BINDESC_ALIGNMENT == 0 &&
+			    ctx->magic == sys_cpu_to_le64(BINDESC_MAGIC)) {
 				ctx->phase = READ_HEADER;
 			}
 			break;
 		case READ_HEADER:
 			ctx->header[ctx->used++] = byte;
 			if (ctx->used == sizeof(ctx->header)) {
-				uint16_t tag = sys_get_le16(ctx->header);
-				uint16_t size = sys_get_le16(ctx->header + 2);
+				uint16_t tag;
+				uint16_t size;
+
+				/* Zephyr descriptors use the target's native byte order. */
+				memcpy(&tag, ctx->header, sizeof(tag));
+				memcpy(&size, ctx->header + sizeof(tag), sizeof(size));
 
 				ctx->used = 0;
 				if (tag == BUILD_ID_TAG) {
@@ -68,9 +87,13 @@ void spotflow_ota_psa_identity_feed(struct spotflow_ota_psa_identity* ctx,
 	}
 }
 
-int spotflow_ota_psa_identity_get(const struct spotflow_ota_psa_identity* ctx,
-				uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+int spotflow_ota_identity_stream_get(const struct spotflow_ota_identity_stream* ctx,
+				     uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
+	if (ctx == NULL || build_id == NULL) {
+		return -EINVAL;
+	}
+
 	if (ctx->error != 0) {
 		return ctx->error;
 	}
@@ -81,11 +104,12 @@ int spotflow_ota_psa_identity_get(const struct spotflow_ota_psa_identity* ctx,
 	return 0;
 }
 
-bool spotflow_ota_psa_identity_matches(const uint8_t expected[SPOTFLOW_BUILD_ID_LENGTH])
+bool spotflow_ota_identity_stream_matches(const uint8_t expected[SPOTFLOW_BUILD_ID_LENGTH])
 {
 	const uint8_t* running;
 	uint16_t len;
 
-	return spotflow_build_id_get(&running, &len) == 0 && len == SPOTFLOW_BUILD_ID_LENGTH &&
-	       memcmp(expected, running, SPOTFLOW_BUILD_ID_LENGTH) == 0;
+	return expected != NULL && spotflow_build_id_get(&running, &len) == 0 &&
+		len == SPOTFLOW_BUILD_ID_LENGTH &&
+		memcmp(expected, running, SPOTFLOW_BUILD_ID_LENGTH) == 0;
 }

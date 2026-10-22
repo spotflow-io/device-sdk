@@ -1,7 +1,7 @@
 #include "ota/firmware/spotflow_ota_fw_main_common.h"
 #include "ota/firmware/spotflow_ota_fw_custom.h"
 #include "ota/firmware/spotflow_ota_psa.h"
-#include "ota/firmware/spotflow_ota_psa_identity.h"
+#include "ota/platform/spotflow_ota_identity_stream.h"
 #include "ota/persistence/spotflow_ota_persistence.h"
 
 #include <string.h>
@@ -111,7 +111,7 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 	/* Without new persistent container metadata, identical executable build IDs
 	 * cannot distinguish an interrupted install from its already-running image.
 	 */
-	if (rc == 0 && spotflow_ota_psa_identity_matches(probation.expected_build_id)) {
+	if (rc == 0 && spotflow_ota_identity_stream_matches(probation.expected_build_id)) {
 		rc = -EALREADY;
 	}
 	if (rc == 0) {
@@ -137,8 +137,9 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 		psa_status_t status = psa_fwu_install();
 
 		/* Main-image installation must transfer execution through a reboot. */
-		rc = status == PSA_SUCCESS_REBOOT ? 0 :
-			     (status < 0 ? spotflow_ota_psa_errno(status) : -ENOTSUP);
+		rc = status == PSA_SUCCESS_REBOOT
+			? 0
+			: (status < 0 ? spotflow_ota_psa_errno(status) : -ENOTSUP);
 	}
 	k_mutex_unlock(&psa_mutex);
 	if (rc < 0) {
@@ -199,13 +200,13 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 		return rc;
 	}
 	if (!spotflow_ota_state_is_main_artifact_pending(probation->attempt_id,
-							probation->artifact_index)) {
+							 probation->artifact_index)) {
 		return spotflow_ota_persistence_clear_probation();
 	}
-	if (!spotflow_ota_psa_identity_matches(probation->expected_build_id)) {
+	if (!spotflow_ota_identity_stream_matches(probation->expected_build_id)) {
 		rc = spotflow_ota_state_queue_main_firmware_result(
-			probation->attempt_id, probation->artifact_index, SPOTFLOW_OTA_RESULT_FAILED,
-			&result->progress_state, &result->effects);
+			probation->attempt_id, probation->artifact_index,
+			SPOTFLOW_OTA_RESULT_FAILED, &result->progress_state, &result->effects);
 	} else if (info.state == PSA_FWU_TRIAL) {
 		rc = spotflow_ota_state_enter_main_firmware_unconfirmed(
 			probation->attempt_id, probation->artifact_index, &result->progress_state);
@@ -215,8 +216,8 @@ int spotflow_ota_fw_main_reconcile_startup(const struct spotflow_ota_probation* 
 			SPOTFLOW_OTA_RESULT_SUCCEEDED, &result->progress_state, &result->effects);
 	} else if (info.state == PSA_FWU_FAILED || info.state == PSA_FWU_REJECTED) {
 		rc = spotflow_ota_state_queue_main_firmware_result(
-			probation->attempt_id, probation->artifact_index, SPOTFLOW_OTA_RESULT_FAILED,
-			&result->progress_state, &result->effects);
+			probation->attempt_id, probation->artifact_index,
+			SPOTFLOW_OTA_RESULT_FAILED, &result->progress_state, &result->effects);
 	} else {
 		/* An unexpected provider state is not evidence of commitment. */
 		return -EIO;
@@ -259,8 +260,8 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 	}
 	if (!has_probation || probation.attempt_id != view.attempt_id ||
 	    !spotflow_ota_state_is_main_artifact_pending(probation.attempt_id,
-							probation.artifact_index) ||
-	    !spotflow_ota_psa_identity_matches(probation.expected_build_id)) {
+							 probation.artifact_index) ||
+	    !spotflow_ota_identity_stream_matches(probation.expected_build_id)) {
 		rc = -EINVAL;
 		goto done;
 	}

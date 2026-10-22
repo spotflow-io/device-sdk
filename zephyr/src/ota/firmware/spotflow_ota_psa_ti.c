@@ -1,5 +1,5 @@
 #include "ota/firmware/spotflow_ota_psa.h"
-#include "ota/firmware/spotflow_ota_psa_identity.h"
+#include "ota/platform/spotflow_ota_identity_stream.h"
 
 #include <psa_fwu.h>
 #include <string.h>
@@ -26,7 +26,7 @@ extern uint32_t vendor_image_slot_2_region_size;
 
 static struct {
 	PSA_FWU_GPESlot_t prefix;
-	struct spotflow_ota_psa_identity identity;
+	struct spotflow_ota_identity_stream identity;
 	psa_fwu_component_t component;
 	size_t offset;
 	size_t max_size;
@@ -67,7 +67,7 @@ static int vendor_info(psa_fwu_component_info_t info[2])
 		}
 	}
 	if ((info[0].impl.running_status == TI_RUNNING) ==
-	    (info[1].impl.running_status == TI_RUNNING) ||
+		    (info[1].impl.running_status == TI_RUNNING) ||
 	    (info[0].impl.Primary == TI_PRIMARY) == (info[1].impl.Primary == TI_PRIMARY)) {
 		return -EIO;
 	}
@@ -126,8 +126,9 @@ int spotflow_ota_psa_check_accept(void)
 	if (rc < 0) {
 		return rc;
 	}
-	psa_fwu_component_t running = slots[0].impl.running_status == TI_RUNNING ?
-					     Vendor_Image_Slot_1 : Vendor_Image_Slot_2;
+	psa_fwu_component_t running = slots[0].impl.running_status == TI_RUNNING
+		? Vendor_Image_Slot_1
+		: Vendor_Image_Slot_2;
 
 	return check_other_components(running, PSA_FWU_TRIAL);
 }
@@ -194,8 +195,7 @@ int spotflow_ota_psa_begin(void)
 	size_t target = running ^ 1;
 
 	/* A trial's primary slot is needed for rollback and must never be erased. */
-	if (slots[running].state != PSA_FWU_UPDATED ||
-	    slots[running].impl.Primary != TI_PRIMARY ||
+	if (slots[running].state != PSA_FWU_UPDATED || slots[running].impl.Primary != TI_PRIMARY ||
 	    slots[target].impl.Primary == TI_PRIMARY ||
 	    slots[target].impl.running_status == TI_RUNNING) {
 		return -EBUSY;
@@ -212,8 +212,8 @@ int spotflow_ota_psa_begin(void)
 			return rc < 0 ? rc : -EBUSY;
 		}
 	}
-	size_t slot_size = target == 0 ? vendor_image_slot_1_region_size :
-					vendor_image_slot_2_region_size;
+	size_t slot_size =
+		target == 0 ? vendor_image_slot_1_region_size : vendor_image_slot_2_region_size;
 
 	if (slot_size <= TI_WIRE_OVERHEAD || slot_size % TI_SECTOR_SIZE != 0 ||
 	    vendor_image_slot_1_region_size <= TI_WIRE_OVERHEAD ||
@@ -244,8 +244,8 @@ static int start_stream(void)
 	}
 	stream.payload_end = sizeof(stream.prefix) + header->ih_img_size;
 	stream.protected_end = stream.payload_end + header->ih_protect_tlv_size;
-	int rc = spotflow_ota_psa_errno(psa_fwu_start(stream.component, &stream.prefix,
-						   sizeof(stream.prefix)));
+	int rc = spotflow_ota_psa_errno(
+		psa_fwu_start(stream.component, &stream.prefix, sizeof(stream.prefix)));
 
 	stream.started = rc == 0;
 	return rc;
@@ -257,7 +257,7 @@ static int inspect_data(const uint8_t* data, size_t len)
 	if (stream.offset < stream.payload_end) {
 		size_t payload_len = MIN(len, stream.payload_end - stream.offset);
 
-		spotflow_ota_psa_identity_feed(&stream.identity, data, payload_len);
+		spotflow_ota_identity_stream_feed(&stream.identity, data, payload_len);
 	}
 	for (size_t i = 0; i < len; i++) {
 		size_t offset = stream.offset + i;
@@ -282,7 +282,8 @@ static int inspect_data(const uint8_t* data, size_t len)
 			if (index == 3) {
 				size_t tlv_size = sys_get_le16(stream.tlv_header + 2);
 
-				if (sys_get_le16(stream.tlv_header) != TI_TLV_MAGIC || tlv_size < 4 ||
+				if (sys_get_le16(stream.tlv_header) != TI_TLV_MAGIC ||
+				    tlv_size < 4 ||
 				    tlv_size > stream.max_size - stream.protected_end) {
 					return -EBADMSG;
 				}
@@ -328,8 +329,8 @@ int spotflow_ota_psa_write(const struct spotflow_artifact_block* block)
 			if (rc < 0) {
 				return rc;
 			}
-			rc = spotflow_ota_psa_errno(psa_fwu_write(stream.component, stream.offset,
-								 data, len));
+			rc = spotflow_ota_psa_errno(
+				psa_fwu_write(stream.component, stream.offset, data, len));
 			if (rc < 0) {
 				return rc;
 			}
@@ -348,13 +349,12 @@ int spotflow_ota_psa_write(const struct spotflow_artifact_block* block)
 	return 0;
 }
 
-int spotflow_ota_psa_end(psa_fwu_component_t* component,
-		       uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+int spotflow_ota_psa_end(psa_fwu_component_t* component, uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
 	if (!stream.complete) {
 		return -EBADMSG;
 	}
-	int rc = spotflow_ota_psa_identity_get(&stream.identity, build_id);
+	int rc = spotflow_ota_identity_stream_get(&stream.identity, build_id);
 
 	if (rc == 0) {
 		*component = stream.component;

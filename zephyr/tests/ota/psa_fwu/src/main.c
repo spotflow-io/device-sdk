@@ -6,7 +6,7 @@
 
 #include "ota/firmware/spotflow_ota_fw_main.h"
 #include "ota/firmware/spotflow_ota_psa.h"
-#include "ota/firmware/spotflow_ota_psa_identity.h"
+#include "ota/platform/spotflow_ota_identity_stream.h"
 #include "ota/persistence/spotflow_ota_persistence.h"
 #include "ota/protocol/spotflow_ota_net.h"
 #include "spotflow_ota_bindesc_test_util.h"
@@ -74,8 +74,8 @@ static void before_each(void* fixture)
 
 	memset(image, 0xff, sizeof(image));
 	memcpy(image, &manifest, sizeof(manifest));
-	zassert_true(spotflow_ota_test_bindesc_write_build_id(image, sizeof(image), 64,
-							    build_id) > 0);
+	zassert_true(spotflow_ota_test_bindesc_write_build_id(image, sizeof(image), 64, build_id) >
+		     0);
 	sys_put_le16(0x6908, image + 176);
 	sys_put_le16(4, image + 178);
 	sys_put_le16(0x6907, image + 180);
@@ -333,7 +333,9 @@ ZTEST(spotflow_ota_psa, test_provider_rejects_nonsequential_offsets)
 {
 	zassert_ok(spotflow_ota_psa_begin());
 	struct spotflow_artifact_block block = {
-		.offset = 1, .data = image, .data_len = 10,
+		.offset = 1,
+		.data = image,
+		.data_len = 10,
 	};
 
 	zassert_equal(spotflow_ota_psa_write(&block), -EINVAL);

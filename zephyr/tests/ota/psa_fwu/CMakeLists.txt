@@ -39,6 +39,7 @@ target_compile_definitions(app PRIVATE
 
 target_sources(app PRIVATE
         src/main.c
+        src/identity_stream.c
         src/psa_fake.c
         ../common/spotflow_ota_bindesc_test_util.c
         ../common/spotflow_ota_build_id_fake.c
@@ -57,7 +58,7 @@ target_sources(app PRIVATE
         ../../../src/ota/core/spotflow_ota_results.c
         ../../../src/ota/core/spotflow_ota_attempt_model.c
         ../../../src/ota/core/spotflow_ota_main_model.c
-        ../../../src/ota/firmware/spotflow_ota_psa_identity.c
+        ../../../src/ota/platform/spotflow_ota_identity_stream.c
         ../../../src/ota/firmware/spotflow_ota_psa_ti.c
         ../../../src/ota/protocol/spotflow_ota_net.c
         ../../../src/ota/persistence/spotflow_ota_persistence.c
