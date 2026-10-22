@@ -61,12 +61,18 @@ if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID)
         )
     endif()
 
+    # Keep arbitrary metadata out of command-line/list expansion (quotes and
+    # semicolons are valid string input). Kconfig changes already trigger relinking.
+    set(spotflow_build_id_extra_input_file "${CMAKE_BINARY_DIR}/spotflow_build_id_extra_input.txt")
+    file(WRITE "${spotflow_build_id_extra_input_file}" "${CONFIG_SPOTFLOW_BUILD_ID_EXTRA_INPUT}")
+
     set_property(
         GLOBAL
         PROPERTY extra_post_build_commands
             COMMAND
                 ${PYTHON_EXECUTABLE}
                 ${spotflow_patch_build_id_script}
+                --extra-input-file "${spotflow_build_id_extra_input_file}"
                 ${POTENTIALLY_PATCHED_FILES}
             ${PROPERTY_EXTRA_POST_BUILD_COMMANDS}
     )

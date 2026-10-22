@@ -55,7 +55,6 @@ void spotflow_on_update_canceled(void)
 int main(void)
 {
 	LOG_INF("Starting Spotflow PSA OTA sample");
-	LOG_INF("TI vendor image version: %s", CONFIG_CC35XXE_VENDOR_IMAGE_VERSION);
 
 	confirm_unconfirmed_main_firmware();
 

@@ -144,3 +144,22 @@ def get_build_id_from_elf(elf_filepath: Path) -> bytes:
                 )
 
             return elf_stream.read(patch_build_id.BUILD_ID_VALUE_SIZE)
+
+
+def test_metadata_file_preserves_shell_metacharacters_and_unicode(tmp_path, monkeypatch):
+    import sys
+
+    elf_path = tmp_path / "zephyr.elf"
+    inputs = Path(__file__).parent / "patch_build_id" / "inputs"
+    shutil.copyfile(inputs / elf_path.name, elf_path)
+    extra_input = 'release \u03b1; "quoted" & $value\n'
+    metadata_path = tmp_path / "metadata.txt"
+    metadata_path.write_bytes(extra_input.encode("utf-8"))
+    with elf_path.open("rb") as stream:
+        elf = ELFFile(stream)
+        address = patch_build_id.find_bindesc_build_id_symbol_vaddr(elf)
+        expected = patch_build_id.generate_build_id(elf, address, extra_input)
+    monkeypatch.setattr(sys, "argv", ["patch_build_id.py", "--extra-input-file",
+                                      str(metadata_path), str(elf_path)])
+    patch_build_id.main()
+    assert get_build_id_from_elf(elf_path) == expected

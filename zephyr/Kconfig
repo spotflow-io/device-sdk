@@ -26,6 +26,16 @@ config SPOTFLOW_GENERATE_BUILD_ID
 		Generate build ID and embed it as a binary descriptor.
 		Build ID allows to match core dumps with the original .elf file.
 
+config SPOTFLOW_BUILD_ID_EXTRA_INPUT
+	string "Additional build ID input"
+	depends on SPOTFLOW_GENERATE_BUILD_ID
+	default ""
+	help
+	  Additional deterministic metadata to include in the build ID hash, such
+	  as a firmware container version that is not part of the executable.
+	  An empty value preserves the executable-only build ID. Reproducing a
+	  nonempty build ID requires both the ELF file and this value.
+
 config SPOTFLOW_DEVICE_ID
 	string "Device ID device will use to connect to Spotflow observability platform"
 	help
