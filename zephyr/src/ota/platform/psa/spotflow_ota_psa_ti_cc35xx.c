@@ -1,4 +1,4 @@
-#include "ota/firmware/spotflow_ota_psa.h"
+#include "ota/platform/psa/spotflow_ota_psa_provider.h"
 #include "ota/platform/spotflow_ota_identity_stream.h"
 
 #include <psa_fwu.h>

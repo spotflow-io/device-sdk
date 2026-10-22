@@ -35,7 +35,6 @@ void spotflow_ota_identity_stream_feed(struct spotflow_ota_identity_stream* ctx,
  */
 int spotflow_ota_identity_stream_get(const struct spotflow_ota_identity_stream* ctx,
 				     uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
-bool spotflow_ota_identity_stream_matches(const uint8_t expected[SPOTFLOW_BUILD_ID_LENGTH]);
 
 #ifdef __cplusplus
 }

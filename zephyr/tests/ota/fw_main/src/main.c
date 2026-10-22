@@ -1196,3 +1196,44 @@ ZTEST(spotflow_ota_fw_main, test_same_executable_identity_is_rejected_before_pro
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
 	zassert_false(has_probation);
 }
+
+ZTEST(spotflow_ota_fw_main, test_finish_failure_releases_candidate_before_probation)
+{
+	struct spotflow_ota_probation probation;
+	bool has_probation;
+
+	platform_fake->finish_result = -EIO;
+	accept_two_artifact_update();
+	zassert_equal(run_main_artifact(), SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(platform_fake->abort_count, 1);
+	zassert_equal(platform_fake->upgrade_request_count, 0);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_false(has_probation);
+}
+
+ZTEST(spotflow_ota_fw_main, test_returning_reboot_error_keeps_probation)
+{
+	struct spotflow_ota_probation probation;
+	bool has_probation;
+
+	platform_fake->reboot_result = -EIO;
+	accept_two_artifact_update();
+	zassert_equal(run_main_artifact(), SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(platform_fake->abort_count, 0);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_true(has_probation);
+}
+
+ZTEST(spotflow_ota_fw_main, test_startup_query_error_preserves_probation)
+{
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	struct spotflow_ota_probation probation;
+	bool has_probation;
+
+	fill_build_id(build_id, 0x30);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->query_result = -EIO;
+	zassert_equal(reconcile_startup(&probation, true, NULL), -EIO);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_true(has_probation);
+}

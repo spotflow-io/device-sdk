@@ -18,8 +18,6 @@ enum spotflow_ota_identity_cmp {
 
 int spotflow_ota_identity_get_running_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
 
-int spotflow_ota_identity_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
-
 enum spotflow_ota_identity_cmp
 spotflow_ota_identity_compare_probation(const uint8_t expected_build_id[SPOTFLOW_BUILD_ID_LENGTH]);
 

@@ -103,13 +103,3 @@ int spotflow_ota_identity_stream_get(const struct spotflow_ota_identity_stream* 
 	memcpy(build_id, ctx->build_id, sizeof(ctx->build_id));
 	return 0;
 }
-
-bool spotflow_ota_identity_stream_matches(const uint8_t expected[SPOTFLOW_BUILD_ID_LENGTH])
-{
-	const uint8_t* running;
-	uint16_t len;
-
-	return expected != NULL && spotflow_build_id_get(&running, &len) == 0 &&
-		len == SPOTFLOW_BUILD_ID_LENGTH &&
-		memcmp(expected, running, SPOTFLOW_BUILD_ID_LENGTH) == 0;
-}

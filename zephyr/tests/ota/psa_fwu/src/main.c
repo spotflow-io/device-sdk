@@ -5,7 +5,7 @@
 #include <zephyr/ztest.h>
 
 #include "ota/firmware/spotflow_ota_fw_main.h"
-#include "ota/firmware/spotflow_ota_psa.h"
+#include "ota/platform/psa/spotflow_ota_psa_provider.h"
 #include "ota/platform/spotflow_ota_identity_stream.h"
 #include "ota/persistence/spotflow_ota_persistence.h"
 #include "ota/protocol/spotflow_ota_net.h"

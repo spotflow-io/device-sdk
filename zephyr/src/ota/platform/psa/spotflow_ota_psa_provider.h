@@ -25,7 +25,7 @@ int spotflow_ota_psa_running_info(psa_fwu_component_info_t* info);
 int spotflow_ota_psa_begin(void);
 int spotflow_ota_psa_write(const struct spotflow_artifact_block* block);
 int spotflow_ota_psa_end(psa_fwu_component_t* component,
-		       uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
+			 uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
 int spotflow_ota_psa_abort(void);
 int spotflow_ota_psa_check_install(psa_fwu_component_t component);
 int spotflow_ota_psa_check_accept(void);
