@@ -28,7 +28,6 @@ if(CONFIG_SPOTFLOW_OTA)
 endif()
 
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
-        firmware/spotflow_ota_fw_main_common.c
         firmware/spotflow_ota_fw_main.c
         platform/spotflow_ota_identity.c
         platform/spotflow_ota_identity_stream.c

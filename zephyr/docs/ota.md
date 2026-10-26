@@ -447,7 +447,6 @@ Important entry points:
 | `protocol/spotflow_ota_net.c` | Pending D2C result merge and MQTT publish wrapper |
 | `persistence/spotflow_ota_persistence.c` | Settings load/save for attempts, versions, and probation |
 | `firmware/spotflow_ota_fw_main.c` | Shared download, installation, confirmation, and startup reconciliation |
-| `firmware/spotflow_ota_fw_main_common.c` | Shared download controls |
 | `firmware/spotflow_ota_fw_custom.c` | Delegated firmware dispatch and cancellation callback |
 | `downloader/spotflow_ota_downloader.c` | Synchronous download API and in-process HTTP Range retry |
 | `platform/spotflow_ota_platform_mcuboot.c` / `spotflow_ota_platform_psa.c` | Native image management behind the shared platform interface |

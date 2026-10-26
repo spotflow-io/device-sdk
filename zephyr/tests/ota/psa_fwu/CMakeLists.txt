@@ -52,7 +52,6 @@ target_sources(app PRIVATE
         ../../../src/ota/downloader/spotflow_ota_downloader_transport_errors.c
         ../../../src/ota/downloader/spotflow_ota_downloader_transport_range.c
         ../../../src/ota/firmware/spotflow_ota_fw_custom.c
-        ../../../src/ota/firmware/spotflow_ota_fw_main_common.c
         ../../../src/ota/firmware/spotflow_ota_fw_main.c
         ../../../src/ota/platform/spotflow_ota_identity.c
         ../../../src/ota/platform/spotflow_ota_platform_psa.c
