@@ -4,7 +4,8 @@
 #include <psa_fwu.h>
 #include <stdbool.h>
 
-struct psa_fake {
+/** @brief State and injected results of the fake TI FWU service. */
+struct spotflow_ota_psa_fake {
 	psa_fwu_component_info_t slots[MAX_COMPONENT_ID];
 	psa_status_t query_error;
 	psa_status_t start_error;
@@ -29,9 +30,24 @@ struct psa_fake {
 	uint8_t image[16384];
 };
 
-extern struct psa_fake fake;
-void psa_fake_reset(void);
-void psa_fake_trial(psa_fwu_component_t running);
-void psa_fake_committed(psa_fwu_component_t running);
-
+#ifdef __cplusplus
+extern "C" {
 #endif
+
+extern struct spotflow_ota_psa_fake fake;
+/** @brief Reset slots and all injected results to their initial state. */
+void spotflow_ota_psa_fake_reset(void);
+/** @brief Simulate a trial boot.
+ * @param running Physical component now executing.
+ */
+void spotflow_ota_psa_fake_set_trial(psa_fwu_component_t running);
+/** @brief Simulate durable confirmation.
+ * @param running Physical component now executing.
+ */
+void spotflow_ota_psa_fake_set_confirmed(psa_fwu_component_t running);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* SPOTFLOW_OTA_PSA_FAKE_H */

@@ -39,7 +39,7 @@ target_compile_definitions(app PRIVATE
 target_sources(app PRIVATE
         src/main.c
         src/identity_stream.c
-        src/psa_fake.c
+        src/spotflow_ota_psa_fake.c
         ../common/spotflow_ota_bindesc_test_util.c
         ../common/spotflow_ota_build_id_fake.c
         ../common/spotflow_ota_test_fakes.c

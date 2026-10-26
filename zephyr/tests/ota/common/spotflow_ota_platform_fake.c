@@ -1,11 +1,10 @@
-#include <stdbool.h>
-#include <errno.h>
-#include <string.h>
+#include "spotflow_ota_platform_fake.h"
 
 #include "ota/platform/spotflow_ota_platform.h"
 #include "ota/platform/spotflow_ota_identity_stream.h"
 
-#include "spotflow_ota_platform_fake.h"
+#include <errno.h>
+#include <string.h>
 
 static struct spotflow_ota_platform_fake platform_fake;
 

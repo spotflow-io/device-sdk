@@ -17,7 +17,10 @@ enum spotflow_ota_running_image_state {
 	SPOTFLOW_OTA_RUNNING_IMAGE_REJECTED,
 };
 
-/** @brief Initialize image management after boot; return zero or negative errno. */
+/**
+ * @brief Initialize image management after boot.
+ * @return Zero on success, negative errno on failure.
+ */
 int spotflow_ota_platform_init(void);
 
 /**
@@ -27,7 +30,10 @@ int spotflow_ota_platform_init(void);
  */
 int spotflow_ota_platform_get_running_image_state(enum spotflow_ota_running_image_state* state);
 
-/** @brief Request installation with rollback enabled; return zero or negative errno. */
+/**
+ * @brief Request installation with rollback enabled.
+ * @return Zero on success, negative errno on failure.
+ */
 int spotflow_ota_platform_request_upgrade(void);
 
 /**
@@ -37,10 +43,16 @@ int spotflow_ota_platform_request_upgrade(void);
  */
 int spotflow_ota_platform_confirm_image(bool* reboot_required);
 
-/** @brief Request a platform reboot; return zero or negative errno if the call returns. */
+/**
+ * @brief Request a platform reboot.
+ * @return Zero or negative errno if the platform returns instead of rebooting.
+ */
 int spotflow_ota_platform_reboot(void);
 
-/** @brief Select and prepare inactive storage; return zero or negative errno. */
+/**
+ * @brief Select and prepare inactive storage.
+ * @return Zero on success, negative errno on failure.
+ */
 int spotflow_ota_platform_begin_image_write(void);
 
 /**
@@ -57,10 +69,16 @@ int spotflow_ota_platform_write_image_block(const struct spotflow_artifact_block
  */
 int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
 
-/** @brief Finalize the candidate before installation; return zero or negative errno. */
+/**
+ * @brief Finalize the candidate before installation.
+ * @return Zero on success, negative errno on failure.
+ */
 int spotflow_ota_platform_finish_image_write(void);
 
-/** @brief Release an incomplete or unused candidate; return zero or negative errno. */
+/**
+ * @brief Release an incomplete or unused candidate.
+ * @return Zero on success, negative errno on failure.
+ */
 int spotflow_ota_platform_abort_image_write(void);
 
 #ifdef __cplusplus

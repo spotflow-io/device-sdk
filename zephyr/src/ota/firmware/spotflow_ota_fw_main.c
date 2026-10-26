@@ -1,7 +1,5 @@
 #include "ota/firmware/spotflow_ota_fw_main.h"
 
-#include <spotflow/downloader.h>
-
 #include "ota/downloader/spotflow_ota_downloader.h"
 #include "ota/firmware/spotflow_ota_fw_custom.h"
 #include "ota/platform/spotflow_ota_identity.h"
@@ -12,6 +10,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <spotflow/downloader.h>
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>

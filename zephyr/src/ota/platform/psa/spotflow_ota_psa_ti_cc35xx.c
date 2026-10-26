@@ -12,16 +12,16 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 #define TI_RUNNING 1
 #define TI_WRITE_CHUNK_SIZE 256U
 
-/* Generated from the selected TI flash profile, not PSA's unpopulated max_size. */
-extern uint32_t vendor_image_slot_1_region_size;
-extern uint32_t vendor_image_slot_2_region_size;
-
 struct spotflow_ota_ti_download {
 	struct spotflow_ota_ti_container container;
 	psa_fwu_component_t component;
 	bool selected;
 	bool started;
 };
+
+/* Generated from the selected TI flash profile, not PSA's unpopulated max_size. */
+extern uint32_t vendor_image_slot_1_region_size;
+extern uint32_t vendor_image_slot_2_region_size;
 
 static struct spotflow_ota_ti_download download;
 static const psa_fwu_component_t vendor_components[] = {

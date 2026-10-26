@@ -1,11 +1,12 @@
-#include "psa_fake.h"
+#include "spotflow_ota_psa_fake.h"
+
 #include <string.h>
 
-struct psa_fake fake;
+struct spotflow_ota_psa_fake fake;
 uint32_t vendor_image_slot_1_region_size = 16384;
 uint32_t vendor_image_slot_2_region_size = 16384;
 
-void psa_fake_reset(void)
+void spotflow_ota_psa_fake_reset(void)
 {
 	memset(&fake, 0, sizeof(fake));
 	for (size_t i = 0; i < MAX_COMPONENT_ID; i += 2) {
@@ -19,7 +20,7 @@ void psa_fake_reset(void)
 	vendor_image_slot_2_region_size = 16384;
 }
 
-void psa_fake_trial(psa_fwu_component_t running)
+void spotflow_ota_psa_fake_set_trial(psa_fwu_component_t running)
 {
 	fake.slots[running].state = PSA_FWU_TRIAL;
 	fake.slots[running].impl.running_status = 1;
@@ -29,7 +30,7 @@ void psa_fake_trial(psa_fwu_component_t running)
 	fake.slots[running ^ 1].impl.Primary = 1;
 }
 
-void psa_fake_committed(psa_fwu_component_t running)
+void spotflow_ota_psa_fake_set_confirmed(psa_fwu_component_t running)
 {
 	fake.slots[running].state = PSA_FWU_UPDATED;
 	fake.slots[running].impl.running_status = 1;
@@ -111,7 +112,7 @@ psa_status_t psa_fwu_accept(void)
 {
 	fake.accept_count++;
 	if (fake.accept_result == PSA_SUCCESS) {
-		psa_fake_committed(fake.slots[4].impl.running_status ? 4 : 5);
+		spotflow_ota_psa_fake_set_confirmed(fake.slots[4].impl.running_status ? 4 : 5);
 	}
 	return fake.accept_result;
 }

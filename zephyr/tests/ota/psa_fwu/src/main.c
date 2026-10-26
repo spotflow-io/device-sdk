@@ -1,9 +1,3 @@
-#include <errno.h>
-#include <string.h>
-#include <zephyr/logging/log.h>
-#include <zephyr/sys/byteorder.h>
-#include <zephyr/ztest.h>
-
 #include "ota/firmware/spotflow_ota_fw_main.h"
 #include "ota/platform/psa/spotflow_ota_psa_provider.h"
 #include "ota/platform/spotflow_ota_identity_stream.h"
@@ -14,7 +8,13 @@
 #include "spotflow_ota_downloader_transport_fake.h"
 #include "spotflow_ota_test_fakes.h"
 #include "spotflow_ota_test_settings.h"
-#include "psa_fake.h"
+#include "spotflow_ota_psa_fake.h"
+
+#include <errno.h>
+#include <string.h>
+#include <zephyr/logging/log.h>
+#include <zephyr/sys/byteorder.h>
+#include <zephyr/ztest.h>
 
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_LOG_DEFAULT_LEVEL);
 
@@ -22,6 +22,13 @@ static bool abort_after_download;
 static uint8_t image[188];
 static uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
 static struct spotflow_ota_downloader_transport_fake* transport;
+
+static void before_each(void* fixture);
+static enum spotflow_ota_result process(void);
+static struct spotflow_ota_probation load_probation(void);
+static int restore_and_reconcile(struct spotflow_ota_fw_main_startup_result* startup);
+static void expect_completion(enum spotflow_ota_result result);
+static void enter_trial(void);
 
 void spotflow_on_main_firmware_update_progressed(
 	const struct spotflow_ota_main_firmware_state* state)
@@ -34,124 +41,6 @@ void spotflow_on_main_firmware_update_progressed(
 bool spotflow_is_update_canceled(void)
 {
 	return spotflow_ota_state_is_update_canceled();
-}
-
-static void before_each(void* fixture)
-{
-	ARG_UNUSED(fixture);
-	abort_after_download = false;
-	spotflow_ota_test_settings_reset();
-	spotflow_ota_test_fakes_reset();
-	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
-	spotflow_ota_net_reset();
-	spotflow_ota_state_reset();
-	spotflow_ota_fw_main_reset();
-	zassert_ok(spotflow_ota_persistence_init());
-	psa_fake_reset();
-	(void)spotflow_ota_psa_abort();
-	struct spotflow_ota_fw_main_startup_result startup;
-
-	zassert_ok(spotflow_ota_fw_main_reconcile_startup(NULL, false, &startup));
-	fake.init_count = 0;
-	fake.clean_count = 0;
-	fake.cancel_count = 0;
-	for (size_t i = 0; i < sizeof(build_id); i++) {
-		build_id[i] = 0x10 + i;
-	}
-	PSA_FWU_GPESlot_t manifest = {
-		.Manifest_Integrity.Manifest_Integrity = { 1, 2, 3, 4 },
-		.Manifest = {
-			.GPE_Header = {
-				.ih_magic.Magic_Number = 0x690c47c2,
-				.ih_hdr_size = 32,
-				.ih_img_size = 128,
-				.ih_protect_tlv_size = 4,
-			},
-			.GPE_Version.iv_major = 1,
-			.GPE_Magic.Magic_Number = 0x690c47c2,
-		},
-	};
-
-	memset(image, 0xff, sizeof(image));
-	memcpy(image, &manifest, sizeof(manifest));
-	zassert_true(spotflow_ota_test_bindesc_write_build_id(image, sizeof(image), 64, build_id) >
-		     0);
-	sys_put_le16(0x6908, image + 176);
-	sys_put_le16(4, image + 178);
-	sys_put_le16(0x6907, image + 180);
-	sys_put_le16(8, image + 182);
-	transport = spotflow_ota_downloader_transport_fake_get();
-	spotflow_ota_downloader_transport_fake_reset(transport);
-	transport->payload = image;
-	transport->payload_len = sizeof(image);
-	transport->chunk_size = 1;
-}
-
-static enum spotflow_ota_result process(void)
-{
-	struct spotflow_ota_update_msg update = {
-		.attempt_id = 42,
-		.artifact_count = 1,
-		.artifacts = { {
-			.is_main = true,
-			.slug = "main",
-			.version = "cloud-version",
-			.url = "https://example.com/vendor_image.sign.bin",
-			.secret = "secret",
-		} },
-	};
-	struct spotflow_ota_update_result accepted;
-	struct spotflow_ota_worker_job job;
-
-	zassert_ok(spotflow_ota_state_accept_update(&update, &accepted));
-	zassert_true(spotflow_ota_state_get_worker_job(&job));
-	return spotflow_ota_fw_main_process_artifact(&job);
-}
-
-static struct spotflow_ota_probation load_probation(void)
-{
-	struct spotflow_ota_probation probation;
-	bool present;
-
-	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &present));
-	zassert_true(present);
-	return probation;
-}
-
-static int restore_and_reconcile(struct spotflow_ota_fw_main_startup_result* startup)
-{
-	struct spotflow_ota_probation probation = load_probation();
-	struct spotflow_ota_persisted_attempt attempt = {
-		.attempt_id = 42,
-		.artifact_count = 1,
-		.artifact_results = { SPOTFLOW_OTA_RESULT_PENDING },
-	};
-
-	zassert_ok(spotflow_ota_persistence_save_attempt(&attempt));
-	zassert_ok(spotflow_ota_state_init_from_persistence(&attempt, true, &probation, true));
-	return spotflow_ota_fw_main_reconcile_startup(&probation, true, startup);
-}
-
-static void expect_completion(enum spotflow_ota_result result)
-{
-	struct spotflow_ota_worker_job job;
-
-	zassert_true(spotflow_ota_state_get_worker_job(&job));
-	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE);
-	zassert_equal(job.token.attempt_id, 42);
-	zassert_equal(job.data.complete_main_firmware.result, result);
-	zassert_str_equal(job.data.complete_main_firmware.artifact.version, "cloud-version");
-}
-
-static void enter_trial(void)
-{
-	struct spotflow_ota_fw_main_startup_result startup;
-
-	zassert_equal(process(), SPOTFLOW_OTA_RESULT_PENDING);
-	psa_fake_trial(5);
-	spotflow_ota_build_id_fake_set_running_build_id(build_id);
-	zassert_ok(restore_and_reconcile(&startup));
-	zassert_equal(startup.progress_state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
 }
 
 ZTEST(spotflow_ota_psa, test_split_stream_installs_inactive_vendor_slot)
@@ -171,7 +60,7 @@ ZTEST(spotflow_ota_psa, test_split_stream_installs_inactive_vendor_slot)
 
 ZTEST(spotflow_ota_psa, test_second_update_uses_slot_one)
 {
-	psa_fake_committed(5);
+	spotflow_ota_psa_fake_set_confirmed(5);
 	zassert_equal(process(), SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(fake.target, 4);
 	zassert_equal(fake.clean_count, 1);
@@ -200,7 +89,7 @@ ZTEST(spotflow_ota_psa, test_acceptance_keeps_probation_and_does_not_reboot)
 
 	/* Application requests commitment, then startup verifies the result. */
 	zassert_equal(psa_fwu_request_reboot(), PSA_SUCCESS);
-	psa_fake_committed(5);
+	spotflow_ota_psa_fake_set_confirmed(5);
 	struct spotflow_ota_fw_main_startup_result startup;
 
 	zassert_ok(restore_and_reconcile(&startup));
@@ -226,7 +115,7 @@ ZTEST(spotflow_ota_psa, test_rollback_is_not_confused_with_committed_old_image)
 	enter_trial();
 	uint8_t old_id[SPOTFLOW_BUILD_ID_LENGTH] = { 99 };
 
-	psa_fake_committed(4);
+	spotflow_ota_psa_fake_set_confirmed(4);
 	spotflow_ota_build_id_fake_set_running_build_id(old_id);
 	struct spotflow_ota_fw_main_startup_result startup;
 
@@ -272,7 +161,7 @@ ZTEST(spotflow_ota_psa, test_foreign_candidate_blocks_global_operation)
 
 ZTEST(spotflow_ota_psa, test_trial_protects_rollback_storage_without_probation)
 {
-	psa_fake_trial(5);
+	spotflow_ota_psa_fake_set_trial(5);
 	zassert_equal(process(), SPOTFLOW_OTA_RESULT_FAILED);
 	zassert_equal(fake.start_count, 0);
 	zassert_equal(fake.clean_count, 0);
@@ -507,4 +396,122 @@ ZTEST(spotflow_ota_psa, test_unexpected_running_state_fails_startup_without_prob
 	zassert_equal(spotflow_ota_fw_main_reconcile_startup(NULL, false, &startup), -EIO);
 	zassert_equal(fake.accept_count, 0);
 	zassert_equal(fake.reboot_count, 0);
+}
+
+static void before_each(void* fixture)
+{
+	ARG_UNUSED(fixture);
+	abort_after_download = false;
+	spotflow_ota_test_settings_reset();
+	spotflow_ota_test_fakes_reset();
+	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
+	spotflow_ota_net_reset();
+	spotflow_ota_state_reset();
+	spotflow_ota_fw_main_reset();
+	zassert_ok(spotflow_ota_persistence_init());
+	spotflow_ota_psa_fake_reset();
+	(void)spotflow_ota_psa_abort();
+	struct spotflow_ota_fw_main_startup_result startup;
+
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(NULL, false, &startup));
+	fake.init_count = 0;
+	fake.clean_count = 0;
+	fake.cancel_count = 0;
+	for (size_t i = 0; i < sizeof(build_id); i++) {
+		build_id[i] = 0x10 + i;
+	}
+	PSA_FWU_GPESlot_t manifest = {
+		.Manifest_Integrity.Manifest_Integrity = { 1, 2, 3, 4 },
+		.Manifest = {
+			.GPE_Header = {
+				.ih_magic.Magic_Number = 0x690c47c2,
+				.ih_hdr_size = 32,
+				.ih_img_size = 128,
+				.ih_protect_tlv_size = 4,
+			},
+			.GPE_Version.iv_major = 1,
+			.GPE_Magic.Magic_Number = 0x690c47c2,
+		},
+	};
+
+	memset(image, 0xff, sizeof(image));
+	memcpy(image, &manifest, sizeof(manifest));
+	zassert_true(spotflow_ota_test_bindesc_write_build_id(image, sizeof(image), 64, build_id) >
+		     0);
+	sys_put_le16(0x6908, image + 176);
+	sys_put_le16(4, image + 178);
+	sys_put_le16(0x6907, image + 180);
+	sys_put_le16(8, image + 182);
+	transport = spotflow_ota_downloader_transport_fake_get();
+	spotflow_ota_downloader_transport_fake_reset(transport);
+	transport->payload = image;
+	transport->payload_len = sizeof(image);
+	transport->chunk_size = 1;
+}
+
+static enum spotflow_ota_result process(void)
+{
+	struct spotflow_ota_update_msg update = {
+		.attempt_id = 42,
+		.artifact_count = 1,
+		.artifacts = { {
+			.is_main = true,
+			.slug = "main",
+			.version = "cloud-version",
+			.url = "https://example.com/vendor_image.sign.bin",
+			.secret = "secret",
+		} },
+	};
+	struct spotflow_ota_update_result accepted;
+	struct spotflow_ota_worker_job job;
+
+	zassert_ok(spotflow_ota_state_accept_update(&update, &accepted));
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	return spotflow_ota_fw_main_process_artifact(&job);
+}
+
+static struct spotflow_ota_probation load_probation(void)
+{
+	struct spotflow_ota_probation probation;
+	bool present;
+
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &present));
+	zassert_true(present);
+	return probation;
+}
+
+static int restore_and_reconcile(struct spotflow_ota_fw_main_startup_result* startup)
+{
+	struct spotflow_ota_probation probation = load_probation();
+	struct spotflow_ota_persisted_attempt attempt = {
+		.attempt_id = 42,
+		.artifact_count = 1,
+		.artifact_results = { SPOTFLOW_OTA_RESULT_PENDING },
+	};
+
+	zassert_ok(spotflow_ota_persistence_save_attempt(&attempt));
+	zassert_ok(spotflow_ota_state_init_from_persistence(&attempt, true, &probation, true));
+	return spotflow_ota_fw_main_reconcile_startup(&probation, true, startup);
+}
+
+static void expect_completion(enum spotflow_ota_result result)
+{
+	struct spotflow_ota_worker_job job;
+
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE);
+	zassert_equal(job.token.attempt_id, 42);
+	zassert_equal(job.data.complete_main_firmware.result, result);
+	zassert_str_equal(job.data.complete_main_firmware.artifact.version, "cloud-version");
+}
+
+static void enter_trial(void)
+{
+	struct spotflow_ota_fw_main_startup_result startup;
+
+	zassert_equal(process(), SPOTFLOW_OTA_RESULT_PENDING);
+	spotflow_ota_psa_fake_set_trial(5);
+	spotflow_ota_build_id_fake_set_running_build_id(build_id);
+	zassert_ok(restore_and_reconcile(&startup));
+	zassert_equal(startup.progress_state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
 }

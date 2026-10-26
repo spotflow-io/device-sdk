@@ -25,13 +25,27 @@ extern "C" {
  * A provider selects the main component and prepares its native image stream.
  * The PSA platform owns finish/install/accept; the coordinator owns probation.
  */
-/** @brief Initialize the provider; return zero or negative errno. */
+/**
+ * @brief Initialize the provider.
+ * @return Zero on success, negative errno on failure.
+ */
 int spotflow_ota_psa_init(void);
-/** @brief Query the running component into info; return zero or negative errno. */
+/**
+ * @brief Query the component containing the running executable.
+ * @param info Receives the native component information.
+ * @return Zero on success, negative errno on invalid arguments or query failure.
+ */
 int spotflow_ota_psa_running_info(psa_fwu_component_info_t* info);
-/** @brief Prepare the inactive main component; return zero or negative errno. */
+/**
+ * @brief Select and prepare inactive storage for the main executable.
+ * @return Zero on success, negative errno if no safe target is available.
+ */
 int spotflow_ota_psa_begin(void);
-/** @brief Consume the next native artifact block; return zero or negative errno. */
+/**
+ * @brief Consume the next sequential native artifact block.
+ * @param block Downloaded block, including container bytes.
+ * @return Zero on success, negative errno on invalid input or write failure.
+ */
 int spotflow_ota_psa_write(const struct spotflow_artifact_block* block);
 /**
  * @brief Read a completed candidate before PSA finish.
@@ -41,15 +55,30 @@ int spotflow_ota_psa_write(const struct spotflow_artifact_block* block);
  */
 int spotflow_ota_psa_end(psa_fwu_component_t* component,
 			 uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
-/** @brief Discard the owned inactive candidate; return zero or negative errno. */
+/**
+ * @brief Discard the owned inactive candidate.
+ * @return Zero on success, negative errno on cleanup failure.
+ */
 int spotflow_ota_psa_abort(void);
-/** @brief Check ownership before global install; return zero or negative errno. */
+/**
+ * @brief Ensure that global installation affects only the owned candidate.
+ * @param component Candidate selected by this provider.
+ * @return Zero on success, negative errno if another update blocks installation.
+ */
 int spotflow_ota_psa_check_install(psa_fwu_component_t component);
-/** @brief Check ownership before global acceptance; return zero or negative errno. */
+/**
+ * @brief Ensure that global acceptance affects only the running main executable.
+ * @return Zero on success, negative errno if another update blocks acceptance.
+ */
 int spotflow_ota_psa_check_accept(void);
 
 /* Use only for operations requiring PSA_SUCCESS; reboot statuses are handled
  * explicitly by the lifecycle, rather than mapped to immediate completion.
+ */
+/**
+ * @brief Translate an ordinary PSA operation result to errno.
+ * @param status Native operation result; reboot statuses require separate handling.
+ * @return Zero for PSA_SUCCESS, negative errno otherwise.
  */
 static inline int spotflow_ota_psa_errno(psa_status_t status)
 {

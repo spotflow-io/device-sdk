@@ -115,7 +115,7 @@ static void confirm_unconfirmed_main_firmware(void)
 	}
 
 	/* Demo only: replace immediate acceptance with application health checks.
-	 * TI acceptance is not durable until this PSA reboot to make confirmation durable.
+	 * TI acceptance becomes durable only after this PSA reboot.
 	 * Spotflow confirmation itself never requests a reboot.
 	 */
 	if (fw_state.phase == SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
