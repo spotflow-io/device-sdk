@@ -716,9 +716,49 @@ cannot be overwritten. Complete signed `vendor_image.sign.bin` artifacts are val
 and streamed with TI's 48-byte prefix and complete-file write offsets. The bootloader
 verifies signatures. Retries preserve the RAM context; after reboot, downloads restart.
 
-See [platform implementation and extension](ota-platforms.md) for slot mapping and the
-requirements for another provider, and [the TI PSA sample](../samples/ota_psa/README.md)
-for its fixed factory layout and application-requested confirmation reboot.
+TI alternates the physical vendor slots: an image initially running from slot 1
+updates into slot 2, then the next update uses slot 1. The bootloader maps either
+physical slot into the same logical XIP window, so both use the same signed artifact.
+The wireless slots hold TI connectivity firmware and are not updated by this provider.
+See [the TI PSA sample](../samples/ota_psa/README.md) for its fixed factory layout
+and application-requested confirmation reboot.
+
+The TI downstream used by the sample requires the
+[CC35xx flash startup patch](../patches/ti/cc35xx-flash-startup.patch).
+Apply it from the workspace root before building:
+
+```sh
+git -C modules/hal/ti apply --check ../../../modules/lib/spotflow/zephyr/patches/ti/cc35xx-flash-startup.patch
+git -C modules/hal/ti apply ../../../modules/lib/spotflow/zephyr/patches/ti/cc35xx-flash-startup.patch
+```
+
+The patch enables SYSTIM before ITS flash initialization, restores XIP after flash
+errors, corrects the XIP status mask, and keeps timeout calculations in microseconds.
+Without these fixes, a trial image can stall before reaching the application. Skip
+application only when the selected HAL already includes these corrections.
+
+#### Adding another PSA provider
+
+Implement the contract in `platform/psa/spotflow_ota_psa_provider.h`, then add its
+Kconfig availability condition and `zephyr_library_sources_ifdef()` selection.
+The provider owns component selection, container preparation, running-component
+queries and checks that global PSA operations cannot affect another client's update.
+Keep physical partitions and provisioning in board or sample integration. Reuse the
+common coordinator and PSA lifecycle; extend their contract explicitly if a new
+provider has different confirmation requirements.
+
+#### Image identity constraints
+
+MCUboot encrypted, compressed and split images are rejected because the stream
+reader cannot inspect their executable payload directly. RAM-load and fixed-address
+images are supported. Both backends reject the running build ID before saving
+probation: otherwise a reset before installation could make the old confirmed image
+look like a successful update. The TI provider includes its numeric vendor image
+version in the ID by default; see [build ID generation](build-id.md).
+
+The streamed ID correlates the candidate with the image running after reboot. It
+does not authenticate the download or verify flash readback. The bootloader remains
+responsible for signature and full-image validation.
 
 Reconciliation enters the same durable result pipeline as a delegated handler:
 
