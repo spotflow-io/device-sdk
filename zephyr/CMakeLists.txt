@@ -61,10 +61,14 @@ if(CONFIG_SPOTFLOW_GENERATE_BUILD_ID)
         )
     endif()
 
-    # Keep arbitrary metadata out of command-line/list expansion (quotes and
-    # semicolons are valid string input). Kconfig changes already trigger relinking.
+    # Kconfig changes trigger relinking and rerun the patcher before TI signing.
+    # Keep metadata in a file so its contents never become command-line syntax.
+    set(spotflow_build_id_extra_input "")
+    if(CONFIG_SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION)
+        set(spotflow_build_id_extra_input "${CONFIG_CC35XXE_VENDOR_IMAGE_VERSION}")
+    endif()
     set(spotflow_build_id_extra_input_file "${CMAKE_BINARY_DIR}/spotflow_build_id_extra_input.txt")
-    file(WRITE "${spotflow_build_id_extra_input_file}" "${CONFIG_SPOTFLOW_BUILD_ID_EXTRA_INPUT}")
+    file(WRITE "${spotflow_build_id_extra_input_file}" "${spotflow_build_id_extra_input}")
 
     set_property(
         GLOBAL

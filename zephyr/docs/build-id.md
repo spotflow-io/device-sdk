@@ -4,17 +4,16 @@ Spotflow hashes allocated ELF sections and compact-log metadata, excluding the b
 ID value itself. The post-build step patches the resulting 20-byte ID into the ELF
 and its related binary artifacts before vendor packaging and signing.
 
-`CONFIG_SPOTFLOW_BUILD_ID_EXTRA_INPUT` adds deterministic UTF-8 metadata to this
-hash. An empty value preserves existing IDs. A nonempty value is appended after a
-fixed domain separator and its byte length, encoded as an unsigned 64-bit little-endian
-integer. Reproducing that ID requires the ELF and the configured input value; the
-ELF alone does not contain this additional metadata.
+`CONFIG_SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION` includes
+`CONFIG_CC35XXE_VENDOR_IMAGE_VERSION` in the hash. The TI CC35xx OTA provider enables
+this option by default. Changing only the container version therefore changes the
+build ID even when the executable is otherwise identical. Disabling the option
+preserves executable-only hashing.
 
-The TI CC35xx OTA integration defaults this input to
-`CONFIG_CC35XXE_VENDOR_IMAGE_VERSION`. Changing only the container version therefore
-changes the build ID even when the executable is otherwise identical. The generator
-itself has no TI-specific behavior. Applications can override the input when other
-packaging metadata must identify their firmware.
+The version is appended as UTF-8 after a fixed domain separator and its byte length,
+encoded as an unsigned 64-bit little-endian integer. Reproducing this ID requires
+the ELF and the configured vendor image version. The generator itself remains
+independent of TI packaging.
 
 An effective Kconfig change regenerates `autoconf.h`, recompiles dependent sources,
 and relinks the executable. Linking reruns the ID patcher before TI builds and signs

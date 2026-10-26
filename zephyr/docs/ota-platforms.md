@@ -42,9 +42,9 @@ provides correlation, not an authenticity check or flash readback check.
 
 Both backends reject the running build ID before saving probation. Otherwise a reset
 between saving probation and requesting installation would make the old confirmed image
-indistinguishable from a completed update. Include packaging metadata through
-`CONFIG_SPOTFLOW_BUILD_ID_EXTRA_INPUT` when it must affect identity; TI defaults this
-to its numeric vendor image version. See [build ID generation](build-id.md).
+indistinguishable from a completed update. The TI provider enables
+`CONFIG_SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION` by default so the numeric
+container version affects identity. See [build ID generation](build-id.md).
 
 ## TI CC35xx slot mapping
 

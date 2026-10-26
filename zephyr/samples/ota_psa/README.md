@@ -80,8 +80,8 @@ settings used by the logs sample are not sufficient for this OTA sample.
 1. Change the application and increment `CONFIG_CC35XXE_VENDOR_IMAGE_VERSION` in
    `prj.conf` (for example, `0.0.1.0` to `0.0.2.0`). TI requires a newer numeric
    container version. The executable build ID must also change; repackaging the same
-   executable with an unchanged build ID is rejected. The TI provider defaults
-   `CONFIG_SPOTFLOW_BUILD_ID_EXTRA_INPUT` to the numeric vendor image version, so
+   executable with an unchanged build ID is rejected. The TI provider enables
+   `CONFIG_SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION` by default, so
    changing only that version also changes the ID. A cached command-line version
    override takes precedence over `prj.conf`; update or clear it when reusing a build.
    The cloud version string does not set the numeric container version.
