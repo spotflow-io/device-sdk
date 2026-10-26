@@ -8,3 +8,8 @@ the TI HAL module, so the standard CI manifest can run it on native_sim and QEMU
 
 Keep these declarations aligned with the TI HAL when updating the TI manifest.
 Hardware builds use the HAL headers and do not include these test declarations.
+
+The suite reserves an 8 KiB ztest thread stack and enables the stack sentinel. Its
+coordinator fixtures keep a full update manifest and worker job on that stack,
+besides the production download/coordinator call chain; Cortex-M3's default 1 KiB
+ztest stack cannot hold even those fixture frames.
