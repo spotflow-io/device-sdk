@@ -679,9 +679,19 @@ Both backends extract the build ID during download using the same descriptor rea
 Their framing wrappers supply only executable payload bytes, excluding headers, padding,
 and signature trailers. Zephyr descriptors use the target's native endianness; native
 container headers may use a different byte order. Missing, malformed or unpatched IDs
-fail the attempt before probation is saved. MCUboot no longer selects `BINDESC_READ`
-or `BINDESC_READ_FLASH`; writing and settings retain their storage dependencies.
+fail the attempt before probation is saved.
 See [build ID generation](build-id.md) for packaging metadata and rebuild behavior.
+
+MCUboot encrypted, compressed and split images are rejected because the stream
+reader cannot inspect their executable payload directly. RAM-load and fixed-address
+images are supported. Both backends reject the running build ID before saving
+probation: otherwise a reset before installation could make the old confirmed image
+look like a successful update. The TI provider includes its numeric vendor image
+version in the ID by default; see [build ID generation](build-id.md).
+
+The streamed ID correlates the candidate with the image running after reboot. It
+does not authenticate the download or verify flash readback. The bootloader remains
+responsible for signature and full-image validation.
 
 Initialization resolves probation as follows:
 
@@ -692,6 +702,34 @@ Initialization resolves probation as follows:
 | Match | Rejected | Queue `FAILED` reconciliation. |
 | Mismatch or unavailable | Any supported state | Queue `FAILED` reconciliation. |
 | Any | Query error or unsupported state | Fail initialization and retain probation. |
+
+Reconciliation enters the same durable result pipeline as a delegated handler:
+
+```mermaid
+flowchart TD
+    source["Handler result or<br/>main-firmware reconciliation"]
+    stage["Stage artifact result"]
+    version{"Succeeded?"}
+    saveVersion["Persist installed version"]
+    saveAttempt["Persist projected attempt"]
+    probation{"Reconciled main result?"}
+    clear["Clear probation"]
+    commit["Commit result in RAM"]
+    report["Schedule cumulative result message"]
+
+    source --> stage --> version
+    version -- yes --> saveVersion --> saveAttempt
+    version -- no --> saveAttempt
+    saveAttempt --> probation
+    probation -- yes --> clear --> commit
+    probation -- no --> commit
+    commit --> report
+```
+
+The result is already durable when probation is cleared. A reset before that point
+repeats reconciliation; a reset afterward restores the result without repeating it.
+After the result is committed in RAM, the coordinator schedules preparation of the
+cumulative result message, which the MQTT thread later publishes.
 
 #### PSA Firmware Update handler
 
@@ -746,47 +784,6 @@ queries and checks that global PSA operations cannot affect another client's upd
 Keep physical partitions and provisioning in board or sample integration. Reuse the
 common coordinator and PSA lifecycle; extend their contract explicitly if a new
 provider has different confirmation requirements.
-
-#### Image identity constraints
-
-MCUboot encrypted, compressed and split images are rejected because the stream
-reader cannot inspect their executable payload directly. RAM-load and fixed-address
-images are supported. Both backends reject the running build ID before saving
-probation: otherwise a reset before installation could make the old confirmed image
-look like a successful update. The TI provider includes its numeric vendor image
-version in the ID by default; see [build ID generation](build-id.md).
-
-The streamed ID correlates the candidate with the image running after reboot. It
-does not authenticate the download or verify flash readback. The bootloader remains
-responsible for signature and full-image validation.
-
-Reconciliation enters the same durable result pipeline as a delegated handler:
-
-```mermaid
-flowchart TD
-    source["Handler result or<br/>main-firmware reconciliation"]
-    stage["Stage artifact result"]
-    version{"Succeeded?"}
-    saveVersion["Persist installed version"]
-    saveAttempt["Persist projected attempt"]
-    probation{"Reconciled main result?"}
-    clear["Clear probation"]
-    commit["Commit result in RAM"]
-    report["Schedule cumulative result message"]
-
-    source --> stage --> version
-    version -- yes --> saveVersion --> saveAttempt
-    version -- no --> saveAttempt
-    saveAttempt --> probation
-    probation -- yes --> clear --> commit
-    probation -- no --> commit
-    commit --> report
-```
-
-The result is already durable when probation is cleared. A reset before that point
-repeats reconciliation; a reset afterward restores the result without repeating it.
-After the result is committed in RAM, the coordinator schedules preparation of the
-cumulative result message, which the MQTT thread later publishes.
 
 ### Cancellation and supersession implementation
 
