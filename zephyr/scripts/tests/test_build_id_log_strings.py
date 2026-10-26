@@ -107,8 +107,11 @@ def test_descriptor_patching_respects_elf_endianness(little_endian, tmp_path):
     header = (0x25F0).to_bytes(2, byteorder) + (20).to_bytes(2, byteorder)
     stream = io.BytesIO(header + bytes(20))
     section = {"sh_addr": 0x1000, "sh_size": 24, "sh_offset": 0}
-    elf = SimpleNamespace(little_endian=little_endian, stream=stream,
-                          iter_sections=lambda: iter([section]))
+    elf = SimpleNamespace(
+        little_endian=little_endian,
+        stream=stream,
+        iter_sections=lambda: iter([section]),
+    )
     identity = bytes(range(20))
     patch_build_id.patch_build_id_parsed_elf(elf, "test.elf", 0x1000, identity)
     assert stream.getvalue() == header + identity

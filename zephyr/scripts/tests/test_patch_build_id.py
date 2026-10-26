@@ -159,8 +159,9 @@ def test_metadata_file_preserves_shell_metacharacters_and_unicode(tmp_path, monk
         elf = ELFFile(stream)
         address = patch_build_id.find_bindesc_build_id_symbol_vaddr(elf)
         expected = patch_build_id.generate_build_id(elf, address, extra_input)
-    monkeypatch.setattr(sys, "argv", ["patch_build_id.py", "--extra-input-file",
-                                      str(metadata_path), str(elf_path)])
+    monkeypatch.setattr(
+        sys, "argv", ["patch_build_id.py", "--extra-input-file", str(metadata_path), str(elf_path)]
+    )
     patch_build_id.main()
     assert get_build_id_from_elf(elf_path) == expected
 

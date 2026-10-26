@@ -69,8 +69,8 @@ psa_status_t psa_fwu_start(psa_fwu_component_t component, const void* manifest, 
 	return PSA_SUCCESS;
 }
 
-psa_status_t psa_fwu_write(psa_fwu_component_t component, size_t offset,
-			   const void* data, size_t len)
+psa_status_t psa_fwu_write(psa_fwu_component_t component, size_t offset, const void* data,
+			   size_t len)
 {
 	fake.write_count++;
 	if (fake.write_error != PSA_SUCCESS) {
