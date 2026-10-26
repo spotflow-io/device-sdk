@@ -9,7 +9,9 @@ immediate acceptance with application health checks in production.
 ## Configure and build
 
 Copy `credentials-sample.conf` to `credentials.conf` and enter Wi-Fi and Spotflow
-credentials. CMake loads that file automatically. From the workspace root, run:
+credentials. CMake loads that file automatically. Apply the prerequisites in
+[Provision the OTA flash layout](#provision-the-ota-flash-layout), then build from
+the workspace root:
 
 ```sh
 west build -b lp_em_cc35x1/cc3551e -d b-psa modules/lib/spotflow/zephyr/samples/ota_psa
@@ -20,29 +22,46 @@ paths. This sample uses TI's native signing pipeline and does not need MCUboot/s
 The default development signing keys must match the board provisioning; configure the
 appropriate signing keys for your device.
 
-The board must already be provisioned with the same two-slot OTA layout. An update cannot
-migrate the single-slot factory layout. Verify the factory programming configuration
-against `zephyr/boards/ti/lp_em_cc35x1/config/flash/is25wj032f/ota` and the generated
-`b-psa/zephyr/ti_flash_map_config.c` before programming. Use the runner that passes
-the selected profile's MemoryConfigurator JSON to Toolbox; `--enable_ota` alone
-does not establish that all factory size defaults match. With that runner, provision
-the development board once using:
+## Provision the OTA flash layout
+
+Before building, complete the Toolbox installation and compatibility changes in
+[CC35X1 flashing setup](https://docs.spotflow.io/guides/texas-instruments/cc35x1-setup).
+Stop before activation and factory programming until this sample is built. The runner
+patch below expects those compatibility changes to have been applied first.
+
+Apply the [CC35xx flash startup patch](../../patches/ti/cc35xx-flash-startup.patch)
+as described in the [implementation notes](../../docs/ota.md#psa-firmware-update-handler).
+Then apply the [Toolbox runner patch](../../patches/ti/cc35xx-toolbox-runner.patch)
+from the workspace root so initial programming uses the selected OTA memory map:
 
 ```sh
-west flash -d b-psa --initial-programming --full-flash-erase
+git -C zephyr apply --check ../modules/lib/spotflow/zephyr/patches/ti/cc35xx-toolbox-runner.patch
+git -C zephyr apply ../modules/lib/spotflow/zephyr/patches/ti/cc35xx-toolbox-runner.patch
 ```
 
-The full erase is required when migrating layouts: old images in secondary slots
-can otherwise appear as unrelated PSA candidates and block vendor updates. It also
-erases saved settings, Wi-Fi profiles and keys. Factory programming replaces the
-board's flash layout. Use ordinary OTA deployments
-for subsequent updates. On Windows, select the installed Toolbox executable with
-`--simplelink-tool` if it is not on `PATH`.
+Skip either patch if your checkout already includes its changes. Build the sample,
+then follow the guide's one-time activation step if the board is not activated yet.
+Use `b-psa` wherever that step uses `build`. For factory programming, use the commands
+below with this sample's build rather than a previously built BLE or Wi-Fi sample.
 
-If reusing a build directory previously configured for build-only validation, clear
-its cached `EXTRA_CONF_FILE=credentials-sample.conf` setting with
-`west build -d b-psa -- -DEXTRA_CONF_FILE=`. Otherwise the placeholder values can
-override `credentials.conf`.
+After activation, provision the two-slot layout:
+
+```sh
+west flash -d b-psa -- --initial-programming
+```
+
+If the board was previously programmed with a different layout, use the following
+command instead. It erases saved settings, Wi-Fi profiles and keys as well as old
+images that could otherwise block PSA updates:
+
+```sh
+west flash -d b-psa -- --initial-programming --full-flash-erase
+```
+
+An OTA update cannot migrate the single-slot factory layout. Initial programming
+writes the `is25wj032f/ota` profile used by this sample. Use OTA deployments for
+subsequent firmware updates. On Windows, add the Toolbox installation directory to
+`PATH`, or append `--simplelink-tool <path-to-executable>` to the flash command.
 
 The overlay describes the running application's logical XIP window and reserves the
 physical areas below. TI remaps either vendor slot into that execution window, so one
@@ -71,10 +90,6 @@ and custom map/discovery JSON overrides: a profile name alone cannot prove that 
 fixed Devicetree addresses match a custom map. Update the overlay, provisioning and
 checks together when supporting a different layout.
 
-The board configuration reserves a 96 KiB Mbed TLS heap and enables 16 KiB TLS
-records for simultaneous MQTT and artifact HTTPS connections. The smaller TLS
-settings used by the logs sample are not sufficient for this OTA sample.
-
 ## Deploy an update
 
 1. Change the application and increment `CONFIG_CC35XXE_VENDOR_IMAGE_VERSION` in
@@ -82,12 +97,11 @@ settings used by the logs sample are not sufficient for this OTA sample.
    container version. The executable build ID must also change; repackaging the same
    executable with an unchanged build ID is rejected. The TI provider enables
    `CONFIG_SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION` by default, so
-   changing only that version also changes the ID. A cached command-line version
-   override takes precedence over `prj.conf`; update or clear it when reusing a build.
+   changing only that version also changes the ID.
    The cloud version string does not set the numeric container version.
 2. Rebuild and upload `b-psa/zephyr/flash/vendor_image.sign.bin` as the main firmware
    artifact. Include its entire signed container.
-3. Create a deployment through the [Spotflow OTA workflow](https://docs.spotflow.io/guides/ota).
+3. Create a deployment through the [Spotflow OTA workflow](https://docs.spotflow.io/using-spotflow/guides/ota).
 4. Observe the installation reboot, `UNCONFIRMED`, application acceptance and the
    additional confirmation reboot. Startup then verifies the running build and queues success.
 
