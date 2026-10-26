@@ -20,8 +20,7 @@ and relinks the executable. Linking reruns the ID patcher before TI builds and s
 the container. A cached command-line Kconfig override takes precedence over `prj.conf`;
 update or clear that override when testing version-only rebuilds.
 
-For direct use, pass `--extra-input=VALUE` to `scripts/patch_build_id.py`, followed by
-the ELF and optional related files. Alternatively, `--extra-input-file=PATH` reads the
-exact UTF-8 file content. CMake uses this file form so metadata containing quotes,
-semicolons or shell characters is never interpreted as part of a command. Omit both
-options to retain executable-only hashing.
+For direct use, pass `--extra-input-file=PATH` to `scripts/patch_build_id.py`,
+followed by the ELF and optional related files. The file supplies the exact UTF-8
+content to hash. CMake uses this form so metadata is never interpreted as command
+syntax. Omit the option to retain executable-only hashing.

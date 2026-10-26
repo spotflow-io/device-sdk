@@ -274,15 +274,13 @@ def find_base_address(elffile: ELFFile) -> int:
 
 def main():
     parser = argparse.ArgumentParser(description="Generate and embed a Spotflow build ID")
-    metadata = parser.add_mutually_exclusive_group()
-    metadata.add_argument("--extra-input", default="", help="Additional deterministic hash input")
-    metadata.add_argument(
+    parser.add_argument(
         "--extra-input-file", type=Path, help="UTF-8 file with the exact hash input"
     )
     parser.add_argument("elf_file")
     parser.add_argument("other_files", nargs="*", help="Related ELF, HEX, BIN or stripped files")
     args = parser.parse_args()
-    extra_input = args.extra_input
+    extra_input = ""
     if args.extra_input_file is not None:
         extra_input = args.extra_input_file.read_bytes().decode("utf-8")
     generate_and_patch_build_id(args.elf_file, args.other_files, extra_input)
