@@ -14,8 +14,7 @@ zephyr_iterable_section(
 )
 
 target_include_directories(app PRIVATE
-        ${ZEPHYR_TI_MODULE_DIR}/simplelink_wff3/source/ti/utils/FWU
-        ${ZEPHYR_TI_MODULE_DIR}/simplelink_wff3/source/ti/utils/FWU/headers
+        ${CMAKE_CURRENT_LIST_DIR}/include
         ${CMAKE_CURRENT_LIST_DIR}/../../../include
         ${CMAKE_CURRENT_LIST_DIR}/../../../src
         ${CMAKE_CURRENT_LIST_DIR}/../common
