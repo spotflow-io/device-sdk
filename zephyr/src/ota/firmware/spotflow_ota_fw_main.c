@@ -90,10 +90,6 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 		return interrupted_main_firmware_result(token);
 	}
 
-	if (spotflow_is_update_canceled()) {
-		return SPOTFLOW_OTA_RESULT_CANCELED;
-	}
-
 	if (spotflow_ota_state_main_firmware_download_pending(token, &state) < 0) {
 		return fail_main_firmware(token);
 	}
@@ -130,11 +126,6 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 	}
 	if (rc < 0) {
 		LOG_ERR("Main firmware download failed: %d", rc);
-		goto failed;
-	}
-
-	if (spotflow_is_update_canceled()) {
-		rc = -ECANCELED;
 		goto failed;
 	}
 
