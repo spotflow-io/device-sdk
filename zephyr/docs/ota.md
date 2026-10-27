@@ -10,7 +10,11 @@ how device-side updates behave, why the design uses its persistence and recovery
 and how those rules are implemented. Application developers integrating OTA updates
 should start with the
 [Zephyr guide for OTA updates](https://docs.spotflow.io/guides/zephyr/ota-zephyr) or the
-[sample for OTA updates](../samples/ota).
+[sample for OTA updates](../samples/ota). Automatic main-firmware updates currently
+support two backends: MCUboot and PSA Firmware Update (PSA FWU), with a TI CC35xx
+provider. TI users should follow
+[Over-the-air (OTA) updates on TI CC35X1](https://docs.spotflow.io/guides/texas-instruments/ota)
+(upcoming public guide) and the [PSA sample](../samples/ota_psa).
 
 The MQTT message schemas are documented in the
 [MQTT protocol guide for OTA updates](https://docs.spotflow.io/guides/mqtt/ota-mqtt).
@@ -684,14 +688,10 @@ See [build ID generation](build-id.md) for packaging metadata and rebuild behavi
 
 MCUboot encrypted, compressed and split images are rejected because the stream
 reader cannot inspect their executable payload directly. RAM-load and fixed-address
-images are supported. Both backends reject the running build ID before saving
-probation: otherwise a reset before installation could make the old confirmed image
+images are supported. Both backends reject a downloaded image whose build ID
+matches that of the currently running firmware before saving probation: otherwise a reset before installation could make the old confirmed image
 look like a successful update. The TI provider includes its numeric vendor image
 version in the ID by default; see [build ID generation](build-id.md).
-
-The streamed ID correlates the candidate with the image running after reboot. It
-does not authenticate the download or verify flash readback. The bootloader remains
-responsible for signature and full-image validation.
 
 Initialization resolves probation as follows:
 
@@ -756,7 +756,8 @@ verifies signatures. Retries preserve the RAM context; after reboot, downloads r
 
 TI alternates the physical vendor slots: an image initially running from slot 1
 updates into slot 2, then the next update uses slot 1. The bootloader maps either
-physical slot into the same logical XIP window, so both use the same signed artifact.
+physical slot into the same logical execute-in-place (XIP) address window: the CPU
+runs the firmware directly from flash. Both slots therefore use the same signed artifact.
 The wireless slots hold TI connectivity firmware and are not updated by this provider.
 See [the TI PSA sample](../samples/ota_psa/README.md) for its fixed factory layout
 and application-requested confirmation reboot.
