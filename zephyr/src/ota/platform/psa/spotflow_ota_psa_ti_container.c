@@ -18,6 +18,16 @@ static int inspect_payload(struct spotflow_ota_ti_container* container, const ui
 static bool copy_tlv_header(uint8_t header[4], size_t header_offset, const uint8_t* data,
 			    size_t offset, size_t len);
 
+int spotflow_ota_ti_container_init(struct spotflow_ota_ti_container* container, size_t max_size)
+{
+	if (container == NULL || max_size == 0) {
+		return -EINVAL;
+	}
+	memset(container, 0, sizeof(*container));
+	container->max_size = max_size;
+	return 0;
+}
+
 int spotflow_ota_ti_container_feed(struct spotflow_ota_ti_container* container,
 				   const struct spotflow_artifact_block* block)
 {

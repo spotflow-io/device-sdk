@@ -14,7 +14,7 @@ extern "C" {
 /* TI reserves a slot header sector, less the manifest integrity and auth fields. */
 #define SPOTFLOW_OTA_TI_SLOT_OVERHEAD (SPOTFLOW_OTA_TI_SECTOR_SIZE - 4U - 16U)
 
-/** @brief TI signed-container parser; zero-initialize and set max_size before use. */
+/** @brief TI signed-container parser; initialize with spotflow_ota_ti_container_init(). */
 struct spotflow_ota_ti_container {
 	PSA_FWU_GPESlot_t prefix;
 	struct spotflow_ota_identity_stream identity;
@@ -27,6 +27,14 @@ struct spotflow_ota_ti_container {
 	uint8_t tlv_header[4];
 	bool complete;
 };
+
+/**
+ * @brief Initialize or reset a TI signed-container parser.
+ * @param container Parser context.
+ * @param max_size Maximum complete signed-artifact size in bytes; must be nonzero.
+ * @return Zero on success, -EINVAL for a NULL context or zero size limit.
+ */
+int spotflow_ota_ti_container_init(struct spotflow_ota_ti_container* container, size_t max_size);
 
 /**
  * @brief Validate sequential container bytes and scan only executable descriptors.

@@ -134,7 +134,11 @@ int spotflow_ota_psa_begin(void)
 	}
 	download.component = vendor_components[target];
 	LOG_INF("PSA vendor update target: component %u", download.component);
-	download.container.max_size = slot_size - SPOTFLOW_OTA_TI_SLOT_OVERHEAD;
+	rc = spotflow_ota_ti_container_init(&download.container,
+					    slot_size - SPOTFLOW_OTA_TI_SLOT_OVERHEAD);
+	if (rc < 0) {
+		return rc;
+	}
 	download.selected = true;
 	return clean_download_target();
 }
