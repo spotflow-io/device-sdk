@@ -32,7 +32,8 @@ struct spotflow_ota_identity_stream {
  * @param ctx Zero-initialized parser context; NULL is ignored.
  * @param data Payload bytes, or NULL when len is zero.
  * @param len Number of bytes to consume.
- * @note Errors are retained in the context and returned by the identity getter.
+ * @note Scanning stops when the ID is found; later payload bytes are ignored.
+ * Errors are retained in the context and returned by the identity getter.
  */
 void spotflow_ota_identity_stream_feed(struct spotflow_ota_identity_stream* ctx,
 				       const uint8_t* data, size_t len);

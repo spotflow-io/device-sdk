@@ -9,13 +9,14 @@
 #define TI_IMAGE_MAGIC 0x690c47c2U
 #define TI_PROTECTED_TLV_MAGIC 0x6908U
 #define TI_TLV_MAGIC 0x6907U
-#define TI_INSPECTION_CHUNK_SIZE 256U
 
 BUILD_ASSERT(sizeof(PSA_FWU_GPESlot_t) == 48);
 
 static int read_prefix(struct spotflow_ota_ti_container* container);
 static int inspect_payload(struct spotflow_ota_ti_container* container, const uint8_t* data,
 			   size_t len);
+static bool copy_tlv_header(uint8_t header[4], size_t header_offset, const uint8_t* data,
+			    size_t offset, size_t len);
 
 int spotflow_ota_ti_container_feed(struct spotflow_ota_ti_container* container,
 				   const struct spotflow_artifact_block* block)
@@ -46,7 +47,7 @@ int spotflow_ota_ti_container_feed(struct spotflow_ota_ti_container* container,
 				}
 			}
 		} else {
-			len = MIN(remaining, TI_INSPECTION_CHUNK_SIZE);
+			len = remaining;
 			rc = inspect_payload(container, data, len);
 			if (rc < 0) {
 				return rc;
@@ -100,47 +101,51 @@ static int read_prefix(struct spotflow_ota_ti_container* container)
 static int inspect_payload(struct spotflow_ota_ti_container* container, const uint8_t* data,
 			   size_t len)
 {
-	/* Build identity is read from executable bytes only, never signature TLVs. */
-	if (container->offset < container->payload_end) {
-		size_t payload_len = MIN(len, container->payload_end - container->offset);
+	size_t offset = container->offset;
+
+	/* The identity reader stops scanning as soon as it finds the build ID. */
+	if (offset < container->payload_end) {
+		size_t payload_len = MIN(len, container->payload_end - offset);
 
 		spotflow_ota_identity_stream_feed(&container->identity, data, payload_len);
 	}
-	for (size_t i = 0; i < len; i++) {
-		size_t offset = container->offset + i;
-
-		if (container->protected_end != container->payload_end &&
-		    offset >= container->payload_end &&
-		    offset - container->payload_end < sizeof(container->protected_header)) {
-			size_t index = offset - container->payload_end;
-
-			container->protected_header[index] = data[i];
-			if (index == 3 &&
-			    (sys_get_le16(container->protected_header) != TI_PROTECTED_TLV_MAGIC ||
-			     sys_get_le16(container->protected_header + 2) !=
-				     container->prefix.Manifest.GPE_Header.ih_protect_tlv_size)) {
-				return -EBADMSG;
-			}
-		}
-		if (offset >= container->protected_end &&
-		    offset - container->protected_end < sizeof(container->tlv_header)) {
-			size_t index = offset - container->protected_end;
-
-			container->tlv_header[index] = data[i];
-			if (index == 3) {
-				size_t tlv_size = sys_get_le16(container->tlv_header + 2);
-
-				if (sys_get_le16(container->tlv_header) != TI_TLV_MAGIC ||
-				    tlv_size < 4 ||
-				    tlv_size > container->max_size - container->protected_end) {
-					return -EBADMSG;
-				}
-				container->total_size = container->protected_end + tlv_size;
-			}
-		}
-		if (container->total_size != 0 && offset >= container->total_size) {
-			return -EFBIG;
+	/* Only the two TLV headers need inspection after the executable payload. */
+	if (container->protected_end != container->payload_end &&
+	    copy_tlv_header(container->protected_header, container->payload_end, data, offset,
+			    len)) {
+		if (sys_get_le16(container->protected_header) != TI_PROTECTED_TLV_MAGIC ||
+		    sys_get_le16(container->protected_header + 2) !=
+			    container->prefix.Manifest.GPE_Header.ih_protect_tlv_size) {
+			return -EBADMSG;
 		}
 	}
+	if (copy_tlv_header(container->tlv_header, container->protected_end, data, offset, len)) {
+		size_t tlv_size = sys_get_le16(container->tlv_header + 2);
+
+		if (sys_get_le16(container->tlv_header) != TI_TLV_MAGIC || tlv_size < 4 ||
+		    tlv_size > container->max_size - container->protected_end) {
+			return -EBADMSG;
+		}
+		container->total_size = container->protected_end + tlv_size;
+	}
+	if (container->total_size != 0 && offset + len > container->total_size) {
+		return -EFBIG;
+	}
 	return 0;
+}
+
+/* Copy just the intersection with a four-byte TLV header. Return true when this
+ * block completes it, including when the header spans multiple blocks.
+ */
+static bool copy_tlv_header(uint8_t header[4], size_t header_offset, const uint8_t* data,
+			    size_t offset, size_t len)
+{
+	size_t start = MAX(offset, header_offset);
+	size_t end = MIN(offset + len, header_offset + 4U);
+
+	if (start >= end) {
+		return false;
+	}
+	memcpy(header + start - header_offset, data + start - offset, end - start);
+	return end == header_offset + 4U;
 }
