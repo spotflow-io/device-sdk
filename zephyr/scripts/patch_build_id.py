@@ -19,7 +19,7 @@ BUILD_ID_HEADER_SIZE = len(BUILD_ID_HEADER_VALUE)
 BUILD_ID_VALUE_SIZE = 20
 
 def generate_and_patch_build_id(
-    elf_filepath: str, other_filepaths: list[str], extra_input: str = ""
+    elf_filepath: str, other_filepaths: list[str], extra_input: bytes = b""
 ):
     with open(elf_filepath, "rb+") as elf_stream:
         elffile = ELFFile(elf_stream)
@@ -94,7 +94,7 @@ def convert_vaddr_to_paddr(elffile: ELFFile, vaddr: int) -> int:
     raise Exception(f"Virtual address 0x{vaddr:08x} not found in any segment of ELF file")
 
 
-def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int, extra_input: str = ""):
+def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int, extra_input: bytes = b""):
     hash_builder = hashlib.sha1()
 
     for section in elffile.iter_sections():
@@ -124,13 +124,7 @@ def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int, extra_input: 
         else:
             hash_builder.update(data)
 
-    # Keep existing IDs unchanged when no additional metadata is supplied.
-    # Domain separation and the byte length make the appended input unambiguous.
-    if extra_input:
-        encoded_input = extra_input.encode("utf-8")
-        hash_builder.update(b"\x00Spotflow build ID extra input\x00")
-        hash_builder.update(len(encoded_input).to_bytes(8, byteorder="little"))
-        hash_builder.update(encoded_input)
+    hash_builder.update(extra_input)
 
     build_id = hash_builder.digest()
     assert len(build_id) == BUILD_ID_VALUE_SIZE
@@ -275,14 +269,14 @@ def find_base_address(elffile: ELFFile) -> int:
 def main():
     parser = argparse.ArgumentParser(description="Generate and embed a Spotflow build ID")
     parser.add_argument(
-        "--extra-input-file", type=Path, help="UTF-8 file with the exact hash input"
+        "--extra-input-file", type=Path, help="File whose raw bytes are appended to the hash input"
     )
     parser.add_argument("elf_file")
     parser.add_argument("other_files", nargs="*", help="Related ELF, HEX, BIN or stripped files")
     args = parser.parse_args()
-    extra_input = ""
+    extra_input = b""
     if args.extra_input_file is not None:
-        extra_input = args.extra_input_file.read_bytes().decode("utf-8")
+        extra_input = args.extra_input_file.read_bytes()
     generate_and_patch_build_id(args.elf_file, args.other_files, extra_input)
 
 

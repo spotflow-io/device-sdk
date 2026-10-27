@@ -80,21 +80,19 @@ def test_extra_input_is_optional_and_changes_identity_without_changing_elf():
     section = ElfSection(".text", 0x2000, b"same executable", allocated=True)
     elf = SimpleNamespace(iter_sections=lambda: iter([section]))
     original = patch_build_id.generate_build_id(elf, 0x1000)
-    assert patch_build_id.generate_build_id(elf, 0x1000, "") == original
-    first = patch_build_id.generate_build_id(elf, 0x1000, "0.0.7.0")
-    second = patch_build_id.generate_build_id(elf, 0x1000, "0.0.8.0")
+    assert patch_build_id.generate_build_id(elf, 0x1000, b"") == original
+    first = patch_build_id.generate_build_id(elf, 0x1000, b"0.0.7.0")
+    second = patch_build_id.generate_build_id(elf, 0x1000, b"0.0.8.0")
     assert len({original, first, second}) == 3
-    assert patch_build_id.generate_build_id(elf, 0x1000, "0.0.7.0") == first
+    assert patch_build_id.generate_build_id(elf, 0x1000, b"0.0.7.0") == first
 
 
-def test_extra_input_has_stable_utf8_encoding_and_framing():
-    elf = SimpleNamespace(iter_sections=lambda: iter([]))
-    value = "release \u03b1"
-    encoded = value.encode("utf-8")
+def test_extra_input_bytes_are_appended_without_framing():
+    section = ElfSection(".text", 0x2000, b"firmware", allocated=True)
+    elf = SimpleNamespace(iter_sections=lambda: iter([section]))
+    value = b"\x00\xff\xfe\r\n"
     expected = hashlib.sha1(
-        b"\x00Spotflow build ID extra input\x00"
-        + len(encoded).to_bytes(8, "little")
-        + encoded
+        (0x2000).to_bytes(8, "little") + b"firmware" + value
     ).digest()
     assert patch_build_id.generate_build_id(elf, 0x1000, value) == expected
 
