@@ -30,23 +30,27 @@ extern "C" {
  * @return Zero on success, negative errno on failure.
  */
 int spotflow_ota_psa_init(void);
+
 /**
  * @brief Query the component containing the running executable.
  * @param info Receives the native component information.
  * @return Zero on success, negative errno on invalid arguments or query failure.
  */
 int spotflow_ota_psa_running_info(psa_fwu_component_info_t* info);
+
 /**
  * @brief Select and prepare inactive storage for the main executable.
  * @return Zero on success, negative errno if no safe target is available.
  */
 int spotflow_ota_psa_begin(void);
+
 /**
  * @brief Consume the next sequential native artifact block.
  * @param block Downloaded block, including container bytes.
  * @return Zero on success, negative errno on invalid input or write failure.
  */
 int spotflow_ota_psa_write(const struct spotflow_artifact_block* block);
+
 /**
  * @brief Read a completed candidate before PSA finish.
  * @param component Receives the provider-selected component ID.
@@ -55,17 +59,20 @@ int spotflow_ota_psa_write(const struct spotflow_artifact_block* block);
  */
 int spotflow_ota_psa_end(psa_fwu_component_t* component,
 			 uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
+
 /**
  * @brief Discard the owned inactive candidate.
  * @return Zero on success, negative errno on cleanup failure.
  */
 int spotflow_ota_psa_abort(void);
+
 /**
  * @brief Ensure that global installation affects only the owned candidate.
  * @param component Candidate selected by this provider.
  * @return Zero on success, negative errno if another update blocks installation.
  */
 int spotflow_ota_psa_check_install(psa_fwu_component_t component);
+
 /**
  * @brief Ensure that global acceptance affects only the running main executable.
  * @return Zero on success, negative errno if another update blocks acceptance.
