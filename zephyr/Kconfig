@@ -33,7 +33,6 @@ config SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION
 	help
 	  Include CC35XXE_VENDOR_IMAGE_VERSION in the build ID hash so changing
 	  only the signed container version also changes the executable identity.
-	  Reproducing this build ID requires the ELF and the vendor image version.
 
 config SPOTFLOW_DEVICE_ID
 	string "Device ID device will use to connect to Spotflow observability platform"
