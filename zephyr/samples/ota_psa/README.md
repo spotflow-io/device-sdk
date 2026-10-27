@@ -6,48 +6,55 @@ reboots into trial execution, and waits for application acceptance. The sample a
 immediately for demonstration, then explicitly requests TI's confirmation reboot. Replace the
 immediate acceptance with application health checks in production.
 
+## Prepare the workspace
+
+Perform these steps in order from the workspace root:
+
+1. Complete the Toolbox installation and compatibility changes in
+   [CC35X1 flashing setup](https://docs.spotflow.io/guides/texas-instruments/cc35x1-setup).
+   Stop before activation and factory programming; those steps require the sample
+   built below. The runner patch in step 3 expects the guide's compatibility changes.
+2. Apply the [CC35xx flash startup patch](../../patches/ti/cc35xx-flash-startup.patch):
+
+   ```sh
+   git -C modules/hal/ti apply --check ../../../modules/lib/spotflow/zephyr/patches/ti/cc35xx-flash-startup.patch
+   git -C modules/hal/ti apply ../../../modules/lib/spotflow/zephyr/patches/ti/cc35xx-flash-startup.patch
+   ```
+
+3. Apply the [Toolbox runner patch](../../patches/ti/cc35xx-toolbox-runner.patch)
+   so initial programming uses the selected OTA memory map:
+
+   ```sh
+   git -C zephyr apply --check ../modules/lib/spotflow/zephyr/patches/ti/cc35xx-toolbox-runner.patch
+   git -C zephyr apply ../modules/lib/spotflow/zephyr/patches/ti/cc35xx-toolbox-runner.patch
+   ```
+
+Skip a patch if your checkout already includes its changes.
+
 ## Configure and build
 
-Copy `credentials-sample.conf` to `credentials.conf` and enter Wi-Fi and Spotflow
-credentials. CMake loads that file automatically. Apply the prerequisites in
-[Provision the OTA flash layout](#provision-the-ota-flash-layout), then build from
-the workspace root:
+Copy `credentials-sample.conf` to `credentials.conf` in the sample directory and
+enter Wi-Fi and Spotflow credentials. CMake loads that file automatically.
+Build from the workspace root:
 
 ```sh
-west build -b lp_em_cc35x1/cc3551e -d b-psa modules/lib/spotflow/zephyr/samples/ota_psa
+west build -b lp_em_cc35x1/cc3551e modules/lib/spotflow/zephyr/samples/ota_psa
 ```
 
-Use a short build directory on Windows because the TI Wi-Fi sources have long object
-paths. This sample uses TI's native signing pipeline and does not need MCUboot/sysbuild.
+This sample uses TI's native signing pipeline and does not need MCUboot/sysbuild.
 The default development signing keys must match the board provisioning; configure the
 appropriate signing keys for your device.
 
-## Provision the OTA flash layout
+## Activate and provision the OTA flash layout
 
-Before building, complete the Toolbox installation and compatibility changes in
-[CC35X1 flashing setup](https://docs.spotflow.io/guides/texas-instruments/cc35x1-setup).
-Stop before activation and factory programming until this sample is built. The runner
-patch below expects those compatibility changes to have been applied first.
-
-Apply the [CC35xx flash startup patch](../../patches/ti/cc35xx-flash-startup.patch)
-as described in the [implementation notes](../../docs/ota.md#psa-firmware-update-handler).
-Then apply the [Toolbox runner patch](../../patches/ti/cc35xx-toolbox-runner.patch)
-from the workspace root so initial programming uses the selected OTA memory map:
-
-```sh
-git -C zephyr apply --check ../modules/lib/spotflow/zephyr/patches/ti/cc35xx-toolbox-runner.patch
-git -C zephyr apply ../modules/lib/spotflow/zephyr/patches/ti/cc35xx-toolbox-runner.patch
-```
-
-Skip either patch if your checkout already includes its changes. Build the sample,
-then follow the guide's one-time activation step if the board is not activated yet.
-Use `b-psa` wherever that step uses `build`. For factory programming, use the commands
-below with this sample's build rather than a previously built BLE or Wi-Fi sample.
+With the sample built, perform the flashing guide's one-time activation step if the
+board is not activated yet. Then factory-program this sample using the commands
+below. Subsequent firmware updates use OTA deployments.
 
 After activation, provision the two-slot layout:
 
 ```sh
-west flash -d b-psa -- --initial-programming
+west flash -- --initial-programming
 ```
 
 If the board was previously programmed with a different layout, use the following
@@ -55,7 +62,7 @@ command instead. It erases saved settings, Wi-Fi profiles and keys as well as ol
 images that could otherwise block PSA updates:
 
 ```sh
-west flash -d b-psa -- --initial-programming --full-flash-erase
+west flash -- --initial-programming --full-flash-erase
 ```
 
 An OTA update cannot migrate the single-slot factory layout. Initial programming
@@ -63,8 +70,9 @@ writes the `is25wj032f/ota` profile used by this sample. Use OTA deployments for
 subsequent firmware updates. On Windows, add the Toolbox installation directory to
 `PATH`, or append `--simplelink-tool <path-to-executable>` to the flash command.
 
-The overlay describes the running application's logical XIP window and reserves the
-physical areas below. TI remaps either vendor slot into that execution window, so one
+The overlay describes the running application's logical execute-in-place (XIP)
+address window and reserves the physical areas below. TI remaps either vendor slot
+into that execution window, so one
 signed artifact works in both slots. The wireless slots contain TI connectivity firmware
 read by the Wi-Fi driver; this sample updates only the vendor application. Both wireless
 slots must remain described even though Spotflow does not update them.
@@ -99,7 +107,7 @@ checks together when supporting a different layout.
    `CONFIG_SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION` by default, so
    changing only that version also changes the ID.
    The cloud version string does not set the numeric container version.
-2. Rebuild and upload `b-psa/zephyr/flash/vendor_image.sign.bin` as the main firmware
+2. Rebuild and upload `build/zephyr/flash/vendor_image.sign.bin` as the main firmware
    artifact. Include its entire signed container.
 3. Create a deployment through the [Spotflow OTA workflow](https://docs.spotflow.io/using-spotflow/guides/ota).
 4. Observe the installation reboot, `UNCONFIRMED`, application acceptance and the
