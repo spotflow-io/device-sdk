@@ -1080,12 +1080,30 @@ int spotflow_ota_state_fail_main_firmware(const struct spotflow_ota_operation_to
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
+	bool released_for_reboot =
+		ota_state.main_firmware.execution == OTA_MAIN_EXECUTION_REBOOT_READY ||
+		ota_state.main_firmware.execution == OTA_MAIN_EXECUTION_REBOOT_STARTED;
+
+	if (released_for_reboot &&
+	    spotflow_ota_attempt_transaction_is_active(&ota_state.current_attempt)) {
+		k_mutex_unlock(&state_mutex);
+		return -EINVAL;
+	}
 	int rc = spotflow_ota_main_fail_handler(&ota_state.main_firmware, out_state);
 	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
 		return rc;
 	}
 
+	if (released_for_reboot) {
+		/* Prereboot finalization released the original handler transaction.
+		 * Restore it so the returning worker can persist its failure result.
+		 */
+		ota_state.current_attempt.execution.transaction.state =
+			OTA_ARTIFACT_TRANSACTION_RUNNING;
+		ota_state.current_attempt.execution.transaction.artifact_index =
+			ota_state.main_firmware.artifact_index;
+	}
 	assert_state_locked();
 	k_mutex_unlock(&state_mutex);
 	return 0;

@@ -1142,7 +1142,11 @@ ZTEST(spotflow_ota_state, test_main_firmware_semantic_transition_sequence)
 	zassert_ok(spotflow_ota_state_set_main_firmware_paused(false, &state));
 	zassert_ok(spotflow_ota_state_begin_main_firmware_reboot(&job.token));
 	zassert_equal(spotflow_ota_state_begin_main_firmware_reboot(&job.token), -EINVAL);
+	zassert_ok(spotflow_ota_state_fail_main_firmware(&job.token, &state));
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_FAILED);
 	zassert_equal(spotflow_ota_state_fail_main_firmware(&job.token, NULL), -EINVAL);
+	zassert_ok(spotflow_ota_state_stage_artifact_result(&job, SPOTFLOW_OTA_RESULT_FAILED));
 }
 
 ZTEST(spotflow_ota_state, test_stale_main_handler_token_rejects_all_transitions)

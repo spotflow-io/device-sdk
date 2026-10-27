@@ -1,4 +1,5 @@
 #include "ota/firmware/spotflow_ota_fw_main.h"
+#include "ota/core/spotflow_ota_worker.h"
 #include "ota/platform/psa/spotflow_ota_psa_provider.h"
 #include "ota/platform/spotflow_ota_identity_stream.h"
 #include "ota/persistence/spotflow_ota_persistence.h"
@@ -19,11 +20,14 @@
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_LOG_DEFAULT_LEVEL);
 
 static bool abort_after_download;
+static bool capture_probation_after_result;
+static struct spotflow_ota_probation probation_after_result;
 static uint8_t image[188];
 static uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
 static struct spotflow_ota_downloader_transport_fake* transport;
 
 static void before_each(void* fixture);
+static void accept_update(void);
 static enum spotflow_ota_result process(void);
 static struct spotflow_ota_probation load_probation(void);
 static int restore_and_reconcile(struct spotflow_ota_fw_main_startup_result* startup);
@@ -41,6 +45,18 @@ void spotflow_on_main_firmware_update_progressed(
 bool spotflow_is_update_canceled(void)
 {
 	return spotflow_ota_state_is_update_canceled();
+}
+
+void spotflow_ota_worker_test_after_artifact_result_persisted(void)
+{
+	if (capture_probation_after_result) {
+		bool present;
+
+		zassert_ok(
+			spotflow_ota_persistence_load_probation(&probation_after_result, &present));
+		zassert_true(present);
+		capture_probation_after_result = false;
+	}
 }
 
 ZTEST(spotflow_ota_psa, test_split_stream_installs_inactive_vendor_slot)
@@ -211,11 +227,58 @@ ZTEST(spotflow_ota_psa, test_download_retry_preserves_prefix_and_offsets)
 	zassert_mem_equal(fake.image, image, sizeof(image));
 }
 
-ZTEST(spotflow_ota_psa, test_failed_installation_reboot_retains_pending_record)
+ZTEST(spotflow_ota_psa, test_failed_installation_reboot_is_persisted_by_worker)
 {
+	struct spotflow_ota_persisted_attempt attempt;
+	struct spotflow_ota_probation probation;
+	struct spotflow_ota_state_diagnostic snapshot;
+	bool present = false;
+
 	fake.reboot_result = PSA_ERROR_STORAGE_FAILURE;
-	zassert_equal(process(), SPOTFLOW_OTA_RESULT_PENDING);
-	(void)load_probation();
+	capture_probation_after_result = true;
+	accept_update();
+	zassert_ok(spotflow_ota_worker_init());
+	spotflow_ota_worker_wake();
+	struct spotflow_ota_test_fake_transport* reporting = spotflow_ota_test_fake_transport_get();
+
+	for (size_t i = 0; i < 1000; i++) {
+		zassert_ok(spotflow_ota_net_send_pending_message());
+		if (reporting->publish_count > 0) {
+			break;
+		}
+		k_sleep(K_MSEC(1));
+	}
+	/* Wait until the worker also finishes its report operation before reset. */
+	spotflow_ota_worker_reset();
+	zassert_equal(reporting->publish_count, 1);
+	spotflow_ota_state_get_diagnostic(&snapshot);
+	zassert_equal(snapshot.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(snapshot.main_firmware_state.result, SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(snapshot.main_firmware_state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+	zassert_ok(spotflow_ota_persistence_load_attempt(&attempt, &present));
+	zassert_true(present);
+	zassert_equal(attempt.artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(fake.reboot_count, 1);
+	zassert_equal(fake.accept_count, 0);
+	zassert_false(capture_probation_after_result);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &present));
+	zassert_false(present);
+
+	/* Recreate a reset after saving failure but before clearing probation.
+	 * Even if that reset boots the candidate, the durable failure wins.
+	 */
+	probation = probation_after_result;
+	struct spotflow_ota_fw_main_startup_result startup;
+
+	zassert_ok(spotflow_ota_persistence_save_probation(&probation));
+	spotflow_ota_psa_fake_set_trial(5);
+	spotflow_ota_build_id_fake_set_running_build_id(build_id);
+	zassert_ok(spotflow_ota_state_init_from_persistence(&attempt, true, &probation, true));
+	zassert_ok(spotflow_ota_fw_main_reconcile_startup(&probation, true, &startup));
+	zassert_false(startup.has_progress_notification);
+	zassert_equal(fake.accept_count, 0);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &present));
+	zassert_false(present);
 }
 
 ZTEST(spotflow_ota_psa, test_provider_rejects_nonsequential_offsets)
@@ -401,7 +464,9 @@ ZTEST(spotflow_ota_psa, test_unexpected_running_state_fails_startup_without_prob
 static void before_each(void* fixture)
 {
 	ARG_UNUSED(fixture);
+	spotflow_ota_worker_reset();
 	abort_after_download = false;
+	capture_probation_after_result = false;
 	spotflow_ota_test_settings_reset();
 	spotflow_ota_test_fakes_reset();
 	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
@@ -449,7 +514,7 @@ static void before_each(void* fixture)
 	transport->chunk_size = 1;
 }
 
-static enum spotflow_ota_result process(void)
+static void accept_update(void)
 {
 	struct spotflow_ota_update_msg update = {
 		.attempt_id = 42,
@@ -463,9 +528,15 @@ static enum spotflow_ota_result process(void)
 		} },
 	};
 	struct spotflow_ota_update_result accepted;
-	struct spotflow_ota_worker_job job;
 
 	zassert_ok(spotflow_ota_state_accept_update(&update, &accepted));
+}
+
+static enum spotflow_ota_result process(void)
+{
+	struct spotflow_ota_worker_job job;
+
+	accept_update();
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
 	return spotflow_ota_fw_main_process_artifact(&job);
 }

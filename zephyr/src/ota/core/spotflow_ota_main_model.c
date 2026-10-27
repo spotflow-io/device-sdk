@@ -181,15 +181,25 @@ int spotflow_ota_main_download_completed(struct ota_main_firmware_model* main, b
 int spotflow_ota_main_fail_handler(struct ota_main_firmware_model* main,
 				   struct spotflow_ota_main_firmware_state* out_state)
 {
+	bool awaiting_reboot = main->execution == OTA_MAIN_EXECUTION_REBOOT_READY ||
+		main->execution == OTA_MAIN_EXECUTION_REBOOT_STARTED;
+
 	if (main->presence != OTA_MAIN_FIRMWARE_PRESENT ||
 	    (main->execution != OTA_MAIN_EXECUTION_CLAIMED &&
 	     main->execution != OTA_MAIN_EXECUTION_PENDING_DOWNLOAD &&
 	     main->execution != OTA_MAIN_EXECUTION_DOWNLOADING &&
 	     main->execution != OTA_MAIN_EXECUTION_PENDING_UPGRADE &&
-	     main->execution != OTA_MAIN_EXECUTION_INSTALLING) ||
-	    main->probation.state != OTA_MAIN_PROBATION_NONE) {
+	     main->execution != OTA_MAIN_EXECUTION_INSTALLING &&
+	     main->execution != OTA_MAIN_EXECUTION_REBOOT_READY &&
+	     main->execution != OTA_MAIN_EXECUTION_REBOOT_STARTED) ||
+	    main->probation.state !=
+		    (awaiting_reboot ? OTA_MAIN_PROBATION_PENDING : OTA_MAIN_PROBATION_NONE)) {
 		return -EINVAL;
 	}
+	/* The worker persists failure before a later startup clears the saved
+	 * probation. Do not leave this runtime waiting for confirmation.
+	 */
+	main->probation.state = OTA_MAIN_PROBATION_NONE;
 	spotflow_ota_main_finish_handler(main, SPOTFLOW_OTA_RESULT_FAILED);
 	spotflow_ota_main_project_state(main, out_state);
 	return 0;
