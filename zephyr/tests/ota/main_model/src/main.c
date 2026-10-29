@@ -31,7 +31,7 @@ static void claim_and_download(struct ota_main_firmware_model* main)
 ZTEST(spotflow_ota_main_model, test_upgrade_transition_sequence)
 {
 	struct ota_main_firmware_model main;
-	struct ota_main_prereboot_transition transition;
+	struct spotflow_ota_main_firmware_state state;
 
 	spotflow_ota_main_clear(&main);
 	zassert_true(spotflow_ota_main_is_valid(&main));
@@ -43,12 +43,33 @@ ZTEST(spotflow_ota_main_model, test_upgrade_transition_sequence)
 	zassert_ok(spotflow_ota_main_cancel_installation(&main));
 	zassert_false(spotflow_ota_main_upgrade_is_irreversible(&main));
 	zassert_ok(spotflow_ota_main_begin_installation(&main, true, false));
-	zassert_ok(spotflow_ota_main_finish_prereboot(&main, true, &transition));
-	zassert_true(transition.clear_artifact_transaction);
-	zassert_equal(transition.state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
-	zassert_true(spotflow_ota_main_probation_is_pending(&main));
+	zassert_ok(spotflow_ota_main_finish_prereboot(&main, true, &state));
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+	zassert_false(spotflow_ota_main_probation_is_pending(&main));
 	zassert_ok(spotflow_ota_main_begin_reboot(&main));
 	zassert_true(spotflow_ota_main_is_valid(&main));
+}
+
+ZTEST(spotflow_ota_main_model, test_prereboot_failure_needs_no_probation_transition)
+{
+	for (size_t reboot_started = 0; reboot_started < 2; reboot_started++) {
+		struct ota_main_firmware_model main;
+		struct spotflow_ota_main_firmware_state state;
+
+		spotflow_ota_main_clear(&main);
+		claim_and_download(&main);
+		zassert_ok(spotflow_ota_main_begin_installation(&main, true, false));
+		zassert_ok(spotflow_ota_main_finish_prereboot(&main, true, NULL));
+		if (reboot_started) {
+			zassert_ok(spotflow_ota_main_begin_reboot(&main));
+		}
+		zassert_true(spotflow_ota_main_is_valid(&main));
+		zassert_false(spotflow_ota_main_probation_is_pending(&main));
+		zassert_ok(spotflow_ota_main_fail_handler(&main, &state));
+		zassert_equal(state.result, SPOTFLOW_OTA_RESULT_FAILED);
+		zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+		zassert_true(spotflow_ota_main_is_valid(&main));
+	}
 }
 
 ZTEST(spotflow_ota_main_model, test_control_transition_table)
@@ -72,8 +93,7 @@ ZTEST(spotflow_ota_main_model, test_control_transition_table)
 		main.presence = OTA_MAIN_FIRMWARE_PRESENT;
 		main.artifact = make_main_artifact();
 		main.execution = cases[i].execution;
-		if (cases[i].execution == OTA_MAIN_EXECUTION_REBOOT_READY ||
-		    cases[i].execution == OTA_MAIN_EXECUTION_UNCONFIRMED) {
+		if (cases[i].execution == OTA_MAIN_EXECUTION_UNCONFIRMED) {
 			main.probation.state = OTA_MAIN_PROBATION_PENDING;
 		}
 
@@ -206,7 +226,6 @@ ZTEST(spotflow_ota_main_model, test_invariant_rejects_cross_machine_drift)
 	invalid = valid;
 	invalid.execution = OTA_MAIN_EXECUTION_REBOOT_READY;
 	invalid.abort_requested = true;
-	invalid.probation.state = OTA_MAIN_PROBATION_PENDING;
 	zassert_false(spotflow_ota_main_is_valid(&invalid));
 
 	invalid = valid;

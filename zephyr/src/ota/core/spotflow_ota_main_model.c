@@ -68,11 +68,11 @@ bool spotflow_ota_main_is_valid(const struct ota_main_firmware_model* main)
 			main->result == SPOTFLOW_OTA_RESULT_PENDING;
 	case OTA_MAIN_EXECUTION_REBOOT_READY:
 		return main->presence == OTA_MAIN_FIRMWARE_PRESENT &&
-			main->probation.state == OTA_MAIN_PROBATION_PENDING &&
+			main->probation.state == OTA_MAIN_PROBATION_NONE &&
 			main->result == SPOTFLOW_OTA_RESULT_PENDING && !main->abort_requested;
 	case OTA_MAIN_EXECUTION_REBOOT_STARTED:
 		return main->presence == OTA_MAIN_FIRMWARE_PRESENT &&
-			main->probation.state == OTA_MAIN_PROBATION_PENDING &&
+			main->probation.state == OTA_MAIN_PROBATION_NONE &&
 			main->result == SPOTFLOW_OTA_RESULT_PENDING && !main->is_paused &&
 			!main->abort_requested;
 	case OTA_MAIN_EXECUTION_UNCONFIRMED:
@@ -186,7 +186,9 @@ int spotflow_ota_main_fail_handler(struct ota_main_firmware_model* main,
 	     main->execution != OTA_MAIN_EXECUTION_PENDING_DOWNLOAD &&
 	     main->execution != OTA_MAIN_EXECUTION_DOWNLOADING &&
 	     main->execution != OTA_MAIN_EXECUTION_PENDING_UPGRADE &&
-	     main->execution != OTA_MAIN_EXECUTION_INSTALLING) ||
+	     main->execution != OTA_MAIN_EXECUTION_INSTALLING &&
+	     main->execution != OTA_MAIN_EXECUTION_REBOOT_READY &&
+	     main->execution != OTA_MAIN_EXECUTION_REBOOT_STARTED) ||
 	    main->probation.state != OTA_MAIN_PROBATION_NONE) {
 		return -EINVAL;
 	}
@@ -257,16 +259,16 @@ int spotflow_ota_main_commit_probation_cleared(struct ota_main_firmware_model* m
 }
 
 int spotflow_ota_main_finish_prereboot(struct ota_main_firmware_model* main, bool handler_owned,
-				       struct ota_main_prereboot_transition* transition)
+				       struct spotflow_ota_main_firmware_state* out_state)
 {
-	if (!handler_owned || transition == NULL ||
-	    main->execution != OTA_MAIN_EXECUTION_INSTALLING) {
+	if (!handler_owned || main->execution != OTA_MAIN_EXECUTION_INSTALLING) {
 		return -EINVAL;
 	}
-	main->probation.state = OTA_MAIN_PROBATION_PENDING;
+	/* The handler owns installation until reset. Probation is restored from
+	 * persistent storage in the new runtime, rather than entered here.
+	 */
 	main->execution = OTA_MAIN_EXECUTION_REBOOT_READY;
-	spotflow_ota_main_project_state(main, &transition->state);
-	transition->clear_artifact_transaction = true;
+	spotflow_ota_main_project_state(main, out_state);
 	return 0;
 }
 
@@ -344,7 +346,7 @@ int spotflow_ota_main_cancel_installation(struct ota_main_firmware_model* main)
 int spotflow_ota_main_begin_reboot(struct ota_main_firmware_model* main)
 {
 	if (main->execution != OTA_MAIN_EXECUTION_REBOOT_READY ||
-	    main->probation.state != OTA_MAIN_PROBATION_PENDING) {
+	    main->probation.state != OTA_MAIN_PROBATION_NONE) {
 		return -EINVAL;
 	}
 	if (main->is_paused) {

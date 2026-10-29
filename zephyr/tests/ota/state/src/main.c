@@ -1103,6 +1103,7 @@ ZTEST(spotflow_ota_state, test_main_firmware_semantic_transition_sequence)
 	struct spotflow_ota_update_result update_result;
 	struct spotflow_ota_main_firmware_state state;
 	struct spotflow_ota_worker_job job;
+	struct spotflow_ota_persistence_capture capture;
 
 	zassert_ok(spotflow_ota_state_accept_update(&update, &update_result));
 	zassert_true(spotflow_ota_state_get_worker_job(&job));
@@ -1135,14 +1136,23 @@ ZTEST(spotflow_ota_state, test_main_firmware_semantic_transition_sequence)
 
 	zassert_ok(spotflow_ota_state_finish_main_firmware_prereboot(&job.token, &state));
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_PENDING_REBOOT);
+	/* The same handler transaction still owns the artifact before reset. */
+	zassert_ok(spotflow_ota_state_capture_persisted_attempt(
+		&job, SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE, &capture));
 	zassert_equal(spotflow_ota_state_finish_main_firmware_prereboot(&job.token, NULL), -EINVAL);
 	zassert_ok(spotflow_ota_state_set_main_firmware_paused(true, &state));
 	zassert_true(state.is_paused);
 	zassert_equal(spotflow_ota_state_begin_main_firmware_reboot(&job.token), -EAGAIN);
 	zassert_ok(spotflow_ota_state_set_main_firmware_paused(false, &state));
 	zassert_ok(spotflow_ota_state_begin_main_firmware_reboot(&job.token));
+	zassert_ok(spotflow_ota_state_capture_persisted_attempt(
+		&job, SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE, &capture));
 	zassert_equal(spotflow_ota_state_begin_main_firmware_reboot(&job.token), -EINVAL);
+	zassert_ok(spotflow_ota_state_fail_main_firmware(&job.token, &state));
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
+	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_FAILED);
 	zassert_equal(spotflow_ota_state_fail_main_firmware(&job.token, NULL), -EINVAL);
+	zassert_ok(spotflow_ota_state_stage_artifact_result(&job, SPOTFLOW_OTA_RESULT_FAILED));
 }
 
 ZTEST(spotflow_ota_state, test_stale_main_handler_token_rejects_all_transitions)
