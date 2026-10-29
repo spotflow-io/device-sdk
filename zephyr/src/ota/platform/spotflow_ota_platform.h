@@ -1,34 +1,85 @@
 #ifndef SPOTFLOW_OTA_PLATFORM_H
 #define SPOTFLOW_OTA_PLATFORM_H
 
-#include <stdbool.h>
-#include <stddef.h>
-#include <stdint.h>
+#include "spotflow_build_id.h"
 
-#include <zephyr/bindesc.h>
+#include <stdbool.h>
+#include <spotflow/downloader.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-int spotflow_ota_platform_request_test_upgrade(void);
+/** @brief Bootloader state of the executable currently running. */
+enum spotflow_ota_running_image_state {
+	SPOTFLOW_OTA_RUNNING_IMAGE_UNCONFIRMED,
+	SPOTFLOW_OTA_RUNNING_IMAGE_CONFIRMED,
+	SPOTFLOW_OTA_RUNNING_IMAGE_REJECTED,
+};
 
-int spotflow_ota_platform_confirm_image(void);
+/**
+ * @brief Initialize image management after boot.
+ * @return Zero on success, negative errno on failure.
+ */
+int spotflow_ota_platform_init(void);
 
-bool spotflow_ota_platform_is_image_confirmed(void);
+/**
+ * @brief Read the running image's bootloader state.
+ * @param state Receives the normalized state.
+ * @return Zero on success, negative errno on query failure or an unsupported state.
+ */
+int spotflow_ota_platform_get_running_image_state(enum spotflow_ota_running_image_state* state);
 
-void spotflow_ota_platform_reboot(void);
+/**
+ * @brief Request installation with rollback enabled.
+ * @return Zero on success, negative errno on failure.
+ */
+int spotflow_ota_platform_request_upgrade(void);
 
-int spotflow_ota_platform_read_upload_slot(size_t offset, uint8_t* dst, size_t len);
+/**
+ * @brief Confirm the running image without rebooting.
+ * @param reboot_required True if confirmation must be made durable by an application reboot.
+ * @return Zero on success, negative errno on failure. A successful pending request is idempotent.
+ */
+int spotflow_ota_platform_confirm_image(bool* reboot_required);
 
-int spotflow_ota_platform_get_upload_image_info(size_t* image_start, size_t* image_size);
+/**
+ * @brief Request a platform reboot.
+ * @return Zero or negative errno if the platform returns instead of rebooting.
+ */
+int spotflow_ota_platform_reboot(void);
 
-int spotflow_ota_platform_bindesc_open_upload(struct bindesc_handle* handle,
-					      size_t partition_offset);
-
+/**
+ * @brief Select and prepare inactive storage.
+ * @return Zero on success, negative errno on failure.
+ */
 int spotflow_ota_platform_begin_image_write(void);
 
-int spotflow_ota_platform_write_image_block(const uint8_t* data, size_t len, bool is_last);
+/**
+ * @brief Write the next sequential artifact block, including native container bytes.
+ * @param block Downloaded block; its final flag terminates the artifact stream.
+ * @return Zero on success, negative errno on invalid data or write failure.
+ */
+int spotflow_ota_platform_write_image_block(const struct spotflow_artifact_block* block);
+
+/**
+ * @brief Read the completed candidate's identity without exposing native storage.
+ * @param build_id Receives the executable build ID.
+ * @return Zero on success, negative errno if the identity is missing or invalid.
+ */
+int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
+
+/**
+ * @brief Finalize the candidate before installation.
+ * @return Zero on success, negative errno on failure.
+ */
+int spotflow_ota_platform_finish_image_write(void);
+
+/**
+ * @brief Release an incomplete or unused candidate.
+ * @return Zero on success, negative errno on failure.
+ */
+int spotflow_ota_platform_abort_image_write(void);
 
 #ifdef __cplusplus
 }

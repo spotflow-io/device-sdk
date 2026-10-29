@@ -8,9 +8,9 @@ menuconfig SPOTFLOW_OTA
 	default n
 	help
 	  Enable Spotflow OTA protocol handling, persistence, worker thread,
-	  artifact downloader, and delegated firmware callbacks. MCUboot and
-	  image-management options are selected only when automatic main-firmware
-	  handling is enabled.
+	  artifact downloader, and delegated firmware callbacks. The selected
+	  main-firmware backend supplies image management when automatic handling
+	  is enabled.
 
 	  OTA requires the MQTT transport and a persistent Zephyr settings storage
 	  backend (SETTINGS_NONE is not supported). BLE transport does not support
@@ -85,9 +85,9 @@ config SPOTFLOW_OTA_DOWNLOAD_RETRY_MAX_DELAY_MS
 	  randomized delays between half this value and this value, until the
 	  download succeeds, is canceled, or encounters a non-retryable error.
 
-config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
-	bool "Automatically handle main firmware OTA updates"
-	depends on SPOTFLOW_OTA
+config SPOTFLOW_OTA_MCUBOOT_AVAILABLE
+	bool
+	default y
 	depends on BOOTLOADER_MCUBOOT
 	depends on MCUBOOT_BOOTLOADER_MODE_SWAP_USING_OFFSET || \
 		MCUBOOT_BOOTLOADER_MODE_SWAP_USING_MOVE || \
@@ -95,22 +95,58 @@ config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 		MCUBOOT_BOOTLOADER_MODE_DIRECT_XIP_WITH_REVERT || \
 		MCUBOOT_BOOTLOADER_MODE_RAM_LOAD_WITH_REVERT
 	depends on ARCH_SUPPORTS_ROM_START || ARCH_POSIX
+	depends on FLASH && FLASH_MAP && STREAM_FLASH
+
+config SPOTFLOW_OTA_PSA_FWU_AVAILABLE
+	bool
+	default y if CC35XXE_FWU
+	help
+	  A PSA FWU implementation supported by Spotflow is available on this target.
+	  Extend this condition when adding another provider implementation.
+
+config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+	bool "Automatically handle main firmware OTA updates"
 	depends on SPOTFLOW_GENERATE_BUILD_ID
-	depends on FLASH
-	depends on FLASH_MAP
-	depends on STREAM_FLASH
+	depends on SPOTFLOW_OTA_MCUBOOT_AVAILABLE || SPOTFLOW_OTA_PSA_FWU_AVAILABLE
+	default y
+	help
+	  Download main firmware artifacts, install them for unconfirmed execution, and
+	  reconcile the persisted probation record after reboot. The application
+	  confirms the new image after its health checks. Requires an available
+	  firmware update provider and embedded build IDs in both images.
+
+if SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+
+choice SPOTFLOW_OTA_MAIN_FIRMWARE_BACKEND
+	prompt "Main firmware update backend"
+	default SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU if SPOTFLOW_OTA_PSA_FWU_AVAILABLE && !BOOTLOADER_MCUBOOT
+	default SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
+
+config SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
+	bool "MCUboot"
+	depends on SPOTFLOW_OTA_MCUBOOT_AVAILABLE
 	select IMG_MANAGER
 	select IMG_ERASE_PROGRESSIVELY
 	select REBOOT
-	select BINDESC_READ if SPOTFLOW_GENERATE_BUILD_ID
-	select BINDESC_READ_FLASH if SPOTFLOW_GENERATE_BUILD_ID && (ARCH_SUPPORTS_ROM_START || ARCH_POSIX)
-	default y
 	help
-	  When enabled, the Spotflow OTA SDK downloads main firmware artifacts,
-	  requests an MCUboot test upgrade, and reconciles probation state after
-	  reboot. Requires MCUboot (typically via sysbuild) in a rollback-capable
-	  mode, flash support (FLASH, FLASH_MAP, STREAM_FLASH), a partition layout
-	  with a secondary slot, and binary descriptor support for downloaded-image
-	  build ID extraction.
+	  Use a rollback-capable MCUboot mode and a secondary flash slot.
+
+config SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU
+	bool "PSA Firmware Update"
+	depends on SPOTFLOW_OTA_PSA_FWU_AVAILABLE
+	help
+	  Use the PSA Firmware Update lifecycle. The TI CC35xx implementation
+	  currently supplies component selection and signed-image preparation.
+	  Confirmation does not reboot. If the platform requires a reboot to make
+	  confirmation durable, the application must request it through PSA FWU.
+
+endchoice
+
+config SPOTFLOW_OTA_PSA_FWU_TI_CC35XX
+	bool
+	default y
+	depends on SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU && CC35XXE_FWU
+
+endif # SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 
 endif # SPOTFLOW_OTA

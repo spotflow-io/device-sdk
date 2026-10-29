@@ -1,0 +1,298 @@
+diff --git a/simplelink_wff3/kernel/zephyr/dpl/ClockP_zephyr.c b/simplelink_wff3/kernel/zephyr/dpl/ClockP_zephyr.c
+index 997159c..7784b4b 100644
+--- a/simplelink_wff3/kernel/zephyr/dpl/ClockP_zephyr.c
++++ b/simplelink_wff3/kernel/zephyr/dpl/ClockP_zephyr.c
+@@ -36,6 +36,7 @@
+ 
+ 
+ #include <zephyr/kernel.h>
++#include <zephyr/init.h>
+ #include <zephyr/sys/__assert.h>
+ #include <kernel/zephyr/dpl/dpl.h>
+ #include <ti/drivers/dpl/ClockP.h>
+@@ -340,3 +341,18 @@ void ClockP_destruct(ClockP_Struct *clockP)
+ 
+     k_timer_stop(&obj->timer);
+ }
++
++#ifdef CONFIG_HAS_CC35XX_SDK
++/*
++ * TI's RAM flash routines poll SYSTIM while interrupts are locked. Zephyr can
++ * use SysTick for its kernel clock and does not call the TI Power_init() path
++ * that normally enables SYSTIM. Enable the peripheral before any flash users.
++ */
++static int clockp_init_systim(void)
++{
++    HWREG(SYSTIM_BASE + SYSTIM_O_CLKCFG) = SYSTIM_CLKCFG_EN;
++    return 0;
++}
++
++SYS_INIT(clockp_init_systim, PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
++#endif /* CONFIG_HAS_CC35XX_SDK */
+diff --git a/simplelink_wff3/source/ti/devices/cc35xx/driverlib/xip.c b/simplelink_wff3/source/ti/devices/cc35xx/driverlib/xip.c
+index 8fb32f6..eba49a6 100644
+--- a/simplelink_wff3/source/ti/devices/cc35xx/driverlib/xip.c
++++ b/simplelink_wff3/source/ti/devices/cc35xx/driverlib/xip.c
+@@ -46,7 +46,7 @@
+ #define XIP_UDMA_JOB_CONFIGURED    HOST_XIP_UDSSTA_JSTA
+ #define XIP_UDMA_NO_JOB_CONFIGURED 0
+ 
+-#define XIP_OTFDE_DISABLE_M HOST_XIP_OTSTA_ACTIVESTA_M | HOST_XIP_OTSTA_TASKSUS
++#define XIP_OTFDE_DISABLE_M (HOST_XIP_OTSTA_ACTIVESTA_M | HOST_XIP_OTSTA_TASKSUS)
+ #define XIP_OTFDE_DISABLE   0
+ 
+ //*****************************************************************************
+diff --git a/simplelink_wff3/source/ti/drivers/xmem/flash/FlashWFF3.c b/simplelink_wff3/source/ti/drivers/xmem/flash/FlashWFF3.c
+index db6c502..c65140e 100644
+--- a/simplelink_wff3/source/ti/drivers/xmem/flash/FlashWFF3.c
++++ b/simplelink_wff3/source/ti/drivers/xmem/flash/FlashWFF3.c
+@@ -35,7 +35,6 @@
+ 
+ #include "assert.h"
+ #include "FlashWFF3.h"
+-#include <ti/drivers/dpl/ClockP.h>
+ #include <ti/drivers/dpl/DebugP.h>
+ #include <ti/devices/DeviceFamily.h>
+ #include <ti/drivers/xmem/XMEMWFF3.h>
+@@ -43,13 +42,12 @@
+ #include DeviceFamily_constructPath(inc/hw_systim.h)
+ 
+ /*
+- * Globals
++ * Private helpers
+  */
+-static uint32_t flashClockPTickPeriod = 1U;
+ 
+-static uint32_t __attribute__((section(".TI.ramfunc"))) getClockPTickUs(void);
++static uint32_t __attribute__((section(".TI.ramfunc"))) FlashGetTimeUs(void);
+ static bool __attribute__((section(".TI.ramfunc")))
+-FlashClockPCheckTimeout(uint32_t StartTick, uint32_t TimerInMicroSec);
++FlashCheckTimeoutUs(uint32_t startTimeUs, uint32_t timeoutUs);
+ static FlashStigStatus __attribute__((section(".TI.ramfunc"))) FlashStigConfigOp(uint8_t configOp);
+ static FlashStigStatus __attribute__((section(".TI.ramfunc"))) FlashStigPreConfigOp(uint8_t DeviceNum);
+ static FlashStigStatus __attribute__((section(".TI.ramfunc"))) FlashStigPostConfigOp(uint8_t DeviceNum);
+@@ -64,6 +62,26 @@ static void FlashPartitioningUDMATransaction(uint32_t *srcAddr,
+ 
+ extern XMEMWFF3_HWAttrs XMEMWFF3_hwAttrs;
+ 
++/*
++ * Restore XIP before returning to callers in external flash, including when
++ * a command fails before its normal exit sequence. Preserve the command error
++ * after attempting both controller restoration and OTFDE re-enablement.
++ */
++static FlashStigStatus __attribute__((section(".TI.ramfunc")))
++FlashStigFinishOperation(uint8_t DeviceNum, FlashStigStatus operationStatus)
++{
++    FlashStigStatus restoreStatus;
++
++    if (operationStatus != FLASH_STATUS_SUCCESS)
++    {
++        FlashStigConfigOp(FLASH_STIG_CONFIG_EXIT);
++    }
++
++    restoreStatus = FlashStigPostConfigOp(DeviceNum);
++
++    return operationStatus != FLASH_STATUS_SUCCESS ? operationStatus : restoreStatus;
++}
++
+ uint32_t __attribute__((section(".TI.ramfunc"))) FlashIsXspiIdle()
+ {
+     uint32_t idleXSPICoutnerBefore = 0;
+@@ -125,7 +143,7 @@ uint32_t __attribute__((section(".TI.ramfunc"))) FlashExecutePolling(void)
+     XspiStigConifgReg.stigOpcode       = OSPI_COMMAND_RDSR;
+     XspiStigConifgReg.stigRdEn         = OSPI_STIG_READ_DATA_ENABLE >> OSPI_FLASH_CMD_CTRL_ENB_READ_DATA_S;
+     XspiStigConifgReg.stigRDNumBytes   = 1;
+-    uint32_t startTime                 = (uint32_t)getClockPTickUs();
++    uint32_t startTime                 = FlashGetTimeUs();
+     uint32_t timerValMicroSec          = XMEMWFF3_hwAttrs.flashType.pollingCfg.timeOut * 1000;
+     int pollingCount                   = 0;
+ 
+@@ -137,7 +155,7 @@ uint32_t __attribute__((section(".TI.ramfunc"))) FlashExecutePolling(void)
+         {
+             if (XMEMWFF3_hwAttrs.flashType.pollingCfg.timeOut != 0)
+             {
+-                if (FlashClockPCheckTimeout(startTime, timerValMicroSec) != 1)
++                if (!FlashCheckTimeoutUs(startTime, timerValMicroSec))
+                 {
+                     return FLASH_TIMEOUT_REACHED_ERROR;
+                 }
+@@ -229,28 +247,13 @@ FlashReadSTIG(uint32_t readStartAddr, uint32_t *writeToAddr, uint8_t DeviceNum)
+ {
+     FlashStigStatus status;
+ 
+-    /* Prepare system for STIG operations */
+     status = FlashStigPreConfigOp(DeviceNum);
+-    if (status != FLASH_STATUS_SUCCESS)
++    if (status == FLASH_STATUS_SUCCESS)
+     {
+-        return FLASH_STIG_ERROR;
++        status = FlashExecuteReadSTIGCommand(readStartAddr, writeToAddr);
+     }
+ 
+-    /* Execute the read command */
+-    status = FlashExecuteReadSTIGCommand(readStartAddr, writeToAddr);
+-    if (status != FLASH_STATUS_SUCCESS)
+-    {
+-        return status;
+-    }
+-
+-    /* Restore system after STIG operations */
+-    status = FlashStigPostConfigOp(DeviceNum);
+-    if (status != FLASH_STATUS_SUCCESS)
+-    {
+-        return FLASH_STIG_ERROR;
+-    }
+-
+-    return status;
++    return FlashStigFinishOperation(DeviceNum, status);
+ }
+ 
+ /*
+@@ -313,28 +316,13 @@ FlashStigStatus __attribute__((section(".TI.ramfunc"))) FlashSectorErase(uint32_
+ {
+     FlashStigStatus status;
+ 
+-    /* Prepare system for STIG operations */
+     status = FlashStigPreConfigOp(DeviceNum);
+-    if (status != FLASH_STATUS_SUCCESS)
++    if (status == FLASH_STATUS_SUCCESS)
+     {
+-        return FLASH_STIG_ERROR;
+-    }
+-
+-    /* Execute the write command */
+-    status = FlashExecuteEraseSTIGCommand(1, eraseStartAddr);
+-    if (status != FLASH_STATUS_SUCCESS)
+-    {
+-        return status;
++        status = FlashExecuteEraseSTIGCommand(1, eraseStartAddr);
+     }
+ 
+-    /* Restore system after STIG operations */
+-    status = FlashStigPostConfigOp(DeviceNum);
+-    if (status != FLASH_STATUS_SUCCESS)
+-    {
+-        return FLASH_STIG_ERROR;
+-    }
+-
+-    return status;
++    return FlashStigFinishOperation(DeviceNum, status);
+ }
+ 
+ /*
+@@ -396,28 +384,13 @@ FlashWriteSTIG(uint32_t *readFromAddr, uint32_t *writeToAddr, uint8_t DeviceNum)
+ {
+     FlashStigStatus status;
+ 
+-    /* Prepare system for STIG operations */
+     status = FlashStigPreConfigOp(DeviceNum);
+-    if (status != FLASH_STATUS_SUCCESS)
+-    {
+-        return FLASH_STIG_ERROR;
+-    }
+-
+-    /* Execute the write command */
+-    status = FlashExecuteWriteSTIGCommand((uint32_t)*readFromAddr, (uint32_t)writeToAddr);
+-    if (status != FLASH_STATUS_SUCCESS)
+-    {
+-        return status;
+-    }
+-
+-    /* Restore system after STIG operations */
+-    status = FlashStigPostConfigOp(DeviceNum);
+-    if (status != FLASH_STATUS_SUCCESS)
++    if (status == FLASH_STATUS_SUCCESS)
+     {
+-        return FLASH_STIG_ERROR;
++        status = FlashExecuteWriteSTIGCommand((uint32_t)*readFromAddr, (uint32_t)writeToAddr);
+     }
+ 
+-    return status;
++    return FlashStigFinishOperation(DeviceNum, status);
+ }
+ 
+ /*
+@@ -425,52 +398,32 @@ FlashWriteSTIG(uint32_t *readFromAddr, uint32_t *writeToAddr, uint8_t DeviceNum)
+  */
+ void FlashSetTickPeriod(uint32_t TickPeriod)
+ {
+-    flashClockPTickPeriod = TickPeriod;
++    /* Kept for existing callers; SYSTIM.TIME1U already counts microseconds. */
++    (void)TickPeriod;
+ }
+ 
+-/*
+- *  ======== FlashClockPCheckTimeout ========
+- *
+- * @brief Return indication if configurable timeout excedded.
+- *
+- * @param[in] StartTick The start Time from which we count #TimerInMicroSec Ticks in micro seconds,
+- * if exceeds stop counting #getClockPTickUs.
+- *
+- * @param[in] TimerInMicroSec Configured time in micro seconds,
+- * if exceeds stop counting #getClockPTickUs.
+- *
+- * @return bool
+- * false - Timeout occur
+- * true  - Timeout not occur
+- *
+- */
++/* Unsigned subtraction keeps the elapsed time valid across counter wrap. */
+ static bool __attribute__((section(".TI.ramfunc")))
+-FlashClockPCheckTimeout(uint32_t StartTick, uint32_t TimerInMicroSec)
++FlashCheckTimeoutUs(uint32_t startTimeUs, uint32_t timeoutUs)
+ {
+-    uint32_t currTick = getClockPTickUs();
+-
+-    if ((currTick - StartTick) > TimerInMicroSec)
+-    {
+-        return false;
+-    }
+-
+-    return true;
++    return (FlashGetTimeUs() - startTimeUs) <= timeoutUs;
+ }
+ 
+ /*
+- *  ======== getClockPTickUs ========
++ *  ======== FlashGetTimeUs ========
+  *
+- * @brief Return the current ClockP tick value.
++ * @brief Return the free-running hardware counter in microseconds.
+  *
+- * @return The current ClockP tick value.
++ * @return The current hardware counter value in microseconds.
+  *
+- * @note the global variable #flashClockPTickPeriod will be set by
+- * #ClockP_getSystemTickPeriod() before entering RAM routiens.
++ * @note TIME1U has a fixed one-microsecond resolution, independent of the
++ * RTOS tick period. Keeping the raw counter also preserves unsigned wrap
++ * handling in FlashCheckTimeoutUs().
+  *
+  */
+-static uint32_t __attribute__((section(".TI.ramfunc"))) getClockPTickUs(void)
++static uint32_t __attribute__((section(".TI.ramfunc"))) FlashGetTimeUs(void)
+ {
+-    return (HWREG(SYSTIM_BASE + SYSTIM_O_TIME1U) / flashClockPTickPeriod);
++    return HWREG(SYSTIM_BASE + SYSTIM_O_TIME1U);
+ }
+ 
+ /*
+diff --git a/simplelink_wff3/source/ti/drivers/xmem/flash/FlashWFF3.h b/simplelink_wff3/source/ti/drivers/xmem/flash/FlashWFF3.h
+index 0252ebf..e9065df 100644
+--- a/simplelink_wff3/source/ti/drivers/xmem/flash/FlashWFF3.h
++++ b/simplelink_wff3/source/ti/drivers/xmem/flash/FlashWFF3.h
+@@ -290,10 +290,11 @@ FlashStigStatus FlashExecuteEraseSTIGCommand(uint32_t EraseAddr_en, uint32_t src
+ FlashStigStatus FlashSectorErase(uint32_t eraseStartAddr, uint8_t DeviceNum);
+ 
+ /*!
+- * @brief Store the ClockP period internally.
++ * @brief Compatibility entry point for existing ClockP callers.
+  *
+- * @param TickPeriod Periodic interval in ClockP ticks
++ * Flash polling uses the fixed microsecond resolution of SYSTIM.TIME1U.
+  *
++ * @param TickPeriod Legacy RTOS tick period in microseconds; ignored.
+  */
+ void FlashSetTickPeriod(uint32_t TickPeriod);
+ 

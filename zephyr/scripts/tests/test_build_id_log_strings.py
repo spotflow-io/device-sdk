@@ -74,3 +74,49 @@ def test_nonallocated_strings_overlapping_descriptor_address_are_hashed_in_full(
     first = ElfSection("log_strings", 0x1000, b"head" + b"A" * 20 + b"tail")
     second = ElfSection("log_strings", 0x1000, b"head" + b"B" * 20 + b"tail")
     assert build_id(first) != build_id(second)
+
+
+def test_extra_input_is_optional_and_changes_identity_without_changing_elf():
+    section = ElfSection(".text", 0x2000, b"same executable", allocated=True)
+    elf = SimpleNamespace(iter_sections=lambda: iter([section]))
+    original = patch_build_id.generate_build_id(elf, 0x1000)
+    assert patch_build_id.generate_build_id(elf, 0x1000, b"") == original
+    first = patch_build_id.generate_build_id(elf, 0x1000, b"0.0.7.0")
+    second = patch_build_id.generate_build_id(elf, 0x1000, b"0.0.8.0")
+    assert len({original, first, second}) == 3
+    assert patch_build_id.generate_build_id(elf, 0x1000, b"0.0.7.0") == first
+
+
+def test_extra_input_bytes_are_appended_without_framing():
+    section = ElfSection(".text", 0x2000, b"firmware", allocated=True)
+    elf = SimpleNamespace(iter_sections=lambda: iter([section]))
+    value = b"\x00\xff\xfe\r\n"
+    expected = hashlib.sha1(
+        (0x2000).to_bytes(8, "little") + b"firmware" + value
+    ).digest()
+    assert patch_build_id.generate_build_id(elf, 0x1000, value) == expected
+
+
+@pytest.mark.parametrize("little_endian", [False, True])
+def test_descriptor_patching_respects_elf_endianness(little_endian, tmp_path):
+    import io
+
+    byteorder = "little" if little_endian else "big"
+    header = (0x25F0).to_bytes(2, byteorder) + (20).to_bytes(2, byteorder)
+    stream = io.BytesIO(header + bytes(20))
+    section = {"sh_addr": 0x1000, "sh_size": 24, "sh_offset": 0}
+    elf = SimpleNamespace(
+        little_endian=little_endian,
+        stream=stream,
+        iter_sections=lambda: iter([section]),
+    )
+    identity = bytes(range(20))
+    patch_build_id.patch_build_id_parsed_elf(elf, "test.elf", 0x1000, identity)
+    assert stream.getvalue() == header + identity
+    bin_path = tmp_path / "test.bin"
+    bin_path.write_bytes(header + bytes(20))
+    elf.iter_segments = lambda: iter([{
+        "p_type": "PT_LOAD", "p_paddr": 0x1000, "p_filesz": 24,
+    }])
+    patch_build_id.patch_build_id_bin(str(bin_path), elf, 0x1000, identity)
+    assert bin_path.read_bytes() == header + identity

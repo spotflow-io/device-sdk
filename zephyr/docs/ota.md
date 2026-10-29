@@ -10,7 +10,11 @@ how device-side updates behave, why the design uses its persistence and recovery
 and how those rules are implemented. Application developers integrating OTA updates
 should start with the
 [Zephyr guide for OTA updates](https://docs.spotflow.io/guides/zephyr/ota-zephyr) or the
-[sample for OTA updates](../samples/ota).
+[sample for OTA updates](../samples/ota). Automatic main-firmware updates currently
+support two backends: MCUboot and PSA Firmware Update (PSA FWU), with a TI CC35xx
+provider. TI users should follow
+[Over-the-air (OTA) updates on TI CC35X1](https://docs.spotflow.io/guides/texas-instruments/ota)
+(upcoming public guide) and the [PSA sample](../samples/ota_psa).
 
 The MQTT message schemas are documented in the
 [MQTT protocol guide for OTA updates](https://docs.spotflow.io/guides/mqtt/ota-mqtt).
@@ -33,9 +37,10 @@ succeed, the SDK cancels all artifacts that have not started.
 There are two firmware-handling paths:
 
 - **Main firmware** is the firmware running the Spotflow SDK. With automatic handling
-  enabled, the SDK downloads it into the MCUboot secondary slot, requests a test upgrade,
+  enabled, the SDK downloads it through the selected firmware backend, requests trial installation,
   reboots, and waits for the application to confirm the new image. Success is not
-  recorded until the image is confirmed.
+  recorded until the image is durably confirmed. Confirmation never reboots; TI PSA FWU requires
+  an application-controlled confirmation reboot.
 - **Delegated firmware** is installed by an application callback. Updating an external
   MCU is the usual example. Main firmware also uses this path when automatic handling is
   disabled.
@@ -60,8 +65,8 @@ sequencing, persistence, and result reporting.
 | Terminal result | `SUCCEEDED`, `FAILED`, or `CANCELED`; processing of that artifact is finished. |
 | Durable state | State successfully stored through Zephyr Settings and recoverable after reset. |
 | Rehydration | Restoring RAM-only artifact descriptions when the cloud resends a manifest matching an attempt loaded from persistence. |
-| Probation | Persisted main-firmware context spanning an MCUboot test upgrade and reboot until success or rollback is resolved. |
-| Actionable cancellation | A cancellation request received while the first artifact is still being processed and, for automatic main firmware, before the MCUboot test upgrade is requested. |
+| Probation | Persisted main-firmware context spanning trial installation and reboot until success or rollback is resolved. |
+| Actionable cancellation | A cancellation request received while the first artifact is still being processed and, for automatic main firmware, before trial installation is requested. |
 | Supersession | Exceptional replacement of an unfinished current attempt by a newer attempt. |
 | C2D / D2C | Cloud-to-device requests and device-to-cloud results. |
 
@@ -79,7 +84,7 @@ flowchart TD
     kind{"Automatic<br/>main firmware?"}
     delegated["Invoke delegated<br/>application handler"]
     delegatedResult{"Handler result"}
-    main["Download to MCUboot slot"]
+    main["Download main image through firmware backend"]
     isCanceled{"Received cancellation request?"}
     reboot["Persist probation,<br/>request test upgrade,<br/>and reboot"]
     resolve{"New image confirmed?"}
@@ -220,8 +225,10 @@ when cancellation or supersession arrives during result persistence.
 ### Main-firmware upgrade and probation
 
 Automatic main-firmware updates cross a reboot, so their success cannot be decided by
-the code that downloads the image. The SDK uses MCUboot test upgrades and a probation
-record to transfer ownership of the update to the next boot.
+the code that downloads the image. Both MCUboot and PSA FWU use the existing probation
+record to transfer ownership of the update to the next boot. The MCUboot flow below
+makes confirmation durable immediately; the [PSA handler](#psa-firmware-update-handler) may need
+an additional application-controlled reboot.
 
 ```mermaid
 stateDiagram-v2
@@ -293,7 +300,8 @@ Firmware download and firmware authenticity are separate concerns. HTTPS protect
 download in transit, and the per-artifact OTA secret authorizes access to the image.
 URLs and secrets are therefore sensitive and must not appear in logs.
 
-For automatic main-firmware updates, MCUboot verifies the signed image before booting it.
+For automatic main-firmware updates, the configured bootloader verifies the signed image
+before booting it (MCUboot, or TI BL2 for the CC35XX PSA provider).
 Production devices must use an appropriate private signing key. The Spotflow build ID is
 used only to correlate the downloaded, expected, and running images across reboot; it is
 not a substitute for signature verification.
@@ -342,7 +350,7 @@ work or cancel an active download. An automatically handled main-firmware update
 likewise be stopped while it is being downloaded or prepared. Once the first artifact
 has produced a terminal result, cancellation is ignored even if that result is still
 being saved. Cancellation is also no longer applied once the SDK has started the final
-sequence that saves probation and requests the MCUboot test upgrade. This prevents
+sequence that saves probation and requests installation with rollback enabled. This prevents
 cancellation from interleaving with a boot request that cannot be withdrawn.
 
 After the first artifact returns:
@@ -391,8 +399,8 @@ The implementation is split by responsibility under `spotflow/zephyr/src/ota`:
 | `protocol/` | C2D decoding, D2C encoding, and pending result publishing |
 | `persistence/` | Zephyr Settings records and their CBOR encoding |
 | `downloader/` | Public downloader API, URL parsing, HTTP transport, retry, pause/resume/cancel |
-| `firmware/` | Automatic main-firmware lifecycle and delegated callback dispatch |
-| `platform/` | MCUboot, flash, reboot, and build-ID wrappers |
+| `firmware/` | Shared main-firmware coordinator, download controls, and delegated dispatch |
+| `platform/` | MCUboot and PSA backends, image identity, and native container framing |
 
 ```mermaid
 flowchart TD
@@ -402,7 +410,7 @@ flowchart TD
     persistence["Persistence<br/>Settings records"]
     firmware["Firmware handlers<br/>main and delegated"]
     downloader["Downloader<br/>HTTP(S)"]
-    platform["Platform<br/>MCUboot, flash, build ID"]
+    platform["Platform<br/>MCUboot or PSA FWU, build ID"]
     public["Public headers<br/>spotflow/ota.h<br/>spotflow/downloader.h"]
     zephyr["Zephyr and network stack"]
 
@@ -415,6 +423,8 @@ flowchart TD
     core --> firmware
     firmware --> downloader
     firmware --> platform
+    platform -->|PSA FWU| psa["PSA provider<br/>components and native stream"]
+    psa --> zephyr
     firmware --> persistence
     firmware --> core
     downloader --> zephyr
@@ -440,11 +450,14 @@ Important entry points:
 | `protocol/spotflow_ota_cbor.c` | C2D decoding and D2C encoding |
 | `protocol/spotflow_ota_net.c` | Pending D2C result merge and MQTT publish wrapper |
 | `persistence/spotflow_ota_persistence.c` | Settings load/save for attempts, versions, and probation |
-| `firmware/spotflow_ota_fw_main.c` | Automatic main-firmware pre/post-reboot flow |
+| `firmware/spotflow_ota_fw_main.c` | Shared download, installation, confirmation, and startup reconciliation |
 | `firmware/spotflow_ota_fw_custom.c` | Delegated firmware dispatch and cancellation callback |
 | `downloader/spotflow_ota_downloader.c` | Synchronous download API and in-process HTTP Range retry |
-| `platform/spotflow_ota_platform.c` | MCUboot, flash-slot, confirmation, and reboot operations |
-| `platform/spotflow_ota_identity.c` | Running and downloaded image build-ID reads |
+| `platform/spotflow_ota_platform_mcuboot.c` / `spotflow_ota_platform_psa.c` | Native image management behind the shared platform interface |
+| `platform/psa/` | PSA provider contract, TI component ownership, and TI container framing |
+| `platform/spotflow_ota_identity.c` | Running identity and probation comparison |
+| `platform/spotflow_ota_identity_stream.c` | Incremental native-endian Zephyr descriptor reader |
+| `platform/mcuboot/` | MCUboot container framing and executable payload boundaries |
 
 MQTT subscription and inbound routing live outside this directory in
 `spotflow_mqtt.c` and `spotflow_processor.c`.
@@ -572,7 +585,7 @@ flowchart TD
 
     idle -->|"Claim artifact or reconciled main result"| running
     running -->|"Handler or reconciliation returns result"| staged
-    running -->|"Main firmware enters reboot probation"| idle
+    running -->|"Reset: restore attempt and probation"| idle
     staged -->|"Projection saved and unchanged<br/>Commit to in-memory results"| idle
     staged -->|"Transient storage failure<br/>Retry"| staged
     staged -->|"Supersession changes mutation<br/>Save the new projection"| staged
@@ -654,28 +667,51 @@ attempt starts.
 
 ### Main-firmware implementation
 
-Automatic handling (`CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE`) requires MCUboot in
-a rollback-capable mode, plus `CONFIG_FLASH`, `CONFIG_FLASH_MAP`, and
-`CONFIG_STREAM_FLASH`. With `CONFIG_SPOTFLOW_GENERATE_BUILD_ID`, a custom build script
-generates the build ID during the build and patches it into a Zephyr binary descriptor.
-That ID identifies the running and downloaded images. Failure to read the downloaded
-image identity fails the attempt.
+Automatic handling (`CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE`) selects a platform
+backend at build time. `firmware/spotflow_ota_fw_main.c` owns download controls,
+probation, installation ordering, and startup reconciliation for both backends.
+`platform/spotflow_ota_platform.h` exposes errors separately from image states and
+separates confirmation from the reboot that some platforms require to make it durable.
 
-Before reboot, `firmware/spotflow_ota_fw_main.c` streams the image through the downloader
-into the MCUboot secondary slot, saves probation, requests `BOOT_UPGRADE_TEST`, and
-reboots. The public abort control applies only before the SDK starts the final sequence
-of saving probation and requesting the test upgrade. Pause/resume can postpone the
-SDK-initiated reboot after the test upgrade is requested, but cannot undo that request
-or prevent a reboot initiated elsewhere.
+Before installation, the coordinator reads the candidate identity, rejects the currently
+running build ID, finalizes the writer, saves probation, and requests installation with
+rollback enabled. The artifact transaction remains owned by the handler through
+`PENDING_REBOOT` and the reboot request; saving probation does not transfer ownership
+within the installing runtime. A reset discards that RAM transaction, and startup
+restores probation to reconcile the running image. A returning error uses the original
+handler transaction to persist failure, without reclaiming it.
+
+Cancellation stops at the installation boundary. Pause/resume can
+postpone the SDK's reboot, but cannot undo a successful installation request. A failed
+reboot request fails the artifact through the worker's normal persistence pipeline.
+The worker clears saved probation after persisting failure, before processing another
+attempt. If a reset interrupts that cleanup, startup clears the stale probation after
+observing the durable failure. A successful installation reboot leaves the result
+pending for startup reconciliation and application confirmation.
+
+Both backends extract the build ID during download using the same descriptor reader.
+Their framing wrappers supply only executable payload bytes, excluding headers, padding,
+and signature trailers. Zephyr descriptors use the target's native endianness; native
+container headers may use a different byte order. Missing, malformed or unpatched IDs
+fail the attempt before probation is saved.
+See [build ID generation](build-id.md) for packaging metadata and rebuild behavior.
+
+MCUboot encrypted, compressed and split images are rejected because the stream
+reader cannot inspect their executable payload directly. RAM-load and fixed-address
+images are supported. Both backends reject a downloaded image whose build ID
+matches that of the currently running firmware before saving probation: otherwise a reset before installation could make the old confirmed image
+look like a successful update. The TI provider includes its numeric vendor image
+version in the ID by default; see [build ID generation](build-id.md).
 
 Initialization resolves probation as follows:
 
-| Running build ID vs probation | MCUboot confirmed | Outcome |
+| Running build ID vs probation | Running image state | Outcome |
 |---|---|---|
-| Match | No | Public phase `UNCONFIRMED`; wait for `spotflow_confirm_main_firmware_image()`. |
-| Match | Yes | Queue `SUCCEEDED` reconciliation. |
-| Mismatch | — | Queue `FAILED` reconciliation for rollback or failed swap. |
-| Unavailable | — | Queue `FAILED` reconciliation. |
+| Match | Unconfirmed | Phase `UNCONFIRMED`; wait for application health checks and confirmation. |
+| Match | Confirmed | Queue `SUCCEEDED` reconciliation. |
+| Match | Rejected | Queue `FAILED` reconciliation. |
+| Mismatch or unavailable | Any supported state | Queue `FAILED` reconciliation. |
+| Any | Query error or unsupported state | Fail initialization and retain probation. |
 
 Reconciliation enters the same durable result pipeline as a delegated handler:
 
@@ -686,7 +722,7 @@ flowchart TD
     version{"Succeeded?"}
     saveVersion["Persist installed version"]
     saveAttempt["Persist projected attempt"]
-    probation{"Reconciled main result?"}
+    probation{"Automatic main-firmware result?"}
     clear["Clear probation"]
     commit["Commit result in RAM"]
     report["Schedule cumulative result message"]
@@ -704,6 +740,61 @@ The result is already durable when probation is cleared. A reset before that poi
 repeats reconciliation; a reset afterward restores the result without repeating it.
 After the result is committed in RAM, the coordinator schedules preparation of the
 cumulative result message, which the MQTT thread later publishes.
+
+#### PSA Firmware Update handler
+
+`platform/spotflow_ota_platform_psa.c` serializes PSA operations and handles the standard
+finish/install/accept lifecycle. The internal contract in
+`platform/psa/spotflow_ota_psa_provider.h` supplies initialization, selection of the main
+component, native stream preparation, running-component queries, and ownership checks.
+The currently supported provider is TI CC35xx. The model, probation fields, CBOR schema,
+and storage records are shared with MCUboot.
+
+A matching PSA `TRIAL` image enters `UNCONFIRMED`. Confirmation calls `psa_fwu_accept()`
+without rebooting. If acceptance requires a reboot, confirmation remains pending and
+repeated calls do not issue acceptance again. The application must request the provider's
+reboot; on TI this is `psa_fwu_request_reboot()`. A plain `sys_reboot()` loses TI's
+RAM-resident acceptance request. A subsequent matching `UPDATED` image queues success.
+Providers that accept immediately can complete without an additional reboot.
+
+The TI provider requires exclusive ownership of the PSA FWU service. Its global install
+and acceptance operations must not include unrelated candidates, staged images, or trials.
+A trial without Spotflow probation is not accepted automatically, and its rollback slot
+cannot be overwritten. Complete signed `vendor_image.sign.bin` artifacts are validated
+and streamed with TI's 48-byte prefix and complete-file write offsets. The bootloader
+verifies signatures. Retries preserve the RAM context; after reboot, downloads restart.
+
+TI alternates the physical vendor slots: an image initially running from slot 1
+updates into slot 2, then the next update uses slot 1. The bootloader maps either
+physical slot into the same logical execute-in-place (XIP) address window: the CPU
+runs the firmware directly from flash. Both slots therefore use the same signed artifact.
+The wireless slots hold TI connectivity firmware and are not updated by this provider.
+See [the TI PSA sample](../samples/ota_psa/README.md) for its fixed factory layout
+and application-requested confirmation reboot.
+
+The TI downstream used by the sample requires the
+[CC35xx flash startup patch](../patches/ti/cc35xx-flash-startup.patch).
+Apply it from the workspace root before building:
+
+```sh
+git -C modules/hal/ti apply --check ../../../modules/lib/spotflow/zephyr/patches/ti/cc35xx-flash-startup.patch
+git -C modules/hal/ti apply ../../../modules/lib/spotflow/zephyr/patches/ti/cc35xx-flash-startup.patch
+```
+
+The patch enables SYSTIM before ITS flash initialization, restores XIP after flash
+errors, corrects the XIP status mask, and keeps timeout calculations in microseconds.
+Without these fixes, a trial image can stall before reaching the application. Skip
+application only when the selected HAL already includes these corrections.
+
+#### Adding another PSA provider
+
+Implement the contract in `platform/psa/spotflow_ota_psa_provider.h`, then add its
+Kconfig availability condition and `zephyr_library_sources_ifdef()` selection.
+The provider owns component selection, container preparation, running-component
+queries and checks that global PSA operations cannot affect another client's update.
+Keep physical partitions and provisioning in board or sample integration. Reuse the
+common coordinator and PSA lifecycle; extend their contract explicitly if a new
+provider has different confirmation requirements.
 
 ### Cancellation and supersession implementation
 
@@ -731,7 +822,7 @@ but is not exposed through the public API.
 
 A different valid attempt or trustworthy rejection occupies the single pending slot.
 Supersession can stop the current attempt only before an automatic main-firmware handler
-has requested the MCUboot test upgrade. It immediately marks every pending artifact
+has requested installation with rollback enabled. It immediately marks every pending artifact
 other than the active one `CANCELED` and asks the active handler to stop. The handler's
 eventual result is retained, but no subsequent artifact from that attempt can be
 claimed—even if the active handler returns `SUCCEEDED`. If its result was already
@@ -785,5 +876,6 @@ west twister -T spotflow/zephyr/tests/ota -p native_sim --inline-logs
 | Facade and routing | `facade/` | C2D routing, public effects, cancellation threading |
 | Worker | `worker/` | Durable ordering, retries, promotion, multi-artifact chains |
 | Downloader | `downloader/` | Faked transport, retry, pause, resume, cancellation |
-| Platform and identity | `platform/` | Faked MCUboot, flash, and build IDs |
-| Main firmware | `fw_main/` | Downloader, platform, persistence, reconciliation |
+| Platform and identity | `platform_identity/` | MCUboot framing, descriptor boundaries, and build-ID fakes |
+| Main firmware | `fw_main/` | Shared coordinator, controls, persistence, reconciliation |
+| PSA firmware | `psa_fwu/` | TI stream adapter, slot ownership, acceptance, confirmation reboot and rollback |

@@ -1,0 +1,167 @@
+diff --git a/scripts/west_commands/runners/simplelink_toolbox.py b/scripts/west_commands/runners/simplelink_toolbox.py
+index 777f2eaa6c8..aeadd469a2b 100644
+--- a/scripts/west_commands/runners/simplelink_toolbox.py
++++ b/scripts/west_commands/runners/simplelink_toolbox.py
+@@ -78,6 +78,7 @@ class SimpleLinkBinaryRunner(ZephyrBinaryRunner):
+         no_flash=False,
+         flash_address=None,
+         initial_programming=False,
++        full_flash_erase=False,
+         activation_type='sdk_example_key',
+     ):
+         super().__init__(cfg)
+@@ -112,7 +113,7 @@ class SimpleLinkBinaryRunner(ZephyrBinaryRunner):
+             for p in cfg.openocd_search:
+                 search_args.extend(['-s', p])
+         self.openocd_cmd = [cfg.openocd or 'openocd'] + search_args
+-        self.elf_name = Path(cfg.elf_file).as_posix() if cfg.elf_file else None
++        self.elf_name = Path(cfg.elf_file).resolve().as_posix() if cfg.elf_file else None
+         self.pre_init = pre_init or []
+         self.simplelink_tool = simplelink_tool
+         self.vendor_file = (
+@@ -144,6 +145,7 @@ class SimpleLinkBinaryRunner(ZephyrBinaryRunner):
+         self.rtt_server = rtt_server
+         self.no_flash = no_flash
+         self.initial_programming = initial_programming
++        self.full_flash_erase = full_flash_erase
+         self.activation_type = activation_type
+         self.config_file = (Path(cfg.build_dir) / 'zephyr' / '.config').resolve()
+         self.flash_dir = (Path(cfg.build_dir) / 'zephyr' / 'flash').resolve()
+@@ -181,6 +183,11 @@ class SimpleLinkBinaryRunner(ZephyrBinaryRunner):
+             action='store_true',
+             help='''run factory initial programming instead of regular programming''',
+         )
++        parser.add_argument(
++            '--full-flash-erase',
++            action='store_true',
++            help='erase all flash before initial programming when changing layouts',
++        )
+         parser.add_argument(
+             '--activation-type',
+             choices=('sdk_example_key', 'authentication_bypass'),
+@@ -264,6 +271,7 @@ class SimpleLinkBinaryRunner(ZephyrBinaryRunner):
+             no_init=args.no_init,
+             no_flash=args.no_flash,
+             initial_programming=args.initial_programming,
++            full_flash_erase=args.full_flash_erase,
+             activation_type=args.activation_type,
+         )
+ 
+@@ -288,6 +296,8 @@ class SimpleLinkBinaryRunner(ZephyrBinaryRunner):
+             self.do_debugserver(**kwargs)
+ 
+     def do_flash(self):
++        if self.full_flash_erase and not self.initial_programming:
++            raise ValueError('--full-flash-erase requires --initial-programming')
+         if self.initial_programming:
+             self.do_initial_programming()
+             return
+@@ -380,65 +390,51 @@ class SimpleLinkBinaryRunner(ZephyrBinaryRunner):
+             if (flash_profile_dir / 'ota').is_dir():
+                 flash_profile_dir = flash_profile_dir / 'ota'
+ 
+-            flash_type = self._flash_type_from_xspi(flash_profile_dir)
+-            cmd = [
+-                str(self.simplelink_tool),
+-                'programmer',
+-                '-i',
+-                'XDS110',
+-                '-param1',
+-                serial,
+-                'factory_programming',
+-                '--activation_type',
+-                self.activation_type,
+-                '--flash_type',
+-                flash_type,
+-                '--enable_ota',
+-                '--vendor_out_file',
+-                self.elf_name,
+-                '--conf_bin_file',
+-                str(self.conf_bin_file),
+-                '--vendor_app_version',
+-                version,
+-                '--rollback_protection',
+-                'no',
+-                '--verbose',
+-            ]
+-        else:
+-            memory_config = flash_profile_dir / 'external_memory_configurator.json'
+-            if not memory_config.is_file():
+-                raise ValueError(
+-                    f'missing MemoryConfigurator layout for {flash_profile}: {memory_config}'
+-                )
+-
+-            factory_config = json.loads(memory_config.read_text())
+-            flash_type = factory_config['flash_type']['flash_device_type']
+-            config_json = self.flash_dir / 'initial_programming.json'
+-            config_json.write_text(json.dumps(factory_config, indent=2) + '\n')
+-            cmd = [
+-                str(self.simplelink_tool),
+-                'programmer',
+-                '-i',
+-                'XDS110',
+-                '-param1',
+-                serial,
+-                'factory_programming_from_json',
+-                '--config_json',
+-                str(config_json),
+-                '--activation_type',
+-                self.activation_type,
+-                '--vendor_out_file',
+-                self.elf_name,
+-                '--conf_bin_file',
+-                str(self.conf_bin_file),
+-                '--vendor_app_version',
+-                version,
+-                '--rollback_protection',
+-                'no',
+-                '--verbose',
+-            ]
++        # Use the same explicit layout as the application flash-map generator.
++        # Toolbox defaults (including protected-storage sizes) can differ, even
++        # when --enable_ota selects two slots.
++        memory_config = flash_profile_dir / 'external_memory_configurator.json'
++        if not memory_config.is_file():
++            raise ValueError(
++                f'missing MemoryConfigurator layout for {flash_profile}: {memory_config}'
++            )
++
++        factory_config = json.loads(memory_config.read_text())
++        # Toolbox 4.3.23 requires this newer field; older board profiles omit
++        # the optional vendor BL3 component.
++        factory_config['inputs'].setdefault('vendor_bl3_size', 0)
++        factory_config['inputs'].setdefault('ti_fw_in_vendor_image', False)
++        if bool(factory_config['internal']['ota']) != self._config_enabled('CONFIG_CC35XXE_FWU'):
++            raise ValueError('factory layout OTA setting does not match CONFIG_CC35XXE_FWU')
++        flash_type = factory_config['flash_type']['flash_device_type']
++        config_json = self.flash_dir / 'initial_programming.json'
++        config_json.write_text(json.dumps(factory_config, indent=2) + '\n')
++        cmd = [
++            str(self.simplelink_tool),
++            'programmer',
++            '-i',
++            'XDS110',
++            '-param1',
++            serial,
++            'factory_programming_from_json',
++            '--config_json',
++            str(config_json),
++            '--activation_type',
++            self.activation_type,
++            '--vendor_out_file',
++            self.elf_name,
++            '--conf_bin_file',
++            str(self.conf_bin_file),
++            '--vendor_app_version',
++            version,
++            '--rollback_protection',
++            'no',
++            '--verbose',
++        ]
+ 
+         self.logger.info(f'Initial programming flash profile: {flash_type}')
++        if self.full_flash_erase:
++            cmd.append('--full_flash_erase')
+         self.check_call(cmd, cwd=Path(self.cfg.build_dir).resolve())
+ 
+     def print_gdbserver_message(self):
