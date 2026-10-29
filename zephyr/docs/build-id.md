@@ -17,7 +17,7 @@ build ID even when the executable is otherwise identical. Disabling the option
 preserves executable-only hashing.
 
 CMake writes the configured version to an input file. The generator appends that
-file's raw bytes after the ELF section input, with no separator or length prefix.
+file's raw bytes after the ELF section input.
 Reproducing this ID requires the ELF and the exact input bytes. The generator
 itself remains independent of TI packaging.
 
@@ -25,14 +25,6 @@ An effective Kconfig change regenerates `autoconf.h`, recompiles dependent sourc
 and relinks the executable. Linking reruns the ID patcher before TI builds and signs
 the container. A cached command-line Kconfig override takes precedence over `prj.conf`;
 update or clear that override when testing version-only rebuilds.
-
-## Direct script use
-
-For direct use, pass `--extra-input-file=PATH` to `scripts/patch_build_id.py`,
-followed by the ELF and optional related files. The file supplies the exact binary
-content to append to the hash input; no text decoding or newline conversion occurs.
-CMake uses this form so metadata is never interpreted as command syntax. Omit the
-option to retain executable-only hashing.
 
 ## Embedded descriptor and retrieval
 
