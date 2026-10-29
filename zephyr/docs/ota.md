@@ -676,12 +676,8 @@ separates confirmation from the reboot that some platforms require to make it du
 Before installation, the coordinator reads the candidate identity, rejects the currently
 running build ID, finalizes the writer, saves probation, and requests installation with
 rollback enabled. Cancellation stops at the installation boundary. Pause/resume can
-postpone the SDK's reboot, but cannot undo a successful installation request. A failed
-reboot request fails the artifact through the worker's normal persistence pipeline.
-The worker clears saved probation after persisting failure, before processing another
-attempt. If a reset interrupts that cleanup, startup clears the stale probation after
-observing the durable failure. A successful installation reboot leaves the result
-pending for startup reconciliation and application confirmation.
+postpone the SDK's reboot, but cannot undo a successful installation request. If a reboot
+request returns, including with an error, probation remains pending for startup recovery.
 
 Both backends extract the build ID during download using the same descriptor reader.
 Their framing wrappers supply only executable payload bytes, excluding headers, padding,
@@ -716,7 +712,7 @@ flowchart TD
     version{"Succeeded?"}
     saveVersion["Persist installed version"]
     saveAttempt["Persist projected attempt"]
-    probation{"Automatic main-firmware result?"}
+    probation{"Reconciled main result?"}
     clear["Clear probation"]
     commit["Commit result in RAM"]
     report["Schedule cumulative result message"]

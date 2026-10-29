@@ -1211,21 +1211,14 @@ ZTEST(spotflow_ota_fw_main, test_finish_failure_releases_candidate_before_probat
 	zassert_false(has_probation);
 }
 
-ZTEST(spotflow_ota_fw_main, test_reboot_error_fails_artifact_and_cancels_remaining)
+ZTEST(spotflow_ota_fw_main, test_returning_reboot_error_keeps_probation)
 {
 	struct spotflow_ota_probation probation;
-	struct spotflow_ota_worker_job job;
-	struct spotflow_ota_state_diagnostic snapshot;
 	bool has_probation;
 
 	platform_fake->reboot_result = -EIO;
 	accept_two_artifact_update();
-	zassert_true(spotflow_ota_state_get_worker_job(&job));
-	zassert_equal(spotflow_ota_fw_main_process_artifact(&job), SPOTFLOW_OTA_RESULT_FAILED);
-	zassert_ok(spotflow_ota_state_stage_artifact_result(&job, SPOTFLOW_OTA_RESULT_FAILED));
-	spotflow_ota_state_get_diagnostic(&snapshot);
-	zassert_equal(snapshot.projected_artifact_results[0], SPOTFLOW_OTA_RESULT_FAILED);
-	zassert_equal(snapshot.projected_artifact_results[1], SPOTFLOW_OTA_RESULT_CANCELED);
+	zassert_equal(run_main_artifact(), SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(platform_fake->abort_count, 0);
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
 	zassert_true(has_probation);

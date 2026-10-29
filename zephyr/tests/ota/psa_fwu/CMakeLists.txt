@@ -65,7 +65,6 @@ target_sources(app PRIVATE
         ../../../src/ota/persistence/spotflow_ota_persistence.c
         ../../../src/ota/persistence/spotflow_ota_records_cbor.c
         ../../../src/ota/core/spotflow_ota_state.c
-        ../../../src/ota/core/spotflow_ota_worker.c
         ../../../src/ota/downloader/spotflow_ota_url.c
         ${ZEPHYR_BASE}/subsys/net/lib/http/http_parser_url.c
 )

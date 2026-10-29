@@ -431,18 +431,9 @@ static struct worker_outcome process_artifact_operation(void)
 			spotflow_ota_worker_test_after_artifact_result_persisted();
 #endif /* CONFIG_ZTEST */
 
-			bool main_firmware_result = operation.job.type ==
-					SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE ||
-				(IS_ENABLED(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE) &&
-				 operation.job.type == SPOTFLOW_OTA_WORKER_JOB_PROCESS_ARTIFACT &&
-				 operation.job.data.process_artifact.artifact.is_main);
-
-			/* A returning automatic handler can have saved probation before
-			 * failing. Remove it only after that failure is durable, before
-			 * another attempt can replace the persisted attempt record.
-			 */
 			advance_artifact_operation(
-				main_firmware_result && !operation.data.artifact.probation_resolved
+				operation.job.type == SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE &&
+						!operation.data.artifact.probation_resolved
 					? ARTIFACT_STAGE_CLEAR_PROBATION
 					: ARTIFACT_STAGE_COMMIT_RESULT);
 			break;
@@ -453,12 +444,10 @@ static struct worker_outcome process_artifact_operation(void)
 				return classify_storage_error(rc, true);
 			}
 
-			if (operation.job.type == SPOTFLOW_OTA_WORKER_JOB_COMPLETE_MAIN_FIRMWARE) {
-				rc = spotflow_ota_state_commit_main_firmware_probation_cleared(
-					&operation.job.token);
-				if (rc < 0) {
-					return classify_state_error(&operation.job, rc);
-				}
+			rc = spotflow_ota_state_commit_main_firmware_probation_cleared(
+				&operation.job.token);
+			if (rc < 0) {
+				return classify_state_error(&operation.job, rc);
 			}
 			operation.data.artifact.probation_resolved = true;
 			advance_artifact_operation(ARTIFACT_STAGE_COMMIT_RESULT);
