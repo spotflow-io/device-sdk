@@ -23,8 +23,6 @@
 /* External flash chip - Winbond */
 &w25q512jvfiq {
 	partitions {
-		compatible = "fixed-partitions";
-
 		/* Reducing size by 1 MB to leave space for coredump */
 		storage_partition: partition@620000 {
 			label = "storage";
