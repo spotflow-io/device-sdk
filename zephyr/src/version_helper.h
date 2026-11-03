@@ -1,7 +1,11 @@
 ﻿#ifndef VERSION_HELPER_H
 #define VERSION_HELPER_H
 
+#if __has_include(<zephyr/version.h>)
+#include <zephyr/version.h>
+#else
 #include <version.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
