@@ -3,7 +3,6 @@ menuconfig SPOTFLOW_OTA
 	depends on SPOTFLOW
 	depends on SPOTFLOW_TRANSPORT_MQTT
 	depends on SETTINGS
-	depends on !SETTINGS_NONE
 	select HTTP_CLIENT
 	default n
 	help
@@ -13,8 +12,8 @@ menuconfig SPOTFLOW_OTA
 	  handling is enabled.
 
 	  OTA requires the MQTT transport and a persistent Zephyr settings storage
-	  backend (SETTINGS_NONE is not supported). BLE transport does not support
-	  OTA updates.
+	  backend (SETTINGS_NONE is rejected at CMake configuration time). BLE
+	  transport does not support OTA updates.
 
 if SPOTFLOW_OTA
 
