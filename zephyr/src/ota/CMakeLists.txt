@@ -1,3 +1,9 @@
+if(CONFIG_SPOTFLOW_OTA AND CONFIG_SETTINGS_NONE)
+        message(FATAL_ERROR
+                "Spotflow OTA requires a persistent Zephyr settings storage backend. "
+                "CONFIG_SETTINGS_NONE is not supported.")
+endif()
+
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
         spotflow_ota.c
         protocol/spotflow_ota_cbor.c

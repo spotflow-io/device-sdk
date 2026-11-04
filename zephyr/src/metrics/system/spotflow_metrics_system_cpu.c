@@ -5,7 +5,12 @@
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
+
+#if __has_include(<zephyr/sys/cpu_load.h>)
+#include <zephyr/sys/cpu_load.h>
+#else
 #include <zephyr/debug/cpu_load.h>
+#endif
 
 LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVEL);
 

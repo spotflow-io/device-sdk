@@ -1,16 +1,19 @@
 /* Partitions unused in the sample (storage partition defined in pm_static file) */
 /delete-node/ &storage_partition;
-/delete-node/ &tfm_ps_partition;
-/delete-node/ &tfm_its_partition;
-/delete-node/ &tfm_otp_partition;
 
 &flash0 {
 	/* Although partitions are defined using Partition Manager, Zephyr core dumps require to
 	 * have the core dump partition defined here as well.
 	 */
 	partitions {
+		/* Remove TF-M partitions when present in the board's partition layout. */
+		/delete-node/ partition@f0000;
+		/delete-node/ partition@f4000;
+		/delete-node/ partition@f6000;
+
 		/* Reserve last 64 KiB of flash for core dumps */
 		coredump_partition: partition@f0000 {
+			compatible = "zephyr,mapped-partition";
 			label = "coredump-partition";
 			reg = <0x000f0000 DT_SIZE_K(64)>;
 		};

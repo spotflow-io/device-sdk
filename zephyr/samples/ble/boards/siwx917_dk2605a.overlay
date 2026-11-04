@@ -6,8 +6,6 @@
 
 &flash0 {
 	partitions {
-		compatible = "fixed-partitions";
-
 		coredump_partition: partition@6cf000 {
 			label = "coredump-partition";
 			reg = <0x6cf000 0x100000>;

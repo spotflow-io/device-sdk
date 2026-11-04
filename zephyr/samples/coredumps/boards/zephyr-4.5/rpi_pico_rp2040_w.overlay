@@ -1,0 +1,7 @@
+&code_partition {
+	compatible = "zephyr,mapped-partition";
+};
+
+&coredump_partition {
+	compatible = "zephyr,mapped-partition";
+};

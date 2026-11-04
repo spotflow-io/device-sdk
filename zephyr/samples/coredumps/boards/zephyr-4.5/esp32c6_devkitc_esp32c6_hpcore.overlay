@@ -1,0 +1,3 @@
+&coredump_partition {
+	compatible = "zephyr,mapped-partition";
+};
