@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added runtime ingest keys for Zephyr via `CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC` and the required `spotflow_on_ingest_key_requested()` callback, while retaining compile-time validation of static ingest keys.
 
 ### Changed
+* Automatic Zephyr main-firmware updates now reject downloaded images whose build ID
+  matches the currently running firmware, before requesting installation.
 * Automatic MCUboot updates now require directly readable MCUboot v1 images. Encrypted,
   compressed, split, and other unsupported image formats are rejected during download.
 * Made Zephyr metric-name storage configurable so constrained applications can reduce per-registry-slot static RAM usage.

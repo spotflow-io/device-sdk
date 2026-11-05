@@ -1181,6 +1181,22 @@ ZTEST(spotflow_ota_fw_main, test_confirm_rejects_non_unconfirmed_phase)
 
 ZTEST_SUITE(spotflow_ota_fw_main, NULL, NULL, before_each, NULL, NULL);
 
+ZTEST(spotflow_ota_fw_main, test_same_executable_identity_is_rejected_before_probation)
+{
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+	struct spotflow_ota_probation probation;
+	bool has_probation;
+
+	fill_build_id(build_id, 0x10);
+	spotflow_ota_build_id_fake_set_running_build_id(build_id);
+	accept_two_artifact_update();
+	zassert_equal(run_main_artifact(), SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(platform_fake->upgrade_request_count, 0);
+	zassert_equal(platform_fake->reboot_count, 0);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_false(has_probation);
+}
+
 ZTEST(spotflow_ota_fw_main, test_finish_failure_releases_candidate_before_probation)
 {
 	struct spotflow_ota_probation probation;
