@@ -1,0 +1,3 @@
+rsource "../net-common/Kconfig"
+
+source "Kconfig.zephyr"

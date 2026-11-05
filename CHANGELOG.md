@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added a Zephyr PSA Firmware Update backend and OTA sample for TI LP-EM-CC35X1.
+  TI image confirmation requires an application-requested `psa_fwu_request_reboot()` after
+  `spotflow_confirm_main_firmware_image()`; success is reported after the next startup
+  verifies durable confirmation.
 * Added opt-in Zephyr compact logs, which send format-string addresses, raw arguments, and source name addresses for cloud formatting.
 * Added TI LP-EM-CC35X1 support to the Zephyr logs, metrics, coredumps, and BLE samples.
 * Added a west manifest for TI CC35X1 using SimpleLink Zephyr v4.4.0-ti-10.10.00.
@@ -19,6 +23,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added runtime ingest keys for Zephyr via `CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC` and the required `spotflow_on_ingest_key_requested()` callback, while retaining compile-time validation of static ingest keys.
 
 ### Changed
+* Automatic Zephyr main-firmware updates now reject downloaded images whose build ID
+  matches the currently running firmware, before requesting installation.
+* Automatic MCUboot updates now require directly readable MCUboot v1 images. Encrypted,
+  compressed, split, and other unsupported image formats are rejected during download.
 * Made Zephyr metric-name storage configurable so constrained applications can reduce per-registry-slot static RAM usage.
 * Added manifest for Microchip zephyr downstream
 * Treated a full Zephyr metrics queue as expected backpressure instead of logging each dropped metric as a warning and error.
@@ -26,6 +34,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Scoped Zephyr Mbed TLS and socket defaults to the MQTT transport so BLE-only workspaces do not require Mbed TLS.
 
 ### Fixed
+* Fixed OTA cancellation results not being reported after restoring an unfinished update attempt.
 * Fixed Zephyr reset-cause metrics on targets that omit optional bootloader and flash reset flags.
 * Fixed TLS certificate parsing failures in the Zephyr TI CC35X1 MQTT samples.
 * Fixed nRF7002 DK Wi-Fi connection issue on nRF Connect SDK 3.2.4 when WMM is used.

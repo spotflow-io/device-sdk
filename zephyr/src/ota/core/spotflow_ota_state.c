@@ -1133,20 +1133,13 @@ int spotflow_ota_state_finish_main_firmware_prereboot(
 		k_mutex_unlock(&state_mutex);
 		return -ESTALE;
 	}
-	struct ota_main_prereboot_transition transition;
 	int rc = spotflow_ota_main_finish_prereboot(
-		&ota_state.main_firmware, main_firmware_handler_is_owned(token), &transition);
+		&ota_state.main_firmware, main_firmware_handler_is_owned(token), out_state);
 	if (rc < 0) {
 		k_mutex_unlock(&state_mutex);
 		return rc;
 	}
 
-	if (transition.clear_artifact_transaction) {
-		spotflow_ota_attempt_clear_transaction(&ota_state.current_attempt);
-	}
-	if (out_state != NULL) {
-		*out_state = transition.state;
-	}
 	assert_state_locked();
 
 	k_mutex_unlock(&state_mutex);
@@ -1229,7 +1222,7 @@ bool spotflow_ota_state_is_main_firmware_abort_requested(void)
 	return requested;
 }
 
-int spotflow_ota_state_begin_main_firmware_upgrade_commit(
+int spotflow_ota_state_begin_main_firmware_installation(
 	const struct spotflow_ota_operation_token* token)
 {
 	if (token == NULL) {
@@ -1243,7 +1236,7 @@ int spotflow_ota_state_begin_main_firmware_upgrade_commit(
 	if (!operation_token_matches_current(token)) {
 		rc = -ESTALE;
 	} else {
-		rc = spotflow_ota_main_begin_upgrade_commit(
+		rc = spotflow_ota_main_begin_installation(
 			&ota_state.main_firmware, main_firmware_handler_is_owned(token),
 			ota_state.current_attempt.execution.cancellation_requested);
 		if (rc == 0) {
@@ -1255,7 +1248,7 @@ int spotflow_ota_state_begin_main_firmware_upgrade_commit(
 	return rc;
 }
 
-int spotflow_ota_state_cancel_main_firmware_upgrade_commit(
+int spotflow_ota_state_cancel_main_firmware_installation(
 	const struct spotflow_ota_operation_token* token)
 {
 	if (token == NULL) {
@@ -1267,7 +1260,7 @@ int spotflow_ota_state_cancel_main_firmware_upgrade_commit(
 	if (!operation_token_matches_current(token)) {
 		rc = -ESTALE;
 	} else {
-		rc = spotflow_ota_main_cancel_upgrade_commit(&ota_state.main_firmware);
+		rc = spotflow_ota_main_cancel_installation(&ota_state.main_firmware);
 		if (rc == 0) {
 			assert_state_locked();
 		}
@@ -1398,6 +1391,15 @@ static bool state_is_valid(void)
 
 	if (ota_state.main_firmware.presence == OTA_MAIN_FIRMWARE_PRESENT &&
 	    ota_state.main_firmware.artifact_index >= ota_state.current_attempt.plan.count) {
+		return false;
+	}
+
+	if ((ota_state.main_firmware.execution == OTA_MAIN_EXECUTION_REBOOT_READY ||
+	     ota_state.main_firmware.execution == OTA_MAIN_EXECUTION_REBOOT_STARTED) &&
+	    (ota_state.current_attempt.execution.transaction.state !=
+		     OTA_ARTIFACT_TRANSACTION_RUNNING ||
+	     ota_state.current_attempt.execution.transaction.artifact_index !=
+		     ota_state.main_firmware.artifact_index)) {
 		return false;
 	}
 
