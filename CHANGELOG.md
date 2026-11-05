@@ -8,6 +8,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added a Zephyr PSA Firmware Update backend for TI LP-EM-CC35X1.
+  TI image confirmation requires an application-requested `psa_fwu_request_reboot()` after
+  `spotflow_confirm_main_firmware_image()`; success is reported after the next startup
+  verifies durable confirmation.
 * Added opt-in Zephyr compact logs, which send format-string addresses, raw arguments, and source name addresses for cloud formatting.
 * Added TI LP-EM-CC35X1 support to the Zephyr logs, metrics, coredumps, and BLE samples.
 * Added a west manifest for TI CC35X1 using SimpleLink Zephyr v4.4.0-ti-10.10.00.
