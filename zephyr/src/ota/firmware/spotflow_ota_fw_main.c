@@ -193,11 +193,11 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 		goto cancel_installation;
 	}
 
-	/* Installation is requested. Only startup can resolve its outcome now. */
+	/* A successful reboot transfers outcome resolution to startup. */
 	rc = spotflow_ota_state_finish_main_firmware_prereboot(token, &state);
 	if (rc < 0) {
 		LOG_ERR("Failed to finalize main firmware before reboot: %d", rc);
-		return SPOTFLOW_OTA_RESULT_PENDING;
+		return fail_main_firmware(token);
 	}
 
 	LOG_INF("Main firmware phase -> %s",
@@ -206,13 +206,15 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 
 	rc = begin_main_firmware_reboot(token);
 	if (rc < 0) {
-		LOG_ERR("Failed to begin main firmware reboot: %d; probation retained", rc);
-		return SPOTFLOW_OTA_RESULT_PENDING;
+		LOG_ERR("Failed to begin main firmware reboot: %d", rc);
+		return fail_main_firmware(token);
 	}
 	rc = spotflow_ota_platform_reboot();
 	if (rc < 0) {
-		LOG_ERR("Main firmware reboot failed: %d; probation retained", rc);
+		LOG_ERR("Main firmware reboot failed: %d", rc);
+		return fail_main_firmware(token);
 	}
+	/* A successful reboot does not return on hardware; test fakes may return. */
 	return SPOTFLOW_OTA_RESULT_PENDING;
 
 cancel_installation:
