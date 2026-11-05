@@ -10,7 +10,11 @@ target_include_directories(app PRIVATE
 target_compile_definitions(app PRIVATE
         CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL=4
         CONFIG_BT_L2CAP_TX_MTU=23
+        CONFIG_SPOTFLOW_OTA=1
+        CONFIG_SPOTFLOW_OTA_BLE_COMMAND_BUFFER_SIZE=64
+        CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE=32
 )
 
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE ../../src/net/transport/ble/spotflow_ble_framing.c)
+target_sources(app PRIVATE src/ota_rx.c ../../src/net/transport/ble/spotflow_ble_ota_rx.c)

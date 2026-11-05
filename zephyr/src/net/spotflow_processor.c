@@ -77,6 +77,13 @@ static void spotflow_processing_thread_entry(void)
 
 #ifdef CONFIG_SPOTFLOW_OTA
 	int rc_ota = spotflow_ota_init();
+	if (rc_ota == 0 && IS_ENABLED(CONFIG_SPOTFLOW_TRANSPORT_BLE)) {
+		/* MQTT installs its C2D callback when establishing a broker session.
+		 * BLE keeps the callback across gateway reconnects; the gateway owns
+		 * the corresponding MQTT subscription.
+		 */
+		rc_ota = spotflow_ota_init_session();
+	}
 	if (rc_ota < 0) {
 		LOG_ERR("Failed to initialize OTA updates: %d", rc_ota);
 	}

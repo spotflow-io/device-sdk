@@ -17,11 +17,15 @@
 #define SPOTFLOW_BLE_DEVICE_NAME_LEN (sizeof(SPOTFLOW_BLE_DEVICE_NAME) - 1)
 
 #define SPOTFLOW_PROTOCOL_VERSION_MAJOR 0x01
-#define SPOTFLOW_PROTOCOL_VERSION_MINOR 0x00
+#define SPOTFLOW_PROTOCOL_VERSION_MINOR 0x01
 
 #define SPOTFLOW_MSG_TELEMETRY 0x02
 #define SPOTFLOW_MSG_REPORTED_CONFIGURATION 0x03
 #define SPOTFLOW_MSG_DESIRED_CONFIGURATION 0x04
+#define SPOTFLOW_MSG_OTA_D2C 0x05
+#define SPOTFLOW_MSG_OTA_C2D 0x06
+#define SPOTFLOW_MSG_ARTIFACT_REQUEST 0x07
+#define SPOTFLOW_MSG_ARTIFACT_RESPONSE 0x08
 
 #define SPOTFLOW_FRAME_IS_FIRST BIT(0)
 #define SPOTFLOW_FRAME_IS_LAST BIT(1)
@@ -53,6 +57,9 @@ struct spotflow_ble_tx_state {
 	bool notifications_enabled;
 	uint8_t telemetry_sequence;
 	uint8_t reported_config_sequence;
+	uint8_t ota_sequence;
+	uint8_t artifact_sequence;
+	uint32_t generation;
 };
 
 struct spotflow_ble_config_rx_state {
@@ -71,6 +78,7 @@ struct spotflow_ble_transport_state {
 	struct k_work_delayable restart_advertising_work;
 	struct spotflow_ble_tx_state tx;
 	struct spotflow_ble_config_rx_state config_rx;
+	spotflow_transport_message_cb ota_callback;
 };
 
 extern struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
@@ -85,5 +93,8 @@ int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t seque
 int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* sequence_counter,
 					       uint8_t* payload, size_t len);
 int spotflow_ble_transport_process_config_rx_frame(const void* buf, uint16_t len, uint8_t flags);
+int spotflow_ble_transport_queue_ota_frame(const void* buf, uint16_t len);
+int spotflow_ble_transport_send_control(bool accepted, uint8_t message_type, uint8_t sequence);
+void spotflow_ble_artifact_receive(const uint8_t* payload, size_t len);
 
 #endif /* SPOTFLOW_BLE_TRANSPORT_INTERNAL_H */

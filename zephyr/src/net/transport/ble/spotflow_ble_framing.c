@@ -13,6 +13,7 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static int notify_frame(struct bt_conn* conn, const uint8_t* frame, size_t frame_len);
 static int map_notify_error(int rc);
+static K_MUTEX_DEFINE(tx_message_lock);
 
 struct config_rx_frame {
 	bool ignored;
@@ -170,8 +171,8 @@ int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t seque
 	return 0;
 }
 
-int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* sequence_counter,
-					       uint8_t* payload, size_t len)
+static int send_framed_message(uint8_t message_type, uint8_t* sequence_counter, uint8_t* payload,
+			       size_t len)
 {
 	struct bt_conn* conn = NULL;
 	uint8_t sequence = 0;
@@ -341,6 +342,37 @@ static int complete_config_rx_if_last_locked(const struct config_rx_frame* frame
 static int notify_frame(struct bt_conn* conn, const uint8_t* frame, size_t frame_len)
 {
 	return bt_gatt_notify(conn, spotflow_ble_tx_stream_attr_get(), frame, frame_len);
+}
+
+int spotflow_ble_transport_send_framed_message(uint8_t message_type, uint8_t* sequence_counter,
+					       uint8_t* payload, size_t len)
+{
+	/* OTA and telemetry can originate on different threads. Keep each message's
+	 * fragments together, including when the two producers use the same type.
+	 */
+	k_mutex_lock(&tx_message_lock, K_FOREVER);
+	int rc = send_framed_message(message_type, sequence_counter, payload, len);
+	k_mutex_unlock(&tx_message_lock);
+	return rc;
+}
+
+int spotflow_ble_transport_send_control(bool accepted, uint8_t message_type, uint8_t sequence)
+{
+	uint8_t frame[] = { accepted ? 0x00 : 0x01, message_type, sequence };
+	struct bt_conn* conn = NULL;
+
+	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
+	if (g_spotflow_ble_transport_state.tx.conn != NULL &&
+	    g_spotflow_ble_transport_state.tx.notifications_enabled) {
+		conn = bt_conn_ref(g_spotflow_ble_transport_state.tx.conn);
+	}
+	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+	if (conn == NULL) {
+		return -EAGAIN;
+	}
+	int rc = notify_frame(conn, frame, sizeof(frame));
+	bt_conn_unref(conn);
+	return map_notify_error(rc);
 }
 
 static int map_notify_error(int rc)
