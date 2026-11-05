@@ -229,6 +229,30 @@ ZTEST(spotflow_ota_state, test_same_attempt_manifest_rehydrates_restored_attempt
 	zassert_str_equal(job.data.process_artifact.artifact.version, msg.artifacts[1].version);
 }
 
+ZTEST(spotflow_ota_state, test_restored_cancellation_queues_result_report)
+{
+	struct spotflow_ota_persisted_attempt persisted = {
+		.attempt_id = 42,
+		.artifact_count = 1,
+		.artifact_results = { SPOTFLOW_OTA_RESULT_PENDING },
+	};
+	struct spotflow_ota_update_msg update = make_update(42, 1);
+	struct spotflow_ota_update_result accepted;
+	struct spotflow_ota_worker_job job;
+
+	update.is_canceled = true;
+	zassert_ok(spotflow_ota_state_init_from_persistence(&persisted, true, NULL, false));
+	zassert_ok(spotflow_ota_state_accept_update(&update, &accepted));
+	zassert_true(accepted.effects & SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER);
+	zassert_true(spotflow_ota_state_get_worker_job(&job));
+	zassert_equal(job.type, SPOTFLOW_OTA_WORKER_JOB_REPORT_ATTEMPT);
+	struct spotflow_ota_persistence_capture capture;
+
+	zassert_ok(spotflow_ota_state_capture_persisted_attempt(
+		&job, SPOTFLOW_OTA_PERSISTENCE_VIEW_DURABLE, &capture));
+	zassert_equal(capture.attempt.artifact_results[0], SPOTFLOW_OTA_RESULT_CANCELED);
+}
+
 ZTEST(spotflow_ota_state, test_rehydration_rejects_mismatched_artifact_count)
 {
 	const struct spotflow_ota_persisted_attempt persisted = {
