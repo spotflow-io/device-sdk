@@ -443,7 +443,7 @@ Important entry points:
 | `firmware/spotflow_ota_fw_main.c` | Automatic main-firmware pre/post-reboot flow |
 | `firmware/spotflow_ota_fw_custom.c` | Delegated firmware dispatch and cancellation callback |
 | `downloader/spotflow_ota_downloader.c` | Synchronous download API and in-process HTTP Range retry |
-| `platform/spotflow_ota_platform.c` | MCUboot, flash-slot, confirmation, and reboot operations |
+| `platform/spotflow_ota_platform_mcuboot.c` | MCUboot image management behind the platform contract |
 | `platform/spotflow_ota_identity.c` | Running and downloaded image build-ID reads |
 
 MQTT subscription and inbound routing live outside this directory in
@@ -654,19 +654,16 @@ attempt starts.
 
 ### Main-firmware implementation
 
-Automatic handling (`CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE`) requires MCUboot in
-a rollback-capable mode, plus `CONFIG_FLASH`, `CONFIG_FLASH_MAP`, and
-`CONFIG_STREAM_FLASH`. With `CONFIG_SPOTFLOW_GENERATE_BUILD_ID`, a custom build script
-generates the build ID during the build and patches it into a Zephyr binary descriptor.
-That ID identifies the running and downloaded images. Failure to read the downloaded
-image identity fails the attempt.
+Automatic handling selects the MCUboot platform implementation at build time.
+`firmware/spotflow_ota_fw_main.c` owns download controls, probation, installation
+ordering, confirmation and startup reconciliation. The platform contract exposes
+fallible image-state queries, candidate finalization and cleanup. Confirmation
+and reboot are separate operations; MCUboot confirmation is immediately durable.
 
-Before reboot, `firmware/spotflow_ota_fw_main.c` streams the image through the downloader
-into the MCUboot secondary slot, saves probation, requests `BOOT_UPGRADE_TEST`, and
-reboots. The public abort control applies only before the SDK starts the final sequence
-of saving probation and requesting the test upgrade. Pause/resume can postpone the
-SDK-initiated reboot after the test upgrade is requested, but cannot undo that request
-or prevent a reboot initiated elsewhere.
+The coordinator finalizes the candidate before saving probation and requesting
+installation. Cancellation stops at this installation boundary. Pause/resume can
+delay the SDK's reboot after installation is requested but cannot undo the request.
+Candidate identity is currently read from the uploaded flash image.
 
 Initialization resolves probation as follows:
 

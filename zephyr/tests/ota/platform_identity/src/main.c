@@ -36,24 +36,31 @@ static void write_bindesc_build_id(size_t offset, const uint8_t build_id[SPOTFLO
 
 ZTEST(spotflow_ota_platform_identity, test_platform_fake_records_upgrade_confirm_reboot)
 {
-	zassert_ok(spotflow_ota_platform_request_test_upgrade());
-	zassert_ok(spotflow_ota_platform_confirm_image());
+	bool reboot_required;
+	enum spotflow_ota_running_image_state state;
+	zassert_ok(spotflow_ota_platform_request_upgrade());
+	zassert_ok(spotflow_ota_platform_confirm_image(&reboot_required));
 	spotflow_ota_platform_reboot();
 
 	zassert_equal(fake->upgrade_request_count, 1);
 	zassert_equal(fake->confirm_count, 1);
 	zassert_equal(fake->reboot_count, 1);
-	zassert_true(spotflow_ota_platform_is_image_confirmed());
+	zassert_ok(spotflow_ota_platform_get_running_image_state(&state));
+	zassert_equal(state, SPOTFLOW_OTA_RUNNING_IMAGE_CONFIRMED);
+	zassert_false(reboot_required);
 }
 
 ZTEST(spotflow_ota_platform_identity, test_platform_fake_propagates_errors)
 {
+	bool reboot_required;
+	enum spotflow_ota_running_image_state state;
 	fake->upgrade_request_result = -EIO;
 	fake->confirm_result = -EIO;
 
-	zassert_equal(spotflow_ota_platform_request_test_upgrade(), -EIO);
-	zassert_equal(spotflow_ota_platform_confirm_image(), -EIO);
-	zassert_false(spotflow_ota_platform_is_image_confirmed());
+	zassert_equal(spotflow_ota_platform_request_upgrade(), -EIO);
+	zassert_equal(spotflow_ota_platform_confirm_image(&reboot_required), -EIO);
+	zassert_ok(spotflow_ota_platform_get_running_image_state(&state));
+	zassert_equal(state, SPOTFLOW_OTA_RUNNING_IMAGE_UNCONFIRMED);
 }
 
 ZTEST(spotflow_ota_platform_identity, test_identity_compare_unavailable_when_running_missing)
@@ -96,7 +103,7 @@ ZTEST(spotflow_ota_platform_identity, test_identity_reads_downloaded_build_id)
 
 	write_bindesc_build_id(32, expected);
 
-	zassert_ok(spotflow_ota_identity_get_downloaded_build_id(downloaded));
+	zassert_ok(spotflow_ota_platform_get_downloaded_build_id(downloaded));
 	zassert_mem_equal(expected, downloaded, SPOTFLOW_BUILD_ID_LENGTH);
 }
 
@@ -111,7 +118,7 @@ ZTEST(spotflow_ota_platform_identity, test_identity_reads_downloaded_build_id_ac
 
 	write_bindesc_build_id(252, expected);
 
-	zassert_ok(spotflow_ota_identity_get_downloaded_build_id(downloaded));
+	zassert_ok(spotflow_ota_platform_get_downloaded_build_id(downloaded));
 	zassert_mem_equal(expected, downloaded, SPOTFLOW_BUILD_ID_LENGTH);
 }
 
@@ -121,7 +128,7 @@ ZTEST(spotflow_ota_platform_identity, test_downloaded_build_id_read_failure)
 
 	uint8_t downloaded[SPOTFLOW_BUILD_ID_LENGTH];
 
-	zassert_equal(spotflow_ota_identity_get_downloaded_build_id(downloaded), -EIO);
+	zassert_equal(spotflow_ota_platform_get_downloaded_build_id(downloaded), -EIO);
 }
 
 ZTEST(spotflow_ota_platform_identity, test_downloaded_build_id_missing_bindesc)
@@ -131,7 +138,7 @@ ZTEST(spotflow_ota_platform_identity, test_downloaded_build_id_missing_bindesc)
 
 	uint8_t downloaded[SPOTFLOW_BUILD_ID_LENGTH];
 
-	zassert_equal(spotflow_ota_identity_get_downloaded_build_id(downloaded), -ENOENT);
+	zassert_equal(spotflow_ota_platform_get_downloaded_build_id(downloaded), -ENOENT);
 }
 
 ZTEST_SUITE(spotflow_ota_platform_identity, NULL, NULL, before_each, NULL, NULL);

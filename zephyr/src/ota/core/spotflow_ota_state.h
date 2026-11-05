@@ -252,10 +252,10 @@ int spotflow_ota_state_request_main_firmware_abort(
 
 bool spotflow_ota_state_is_main_firmware_abort_requested(void);
 
-int spotflow_ota_state_begin_main_firmware_upgrade_commit(
+int spotflow_ota_state_begin_main_firmware_installation(
 	const struct spotflow_ota_operation_token* token);
 
-int spotflow_ota_state_cancel_main_firmware_upgrade_commit(
+int spotflow_ota_state_cancel_main_firmware_installation(
 	const struct spotflow_ota_operation_token* token);
 
 int spotflow_ota_state_begin_main_firmware_reboot(const struct spotflow_ota_operation_token* token);
