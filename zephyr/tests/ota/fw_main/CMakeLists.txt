@@ -39,6 +39,7 @@ target_sources(app PRIVATE
         ../common/spotflow_ota_bindesc_test_util.c
         ../common/spotflow_ota_build_id_fake.c
         ../common/spotflow_ota_platform_fake.c
+        ../../../src/ota/platform/spotflow_ota_identity_stream.c
         ../common/spotflow_ota_test_fakes.c
         ../common/spotflow_ota_test_transport_stubs.c
         ../common/spotflow_ota_test_settings.c
