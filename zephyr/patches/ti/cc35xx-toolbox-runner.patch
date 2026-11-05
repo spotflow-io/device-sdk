@@ -1,0 +1,87 @@
+diff --git a/scripts/west_commands/runners/simplelink_toolbox.py b/scripts/west_commands/runners/simplelink_toolbox.py
+--- a/scripts/west_commands/runners/simplelink_toolbox.py
++++ b/scripts/west_commands/runners/simplelink_toolbox.py
+@@ -112,7 +112,7 @@
+             for p in cfg.openocd_search:
+                 search_args.extend(['-s', p])
+         self.openocd_cmd = [cfg.openocd or 'openocd'] + search_args
+-        self.elf_name = Path(cfg.elf_file).as_posix() if cfg.elf_file else None
++        self.elf_name = Path(cfg.elf_file).resolve().as_posix() if cfg.elf_file else None
+         self.pre_init = pre_init or []
+         self.simplelink_tool = simplelink_tool
+         self.vendor_file = (
+@@ -413,6 +413,8 @@
+                 )
+
+             factory_config = json.loads(memory_config.read_text())
++            factory_config['inputs'].setdefault('vendor_bl3_size', 0)
++            factory_config['inputs'].setdefault('ti_fw_in_vendor_image', False)
+             flash_type = factory_config['flash_type']['flash_device_type']
+             config_json = self.flash_dir / 'initial_programming.json'
+             config_json.write_text(json.dumps(factory_config, indent=2) + '\n')
+diff --git a/soc/ti/simplelink/cc35xxe/toolbox.cmake b/soc/ti/simplelink/cc35xxe/toolbox.cmake
+--- a/soc/ti/simplelink/cc35xxe/toolbox.cmake
++++ b/soc/ti/simplelink/cc35xxe/toolbox.cmake
+@@ -234,7 +234,7 @@
+                ${CMAKE_COMMAND} -E copy ${tool_settings} ${outdir}/tool_settings.json)
+
+   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
+-               simplelink-wifi-toolbox flash-images-builder build programming_image
++               simplelink-wifi-toolbox flash-images-builder --device CC35XXE build programming_image
+                --flash_discovery_config_otfde ${otfde}
+                --flash_discovery_config_ext_mem ${ext_mem}
+                --flash_discovery_config_xspi ${xspi}
+@@ -242,31 +242,31 @@
+                --dir_out_path ${outdir})
+
+   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
+-               simplelink-wifi-toolbox flash-images-builder sign programming_image
++               simplelink-wifi-toolbox flash-images-builder --device CC35XXE sign programming_image
+                --unsign_image ${outdir}/programming_instructions_image.unsign.bin
+                --private_key ${privkey} --public_key ${pubkey}
+                --dir_out_path ${outdir})
+
+   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
+-               simplelink-wifi-toolbox flash-images-builder build action_request
++               simplelink-wifi-toolbox flash-images-builder --device CC35XXE build action_request
+                --type programming
+                --params_json ${action_params}
+                --dir_out_path ${outdir})
+
+   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
+-               simplelink-wifi-toolbox flash-images-builder sign action_request
++               simplelink-wifi-toolbox flash-images-builder --device CC35XXE sign action_request
+                --unsign_request ${outdir}/programming_action_request.unsign.bin
+                --private_key ${privkey} --public_key ${pubkey}
+                --dir_out_path ${outdir})
+
+   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
+-               simplelink-wifi-toolbox flash-images-builder build action_request
++               simplelink-wifi-toolbox flash-images-builder --device CC35XXE build action_request
+                --type debug
+                --params_json ${action_params}
+                --dir_out_path ${outdir})
+
+   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
+-               simplelink-wifi-toolbox flash-images-builder sign action_request
++               simplelink-wifi-toolbox flash-images-builder --device CC35XXE sign action_request
+                --unsign_request ${outdir}/debug_action_request.unsign.bin
+                --private_key ${privkey} --public_key ${pubkey}
+                --dir_out_path ${outdir})
+@@ -289,14 +289,14 @@
+                --output "${outdir}/cc35xx-conf.bin")
+
+   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
+-               simplelink-wifi-toolbox flash-images-builder build vendor_image
++               simplelink-wifi-toolbox flash-images-builder --device CC35XXE build vendor_image
+                --version ${CONFIG_CC35XXE_VENDOR_IMAGE_VERSION}
+                --vendor_out_file ${output}.elf
+                --conf_bin_file ${outdir}/cc35xx-conf.bin
+                --dir_out_path ${outdir})
+
+   set_property(GLOBAL APPEND PROPERTY extra_post_build_commands COMMAND
+-               simplelink-wifi-toolbox flash-images-builder sign vendor_image
++               simplelink-wifi-toolbox flash-images-builder --device CC35XXE sign vendor_image
+                --unsign_image ${outdir}/vendor_image.unsign.bin
+                --private_key ${privkey} --public_key ${pubkey}
+                --dir_out_path ${outdir})
