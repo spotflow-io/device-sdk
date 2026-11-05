@@ -663,7 +663,15 @@ and reboot are separate operations; MCUboot confirmation is immediately durable.
 The coordinator finalizes the candidate before saving probation and requesting
 installation. Cancellation stops at this installation boundary. Pause/resume can
 delay the SDK's reboot after installation is requested but cannot undo the request.
-Candidate identity is currently read from the uploaded flash image.
+The MCUboot backend extracts candidate identity from sequential downloaded
+artifact blocks. Its framing wrapper feeds only executable bytes to a shared
+native-endian Zephyr descriptor reader, excluding headers, padding and trailers.
+Missing, malformed or unpatched IDs fail the attempt. Candidate flash scanning
+and its `BINDESC_READ` dependencies are no longer required.
+
+Only directly readable MCUboot v1 images are supported. Encrypted, compressed
+and split images are rejected; RAM-load and fixed-address images are supported.
+Streamed identity correlates images; the bootloader verifies authenticity.
 
 Initialization resolves probation as follows:
 

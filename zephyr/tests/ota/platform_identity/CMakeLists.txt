@@ -18,8 +18,12 @@ target_compile_definitions(app PRIVATE
 
 target_sources(app PRIVATE
         src/main.c
+        src/identity_stream.c
+        src/mcuboot_stream.c
+        ../../../src/ota/platform/mcuboot/spotflow_ota_mcuboot_stream.c
         ../common/spotflow_ota_bindesc_test_util.c
         ../common/spotflow_ota_build_id_fake.c
         ../common/spotflow_ota_platform_fake.c
+        ../../../src/ota/platform/spotflow_ota_identity_stream.c
         ../../../src/ota/platform/spotflow_ota_identity.c
 )

@@ -30,8 +30,10 @@ endif()
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
         firmware/spotflow_ota_fw_main.c
         platform/spotflow_ota_identity.c
+        platform/spotflow_ota_identity_stream.c
 )
 
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
         platform/spotflow_ota_platform_mcuboot.c
+        platform/mcuboot/spotflow_ota_mcuboot_stream.c
 )
