@@ -26,6 +26,14 @@ config SPOTFLOW_GENERATE_BUILD_ID
 		Generate build ID and embed it as a binary descriptor.
 		Build ID allows to match core dumps with the original .elf file.
 
+config SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION
+	bool "Include TI vendor image version in build ID"
+	depends on SPOTFLOW_GENERATE_BUILD_ID && CC35XXE_FWU
+	default y if SPOTFLOW_OTA_PSA_FWU_TI_CC35XX
+	help
+	  Include CC35XXE_VENDOR_IMAGE_VERSION in the build ID hash so changing
+	  only the signed container version also changes the executable identity.
+
 config SPOTFLOW_DEVICE_ID
 	string "Device ID device will use to connect to Spotflow observability platform"
 	help

@@ -10,10 +10,21 @@ artifacts before vendor packaging and signing.
 
 ## Packaging metadata
 
-The generator's `--extra-input-file` option appends a file's raw bytes after
-the ELF section input. Omitted or empty metadata preserves the original hash.
-The input is not decoded or normalized; reproducing the ID requires the ELF
-and the exact metadata bytes. Related binary artifacts receive the same ID.
+`CONFIG_SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION` includes
+`CONFIG_CC35XXE_VENDOR_IMAGE_VERSION` in the hash. The TI CC35xx OTA provider enables
+this option by default. Changing only the container version therefore changes the
+build ID even when the executable is otherwise identical. Disabling the option
+preserves executable-only hashing.
+
+CMake writes the configured version to an input file. The generator appends that
+file's raw bytes after the ELF section input.
+Reproducing this ID requires the ELF and the exact input bytes. The generator
+itself remains independent of TI packaging.
+
+An effective Kconfig change regenerates `autoconf.h`, recompiles dependent sources,
+and relinks the executable. Linking reruns the ID patcher before TI builds and signs
+the container. A cached command-line Kconfig override takes precedence over `prj.conf`;
+update or clear that override when testing version-only rebuilds.
 
 ## Embedded descriptor and retrieval
 

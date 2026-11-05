@@ -698,7 +698,8 @@ MCUboot encrypted, compressed and split images are rejected because the stream
 reader cannot inspect their executable payload directly. RAM-load and fixed-address
 images are supported. Both backends reject a downloaded image whose build ID
 matches that of the currently running firmware before saving probation: otherwise a reset before installation could make the old confirmed image
-look like a successful update. See [build ID generation](build-id.md) for metadata input.
+look like a successful update. The TI provider includes its numeric vendor image
+version in the ID by default; see [build ID generation](build-id.md).
 
 Initialization resolves probation as follows:
 
