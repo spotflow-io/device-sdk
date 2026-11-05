@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 
-import sys
+import argparse
 import os
 import hashlib
+from pathlib import Path
 from elftools.elf.elffile import ELFFile
-from elftools.elf.sections import Section, Symbol
+from elftools.elf.sections import Section
 from elftools.elf.constants import SH_FLAGS
 from intelhex import IntelHex
 
@@ -17,14 +18,16 @@ BUILD_ID_HEADER_VALUE = b"\xf0\x25\x14\x00"
 BUILD_ID_HEADER_SIZE = len(BUILD_ID_HEADER_VALUE)
 BUILD_ID_VALUE_SIZE = 20
 
-def generate_and_patch_build_id(elf_filepath: str, other_filepaths: list[str]):
+def generate_and_patch_build_id(
+    elf_filepath: str, other_filepaths: list[str], extra_input: bytes = b""
+):
     with open(elf_filepath, "rb+") as elf_stream:
         elffile = ELFFile(elf_stream)
 
         bindesc_symbol_vaddr = find_bindesc_build_id_symbol_vaddr(elffile)
         bindesc_symbol_paddr = convert_vaddr_to_paddr(elffile, bindesc_symbol_vaddr)
 
-        build_id = generate_build_id(elffile, bindesc_symbol_vaddr)
+        build_id = generate_build_id(elffile, bindesc_symbol_vaddr, extra_input)
 
         patch_build_id_parsed_elf(elffile, elf_filepath, bindesc_symbol_vaddr, build_id)
 
@@ -56,7 +59,7 @@ def build_id_header_value(elffile: ELFFile) -> bytes:
 
 
 def find_bindesc_build_id_symbol_vaddr(elffile: ELFFile) -> int:
-    symbol = None
+    symbols = None
 
     symbol_table = elffile.get_section_by_name(".symtab")
     if symbol_table is None:
@@ -91,7 +94,7 @@ def convert_vaddr_to_paddr(elffile: ELFFile, vaddr: int) -> int:
     raise Exception(f"Virtual address 0x{vaddr:08x} not found in any segment of ELF file")
 
 
-def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
+def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int, extra_input: bytes = b""):
     hash_builder = hashlib.sha1()
 
     for section in elffile.iter_sections():
@@ -120,6 +123,8 @@ def generate_build_id(elffile: ELFFile, bindesc_symbol_vaddr: int):
             hash_builder.update(data[build_id_section_end_offset:])
         else:
             hash_builder.update(data)
+
+    hash_builder.update(extra_input)
 
     build_id = hash_builder.digest()
     assert len(build_id) == BUILD_ID_VALUE_SIZE
@@ -262,15 +267,17 @@ def find_base_address(elffile: ELFFile) -> int:
 
 
 def main():
-    if len(sys.argv) < 2:
-        print("Usage: patch_build_id.py <elf_file> [<other_file>...]")
-        print("Recognized file extensions: .bin, .elf, .hex")
-        sys.exit(1)
-
-    elf_filepath = sys.argv[1]
-    other_filepaths = sys.argv[2:]
-
-    generate_and_patch_build_id(elf_filepath, other_filepaths)
+    parser = argparse.ArgumentParser(description="Generate and embed a Spotflow build ID")
+    parser.add_argument(
+        "--extra-input-file", type=Path, help="File whose raw bytes are appended to the hash input"
+    )
+    parser.add_argument("elf_file")
+    parser.add_argument("other_files", nargs="*", help="Related ELF, HEX, BIN or stripped files")
+    args = parser.parse_args()
+    extra_input = b""
+    if args.extra_input_file is not None:
+        extra_input = args.extra_input_file.read_bytes()
+    generate_and_patch_build_id(args.elf_file, args.other_files, extra_input)
 
 
 if __name__ == "__main__":
