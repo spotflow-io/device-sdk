@@ -154,6 +154,16 @@ spotflow_ota_fw_main_process_artifact(const struct spotflow_ota_worker_job* job)
 		goto failed;
 	}
 
+	/* The probation record cannot distinguish an interrupted installation from
+	 * the already-running image when both carry the same build ID.
+	 */
+	if (spotflow_ota_identity_compare_probation(expected_build_id) ==
+	    SPOTFLOW_OTA_IDENTITY_MATCH) {
+		LOG_ERR("Downloaded main firmware has the running build ID");
+		rc = -EALREADY;
+		goto failed;
+	}
+
 	rc = spotflow_ota_platform_finish_image_write();
 	if (rc < 0) {
 		goto failed;

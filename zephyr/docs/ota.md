@@ -673,6 +673,10 @@ Only directly readable MCUboot v1 images are supported. Encrypted, compressed
 and split images are rejected; RAM-load and fixed-address images are supported.
 Streamed identity correlates images; the bootloader verifies authenticity.
 
+A candidate whose build ID matches the running image is rejected before saving
+probation. Otherwise a reset before installation could make the old confirmed image
+look like a successful update.
+
 Initialization resolves probation as follows:
 
 | Running build ID vs probation | MCUboot confirmed | Outcome |
