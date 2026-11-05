@@ -17,6 +17,11 @@ struct spotflow_ota_platform_fake {
 	uint32_t upgrade_request_count;
 	uint32_t confirm_count;
 	uint32_t reboot_count;
+	uint32_t abort_count;
+	int query_result;
+	int reboot_result;
+	int finish_result;
+	bool confirmation_requires_reboot;
 	int upgrade_request_result;
 	int confirm_result;
 	bool image_confirmed;

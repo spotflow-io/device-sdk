@@ -5,6 +5,8 @@
 #include <zephyr/bindesc.h>
 
 #include "spotflow_ota_platform_fake.h"
+#include "ota/platform/spotflow_ota_platform.h"
+#include "ota/platform/spotflow_ota_identity.h"
 
 static struct spotflow_ota_platform_fake platform_fake;
 
@@ -20,7 +22,7 @@ void spotflow_ota_platform_fake_reset(struct spotflow_ota_platform_fake* fake)
 	k_sem_init(&fake->continue_upgrade_request, 0, 1);
 }
 
-int spotflow_ota_platform_request_test_upgrade(void)
+int spotflow_ota_platform_request_upgrade(void)
 {
 	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
 
@@ -33,26 +35,40 @@ int spotflow_ota_platform_request_test_upgrade(void)
 	return fake->upgrade_request_result;
 }
 
-int spotflow_ota_platform_confirm_image(void)
+int spotflow_ota_platform_confirm_image(bool* reboot_required)
 {
 	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
 
+	if (reboot_required == NULL) {
+		return -EINVAL;
+	}
+	*reboot_required = fake->confirmation_requires_reboot;
 	fake->confirm_count++;
-	if (fake->confirm_result == 0) {
+	if (fake->confirm_result == 0 && !fake->confirmation_requires_reboot) {
 		fake->image_confirmed = true;
 	}
 
 	return fake->confirm_result;
 }
 
-bool spotflow_ota_platform_is_image_confirmed(void)
+int spotflow_ota_platform_get_running_image_state(enum spotflow_ota_running_image_state* state)
 {
-	return spotflow_ota_platform_fake_get()->image_confirmed;
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+
+	if (state == NULL) {
+		return -EINVAL;
+	}
+	*state = fake->image_confirmed ? SPOTFLOW_OTA_RUNNING_IMAGE_CONFIRMED
+				       : SPOTFLOW_OTA_RUNNING_IMAGE_UNCONFIRMED;
+	return fake->query_result;
 }
 
-void spotflow_ota_platform_reboot(void)
+int spotflow_ota_platform_reboot(void)
 {
-	spotflow_ota_platform_fake_get()->reboot_count++;
+	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
+
+	fake->reboot_count++;
+	return fake->reboot_result;
 }
 
 int spotflow_ota_platform_read_upload_slot(size_t offset, uint8_t* dst, size_t len)
@@ -132,11 +148,15 @@ int spotflow_ota_platform_begin_image_write(void)
 	return 0;
 }
 
-int spotflow_ota_platform_write_image_block(const uint8_t* data, size_t len, bool is_last)
+int spotflow_ota_platform_write_image_block(const struct spotflow_artifact_block* block)
 {
 	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
 
-	ARG_UNUSED(is_last);
+	if (block == NULL) {
+		return -EINVAL;
+	}
+	const uint8_t* data = block->data;
+	size_t len = block->data_len;
 
 	if (fake->write_fail_after_bytes > 0 &&
 	    fake->upload_image_size >= fake->write_fail_after_bytes) {
@@ -161,4 +181,25 @@ int spotflow_ota_platform_write_image_block(const uint8_t* data, size_t len, boo
 	}
 
 	return 0;
+}
+
+int spotflow_ota_platform_init(void)
+{
+	return 0;
+}
+
+int spotflow_ota_platform_finish_image_write(void)
+{
+	return spotflow_ota_platform_fake_get()->finish_result;
+}
+
+int spotflow_ota_platform_abort_image_write(void)
+{
+	spotflow_ota_platform_fake_get()->abort_count++;
+	return 0;
+}
+
+int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+{
+	return spotflow_ota_identity_get_downloaded_build_id(build_id);
 }

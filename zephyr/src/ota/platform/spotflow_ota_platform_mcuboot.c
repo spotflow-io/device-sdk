@@ -1,5 +1,7 @@
 #include "ota/platform/spotflow_ota_platform.h"
 
+#include "ota/platform/spotflow_ota_identity.h"
+
 #include <errno.h>
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,22 +17,31 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 static struct flash_img_context upload_ctx;
 
-int spotflow_ota_platform_request_test_upgrade(void)
+int spotflow_ota_platform_request_upgrade(void)
 {
 	return boot_request_upgrade(BOOT_UPGRADE_TEST);
 }
 
-int spotflow_ota_platform_confirm_image(void)
+int spotflow_ota_platform_confirm_image(bool* reboot_required)
 {
+	if (reboot_required == NULL) {
+		return -EINVAL;
+	}
+	*reboot_required = false;
 	return boot_write_img_confirmed();
 }
 
-bool spotflow_ota_platform_is_image_confirmed(void)
+int spotflow_ota_platform_get_running_image_state(enum spotflow_ota_running_image_state* state)
 {
-	return boot_is_img_confirmed();
+	if (state == NULL) {
+		return -EINVAL;
+	}
+	*state = boot_is_img_confirmed() ? SPOTFLOW_OTA_RUNNING_IMAGE_CONFIRMED
+					 : SPOTFLOW_OTA_RUNNING_IMAGE_UNCONFIRMED;
+	return 0;
 }
 
-void spotflow_ota_platform_reboot(void)
+int spotflow_ota_platform_reboot(void)
 {
 	sys_reboot(SYS_REBOOT_COLD);
 	CODE_UNREACHABLE;
@@ -113,11 +124,35 @@ int spotflow_ota_platform_begin_image_write(void)
 	return flash_img_init(&upload_ctx);
 }
 
-int spotflow_ota_platform_write_image_block(const uint8_t* data, size_t len, bool is_last)
+int spotflow_ota_platform_write_image_block(const struct spotflow_artifact_block* block)
 {
-	if (data == NULL && len > 0) {
+	if (block == NULL || (block->data == NULL && block->data_len > 0)) {
 		return -EINVAL;
 	}
 
-	return flash_img_buffered_write(&upload_ctx, data, len, is_last);
+	return flash_img_buffered_write(&upload_ctx, block->data, block->data_len, block->is_last);
+}
+
+int spotflow_ota_platform_init(void)
+{
+	return 0;
+}
+
+int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+{
+	return spotflow_ota_identity_get_downloaded_build_id(build_id);
+}
+
+int spotflow_ota_platform_finish_image_write(void)
+{
+	return 0;
+}
+
+int spotflow_ota_platform_abort_image_write(void)
+{
+	if (upload_ctx.flash_area != NULL) {
+		flash_area_close(upload_ctx.flash_area);
+		upload_ctx.flash_area = NULL;
+	}
+	return 0;
 }

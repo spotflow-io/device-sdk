@@ -1229,7 +1229,7 @@ bool spotflow_ota_state_is_main_firmware_abort_requested(void)
 	return requested;
 }
 
-int spotflow_ota_state_begin_main_firmware_upgrade_commit(
+int spotflow_ota_state_begin_main_firmware_installation(
 	const struct spotflow_ota_operation_token* token)
 {
 	if (token == NULL) {
@@ -1243,7 +1243,7 @@ int spotflow_ota_state_begin_main_firmware_upgrade_commit(
 	if (!operation_token_matches_current(token)) {
 		rc = -ESTALE;
 	} else {
-		rc = spotflow_ota_main_begin_upgrade_commit(
+		rc = spotflow_ota_main_begin_installation(
 			&ota_state.main_firmware, main_firmware_handler_is_owned(token),
 			ota_state.current_attempt.execution.cancellation_requested);
 		if (rc == 0) {
@@ -1255,7 +1255,7 @@ int spotflow_ota_state_begin_main_firmware_upgrade_commit(
 	return rc;
 }
 
-int spotflow_ota_state_cancel_main_firmware_upgrade_commit(
+int spotflow_ota_state_cancel_main_firmware_installation(
 	const struct spotflow_ota_operation_token* token)
 {
 	if (token == NULL) {
@@ -1267,7 +1267,7 @@ int spotflow_ota_state_cancel_main_firmware_upgrade_commit(
 	if (!operation_token_matches_current(token)) {
 		rc = -ESTALE;
 	} else {
-		rc = spotflow_ota_main_cancel_upgrade_commit(&ota_state.main_firmware);
+		rc = spotflow_ota_main_cancel_installation(&ota_state.main_firmware);
 		if (rc == 0) {
 			assert_state_locked();
 		}
