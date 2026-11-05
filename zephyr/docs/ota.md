@@ -572,7 +572,7 @@ flowchart TD
 
     idle -->|"Claim artifact or reconciled main result"| running
     running -->|"Handler or reconciliation returns result"| staged
-    running -->|"Main firmware enters reboot probation"| idle
+    running -->|"Reset: restore attempt and probation"| idle
     staged -->|"Projection saved and unchanged<br/>Commit to in-memory results"| idle
     staged -->|"Transient storage failure<br/>Retry"| staged
     staged -->|"Supersession changes mutation<br/>Save the new projection"| staged
@@ -676,6 +676,13 @@ Streamed identity correlates images; the bootloader verifies authenticity.
 A candidate whose build ID matches the running image is rejected before saving
 probation. Otherwise a reset before installation could make the old confirmed image
 look like a successful update.
+
+The artifact transaction remains owned by the handler through
+`PENDING_REBOOT` and the installation reboot request. A reset discards that RAM
+transaction, and startup restores saved probation. A returning reboot error uses
+the original handler transaction to persist failure. The worker clears probation
+after failure is durable and before another attempt can replace it. A later reset
+can still boot an installed candidate without changing that durable failure.
 
 Initialization resolves probation as follows:
 
