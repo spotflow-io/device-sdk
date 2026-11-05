@@ -199,7 +199,8 @@ int spotflow_get_main_firmware_update_info(struct spotflow_firmware_info* info,
  * Pausing in @c SPOTFLOW_OTA_PHASE_PENDING_REBOOT delays the reboot initiated by
  * the SDK. Installation has already been requested and cannot be aborted through
  * Spotflow. MCUboot persists its test-upgrade request, so another reboot still
- * selects the new image.
+ * selects the new image. TI PSA FWU requires psa_fwu_request_reboot() to transfer
+ * its pending installation request to the bootloader.
  *
  * When @p state is not NULL, the resulting main-firmware state is written on
  * success. On error, @p state is left unchanged.
@@ -272,8 +273,10 @@ int spotflow_abort_main_firmware_update(struct spotflow_ota_main_firmware_state*
  *
  * Requires CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE. After a
  * successful reboot into an unconfirmed image, requests acceptance through the
- * selected firmware backend. This function does not reboot. MCUboot makes
- * confirmation durable immediately.
+ * selected firmware backend. This function does not reboot. For TI PSA FWU, the
+ * application must subsequently call psa_fwu_request_reboot() to make confirmation durable;
+ * state remains UNCONFIRMED and the result remains PENDING until startup verifies
+ * durable confirmation. A plain system reboot does not persist TI's acceptance request.
  *
  * Once confirmed, persistence, probation cleanup, and result reporting run on the
  * OTA worker. A return value of @c 0 does not mean that the result has already been

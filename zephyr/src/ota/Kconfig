@@ -97,10 +97,17 @@ config SPOTFLOW_OTA_MCUBOOT_AVAILABLE
 	depends on ARCH_SUPPORTS_ROM_START || ARCH_POSIX
 	depends on FLASH && FLASH_MAP && STREAM_FLASH
 
+config SPOTFLOW_OTA_PSA_FWU_AVAILABLE
+	bool
+	default y if CC35XXE_FWU
+	help
+	  A PSA FWU implementation supported by Spotflow is available on this target.
+	  Extend this condition when adding another provider implementation.
+
 config SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 	bool "Automatically handle main firmware OTA updates"
 	depends on SPOTFLOW_GENERATE_BUILD_ID
-	depends on SPOTFLOW_OTA_MCUBOOT_AVAILABLE
+	depends on SPOTFLOW_OTA_MCUBOOT_AVAILABLE || SPOTFLOW_OTA_PSA_FWU_AVAILABLE
 	default y
 	help
 	  Download main firmware artifacts, install them for unconfirmed execution, and
@@ -112,6 +119,7 @@ if SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 
 choice SPOTFLOW_OTA_MAIN_FIRMWARE_BACKEND
 	prompt "Main firmware update backend"
+	default SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU if SPOTFLOW_OTA_PSA_FWU_AVAILABLE && !BOOTLOADER_MCUBOOT
 	default SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
 
 config SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
@@ -123,7 +131,21 @@ config SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
 	help
 	  Use a rollback-capable MCUboot mode and a secondary flash slot.
 
+config SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU
+	bool "PSA Firmware Update"
+	depends on SPOTFLOW_OTA_PSA_FWU_AVAILABLE
+	help
+	  Use the PSA Firmware Update lifecycle. The TI CC35xx implementation
+	  currently supplies component selection and signed-image preparation.
+	  Confirmation does not reboot. If the platform requires a reboot to make
+	  confirmation durable, the application must request it through PSA FWU.
+
 endchoice
+
+config SPOTFLOW_OTA_PSA_FWU_TI_CC35XX
+	bool
+	default y
+	depends on SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU && CC35XXE_FWU
 
 endif # SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
 

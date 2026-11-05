@@ -37,3 +37,12 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_MAIN_FIRMWARE_MCUBOOT
         platform/spotflow_ota_platform_mcuboot.c
         platform/mcuboot/spotflow_ota_mcuboot_stream.c
 )
+
+zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_MAIN_FIRMWARE_PSA_FWU
+        platform/spotflow_ota_platform_psa.c
+)
+
+zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA_PSA_FWU_TI_CC35XX
+        platform/psa/spotflow_ota_psa_ti_cc35xx.c
+        platform/psa/spotflow_ota_psa_ti_container.c
+)
