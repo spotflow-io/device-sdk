@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 from elftools.elf.constants import SH_FLAGS
+from intelhex import IntelHex
 
 import patch_build_id
 
@@ -74,3 +75,37 @@ def test_nonallocated_strings_overlapping_descriptor_address_are_hashed_in_full(
     first = ElfSection("log_strings", 0x1000, b"head" + b"A" * 20 + b"tail")
     second = ElfSection("log_strings", 0x1000, b"head" + b"B" * 20 + b"tail")
     assert build_id(first) != build_id(second)
+
+
+@pytest.mark.parametrize("little_endian", [False, True])
+def test_descriptor_patching_respects_elf_endianness(little_endian, tmp_path):
+    import io
+
+    byteorder = "little" if little_endian else "big"
+    header = (0x25F0).to_bytes(2, byteorder) + (20).to_bytes(2, byteorder)
+    stream = io.BytesIO(header + bytes(20))
+    section = {"sh_addr": 0x1000, "sh_size": 24, "sh_offset": 0}
+    elf = SimpleNamespace(
+        little_endian=little_endian,
+        stream=stream,
+        iter_sections=lambda: iter([section]),
+    )
+    identity = bytes(range(20))
+    patch_build_id.patch_build_id_parsed_elf(elf, "test.elf", 0x1000, identity)
+    assert stream.getvalue() == header + identity
+    bin_path = tmp_path / "test.bin"
+    bin_path.write_bytes(header + bytes(20))
+    elf.iter_segments = lambda: iter([{
+        "p_type": "PT_LOAD", "p_paddr": 0x1000, "p_filesz": 24,
+    }])
+    patch_build_id.patch_build_id_bin(str(bin_path), elf, 0x1000, identity)
+    assert bin_path.read_bytes() == header + identity
+
+    hex_path = tmp_path / "test.hex"
+    hex_file = IntelHex()
+    hex_file.frombytes(header + bytes(20), offset=0x1000)
+    hex_file.write_hex_file(str(hex_path))
+    patch_build_id.patch_build_id_hex(
+        str(hex_path), 0x1000, identity, patch_build_id.build_id_header_value(elf)
+    )
+    assert IntelHex(str(hex_path)).tobinstr() == header + identity
