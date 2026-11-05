@@ -12,7 +12,9 @@ should start with the
 [Zephyr guide for OTA updates](https://docs.spotflow.io/guides/zephyr/ota-zephyr) or the
 [sample for OTA updates](../samples/ota). Automatic main-firmware updates currently
 support two backends: MCUboot and PSA Firmware Update (PSA FWU), with a TI CC35xx
-provider.
+provider. TI users should follow
+[Over-the-air (OTA) updates on TI CC35X1](https://docs.spotflow.io/guides/texas-instruments/ota)
+(upcoming public guide) and the [PSA sample](../samples/ota_psa).
 
 The MQTT message schemas are documented in the
 [MQTT protocol guide for OTA updates](https://docs.spotflow.io/guides/mqtt/ota-mqtt).
@@ -770,6 +772,28 @@ updates into slot 2, then the next update uses slot 1. The bootloader maps eithe
 physical slot into the same logical execute-in-place (XIP) address window: the CPU
 runs the firmware directly from flash. Both slots therefore use the same signed artifact.
 The wireless slots hold TI connectivity firmware and are not updated by this provider.
+See [the TI PSA sample](../samples/ota_psa/README.md) for its fixed factory layout
+and application-requested confirmation reboot.
+
+Before building with the TI manifest, apply both compatibility patches as described
+in [CC35X1 flashing setup](https://docs.spotflow.io/guides/texas-instruments/cc35x1-setup#apply-compatibility-patches-before-building),
+including its checks for already-patched checkouts:
+
+- The [HAL patch](../patches/ti/cc35xx-flash-startup.patch) corrects the Bluetooth
+  source guard and enables the SYSTIM hardware timer before early flash and
+  Internal Trusted Storage (ITS) initialization. Without SYSTIM, a trial image can
+  stall before reaching the application.
+- The [Toolbox patch](../patches/ti/cc35xx-toolbox-runner.patch) supplies device
+  arguments for image generation, missing layout fields and absolute ELF paths. It
+  makes factory programming use the application's selected layout and makes full
+  erase optional.
+
+These patches were tested with the manifest's TI SimpleLink Zephyr
+`v4.4.0-ti-10.10.00`, LP-EM-CC35X1 with CC3551E and Toolbox 4.3.23. Other boards,
+versions or flash layouts may require adjustments. See the
+[sample instructions](../samples/ota_psa/README.md) for activation, factory programming
+and deployment from the shared `build` directory.
+
 #### Adding another PSA provider
 
 Implement the contract in `platform/psa/spotflow_ota_psa_provider.h`, then add its
