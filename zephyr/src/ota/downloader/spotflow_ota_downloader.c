@@ -244,6 +244,8 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 		bool transient_failure = false;
 		struct spotflow_ota_downloader_transport_request transport_request = {
 			.url = &url,
+			.original_url = request->url,
+			.secret = request->secret,
 			.authorization_header = authorization_header,
 			.downloader = downloader,
 			.callback = callback,

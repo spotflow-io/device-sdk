@@ -6,6 +6,13 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#ifdef CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+#include <spotflow/ota.h>
+#ifdef CONFIG_SPOTFLOW_OTA_PSA_FWU_TI_CC35XX
+#include <psa_fwu.h>
+#endif
+#endif
+
 #ifdef CONFIG_SPOTFLOW_METRICS
 #include "metrics/spotflow_metrics_backend.h"
 #include "metrics/spotflow_metrics_registry.h"
@@ -180,6 +187,24 @@ static int prepare_button(void)
 
 int main(void)
 {
+#ifdef CONFIG_SPOTFLOW_OTA_AUTO_HANDLE_MAIN_FIRMWARE
+	/* Demonstration only: production applications must first run their health
+	 * checks before accepting an unconfirmed image.
+	 */
+	struct spotflow_ota_main_firmware_state firmware_state;
+	if (spotflow_get_main_firmware_update_state(&firmware_state) == 0 &&
+	    firmware_state.phase == SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
+		int confirm_rc = spotflow_confirm_main_firmware_image(&firmware_state);
+		if (confirm_rc != 0) {
+			LOG_ERR("Failed to confirm firmware: %d", confirm_rc);
+		}
+#ifdef CONFIG_SPOTFLOW_OTA_PSA_FWU_TI_CC35XX
+		else if (firmware_state.phase == SPOTFLOW_OTA_PHASE_UNCONFIRMED) {
+			(void)psa_fwu_request_reboot();
+		}
+#endif
+	}
+#endif
 	uint32_t log_counter = 0;
 #ifdef CONFIG_SPOTFLOW_METRICS
 	int metric_rc = spotflow_register_metric_int("sample_counter", SPOTFLOW_AGG_INTERVAL_NONE,

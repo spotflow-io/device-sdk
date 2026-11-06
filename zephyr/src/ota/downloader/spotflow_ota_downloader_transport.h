@@ -15,6 +15,8 @@ extern "C" {
 
 struct spotflow_ota_downloader_transport_request {
 	const struct spotflow_ota_url* url;
+	const char* original_url;
+	const char* secret;
 	const char* authorization_header;
 	struct spotflow_downloader* downloader;
 	spotflow_download_block_callback callback;

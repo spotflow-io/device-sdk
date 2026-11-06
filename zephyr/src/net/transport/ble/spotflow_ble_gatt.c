@@ -9,6 +9,7 @@
 #include <zephyr/bluetooth/gatt.h>
 #include <zephyr/bluetooth/uuid.h>
 #include <zephyr/logging/log.h>
+#include <zephyr/sys/byteorder.h>
 #if IS_ENABLED(CONFIG_BT_SETTINGS)
 #include <zephyr/settings/settings.h>
 #endif
@@ -40,6 +41,14 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 #define SPOTFLOW_BLE_ENABLE_RETRY_COUNT 3
 #define SPOTFLOW_BLE_ENABLE_RETRY_DELAY K_MSEC(200)
 
+#if defined(CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION)
+#define SPOTFLOW_READ_PERMISSION BT_GATT_PERM_READ_ENCRYPT
+#define SPOTFLOW_WRITE_PERMISSION BT_GATT_PERM_WRITE_ENCRYPT
+#else
+#define SPOTFLOW_READ_PERMISSION BT_GATT_PERM_READ
+#define SPOTFLOW_WRITE_PERMISSION BT_GATT_PERM_WRITE
+#endif
+
 static const struct bt_uuid_128 spotflow_service_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_SERVICE_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_capabilities_uuid =
@@ -52,11 +61,6 @@ static const struct bt_uuid_128 spotflow_tx_stream_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_TX_STREAM_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_rx_stream_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_RX_STREAM_UUID_ENCODED);
-
-static const uint8_t capabilities[] = {
-	SPOTFLOW_PROTOCOL_VERSION_MAJOR,
-	SPOTFLOW_PROTOCOL_VERSION_MINOR,
-};
 
 /* advertising payload */
 static const struct bt_data ad[] = {
@@ -86,20 +90,19 @@ static void restart_advertising_work_handler(struct k_work* work);
 static void connected(struct bt_conn* conn, uint8_t err);
 static void disconnected(struct bt_conn* conn, uint8_t reason);
 
-BT_GATT_SERVICE_DEFINE(spotflow_svc, BT_GATT_PRIMARY_SERVICE(&spotflow_service_uuid),
-		       BT_GATT_CHARACTERISTIC(&spotflow_capabilities_uuid.uuid, BT_GATT_CHRC_READ,
-					      BT_GATT_PERM_READ, read_capabilities, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_device_id_uuid.uuid, BT_GATT_CHRC_READ,
-					      BT_GATT_PERM_READ, read_device_id, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_session_metadata_uuid.uuid,
-					      BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
-					      read_session_metadata, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_tx_stream_uuid.uuid, BT_GATT_CHRC_NOTIFY,
-					      BT_GATT_PERM_NONE, NULL, NULL, NULL),
-		       BT_GATT_CCC(tx_ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-		       BT_GATT_CHARACTERISTIC(&spotflow_rx_stream_uuid.uuid,
-					      BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE,
-					      NULL, write_rx_stream, NULL));
+BT_GATT_SERVICE_DEFINE(
+	spotflow_svc, BT_GATT_PRIMARY_SERVICE(&spotflow_service_uuid),
+	BT_GATT_CHARACTERISTIC(&spotflow_capabilities_uuid.uuid, BT_GATT_CHRC_READ,
+			       BT_GATT_PERM_READ, read_capabilities, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_device_id_uuid.uuid, BT_GATT_CHRC_READ,
+			       SPOTFLOW_READ_PERMISSION, read_device_id, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_session_metadata_uuid.uuid, BT_GATT_CHRC_READ,
+			       SPOTFLOW_READ_PERMISSION, read_session_metadata, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_tx_stream_uuid.uuid, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_NONE, NULL, NULL, NULL),
+	BT_GATT_CCC(tx_ccc_cfg_changed, SPOTFLOW_READ_PERMISSION | SPOTFLOW_WRITE_PERMISSION),
+	BT_GATT_CHARACTERISTIC(&spotflow_rx_stream_uuid.uuid, BT_GATT_CHRC_WRITE_WITHOUT_RESP,
+			       SPOTFLOW_WRITE_PERMISSION, NULL, write_rx_stream, NULL));
 
 BT_CONN_CB_DEFINE(spotflow_ble_conn_callbacks) = {
 	.connected = connected,
@@ -143,6 +146,18 @@ const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void)
 static ssize_t read_capabilities(struct bt_conn* conn, const struct bt_gatt_attr* attr, void* buf,
 				 uint16_t len, uint16_t offset)
 {
+	uint8_t capabilities[] = {
+		SPOTFLOW_PROTOCOL_VERSION_MAJOR,
+		SPOTFLOW_PROTOCOL_VERSION_MINOR,
+		IS_ENABLED(CONFIG_SPOTFLOW_OTA) ? BIT(0) : 0,
+		0,
+		0,
+	};
+	/* Web Bluetooth does not expose the negotiated MTU. Advertise the usable
+	 * frame size for this connection rather than guessing it in the bridge.
+	 */
+	sys_put_le16(MIN(bt_gatt_get_mtu(conn) - 3, SPOTFLOW_TX_FRAME_BUFFER_SIZE),
+		     capabilities + 3);
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, capabilities, sizeof(capabilities));
 }
 
@@ -189,7 +204,17 @@ static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* 
 		return BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
 	}
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(buf, len, flags);
+	int rc;
+#ifdef CONFIG_SPOTFLOW_OTA
+	if (len > 0 &&
+	    (((const uint8_t*)buf)[0] == SPOTFLOW_MSG_OTA_C2D ||
+	     ((const uint8_t*)buf)[0] == SPOTFLOW_MSG_ARTIFACT_RESPONSE)) {
+		rc = spotflow_ble_transport_queue_ota_frame(buf, len);
+	} else
+#endif
+	{
+		rc = spotflow_ble_transport_process_config_rx_frame(buf, len, flags);
+	}
 	if (rc < 0) {
 		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
 	}
@@ -333,6 +358,7 @@ static void connected(struct bt_conn* conn, uint8_t err)
 		bt_conn_unref(g_spotflow_ble_transport_state.tx.conn);
 	}
 	g_spotflow_ble_transport_state.tx.conn = bt_conn_ref(conn);
+	g_spotflow_ble_transport_state.tx.generation++;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
 	LOG_INF("BLE central connected");
@@ -350,6 +376,7 @@ static void disconnected(struct bt_conn* conn, uint8_t reason)
 		g_spotflow_ble_transport_state.tx.conn = NULL;
 	}
 	g_spotflow_ble_transport_state.tx.notifications_enabled = false;
+	g_spotflow_ble_transport_state.tx.generation++;
 	/* A disconnect terminates any partially reassembled RX config message. */
 	g_spotflow_ble_transport_state.config_rx.active = false;
 	g_spotflow_ble_transport_state.config_rx.sequence = 0;

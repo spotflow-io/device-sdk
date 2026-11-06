@@ -3,8 +3,6 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
         protocol/spotflow_ota_cbor.c
         downloader/spotflow_ota_downloader.c
         downloader/spotflow_ota_downloader_transport_errors.c
-        downloader/spotflow_ota_downloader_transport_range.c
-        downloader/spotflow_ota_downloader_transport_socket.c
         firmware/spotflow_ota_fw_custom.c
         core/spotflow_ota_log.c
         core/spotflow_ota_results.c
@@ -19,6 +17,14 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_OTA
 )
 
 if(CONFIG_SPOTFLOW_OTA)
+        if(CONFIG_SPOTFLOW_TRANSPORT_BLE)
+                zephyr_library_sources(downloader/spotflow_ota_downloader_transport_ble.c)
+        else()
+                zephyr_library_sources(
+                        downloader/spotflow_ota_downloader_transport_range.c
+                        downloader/spotflow_ota_downloader_transport_socket.c
+                )
+        endif()
         zephyr_linker_sources(DATA_SECTIONS downloader/spotflow_ota_downloader.ld)
         zephyr_iterable_section(
                 NAME spotflow_downloader

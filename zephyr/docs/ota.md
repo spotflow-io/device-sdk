@@ -23,6 +23,12 @@ context and message names used by the implementation are introduced below.
 
 ## Overview
 
+OTA supports both the direct MQTT transport and the BLE gateway transport. With BLE,
+the gateway forwards opaque OTA CBOR over the existing TX/RX characteristics and
+downloads artifacts on the device's behalf. The coordinator, persistence, firmware
+backends and delegated callback API are shared. See [BLE OTA](#ble-artifact-downloads)
+for the downloader boundary.
+
 Spotflow creates an **update attempt** for a device when a deployment requires that
 device to install one or more firmware versions. The cloud sends the attempt in an
 `UPDATE_ARTIFACTS` message. The message contains an ordered **manifest** of
@@ -804,6 +810,46 @@ Keep physical partitions and provisioning in board or sample integration. Reuse 
 common coordinator and PSA lifecycle; extend their contract explicitly if a new
 provider has different confirmation requirements.
 
+### BLE artifact downloads
+
+`downloader/spotflow_ota_downloader_transport_ble.c` implements the same synchronous
+transport contract as the HTTP backend. OPEN transfers a URL and per-artifact secret to
+the trusted gateway; READ requests bounded blocks; CLOSE acknowledges final consumption.
+The [BLE wire protocol](https://docs.spotflow.io/fundamentals/bluetooth-low-energy#artifact-transfer-version-1)
+defines operation fields, statuses and byte order.
+
+The gateway caches a complete HTTPS image, limited to 32 MiB. Device RAM contains one
+`CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE` block (1–4096 bytes, default 512), a bounded
+response buffer, and an independent OTA command buffer. Multiple downloader instances
+serialize artifact transfers on the BLE link. Waiting instances continue to check pause
+and cancellation.
+
+The GATT callback enqueues bounded frames. A dedicated RX thread reassembles OTA
+commands and artifact replies separately, invokes the OTA command callback, and wakes
+the downloader for matching replies. Flash and delegated block callbacks run only on
+the thread that called the downloader. A connection generation invalidates queued
+frames after disconnect; transfer/request IDs reject stale responses within a session.
+
+Each READ follows completion of the previous block callback. Duplicate replies cannot
+deliver a block twice. Lost replies retry the same request; reconnect opens a fresh
+transfer and resumes at the callback-consumed offset. If only the final CLOSE reply
+was lost, reopening at the total length does not repeat the final callback. Pause,
+cancellation and transient retry behavior use the common downloader state machine.
+After reset, unfinished artifacts restart at zero while persisted terminal results
+remain intact.
+
+BLE initializes the OTA session callback once after starting the transport. The gateway
+owns MQTT subscription readiness and suspends the transfer when MQTT is unavailable.
+The BLE command ACK confirms handoff to the OTA core, not durable acceptance or firmware
+success. Existing cumulative result reporting and cloud result requests recover lost
+result messages.
+
+OTA builds require encrypted BLE service access by default through
+`CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION`. Applications own their trusted pairing policy.
+The [BLE sample](../samples/ble/README.md) explicitly disables this for unattended
+development tests. The gateway sees download credentials; neither encrypted BLE nor
+firmware signatures make an untrusted gateway safe.
+
 ### Cancellation and supersession implementation
 
 An unseen `UPDATE_ARTIFACTS` message with `isCanceled: true` is accepted as an already
@@ -858,9 +904,10 @@ Never log full artifact URLs, OTA secrets, authorization headers, or raw CBOR pa
 ### Current limitations
 
 - Download byte offsets are not persisted across reboot. In-process retries use HTTP
-  Range; a new `spotflow_download_artifact()` call starts at byte zero.
-- D2C results use QoS 0; recovery uses cumulative durable results and cloud report
-  requests.
+  Range or BLE block offsets; a new `spotflow_download_artifact()` call starts at byte zero.
+- Direct MQTT D2C results use QoS 0. BLE result notifications are best-effort, and the
+  browser publishes them with QoS 1. Recovery uses cumulative durable results and cloud
+  report requests.
 - There is no public diagnostic API for ignored late cancellation.
 - The SDK owns full-manifest processing; applications cannot replace it.
 - Only the latest attempt is stored; historical attempts are not retained on the device.
@@ -884,6 +931,7 @@ west twister -T spotflow/zephyr/tests/ota -p native_sim --inline-logs
 | Facade and routing | `facade/` | C2D routing, public effects, cancellation threading |
 | Worker | `worker/` | Durable ordering, retries, promotion, multi-artifact chains |
 | Downloader | `downloader/` | Faked transport, retry, pause, resume, cancellation |
+| BLE downloader | `ble_downloader/` | Block identity, duplicate and stale replies, reconnect offsets, final CLOSE retries, pause and cancellation |
 | Platform and identity | `platform_identity/` | MCUboot framing, descriptor boundaries, and build-ID fakes |
 | Main firmware | `fw_main/` | Shared coordinator, controls, persistence, reconciliation |
 | PSA firmware | `psa_fwu/` | TI stream adapter, slot ownership, acceptance, confirmation reboot and rollback |

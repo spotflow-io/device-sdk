@@ -19,10 +19,6 @@
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 
-#if IS_ENABLED(CONFIG_SPOTFLOW_OTA) && IS_ENABLED(CONFIG_SPOTFLOW_TRANSPORT_BLE)
-#error "Spotflow OTA requires MQTT transport; BLE does not support OTA updates"
-#endif /* CONFIG_SPOTFLOW_OTA && CONFIG_SPOTFLOW_TRANSPORT_BLE */
-
 LOG_MODULE_REGISTER(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 static K_MUTEX_DEFINE(ota_mutex);

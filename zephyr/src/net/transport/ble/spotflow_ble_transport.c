@@ -1,6 +1,8 @@
 #include "spotflow_ble_transport.h"
 #include "spotflow_ble_transport_internal.h"
 
+#include <errno.h>
+
 struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
 
 int spotflow_ble_transport_start(void)
@@ -42,3 +44,21 @@ int spotflow_ble_transport_subscribe_config(spotflow_transport_message_cb callba
 }
 
 void spotflow_ble_transport_abort(void) {}
+
+int spotflow_ble_transport_send_ota_cbor(uint8_t* payload, size_t len)
+{
+	return spotflow_ble_transport_send_framed_message(
+		SPOTFLOW_MSG_OTA_D2C, &g_spotflow_ble_transport_state.tx.ota_sequence, payload,
+		len);
+}
+
+int spotflow_ble_transport_subscribe_ota(spotflow_transport_message_cb callback)
+{
+	if (!IS_ENABLED(CONFIG_SPOTFLOW_OTA)) {
+		return -ENOTSUP;
+	}
+	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
+	g_spotflow_ble_transport_state.ota_callback = callback;
+	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+	return 0;
+}
