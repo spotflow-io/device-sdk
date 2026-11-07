@@ -654,6 +654,90 @@ ZTEST(spotflow_ota_fw_main, test_confirm_idempotent_when_already_succeeded)
 	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_SUCCEEDED);
 }
 
+static struct spotflow_ota_probation setup_unconfirmed_main_firmware(void)
+{
+	struct spotflow_ota_probation probation;
+	uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH];
+
+	fill_build_id(build_id, 0x50);
+	setup_post_reboot_context(build_id, &probation);
+	platform_fake->image_confirmed = false;
+	zassert_ok(reconcile_startup(&probation, true, NULL));
+	return probation;
+}
+
+static void expect_confirmation_rejected(void)
+{
+	struct spotflow_ota_main_firmware_view before;
+	struct spotflow_ota_main_firmware_state state;
+	spotflow_ota_state_effects effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+
+	spotflow_ota_state_get_main_firmware_view(&before);
+	zassert_equal(spotflow_ota_fw_main_confirm_image(&state, &effects), -EINVAL);
+	zassert_equal(effects, 0);
+	zassert_equal(platform_fake->confirm_count, 0);
+	zassert_equal(platform_fake->reboot_count, 0);
+	zassert_false(platform_fake->image_confirmed);
+	zassert_equal(state.phase, before.state.phase);
+	zassert_equal(state.result, before.state.result);
+	zassert_equal(state.is_paused, before.state.is_paused);
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_rejects_missing_probation)
+{
+	(void)setup_unconfirmed_main_firmware();
+	zassert_ok(spotflow_ota_persistence_clear_probation());
+
+	expect_confirmation_rejected();
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_rejects_probation_from_another_attempt)
+{
+	struct spotflow_ota_probation probation = setup_unconfirmed_main_firmware();
+
+	probation.attempt_id++;
+	zassert_ok(spotflow_ota_persistence_save_probation(&probation));
+
+	expect_confirmation_rejected();
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_rejects_non_pending_artifact)
+{
+	struct spotflow_ota_probation probation = setup_unconfirmed_main_firmware();
+	struct spotflow_ota_persisted_attempt attempt = {
+		.attempt_id = probation.attempt_id,
+		.artifact_count = 2,
+		.artifact_results = {
+			SPOTFLOW_OTA_RESULT_FAILED,
+			SPOTFLOW_OTA_RESULT_CANCELED,
+		},
+	};
+
+	zassert_ok(spotflow_ota_persistence_save_attempt(&attempt));
+	restore_post_reboot_state(&probation);
+
+	expect_confirmation_rejected();
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_rejects_running_build_id_mismatch)
+{
+	uint8_t running_build_id[SPOTFLOW_BUILD_ID_LENGTH];
+
+	(void)setup_unconfirmed_main_firmware();
+	fill_build_id(running_build_id, 0x60);
+	spotflow_ota_build_id_fake_set_running_build_id(running_build_id);
+
+	expect_confirmation_rejected();
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_rejects_unavailable_running_build_id)
+{
+	(void)setup_unconfirmed_main_firmware();
+	spotflow_ota_build_id_fake_reset(spotflow_ota_build_id_fake_get());
+
+	expect_confirmation_rejected();
+}
+
 ZTEST(spotflow_ota_fw_main, test_confirm_invalid_phase_returns_current_state)
 {
 	struct spotflow_ota_main_firmware_state state;

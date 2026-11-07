@@ -323,6 +323,7 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 {
 	struct spotflow_ota_main_firmware_view view;
 	struct spotflow_ota_probation probation;
+	enum spotflow_ota_identity_cmp identity;
 	enum spotflow_ota_running_image_state running_state;
 	bool has_probation;
 	bool reboot_required;
@@ -352,10 +353,36 @@ int spotflow_ota_fw_main_confirm_image(struct spotflow_ota_main_firmware_state* 
 	if (rc < 0) {
 		goto done;
 	}
-	if (!has_probation || probation.attempt_id != view.attempt_id ||
-	    !main_artifact_is_pending(&probation) ||
-	    spotflow_ota_identity_compare_probation(probation.expected_build_id) !=
-		    SPOTFLOW_OTA_IDENTITY_MATCH) {
+	if (!has_probation) {
+		LOG_WRN("Cannot confirm main firmware: no probation record for OTA attempt %llu",
+			(unsigned long long)view.attempt_id);
+		rc = -EINVAL;
+		goto done;
+	}
+	if (probation.attempt_id != view.attempt_id) {
+		LOG_WRN("Cannot confirm main firmware: probation belongs to OTA attempt %llu, "
+			"current attempt is %llu",
+			(unsigned long long)probation.attempt_id,
+			(unsigned long long)view.attempt_id);
+		rc = -EINVAL;
+		goto done;
+	}
+	if (!main_artifact_is_pending(&probation)) {
+		LOG_WRN("Cannot confirm main firmware: artifact %u of OTA attempt %llu is not "
+			"pending",
+			(unsigned int)probation.artifact_index,
+			(unsigned long long)probation.attempt_id);
+		rc = -EINVAL;
+		goto done;
+	}
+	identity = spotflow_ota_identity_compare_probation(probation.expected_build_id);
+	if (identity != SPOTFLOW_OTA_IDENTITY_MATCH) {
+		if (identity == SPOTFLOW_OTA_IDENTITY_UNAVAILABLE) {
+			LOG_WRN("Cannot confirm main firmware: running build ID is unavailable");
+		} else {
+			LOG_WRN("Cannot confirm main firmware: running build ID does not match "
+				"probation");
+		}
 		rc = -EINVAL;
 		goto done;
 	}
