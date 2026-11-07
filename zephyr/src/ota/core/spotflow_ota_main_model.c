@@ -62,17 +62,17 @@ bool spotflow_ota_main_is_valid(const struct ota_main_firmware_model* main)
 	case OTA_MAIN_EXECUTION_PENDING_DOWNLOAD:
 	case OTA_MAIN_EXECUTION_DOWNLOADING:
 	case OTA_MAIN_EXECUTION_PENDING_UPGRADE:
-	case OTA_MAIN_EXECUTION_COMMITTING:
+	case OTA_MAIN_EXECUTION_INSTALLING:
 		return main->presence == OTA_MAIN_FIRMWARE_PRESENT &&
 			main->probation.state == OTA_MAIN_PROBATION_NONE &&
 			main->result == SPOTFLOW_OTA_RESULT_PENDING;
 	case OTA_MAIN_EXECUTION_REBOOT_READY:
 		return main->presence == OTA_MAIN_FIRMWARE_PRESENT &&
-			main->probation.state == OTA_MAIN_PROBATION_PENDING &&
+			main->probation.state == OTA_MAIN_PROBATION_NONE &&
 			main->result == SPOTFLOW_OTA_RESULT_PENDING && !main->abort_requested;
 	case OTA_MAIN_EXECUTION_REBOOT_STARTED:
 		return main->presence == OTA_MAIN_FIRMWARE_PRESENT &&
-			main->probation.state == OTA_MAIN_PROBATION_PENDING &&
+			main->probation.state == OTA_MAIN_PROBATION_NONE &&
 			main->result == SPOTFLOW_OTA_RESULT_PENDING && !main->is_paused &&
 			!main->abort_requested;
 	case OTA_MAIN_EXECUTION_UNCONFIRMED:
@@ -105,7 +105,7 @@ bool spotflow_ota_main_probation_is_pending(const struct ota_main_firmware_model
 
 bool spotflow_ota_main_upgrade_is_irreversible(const struct ota_main_firmware_model* main)
 {
-	return main->execution == OTA_MAIN_EXECUTION_COMMITTING ||
+	return main->execution == OTA_MAIN_EXECUTION_INSTALLING ||
 		main->execution == OTA_MAIN_EXECUTION_REBOOT_READY ||
 		main->execution == OTA_MAIN_EXECUTION_REBOOT_STARTED;
 }
@@ -186,7 +186,9 @@ int spotflow_ota_main_fail_handler(struct ota_main_firmware_model* main,
 	     main->execution != OTA_MAIN_EXECUTION_PENDING_DOWNLOAD &&
 	     main->execution != OTA_MAIN_EXECUTION_DOWNLOADING &&
 	     main->execution != OTA_MAIN_EXECUTION_PENDING_UPGRADE &&
-	     main->execution != OTA_MAIN_EXECUTION_COMMITTING) ||
+	     main->execution != OTA_MAIN_EXECUTION_INSTALLING &&
+	     main->execution != OTA_MAIN_EXECUTION_REBOOT_READY &&
+	     main->execution != OTA_MAIN_EXECUTION_REBOOT_STARTED) ||
 	    main->probation.state != OTA_MAIN_PROBATION_NONE) {
 		return -EINVAL;
 	}
@@ -257,16 +259,16 @@ int spotflow_ota_main_commit_probation_cleared(struct ota_main_firmware_model* m
 }
 
 int spotflow_ota_main_finish_prereboot(struct ota_main_firmware_model* main, bool handler_owned,
-				       struct ota_main_prereboot_transition* transition)
+				       struct spotflow_ota_main_firmware_state* out_state)
 {
-	if (!handler_owned || transition == NULL ||
-	    main->execution != OTA_MAIN_EXECUTION_COMMITTING) {
+	if (!handler_owned || main->execution != OTA_MAIN_EXECUTION_INSTALLING) {
 		return -EINVAL;
 	}
-	main->probation.state = OTA_MAIN_PROBATION_PENDING;
+	/* The handler owns installation until reset. Probation is restored from
+	 * persistent storage in the new runtime, rather than entered here.
+	 */
 	main->execution = OTA_MAIN_EXECUTION_REBOOT_READY;
-	spotflow_ota_main_project_state(main, &transition->state);
-	transition->clear_artifact_transaction = true;
+	spotflow_ota_main_project_state(main, out_state);
 	return 0;
 }
 
@@ -316,8 +318,8 @@ bool spotflow_ota_main_is_abort_requested(const struct ota_main_firmware_model* 
 	return has_attempt && main->abort_requested;
 }
 
-int spotflow_ota_main_begin_upgrade_commit(struct ota_main_firmware_model* main, bool handler_owned,
-					   bool attempt_canceled)
+int spotflow_ota_main_begin_installation(struct ota_main_firmware_model* main, bool handler_owned,
+					 bool attempt_canceled)
 {
 	if (!handler_owned || main->execution != OTA_MAIN_EXECUTION_PENDING_UPGRADE) {
 		return -EINVAL;
@@ -328,13 +330,13 @@ int spotflow_ota_main_begin_upgrade_commit(struct ota_main_firmware_model* main,
 	if (main->is_paused) {
 		return -EAGAIN;
 	}
-	main->execution = OTA_MAIN_EXECUTION_COMMITTING;
+	main->execution = OTA_MAIN_EXECUTION_INSTALLING;
 	return 0;
 }
 
-int spotflow_ota_main_cancel_upgrade_commit(struct ota_main_firmware_model* main)
+int spotflow_ota_main_cancel_installation(struct ota_main_firmware_model* main)
 {
-	if (main->execution != OTA_MAIN_EXECUTION_COMMITTING) {
+	if (main->execution != OTA_MAIN_EXECUTION_INSTALLING) {
 		return -EINVAL;
 	}
 	main->execution = OTA_MAIN_EXECUTION_PENDING_UPGRADE;
@@ -344,7 +346,7 @@ int spotflow_ota_main_cancel_upgrade_commit(struct ota_main_firmware_model* main
 int spotflow_ota_main_begin_reboot(struct ota_main_firmware_model* main)
 {
 	if (main->execution != OTA_MAIN_EXECUTION_REBOOT_READY ||
-	    main->probation.state != OTA_MAIN_PROBATION_PENDING) {
+	    main->probation.state != OTA_MAIN_PROBATION_NONE) {
 		return -EINVAL;
 	}
 	if (main->is_paused) {
@@ -359,7 +361,7 @@ static bool execution_allows_pause(enum ota_main_execution_state execution)
 	return execution == OTA_MAIN_EXECUTION_PENDING_DOWNLOAD ||
 		execution == OTA_MAIN_EXECUTION_DOWNLOADING ||
 		execution == OTA_MAIN_EXECUTION_PENDING_UPGRADE ||
-		execution == OTA_MAIN_EXECUTION_COMMITTING ||
+		execution == OTA_MAIN_EXECUTION_INSTALLING ||
 		execution == OTA_MAIN_EXECUTION_REBOOT_READY;
 }
 
@@ -378,7 +380,7 @@ static enum spotflow_ota_phase execution_phase(enum ota_main_execution_state exe
 	case OTA_MAIN_EXECUTION_DOWNLOADING:
 		return SPOTFLOW_OTA_PHASE_DOWNLOADING;
 	case OTA_MAIN_EXECUTION_PENDING_UPGRADE:
-	case OTA_MAIN_EXECUTION_COMMITTING:
+	case OTA_MAIN_EXECUTION_INSTALLING:
 		return SPOTFLOW_OTA_PHASE_PENDING_UPGRADE;
 	case OTA_MAIN_EXECUTION_REBOOT_READY:
 	case OTA_MAIN_EXECUTION_REBOOT_STARTED:

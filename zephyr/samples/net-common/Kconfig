@@ -17,7 +17,8 @@ config SPOTFLOW_IS_WIFI_AVAILABLE
 		DT_HAS_INFINEON_AIROC_WIFI_ENABLED || \
 		DT_HAS_NORDIC_WLAN_ENABLED || \
 		DT_HAS_NXP_WIFI_ENABLED || \
-		DT_HAS_SILABS_SIWX91X_WIFI_ENABLED
+		DT_HAS_SILABS_SIWX91X_WIFI_ENABLED || \
+		DT_HAS_TI_CC35XX_WLAN_ENABLED
 
 choice SPOTFLOW_NETWORK_IFACE
 	prompt "Spotflow network interface"
@@ -29,6 +30,8 @@ config SPOTFLOW_USE_WIFI
 	imply WIFI
 	imply WIFI_NM
 	imply NET_L2_WIFI_MGMT
+	# TI CC35xx native Wi-Fi driver
+	imply WIFI_TI_CC35XX if DT_HAS_TI_CC35XX_WLAN_ENABLED
 	# NXP specific configs
 	imply WIFI_NXP if BOARD_FRDM_RW612
 	# Enables IP fragmentation, which fixes the TLS handshake issue since Zephyr 4.2

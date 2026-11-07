@@ -269,38 +269,12 @@ Choose the next document according to what you want to do:
 
 ### Build ID
 
-In order to match core dumps with symbol files, our Zephyr module provides a piece of information called build ID.
-The build ID is computed as a hash of the bytes loaded to the device and their addresses. It also includes the `log_strings` section and its address when format strings are retained only in the ELF, so changes to those strings produce a different build ID.
-Our Zephyr module adds a build command that computes the build ID and patches it into the `.elf` file as the following [binary descriptor](https://docs.zephyrproject.org/latest/services/binary_descriptors/index.html):
+Spotflow embeds a build ID in the firmware to match core dumps and logs with their
+ELF symbol files and to identify firmware during OTA updates. The ID is a hash of
+the executable, log metadata, and any enabled packaging metadata.
 
-- **ID**: `0x5f0` (`5f` resembles `sf` - **S**pot**f**low, `0` stands for our first binary descriptor ID)
-- **Type**: `bytes`
-- **Length**: `20`
-
-You can retrieve the build ID from the `.elf` file using the following command:
-
-```bash
-west bindesc custom_search BYTES 0x5f0 zephyr.elf
-```
-
-> **Note:** If the architecture of the device doesn't support binary descriptors (notably, ESP32), retrieving the build ID from the `.elf` file is more complex.
-> In this case, it's necessary to use the symbol table, see the function `get_build_id_from_elf` in script tests.
-
-Because Zephyr doesn't allow to insert a post-build command between the compilation of `zephyr.elf` and the generation of derived files such as `zephyr.hex` and `zephyr.bin`, our build command patches these files as well.
-In particular, the files with the following extensions are patched:
-
-- `.elf`
-- `.hex`
-- `.bin`
-- `.strip`
-- `.exe` when **not** targeting [native simulator](https://docs.zephyrproject.org/latest/boards/native/native_sim/doc/index.html) (it's just a copy of the `.elf` file)
-
-The files with the following extensions (and others that might be introduced in the future) are **not** patched, so the build IDs stored in them are filled with zeros:
-
-- `.lst` (assembly listing)
-- `.uf2`
-- `.s19`
-- `.exe` when targeting [native simulator](https://docs.zephyrproject.org/latest/boards/native/native_sim/doc/index.html)
+See [build ID generation](zephyr/docs/build-id.md) for hashing rules, configuration,
+retrieval commands, and supported output artifacts.
 
 ## Feedback
 Any comments, suggestions, or issues are welcome.
