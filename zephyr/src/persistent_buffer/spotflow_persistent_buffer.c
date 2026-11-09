@@ -55,7 +55,8 @@ LOG_MODULE_REGISTER(spotflow_persistent_buffer, CONFIG_SPOTFLOW_MODULE_DEFAULT_L
 /* Size of FCB's on-flash sector header (struct fcb_disk_area). */
 #define PB_FCB_SECTOR_HEADER_LEN 8
 #define PB_FCB_CRC_LEN 1
-#define PB_SESSION_RECORD_MAX_LEN (SPOTFLOW_PB_RUN_ID_LEN + CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE)
+#define PB_SESSION_RECORD_MAX_LEN \
+	(SPOTFLOW_PB_RUN_ID_LEN + CONFIG_SPOTFLOW_SESSION_METADATA_BUFFER_SIZE)
 #define PB_DROPPED_METRIC_NAME "spotflow_buffer_dropped_messages"
 
 enum pb_msg_source {
@@ -153,8 +154,7 @@ static void writer_finish(struct pb_writer* w);
 static int drop_oldest_sector(void);
 static void release_sent_sectors(const struct flash_sector* current);
 static int next_message(uint16_t* len);
-static int read_msg_header(const struct fcb_entry* loc, uint16_t off, uint8_t* kind,
-			   uint16_t* len);
+static int read_msg_header(const struct fcb_entry* loc, uint16_t off, uint8_t* kind, uint16_t* len);
 static uint32_t count_messages(const struct fcb_entry* loc, uint16_t from_off);
 static uint32_t count_unsent_in_sector(const struct flash_sector* sector);
 static struct flash_sector* next_sector(struct flash_sector* sector);
@@ -212,8 +212,9 @@ int spotflow_pb_init(void)
 
 	pb.first_elem_off = align_up(PB_FCB_SECTOR_HEADER_LEN);
 	/* An entry's length field takes 2 bytes once the entry is 128 bytes or longer. */
-	pb.max_entry_len = MIN(FCB_MAX_LEN, min_sector_size - pb.first_elem_off - align_up(2) -
-						    align_up(PB_FCB_CRC_LEN));
+	pb.max_entry_len =
+		MIN(FCB_MAX_LEN,
+		    min_sector_size - pb.first_elem_off - align_up(2) - align_up(PB_FCB_CRC_LEN));
 	pb.max_entry_len = ROUND_DOWN(pb.max_entry_len, pb.fcb.f_align);
 
 	pb.session_written = false;
@@ -317,7 +318,8 @@ int spotflow_pb_send_next(void)
 	}
 	if (rc == 0) {
 		rc = fcb_flash_read(&pb.fcb, pb.rd.loc.fe_sector,
-				    pb.rd.loc.fe_data_off + pb.rd.msg_off + SPOTFLOW_PB_MSG_HEADER_LEN,
+				    pb.rd.loc.fe_data_off + pb.rd.msg_off +
+					    SPOTFLOW_PB_MSG_HEADER_LEN,
 				    payload, len);
 	}
 	if (rc < 0) {
@@ -490,7 +492,8 @@ static bool format_matches(void)
 	for (uint32_t i = 0; i < pb.sector_cnt; i++) {
 		uint8_t header[PB_FCB_SECTOR_HEADER_LEN];
 
-		if (flash_area_read(pb.fcb.fap, pb.sectors[i].fs_off, header, sizeof(header)) != 0) {
+		if (flash_area_read(pb.fcb.fap, pb.sectors[i].fs_off, header, sizeof(header)) !=
+		    0) {
 			return false;
 		}
 
@@ -591,7 +594,8 @@ static size_t collect_batch(size_t cap, size_t* data_len)
 #ifdef CONFIG_SPOTFLOW_METRICS
 	struct spotflow_metric_msg* metric;
 
-	while (n < PB_BATCH_MAX_MSGS && k_msgq_get(&g_spotflow_metrics_msgq, &metric, K_NO_WAIT) == 0) {
+	while (n < PB_BATCH_MAX_MSGS &&
+	       k_msgq_get(&g_spotflow_metrics_msgq, &metric, K_NO_WAIT) == 0) {
 		msg = (struct pb_msg){
 			.kind = SPOTFLOW_PB_KIND_METRIC,
 			.source = PB_SOURCE_METRIC,
@@ -930,8 +934,7 @@ static int next_message(uint16_t* len)
 }
 
 /* Returns -ENOENT at the end of the entry or when the rest of the entry is malformed. */
-static int read_msg_header(const struct fcb_entry* loc, uint16_t off, uint8_t* kind,
-			   uint16_t* len)
+static int read_msg_header(const struct fcb_entry* loc, uint16_t off, uint8_t* kind, uint16_t* len)
 {
 	uint8_t header[SPOTFLOW_PB_MSG_HEADER_LEN];
 

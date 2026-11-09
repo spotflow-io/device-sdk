@@ -15,8 +15,8 @@ static K_SEM_DEFINE(persister_wake_sem, 0, 1);
 /* The persister runs in its own thread rather than on the processing thread, because the
  * processing thread blocks while the MQTT transport connects and data must be written to flash
  * while offline. Flash erases never run on the Zephyr log thread. */
-K_THREAD_DEFINE(spotflow_persister_thread, PERSISTER_STACK_SIZE, persister_thread_entry, NULL,
-		NULL, NULL, SPOTFLOW_THREAD_PRIORITY, 0, 0);
+K_THREAD_DEFINE(spotflow_persister_thread, PERSISTER_STACK_SIZE, persister_thread_entry, NULL, NULL,
+		NULL, SPOTFLOW_THREAD_PRIORITY, 0, 0);
 
 void spotflow_pb_wake_persister(void)
 {

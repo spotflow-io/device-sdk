@@ -117,9 +117,7 @@ int spotflow_report_metric_int(struct spotflow_metric_int* metric, int64_t value
 	return 0;
 }
 
-void spotflow_pb_wake_persister(void)
-{
-}
+void spotflow_pb_wake_persister(void) {}
 
 /* Helpers */
 
