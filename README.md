@@ -174,6 +174,78 @@ end
 
 For BLE transport, the device exposes session metadata as a readable GATT characteristic and exchanges configuration data through framed TX and RX stream messages.
 
+#### Persistent buffer
+
+By default, logs and metrics wait in RAM until they are sent, so a reboot or a dead battery loses everything not yet uploaded.
+With `CONFIG_SPOTFLOW_PERSISTENT_BUFFER=y`, every log, metric and heartbeat is first written to a ring buffer in a dedicated flash partition and sent from there.
+Data produced while the device is offline (for example, a BLE device out of gateway range) survives reboots and power loss, and is sent after the next connection.
+Core dumps and reported configuration are not buffered.
+
+```mermaid
+---
+title: Data flow with the persistent buffer
+---
+flowchart LR
+    A[Spotflow Logging Backend] --> Q[Log and metrics message queues]
+    B[Spotflow Metrics Backend] --> Q
+    Q -- every flush interval or when half full --> P[Persister thread]
+    P -- batched append --> R[(Flash ring buffer)]
+    R -- oldest first --> S[Spotflow Backend Processor]
+    S --> T[Spotflow Transport]
+```
+
+How it works:
+
+- **Writing.** A dedicated persister thread moves messages from RAM to flash every `CONFIG_SPOTFLOW_PERSISTENT_BUFFER_FLUSH_INTERVAL_MS` (default 5000 ms),
+  whenever a RAM queue is half full, and when `spotflow_persistent_buffer_flush()` is called.
+  A sudden power loss loses at most the messages produced during the last interval.
+- **Storage.** The ring is a [Zephyr Flash Circular Buffer (FCB)](https://docs.zephyrproject.org/latest/services/storage/fcb/fcb.html).
+  Each entry holds a batch of the exact CBOR messages that are sent, and a CRC, so an entry cut off by a power loss is skipped at startup.
+  If a firmware update changes the on-flash format, the ring is erased at startup.
+- **Order and attribution.** Messages are sent in the order they were produced, across reboots.
+  Each boot's session metadata is stored in the ring, and before sending messages from an earlier boot, the SDK sends that boot's session metadata,
+  so the platform attributes them to the run and build that produced them.
+- **Erase on send.** A flash sector is erased once all its messages have been passed to the transport.
+  No read position is stored, so after a reboot up to one sector of messages may be sent again.
+- **Full buffer.** When the ring is full, the oldest sector is dropped.
+  The number of dropped messages is reported as the `spotflow_buffer_dropped_messages` metric.
+- **Fallback.** If the buffer cannot start (for example, on unsupported flash), the SDK logs an error and sends from RAM as if the option were disabled.
+
+To enable the buffer, set `CONFIG_SPOTFLOW_PERSISTENT_BUFFER=y` and add a flash partition labelled `spotflow_buffer_partition` in a devicetree overlay:
+
+```dts
+&flash0 {
+	partitions {
+		spotflow_buffer_partition: partition@f0000 {
+			label = "spotflow-buffer";
+			reg = <0x000f0000 DT_SIZE_K(64)>;
+		};
+	};
+};
+```
+
+On Zephyr 4.5 and newer, also add `compatible = "zephyr,mapped-partition";` to the partition.
+nRF Connect SDK builds that use the Partition Manager need a `spotflow_buffer` partition in `pm_static.yml` instead.
+
+The partition size sets the buffer's capacity. It must span at least two flash sectors (four are recommended, because one sector is always being filled or erased) and at most 64 sectors.
+The flash write block must be at most 8 bytes, which is the limit of FCB.
+On nRF54L Series devices, whose RRAM uses 16-byte writes by default, set `CONFIG_NRF_RRAM_WRITE_BUFFER_SIZE=0` and `write-block-size = <4>` on the RRAM node.
+See the [nRF54L15 DK files of the BLE sample](zephyr/samples/ble/boards) for a complete example.
+
+Flash wear depends on the bytes written per day, so choose the partition size according to the expected message rate and the endurance of your flash:
+
+```
+lifetime (days) ≈ partition size × endurance cycles / bytes written per day
+```
+
+For example, with 60-byte messages and flash rated for 10,000 cycles, a 64 KiB partition lasts about 4 months at one message per second and about 3.5 years at one message every 10 seconds.
+
+The application can use the following functions from `<spotflow/persistent_buffer.h>`:
+
+- `spotflow_persistent_buffer_flush()` writes all queued RAM messages to flash before returning. Call it from low-battery or shutdown hooks.
+- `spotflow_persistent_buffer_get_stats()` returns the bytes used and free, the number of messages stored and the number of messages dropped since boot.
+- `spotflow_persistent_buffer_clear()` erases all stored messages.
+
 #### Over-the-air (OTA) updates
 
 Spotflow OTA updates let the cloud ask a device to install one or more firmware versions.

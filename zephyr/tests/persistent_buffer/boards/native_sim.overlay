@@ -1,0 +1,9 @@
+/* Place the buffer in the unused upper half of the simulated flash. */
+&flash0 {
+	partitions {
+		spotflow_buffer_partition: partition@100000 {
+			label = "spotflow-buffer";
+			reg = <0x00100000 0x8000>;
+		};
+	};
+};

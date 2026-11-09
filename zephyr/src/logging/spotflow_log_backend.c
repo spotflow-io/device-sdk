@@ -11,6 +11,9 @@
 #include "config/spotflow_config.h"
 #include "config/spotflow_config_options.h"
 #include "net/spotflow_processor.h"
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+#include "persistent_buffer/spotflow_persistent_buffer.h"
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 LOG_MODULE_REGISTER(spotflow_logging, CONFIG_SPOTFLOW_LOGS_PROCESSING_LOG_LEVEL);
 
@@ -151,6 +154,9 @@ static void process(const struct log_backend* const backend, union log_msg_gener
 		process_single_message_stats_update(ctx, true /* dropped */);
 	} else {
 		process_single_message_stats_update(ctx, false /* dropped */);
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+		spotflow_pb_on_enqueued(&g_spotflow_logs_msgq);
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 	}
 }
 

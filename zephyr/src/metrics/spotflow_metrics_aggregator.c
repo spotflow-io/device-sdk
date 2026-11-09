@@ -1,6 +1,9 @@
 #include "spotflow_metrics_aggregator.h"
 #include "spotflow_metrics_cbor.h"
 #include "net/spotflow_transport.h"
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+#include "persistent_buffer/spotflow_persistent_buffer.h"
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 #include <inttypes.h>
 #include <zephyr/kernel.h>
@@ -518,6 +521,10 @@ static int enqueue_metric_message(uint8_t* payload, size_t len)
 		/* Zephyr reports a full non-blocking message queue as -ENOMSG. */
 		return rc == -ENOMSG ? -ENOBUFS : rc;
 	}
+
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+	spotflow_pb_on_enqueued(&g_spotflow_metrics_msgq);
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 	LOG_DBG("Enqueued metric message (%zu bytes)", len);
 	return 0;

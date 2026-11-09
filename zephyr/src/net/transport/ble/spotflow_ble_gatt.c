@@ -21,6 +21,9 @@
 #endif
 #include "net/spotflow_device_id.h"
 #include "net/spotflow_session_metadata.h"
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+#include "persistent_buffer/spotflow_persistent_buffer.h"
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -218,6 +221,13 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 		spotflow_metrics_system_report_connection_state(false);
 	}
 #endif
+
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+	if (!was_enabled && enabled) {
+		/* The gateway reads the current session metadata before enabling notifications. */
+		spotflow_pb_on_session_start();
+	}
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	if (!was_enabled && enabled) {
