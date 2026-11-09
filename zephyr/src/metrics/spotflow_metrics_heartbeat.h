@@ -1,6 +1,10 @@
 #ifndef SPOTFLOW_METRICS_HEARTBEAT_H_
 #define SPOTFLOW_METRICS_HEARTBEAT_H_
 
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -22,6 +26,18 @@ void spotflow_metrics_heartbeat_init(void);
  * @return 1 if heartbeat processed, 0 if no heartbeat pending, negative errno on error
  */
 int spotflow_poll_and_process_heartbeat(void);
+
+/**
+ * @brief Move the pending heartbeat message into a caller-owned buffer
+ *
+ * Used by the persistent buffer to store the heartbeat in flash instead of sending it.
+ *
+ * @param buffer Destination buffer, at least SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN bytes
+ * @param buffer_len Size of the destination buffer
+ * @param len Length of the copied message
+ * @return true if a heartbeat was pending and was copied, false otherwise
+ */
+bool spotflow_metrics_heartbeat_take(uint8_t* buffer, size_t buffer_len, size_t* len);
 
 #ifdef __cplusplus
 }

@@ -16,6 +16,7 @@ add_subdirectory(src/config)
 add_subdirectory(src/coredumps)
 add_subdirectory(src/metrics)
 add_subdirectory(src/ota)
+add_subdirectory(src/persistent_buffer)
 
 zephyr_include_directories(
         include

@@ -25,6 +25,9 @@
 #ifdef CONFIG_SPOTFLOW_OTA
 #include "ota/spotflow_ota.h"
 #endif /* CONFIG_SPOTFLOW_OTA */
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+#include "persistent_buffer/spotflow_persistent_buffer.h"
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 #include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
@@ -33,6 +36,9 @@ LOG_MODULE_REGISTER(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static void spotflow_processing_thread_entry(void);
 static int process_config_coredumps_metrics_or_logs(void);
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+static int process_persistent_buffer(void);
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 #if !CONFIG_SPOTFLOW_TRANSPORT_MQTT
 static void process_transport_loop(void);
 #endif /* !CONFIG_SPOTFLOW_TRANSPORT_MQTT */
@@ -116,6 +122,18 @@ static int process_config_coredumps_metrics_or_logs(void)
 		return rc;
 	}
 #endif /* CONFIG_SPOTFLOW_COREDUMPS */
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+	/* Logs and metrics go through the flash ring. If it failed to initialize, they are sent
+	 * from the RAM queues as without the buffer. */
+	switch (spotflow_pb_get_state()) {
+	case SPOTFLOW_PB_STATE_READY:
+		return rc == 0 ? process_persistent_buffer() : rc;
+	case SPOTFLOW_PB_STATE_PENDING:
+		return rc;
+	default:
+		break;
+	}
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 #ifdef CONFIG_SPOTFLOW_METRICS
 	/* Process metrics after coredumps, before logs */
 	if (rc == 0) {
@@ -141,6 +159,24 @@ static int process_config_coredumps_metrics_or_logs(void)
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 	return rc;
 }
+
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+static int process_persistent_buffer(void)
+{
+	int rc = spotflow_pb_send_next();
+
+	if (rc == -EAGAIN) {
+		/* Temporary, retry later without aborting connection */
+		return rc;
+	}
+	if (rc < 0) {
+		LOG_DBG("Failed to send buffered message: %d, aborting connection", rc);
+		spotflow_transport_abort();
+	}
+
+	return rc;
+}
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 #if !CONFIG_SPOTFLOW_TRANSPORT_MQTT
 static void process_transport_loop(void)
