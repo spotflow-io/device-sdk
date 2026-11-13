@@ -14,7 +14,8 @@ should start with the
 support two backends: MCUboot and PSA Firmware Update (PSA FWU), with a TI CC35xx
 provider. TI users should follow
 [Over-the-air (OTA) updates on TI CC35X1](https://docs.spotflow.io/guides/texas-instruments/ota)
-(upcoming public guide) and the [PSA sample](../samples/ota_psa).
+for Wi-Fi and BLE walkthroughs, backed by the [PSA Wi-Fi sample](../samples/ota_psa)
+and [BLE OTA sample](../samples/ble#ota-on-lp-em-cc35x1).
 
 The MQTT message schemas are documented in the
 [MQTT protocol guide for OTA updates](https://docs.spotflow.io/guides/mqtt/ota-mqtt).
@@ -49,6 +50,11 @@ The public API lets the application observe and control the automatic main-firmw
 confirm a test image after reboot, handle delegated firmware, and respond to cancellation
 requests. The SDK owns manifest processing, artifact
 sequencing, persistence, and result reporting.
+
+OTA uses either the direct MQTT transport, with device-side HTTPS downloads, or a
+BLE gateway that relays OTA messages and downloads artifacts on the device's behalf.
+Both share the coordinator, persistence, firmware backends and delegated callback API.
+See [BLE artifact downloads](#ble-artifact-downloads) for the transport implementation.
 
 ### Terminology
 
@@ -398,7 +404,7 @@ The implementation is split by responsibility under `spotflow/zephyr/src/ota`:
 | `core/` | In-memory models, synchronized state coordinator, worker, shared types, and logging |
 | `protocol/` | C2D decoding, D2C encoding, and pending result publishing |
 | `persistence/` | Zephyr Settings records and their CBOR encoding |
-| `downloader/` | Public downloader API, URL parsing, HTTP transport, retry, pause/resume/cancel |
+| `downloader/` | Public downloader API, HTTP and BLE transports, retry, pause/resume/cancel |
 | `firmware/` | Shared main-firmware coordinator, download controls, and delegated dispatch |
 | `platform/` | MCUboot and PSA backends, image identity, and native container framing |
 
@@ -409,7 +415,7 @@ flowchart TD
     protocol["Protocol<br/>CBOR and result outbox"]
     persistence["Persistence<br/>Settings records"]
     firmware["Firmware handlers<br/>main and delegated"]
-    downloader["Downloader<br/>HTTP(S)"]
+    downloader["Downloader<br/>HTTP(S) or BLE gateway"]
     platform["Platform<br/>MCUboot or PSA FWU, build ID"]
     public["Public headers<br/>spotflow/ota.h<br/>spotflow/downloader.h"]
     zephyr["Zephyr and network stack"]
@@ -452,7 +458,9 @@ Important entry points:
 | `persistence/spotflow_ota_persistence.c` | Settings load/save for attempts, versions, and probation |
 | `firmware/spotflow_ota_fw_main.c` | Shared download, installation, confirmation, and startup reconciliation |
 | `firmware/spotflow_ota_fw_custom.c` | Delegated firmware dispatch and cancellation callback |
-| `downloader/spotflow_ota_downloader.c` | Synchronous download API and in-process HTTP Range retry |
+| `downloader/spotflow_ota_downloader.c` | Synchronous download API, retry/backoff, pause and cancellation |
+| `downloader/spotflow_ota_downloader_transport_ble.c` | Gateway OPEN/READ/CLOSE exchanges and block consumption |
+| `protocol/spotflow_ota_ble_protocol.c` | Binary artifact request encoding and response validation |
 | `platform/spotflow_ota_platform_mcuboot.c` / `spotflow_ota_platform_psa.c` | Native image management behind the shared platform interface |
 | `platform/psa/` | PSA provider contract, TI component ownership, and TI container framing |
 | `platform/spotflow_ota_identity.c` | Running identity and probation comparison |
@@ -465,7 +473,7 @@ MQTT subscription and inbound routing live outside this directory in
 ### Initialization
 
 `spotflow_ota_init()` is idempotent and safe to reach through more than one entry point.
-The MQTT thread calls it before the first session metadata publish. It loads persisted data from Zephyr Settings,
+The transport processing thread calls it during startup. It loads persisted data from Zephyr Settings,
 restores in-memory state, starts the update worker, and performs post-reboot
 main-firmware reconciliation when automatic handling is enabled.
 
@@ -485,7 +493,8 @@ Runtime work is divided as follows:
 
 | Execution context | Responsibility |
 |---|---|
-| MQTT thread | Decodes cloud-to-device (C2D) messages, submits them to the update state coordinator, and polls the result outbox for device-to-cloud (D2C) messages to publish. |
+| MQTT thread (direct transport) or BLE RX thread | Decodes cloud-to-device (C2D) messages and submits them to the update state coordinator. |
+| Transport processing thread | Polls the result outbox for device-to-cloud (D2C) messages to send over MQTT or BLE. |
 | Update worker thread | A dedicated SDK thread that saves state, runs one artifact handler at a time, performs automatic downloads, and prepares result messages. |
 | Zephyr system workqueue (`sysworkq`) | Calls `spotflow_on_update_canceled()` without waiting for a possibly blocked update worker. |
 | OTA initialization caller | Calls `spotflow_on_main_firmware_update_progressed()` when startup reconciliation detects an unconfirmed, confirmed, or rolled-back main image. |
@@ -651,7 +660,8 @@ Inbound `UPDATE_ARTIFACTS` handling is:
 | Malformed message without trustworthy ID | Log and ignore it. |
 | Malformed message with trustworthy ID | Persist and report `updateAttemptError`. |
 
-D2C results are published on `ota-cbor-d2c` at QoS 0. The MQTT loop polls
+D2C results use `ota-cbor-d2c`: the direct transport publishes at QoS 0, while BLE
+sends the payload to the gateway for publishing. The transport processing loop polls
 `spotflow_ota_net_send_pending_message()` alongside other outbound traffic. The outbox
 merges results for the same attempt. It retains the encoded message when publish returns
 `-EAGAIN` and drops it after a successful publish call.
@@ -804,6 +814,79 @@ Keep physical partitions and provisioning in board or sample integration. Reuse 
 common coordinator and PSA lifecycle; extend their contract explicitly if a new
 provider has different confirmation requirements.
 
+### BLE artifact downloads
+
+`downloader/spotflow_ota_downloader_transport_ble.c` implements the same synchronous
+transport contract as the HTTP backend. OPEN transfers a URL and per-artifact secret to
+the trusted gateway; READ requests bounded blocks; CLOSE acknowledges final consumption.
+The [BLE wire protocol](https://docs.spotflow.io/fundamentals/bluetooth-low-energy#artifact-transfer)
+defines operation fields, statuses and byte order. Capabilities version 1.1 selects
+the OTA format; artifact messages have no independent version field.
+
+Gateway caching and artifact-size limits are implementation choices. For size
+negotiation, the SDK accepts a positive `uint32` artifact size and requires it to
+remain unchanged across retries. The firmware backend independently enforces its
+image-size limit. Device RAM contains one `CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE`
+block (1–4096 bytes), a bounded response buffer, and an independent OTA command buffer.
+The block size defaults to `CONFIG_IMG_BLOCK_BUF_SIZE` with image management, otherwise
+512 bytes. Multiple downloader instances serialize artifact transfers on the BLE link.
+Waiting instances continue to
+check pause and cancellation.
+
+The GATT callback enqueues bounded frames. A BLE RX thread uses the same reassembly
+and acknowledgement implementation for configuration, OTA commands, and artifact
+replies, with independent state and buffer capacities for each type. It delivers
+complete messages to their handlers and wakes the downloader for matching replies.
+Flash and delegated block callbacks run only on the thread that called the downloader.
+A connection generation invalidates queued
+frames after disconnect; transfer/request IDs reject stale responses within a session.
+Each OPEN/READ/CLOSE attempt also stays bound to its original connection generation.
+A generation change triggers transient recovery even when a reconnect completes
+between readiness polls; old requests and abort cleanup never move to the new link.
+
+Each READ follows completion of the previous block callback. Duplicate replies cannot
+deliver a block twice. Lost replies retry the same request; reconnect opens a fresh
+transfer and resumes at the callback-consumed offset. If only the final CLOSE reply
+was lost, reopening at the total length does not repeat the final callback. Pause,
+cancellation and transient retry behavior use the common downloader state machine.
+After reset, unfinished artifacts restart at zero while persisted terminal results
+remain intact.
+
+The command buffer uses `SPOTFLOW_OTA_CBOR_MAX_C2D_MESSAGE_SIZE`, derived from
+`CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS` and the maximum manifest field lengths. It has no
+independent BLE sizing option. Artifact replies add the named 14-byte protocol header
+to `CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE`; BLE fragment headers are separate.
+
+`CONFIG_SPOTFLOW_OTA_BLE_REQUEST_TIMEOUT_MS` bounds one OPEN, READ, or CLOSE exchange,
+including two-second retransmissions. Its default is 120 seconds; a complete artifact
+may take longer. Expiry uses the common downloader's retry/backoff policy, resuming
+after the last consumed byte. BLE connection supervision cannot detect a stalled
+gateway or cloud download. `CONFIG_SPOTFLOW_OTA_HTTP_TIMEOUT_MS` applies only to the
+socket transport, where each HTTP attempt can resume through a range request.
+
+URL parsing and HTTP authorization-header construction belong to the socket
+transport. BLE passes the bounded URL and secret to the gateway, which validates
+the URL and performs HTTPS; BLE builds do not require `HTTP_PARSER_URL`.
+
+BLE initializes OTA once on the processing thread before advertising, installing
+its receive callback before a gateway can write. Configuration retains its
+original lifecycle: enabling TX notifications prepares a current report and
+registers its receive callback. A newly prepared configuration message replaces
+the previous pending message, including an unsent desired-version acknowledgement.
+OTA startup failures leave telemetry and configuration available, but suppress the
+OTA capability and inbound OTA handling until reboot. Gateway reconnections do not
+retry OTA initialization. The gateway owns MQTT
+subscriptions and forwarding across reconnections.
+The BLE command ACK confirms handoff to the OTA core, not durable acceptance or firmware
+success. Existing cumulative result reporting and cloud result requests recover lost
+result messages.
+
+OTA builds require encrypted BLE service access by default through
+`CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION`. Applications own their trusted pairing policy.
+The [BLE sample](../samples/ble/README.md) disables this for development use.
+The gateway sees download credentials; neither encrypted BLE nor
+firmware signatures make an untrusted gateway safe.
+
 ### Cancellation and supersession implementation
 
 An unseen `UPDATE_ARTIFACTS` message with `isCanceled: true` is accepted as an already
@@ -858,9 +941,9 @@ Never log full artifact URLs, OTA secrets, authorization headers, or raw CBOR pa
 ### Current limitations
 
 - Download byte offsets are not persisted across reboot. In-process retries use HTTP
-  Range; a new `spotflow_download_artifact()` call starts at byte zero.
-- D2C results use QoS 0; recovery uses cumulative durable results and cloud report
-  requests.
+  Range or BLE block offsets; a new `spotflow_download_artifact()` call starts at byte zero.
+- Direct MQTT D2C results use QoS 0, and BLE result notifications are best-effort.
+  Recovery uses cumulative durable results and cloud report requests.
 - There is no public diagnostic API for ignored late cancellation.
 - The SDK owns full-manifest processing; applications cannot replace it.
 - Only the latest attempt is stored; historical attempts are not retained on the device.
@@ -884,6 +967,7 @@ west twister -T spotflow/zephyr/tests/ota -p native_sim --inline-logs
 | Facade and routing | `facade/` | C2D routing, public effects, cancellation threading |
 | Worker | `worker/` | Durable ordering, retries, promotion, multi-artifact chains |
 | Downloader | `downloader/` | Faked transport, retry, pause, resume, cancellation |
+| BLE downloader | `ble_downloader/` | Block identity, duplicate and stale replies, reconnect offsets, final CLOSE retries, pause and cancellation |
 | Platform and identity | `platform_identity/` | MCUboot framing, descriptor boundaries, and build-ID fakes |
 | Main firmware | `fw_main/` | Shared coordinator, controls, persistence, reconciliation |
 | PSA firmware | `psa_fwu/` | TI stream adapter, slot ownership, acceptance, confirmation reboot and rollback |
