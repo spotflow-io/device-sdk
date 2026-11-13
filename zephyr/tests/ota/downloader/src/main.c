@@ -9,6 +9,7 @@
 #include <spotflow/downloader.h>
 
 #include "ota/downloader/spotflow_ota_downloader.h"
+#include "ota/downloader/spotflow_ota_downloader_http.h"
 #include "ota/downloader/spotflow_ota_downloader_transport_range.h"
 #include "ota/downloader/spotflow_ota_url.h"
 

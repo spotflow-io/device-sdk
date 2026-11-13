@@ -17,9 +17,6 @@ uint32_t spotflow_ota_downloader_retry_delay_ms(uint32_t retry_ceiling_ms, uint3
 
 uint32_t spotflow_ota_downloader_next_retry_ceiling_ms(uint32_t retry_ceiling_ms);
 
-int spotflow_ota_downloader_build_authorization_header(const char* secret, char* out,
-						       size_t out_len);
-
 typedef void (*spotflow_ota_download_started_callback)(struct spotflow_downloader* downloader,
 						       void* callback_ctx);
 

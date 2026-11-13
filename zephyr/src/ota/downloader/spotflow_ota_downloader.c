@@ -3,7 +3,6 @@
 #include <spotflow/downloader.h>
 
 #include "ota/downloader/spotflow_ota_downloader_transport.h"
-#include "ota/downloader/spotflow_ota_url.h"
 
 #include <errno.h>
 #include <stdbool.h>
@@ -17,12 +16,6 @@
 #include <zephyr/sys/iterable_sections.h>
 
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
-
-#define OTA_AUTHORIZATION_HEADER_PREFIX "Authorization: OtaSecret "
-#define OTA_AUTHORIZATION_HEADER_SUFFIX "\r\n"
-#define OTA_AUTHORIZATION_HEADER_MAX_LEN                                                         \
-	(sizeof(OTA_AUTHORIZATION_HEADER_PREFIX) - 1 + SPOTFLOW_OTA_DOWNLOAD_SECRET_MAX_LENGTH + \
-	 sizeof(OTA_AUTHORIZATION_HEADER_SUFFIX))
 
 static void downloader_wake_waiters(struct spotflow_downloader* downloader);
 static void downloader_drain_resume_sem(struct spotflow_downloader* downloader);
@@ -50,26 +43,6 @@ uint32_t spotflow_ota_downloader_next_retry_ceiling_ms(uint32_t retry_ceiling_ms
 	}
 
 	return retry_ceiling_ms * 2U;
-}
-
-int spotflow_ota_downloader_build_authorization_header(const char* secret, char* out,
-						       size_t out_len)
-{
-	/* secret is used only for the HTTP Authorization header and must not be logged. */
-	if (secret == NULL || out == NULL || out_len == 0) {
-		LOG_ERR("secret and out cannot be NULL, out_len cannot be 0");
-		return -EINVAL;
-	}
-
-	int written = snprintk(out, out_len,
-			       OTA_AUTHORIZATION_HEADER_PREFIX "%s" OTA_AUTHORIZATION_HEADER_SUFFIX,
-			       secret);
-
-	if (written < 0 || (size_t)written >= out_len) {
-		return -ENOMEM;
-	}
-
-	return 0;
 }
 
 int spotflow_init_downloader(struct spotflow_downloader* downloader)
@@ -196,20 +169,7 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 		return -EINVAL;
 	}
 
-	struct spotflow_ota_url url;
-	int rc = spotflow_ota_parse_url(request->url, &url);
-
-	if (rc < 0) {
-		return rc;
-	}
-
-	char authorization_header[OTA_AUTHORIZATION_HEADER_MAX_LEN];
-
-	rc = spotflow_ota_downloader_build_authorization_header(
-		request->secret, authorization_header, sizeof(authorization_header));
-	if (rc < 0) {
-		return rc;
-	}
+	int rc;
 
 	k_mutex_lock(&downloader->mutex, K_FOREVER);
 
@@ -227,7 +187,7 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 		started_callback(downloader, started_callback_ctx);
 	}
 
-	LOG_DBG("Starting artifact download (TLS: %d, port: %u)", url.tls, url.port);
+	LOG_DBG("Starting artifact download");
 
 	size_t total_bytes_downloaded = 0;
 	uint64_t artifact_size = 0;
@@ -243,8 +203,8 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 		bool paused = false;
 		bool transient_failure = false;
 		struct spotflow_ota_downloader_transport_request transport_request = {
-			.url = &url,
-			.authorization_header = authorization_header,
+			.original_url = request->url,
+			.secret = request->secret,
 			.downloader = downloader,
 			.callback = callback,
 			.callback_ctx = callback_ctx,
@@ -292,7 +252,7 @@ int spotflow_ota_download_artifact(struct spotflow_downloader* downloader,
 		}
 
 		LOG_WRN("Transient artifact download failure (%d) after %zu bytes; retry %u in "
-			"%u ms using Range",
+			"%u ms; will resume from the last consumed byte",
 			rc, total_bytes_downloaded, retry_count, retry_delay_ms);
 
 		rc = downloader_wait_for_retry(downloader, retry_delay_ms);
