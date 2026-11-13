@@ -1,10 +1,14 @@
 # Spotflow OTA with TI PSA FWU
 
-This sample targets `lp_em_cc35x1/cc3551e` with the TI Zephyr 4.4 downstream and the
+This Wi-Fi sample targets `lp_em_cc35x1/cc3551e` with the TI Zephyr 4.4 downstream and the
 `is25wj032f/ota` flash profile. Spotflow downloads a signed vendor image through PSA FWU,
 reboots into trial execution, and waits for application acceptance. The sample accepts
 immediately for demonstration, then explicitly requests TI's confirmation reboot. Replace the
 immediate acceptance with application health checks in production.
+
+For OTA through a BLE gateway, use the [BLE sample's TI OTA profile](../ble#ota-on-lp-em-cc35x1).
+Both transports use the same signed vendor image format and PSA confirmation sequence.
+The [TI OTA guide](https://docs.spotflow.io/guides/texas-instruments/ota) walks through both.
 
 ## Prepare the workspace
 
