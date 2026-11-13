@@ -1,0 +1,7 @@
+tests:
+  spotflow.ble_config:
+    tags:
+      - spotflow
+      - ble
+    integration_platforms:
+      - qemu_cortex_m3

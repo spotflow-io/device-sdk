@@ -25,7 +25,8 @@ enum spotflow_downloader_state {
 };
 
 /**
- * @brief Downloader instance for streaming one OTA artifact over HTTP(S).
+ * @brief Downloader instance for streaming an OTA artifact over HTTP(S), directly
+ * or through the selected BLE gateway transport.
  *
  * Define at file scope with @ref SPOTFLOW_DEFINE_DOWNLOADER or initialize with
  * @ref spotflow_init_downloader. Fields are visible so applications can embed
@@ -96,12 +97,12 @@ typedef void (*spotflow_download_block_callback)(const struct spotflow_artifact_
 						 void* callback_ctx);
 
 /**
- * @brief Download one artifact sequentially over HTTP(S).
+ * @brief Download one artifact sequentially using the selected transport.
  *
  * Blocks the calling thread until the download completes, is canceled, or
  * fails. Transient transport errors are retried automatically using HTTP
- * Range requests to resume from the last received byte. Retries use truncated
- * exponential backoff with jitter and continue indefinitely until the download
+ * Range requests (or BLE block requests) to resume from the last consumed byte.
+ * Retries use truncated exponential backoff with jitter and continue until the download
  * succeeds, is canceled, or encounters a non-retryable error.
  *
  * Only one download may run on a given downloader at a time.

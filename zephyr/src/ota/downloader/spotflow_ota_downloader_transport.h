@@ -7,15 +7,13 @@
 
 #include <spotflow/downloader.h>
 
-#include "ota/downloader/spotflow_ota_url.h"
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 struct spotflow_ota_downloader_transport_request {
-	const struct spotflow_ota_url* url;
-	const char* authorization_header;
+	const char* original_url;
+	const char* secret;
 	struct spotflow_downloader* downloader;
 	spotflow_download_block_callback callback;
 	void* callback_ctx;

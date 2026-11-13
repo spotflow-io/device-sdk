@@ -50,9 +50,7 @@ int spotflow_transport_send_config_cbor(uint8_t* payload, size_t len)
 int spotflow_transport_send_ota_cbor(uint8_t* payload, size_t len)
 {
 #if CONFIG_SPOTFLOW_TRANSPORT_BLE
-	ARG_UNUSED(payload);
-	ARG_UNUSED(len);
-	return -ENOTSUP;
+	return spotflow_ble_transport_send_ota_cbor(payload, len);
 #else
 	return spotflow_mqtt_publish_ota_cbor_msg(payload, len);
 #endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */
@@ -70,8 +68,7 @@ int spotflow_transport_subscribe_config(spotflow_transport_message_cb callback)
 int spotflow_transport_subscribe_ota(spotflow_transport_message_cb callback)
 {
 #if CONFIG_SPOTFLOW_TRANSPORT_BLE
-	ARG_UNUSED(callback);
-	return -ENOTSUP;
+	return spotflow_ble_transport_subscribe_ota(callback);
 #else
 	return spotflow_mqtt_request_ota_subscription(callback);
 #endif /* CONFIG_SPOTFLOW_TRANSPORT_BLE */

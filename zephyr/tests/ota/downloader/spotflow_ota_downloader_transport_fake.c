@@ -6,11 +6,12 @@
 #include <spotflow/downloader.h>
 
 #include "ota/downloader/spotflow_ota_downloader.h"
+#include "ota/downloader/spotflow_ota_downloader_http.h"
 #include "ota/downloader/spotflow_ota_downloader_transport.h"
 
 #include "spotflow_ota_downloader_transport_fake.h"
 
-static struct spotflow_ota_downloader_transport_fake transport_fake;
+struct spotflow_ota_downloader_transport_fake transport_fake;
 
 struct spotflow_ota_downloader_transport_fake* spotflow_ota_downloader_transport_fake_get(void)
 {
@@ -155,13 +156,19 @@ int spotflow_ota_downloader_transport_download(
 	*request->transient_failure = false;
 	*request->bytes_downloaded = 0;
 
-	strncpy(fake->last_authorization_header, request->authorization_header,
+	struct spotflow_ota_http_request http_request;
+	int preparation_rc = spotflow_ota_downloader_prepare_http_request(
+		request->original_url, request->secret, &http_request);
+	if (preparation_rc != 0) {
+		return preparation_rc;
+	}
+	strncpy(fake->last_authorization_header, http_request.authorization_header,
 		sizeof(fake->last_authorization_header) - 1);
-	strncpy(fake->last_host, request->url->host, sizeof(fake->last_host) - 1);
-	strncpy(fake->last_path, request->url->path, sizeof(fake->last_path) - 1);
+	strncpy(fake->last_host, http_request.url.host, sizeof(fake->last_host) - 1);
+	strncpy(fake->last_path, http_request.url.path, sizeof(fake->last_path) - 1);
 	fake->last_range_start = request->range_start;
-	fake->tls = request->url->tls;
-	fake->port = request->url->port;
+	fake->tls = http_request.url.tls;
+	fake->port = http_request.url.port;
 
 	if (fake->next_result_index < fake->next_result_count) {
 		rc = fake->next_results[fake->next_result_index++];

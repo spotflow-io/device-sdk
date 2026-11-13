@@ -5,11 +5,15 @@ application. Main firmware updates are handled automatically by the device modul
 sample wires up the required callbacks and performs a **demo-only** image confirmation on
 boot.
 
+This sample uses MCUboot. For TI CC35X1 with PSA FWU, follow the
+[TI OTA guide](https://docs.spotflow.io/guides/texas-instruments/ota) using the
+[Wi-Fi PSA sample](../ota_psa) or [BLE OTA profile](../ble#ota-on-lp-em-cc35x1).
+
 **Full SDK documentation:**
 [Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr)
 
 **Create a test deployment:**
-[Deploy Over-the-Air (OTA) Updates](https://docs.spotflow.io/guides/ota)
+[Deploy Over-the-Air (OTA) Updates](https://docs.spotflow.io/using-spotflow/guides/ota)
 
 ## What this sample implements
 
@@ -80,7 +84,7 @@ After you flash the sample to the board, follow these steps:
 
 1. Wait for the device to connect (watch serial logs for network and MQTT readiness).
 2. Modify the sample (such as by addding `LOG_INF("Hello, OTA updates!")`) and rebuild the sample.
-3. Follow the instructions in the [OTA update deployment guide](https://docs.spotflow.io/guides/ota) to upload the new firmware image to the [portal](https://app.spotflow.io/) and create a deployment targeting this device.
+3. Follow the instructions in the [OTA update deployment guide](https://docs.spotflow.io/using-spotflow/guides/ota) to upload the new firmware image to the [portal](https://app.spotflow.io/) and create a deployment targeting this device.
    Use the firmware image `build/ota/zephyr/zephyr.signed.bin`, which is signed by the default signing key (suitable for testing only).
    When creating the deployment, keep the *Main firmware* toggle selected so that the update is handled automatically by the device module.
 4. Observe serial logs during download and reboot. You should see main-firmware progress

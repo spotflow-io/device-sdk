@@ -5,12 +5,25 @@ project(spotflow_ble_framing_tests)
 
 target_include_directories(app PRIVATE
         ${CMAKE_CURRENT_LIST_DIR}/../../src
+        ${CMAKE_CURRENT_LIST_DIR}/../../include
 )
 
 target_compile_definitions(app PRIVATE
         CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL=4
+        CONFIG_SPOTFLOW_BLE_RX_THREAD_STACK_SIZE=2048
         CONFIG_BT_L2CAP_TX_MTU=23
+        CONFIG_SPOTFLOW_OTA=1
+        CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS=4
+        CONFIG_SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE=32
 )
 
 target_sources(app PRIVATE src/main.c)
 target_sources(app PRIVATE ../../src/net/transport/ble/spotflow_ble_framing.c)
+target_sources(app PRIVATE src/rx.c ../../src/net/transport/ble/spotflow_ble_rx.c)
+target_sources(app PRIVATE ../../src/net/transport/ble/spotflow_ble_transport.c)
+zephyr_link_libraries(
+        -Wl,--wrap=bt_conn_ref
+        -Wl,--wrap=bt_conn_unref
+        -Wl,--wrap=bt_gatt_notify_cb
+        -Wl,--wrap=bt_gatt_get_mtu
+)

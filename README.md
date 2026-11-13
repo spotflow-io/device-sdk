@@ -183,11 +183,14 @@ firmware image and the version to install. The SDK processes the artifacts in ma
 order, persists their results, and reports those results to the Spotflow platform.
 
 An artifact marked as **main firmware** updates the firmware that runs the Spotflow SDK.
-The SDK can handle it automatically using MCUboot: it downloads the image, requests a
-test upgrade, reboots, and waits for the application to confirm that the new image works.
+The SDK can handle it automatically using MCUboot or TI PSA FWU: it downloads the image,
+requests trial installation, reboots, and waits for the application to confirm that the new image works.
 Other artifacts are **delegated firmware**: the SDK invokes an application callback that
 performs the update, typically for an external MCU. Main firmware can also be delegated
 when automatic handling is disabled.
+
+OTA uses either a direct MQTT connection with device-side HTTPS downloads or a BLE
+gateway that forwards OTA messages and downloads artifacts on the device's behalf.
 
 The implementation is split into the following components:
 
@@ -200,9 +203,9 @@ flowchart TD
     facade[Public API]
     core[Core:<br/>State and worker]
     firmware[Firmware handlers:<br/>Automatic main and delegated]
-    downloader["Downloader:<br/>HTTP(S), retrying, pausing, canceling"]
+    downloader["Downloader:<br/>HTTP(S) or BLE, retrying, pausing, canceling"]
     persistence[Persistence:<br/>State and results]
-    platform[Platform wrappers:<br/>MCUboot, flash memory, build ID parsing]
+    platform[Platform wrappers:<br/>MCUboot or PSA FWU, build ID parsing]
 
     style processor stroke-dasharray: 5 5
 
@@ -230,7 +233,7 @@ flowchart TD
 - *Persistence* of update state, results, installed versions, and main-firmware
   probation is handled by the Zephyr Settings subsystem.
 
-A successful automatic main-firmware update looks like this:
+A successful automatic main-firmware update with MCUboot looks like this:
 
 ```mermaid
 ---
@@ -264,6 +267,8 @@ Choose the next document according to what you want to do:
 - **Integrate OTA updates:** [Over-the-air updates with Zephyr](https://docs.spotflow.io/guides/zephyr/ota-zephyr)
 - **Try OTA updates:** [Sample for OTA updates](zephyr/samples/ota), an end-to-end
   application with MCUboot sysbuild
+- **Update TI CC35X1 over Wi-Fi or BLE:** [TI OTA guide](https://docs.spotflow.io/guides/texas-instruments/ota),
+  using the [PSA Wi-Fi sample](zephyr/samples/ota_psa) or [BLE OTA profile](zephyr/samples/ble#ota-on-lp-em-cc35x1)
 - **Maintain the SDK:** [Implementation design notes for OTA updates](zephyr/docs/ota.md),
   including state, concurrency, persistence, recovery, and testing rationale
 
