@@ -13,6 +13,16 @@ config SPOTFLOW_BLE_RX_THREAD_STACK_SIZE
 	  handlers. Reassembled message buffers are allocated separately.
 	  Increase this if platform settings storage or logging requires more stack.
 
+config SPOTFLOW_BLE_REQUIRE_ENCRYPTION
+	bool "Require an encrypted connection to the Spotflow BLE service"
+	default y if SPOTFLOW_OTA
+	select BT_SMP
+	help
+	  Require BLE link encryption for device context, RX writes, and enabling
+	  TX notifications. Pair only with trusted gateways and configure the
+	  application's pairing and bonding policy for its deployment. The gateway
+	  can read artifact download credentials, so it is part of the trust boundary.
+
 configdefault BT_L2CAP_TX_MTU
 	default 247
 	help
