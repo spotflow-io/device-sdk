@@ -1,10 +1,10 @@
 menuconfig SPOTFLOW_OTA
 	bool "Enable Spotflow over-the-air (OTA) updates"
 	depends on SPOTFLOW
-	depends on SPOTFLOW_TRANSPORT_MQTT
 	depends on SETTINGS
 	depends on !SETTINGS_NONE
-	select HTTP_CLIENT
+	select HTTP_CLIENT if SPOTFLOW_TRANSPORT_MQTT
+	select HTTP_PARSER_URL if SPOTFLOW_TRANSPORT_MQTT
 	default n
 	help
 	  Enable Spotflow OTA protocol handling, persistence, worker thread,
@@ -12,9 +12,9 @@ menuconfig SPOTFLOW_OTA
 	  main-firmware backend supplies image management when automatic handling
 	  is enabled.
 
-	  OTA requires the MQTT transport and a persistent Zephyr settings storage
-	  backend (SETTINGS_NONE is not supported). BLE transport does not support
-	  OTA updates.
+	  OTA requires persistent Zephyr settings storage (SETTINGS_NONE is not
+	  supported). With BLE, a Spotflow bridge relays commands and downloads
+	  artifact bytes on behalf of the device.
 
 if SPOTFLOW_OTA
 
@@ -47,7 +47,8 @@ config SPOTFLOW_OTA_THREAD_STACK_SIZE
 	  overflows during TLS or HTTP operations.
 
 config SPOTFLOW_OTA_HTTP_TIMEOUT_MS
-	int "Artifact download request timeout in milliseconds"
+	int "HTTP artifact request timeout in milliseconds"
+	depends on SPOTFLOW_TRANSPORT_MQTT
 	default 120000
 	help
 	  Time budget for each download attempt. The budget starts before DNS and
@@ -55,12 +56,26 @@ config SPOTFLOW_OTA_HTTP_TIMEOUT_MS
 	  Blocking DNS, TCP, and TLS operations use their own timeouts and can cause
 	  an attempt to exceed this value.
 
+config SPOTFLOW_OTA_BLE_REQUEST_TIMEOUT_MS
+	int "BLE artifact request timeout in milliseconds"
+	depends on SPOTFLOW_TRANSPORT_BLE
+	default 120000
+	range 1 3600000
+	help
+	  Deadline for one OPEN, READ, or CLOSE exchange with the gateway, including
+	  retransmissions every two seconds. The complete artifact may take longer.
+	  BLE supervision alone cannot detect a stalled gateway or cloud download.
+	  Expiry interrupts this attempt; the downloader retries with backoff from
+	  the last consumed byte. Pause, cancellation, and disconnect interrupt the
+	  exchange earlier.
+
 config SPOTFLOW_OTA_DOWNLOAD_BUFFER_SIZE
 	int "Receive buffer size for artifact downloads in bytes"
+	range 1 4096 if SPOTFLOW_TRANSPORT_BLE
 	default IMG_BLOCK_BUF_SIZE if IMG_MANAGER
 	default 512
 	help
-	  Size of the HTTP response receive buffer used while streaming artifacts.
+	  Size of the HTTP response receive buffer or requested BLE artifact block.
 	  When main-firmware image management is enabled, defaults to the image
 	  writer buffer size so download and flash paths can share the same block size.
 
