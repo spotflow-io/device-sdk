@@ -1,6 +1,8 @@
 #include <errno.h>
 #include <string.h>
 
+#include <zcbor_encode.h>
+
 #include <zephyr/logging/log.h>
 #include <zephyr/ztest.h>
 
@@ -270,7 +272,7 @@ ZTEST(spotflow_ota_cbor, test_reject_unknown_artifact_type_with_attempt_error)
 	struct spotflow_ota_cbor_decode_status status;
 
 	memcpy(payload, update_artifacts_payload, sizeof(payload));
-	payload[12] = 0x01;
+	payload[12] = 0x01; /* Replace artifactType FIRMWARE (0) with unknown type 1. */
 
 	int rc = spotflow_ota_cbor_decode_c2d(payload, sizeof(payload), &msg, &status);
 
@@ -288,7 +290,7 @@ ZTEST(spotflow_ota_cbor, test_reject_zero_attempt_id_without_trustworthy_attempt
 	struct spotflow_ota_cbor_decode_status status;
 
 	memcpy(payload, cancel_update_payload, sizeof(payload));
-	payload[5] = 0x00;
+	payload[5] = 0x00; /* Replace updateAttemptId 1 with invalid attempt ID 0. */
 
 	int rc = spotflow_ota_cbor_decode_c2d(payload, sizeof(payload), &msg, &status);
 
@@ -298,3 +300,44 @@ ZTEST(spotflow_ota_cbor, test_reject_zero_attempt_id_without_trustworthy_attempt
 }
 
 ZTEST_SUITE(spotflow_ota_cbor, NULL, NULL, NULL, NULL, NULL);
+
+ZTEST(spotflow_ota_cbor, test_maximum_manifest_fits_command_buffer)
+{
+	static uint8_t payload[SPOTFLOW_OTA_CBOR_MAX_C2D_MESSAGE_SIZE];
+	static struct spotflow_ota_cbor_c2d_msg decoded;
+	static char field[SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH];
+	struct spotflow_ota_cbor_decode_status status;
+	ZCBOR_STATE_E(state, 5, payload, sizeof(payload), 1);
+
+	memset(field, 'x', sizeof(field));
+	zassert_true(zcbor_map_start_encode(state, 3));
+	zassert_true(zcbor_uint32_put(state, 0) && zcbor_uint32_put(state, 6));
+	zassert_true(zcbor_uint32_put(state, 32) && zcbor_uint64_put(state, UINT64_MAX));
+	zassert_true(zcbor_uint32_put(state, 34));
+	zassert_true(zcbor_list_start_encode(state, CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS));
+	for (size_t i = 0; i < CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS; i++) {
+		zassert_true(zcbor_map_start_encode(state, 6));
+		zassert_true(zcbor_uint32_put(state, 35) && zcbor_uint32_put(state, 0));
+		zassert_true(
+			zcbor_uint32_put(state, 36) &&
+			zcbor_tstr_encode_ptr(state, field, SPOTFLOW_OTA_ARTIFACT_SLUG_MAX_LENGTH));
+		zassert_true(zcbor_uint32_put(state, 37) && zcbor_bool_put(state, i == 0));
+		zassert_true(
+			zcbor_uint32_put(state, 38) &&
+			zcbor_tstr_encode_ptr(state, field, SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH));
+		zassert_true(zcbor_uint32_put(state, 39) &&
+			     zcbor_tstr_encode_ptr(state, field,
+						   SPOTFLOW_OTA_ARTIFACT_SECRET_MAX_LENGTH));
+		zassert_true(zcbor_uint32_put(state, 40) &&
+			     zcbor_tstr_encode_ptr(state, field,
+						   SPOTFLOW_OTA_ARTIFACT_VERSION_MAX_LENGTH));
+		zassert_true(zcbor_map_end_encode(state, 6));
+	}
+	zassert_true(zcbor_list_end_encode(state, CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS));
+	zassert_true(zcbor_map_end_encode(state, 3));
+
+	size_t payload_len = state->payload - payload;
+
+	zassert_ok(spotflow_ota_cbor_decode_c2d(payload, payload_len, &decoded, &status));
+	zassert_equal(decoded.payload.update.artifact_count, CONFIG_SPOTFLOW_OTA_MAX_ARTIFACTS);
+}

@@ -2,8 +2,10 @@ tests:
   spotflow.ble_framing.tx:
     integration_platforms:
       - native_sim
+      - qemu_cortex_m3
     platform_allow:
       - native_sim
+      - qemu_cortex_m3
     tags:
       - spotflow
       - bluetooth
