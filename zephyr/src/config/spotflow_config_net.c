@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdbool.h>
 #include <stdint.h>
 
@@ -19,6 +20,11 @@ static size_t pending_message_length = 0;
 
 int spotflow_config_prepare_pending_message(struct spotflow_config_reported_msg* reported_msg)
 {
+	if (reported_msg == NULL) {
+		LOG_ERR("reported_msg cannot be NULL");
+		return -EINVAL;
+	}
+
 	k_mutex_lock(&pending_message_mutex, K_FOREVER);
 
 	int rc = spotflow_config_cbor_encode_reported(reported_msg, pending_message_buffer,

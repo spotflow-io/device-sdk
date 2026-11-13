@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+/* Preparing a report or response replaces the previous pending message. */
 int spotflow_config_prepare_pending_message(struct spotflow_config_reported_msg* reported_msg);
 int spotflow_config_send_pending_message();
 

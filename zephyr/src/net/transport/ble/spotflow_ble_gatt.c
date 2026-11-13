@@ -53,11 +53,6 @@ static const struct bt_uuid_128 spotflow_tx_stream_uuid =
 static const struct bt_uuid_128 spotflow_rx_stream_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_RX_STREAM_UUID_ENCODED);
 
-static const uint8_t capabilities[] = {
-	SPOTFLOW_PROTOCOL_VERSION_MAJOR,
-	SPOTFLOW_PROTOCOL_VERSION_MINOR,
-};
-
 /* advertising payload */
 static const struct bt_data ad[] = {
 	BT_DATA_BYTES(BT_DATA_FLAGS, (BT_LE_AD_GENERAL | BT_LE_AD_NO_BREDR)),
@@ -143,6 +138,14 @@ const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void)
 static ssize_t read_capabilities(struct bt_conn* conn, const struct bt_gatt_attr* attr, void* buf,
 				 uint16_t len, uint16_t offset)
 {
+	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
+	bool ota_ready = g_spotflow_ble_transport_state.ota_callback != NULL;
+	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+	const uint8_t capabilities[] = {
+		SPOTFLOW_PROTOCOL_VERSION_MAJOR,
+		SPOTFLOW_PROTOCOL_VERSION_MINOR,
+		ota_ready ? BIT(0) : 0,
+	};
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, capabilities, sizeof(capabilities));
 }
 
@@ -189,7 +192,7 @@ static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* 
 		return BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
 	}
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(buf, len, flags);
+	int rc = spotflow_ble_transport_queue_rx_frame(buf, len);
 	if (rc < 0) {
 		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
 	}
@@ -209,6 +212,15 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 	g_spotflow_ble_transport_state.tx.notifications_enabled = enabled;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+	if (!was_enabled && enabled) {
+		int rc = spotflow_config_init_session();
+		if (rc < 0) {
+			LOG_WRN("Failed to initialize configuration updating: %d", rc);
+		}
+	}
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
+
 	LOG_INF("BLE TX Stream notifications %s", enabled ? "enabled" : "disabled");
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
@@ -218,15 +230,6 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 		spotflow_metrics_system_report_connection_state(false);
 	}
 #endif
-
-#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
-	if (!was_enabled && enabled) {
-		int rc = spotflow_config_init_session();
-		if (rc < 0) {
-			LOG_WRN("Failed to initialize configuration updating: %d", rc);
-		}
-	}
-#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 }
 
 /* A BLE transport session starts only after TX notifications are enabled. A
@@ -333,6 +336,7 @@ static void connected(struct bt_conn* conn, uint8_t err)
 		bt_conn_unref(g_spotflow_ble_transport_state.tx.conn);
 	}
 	g_spotflow_ble_transport_state.tx.conn = bt_conn_ref(conn);
+	g_spotflow_ble_transport_state.tx.connection_generation++;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
 	LOG_INF("BLE central connected");
@@ -350,11 +354,8 @@ static void disconnected(struct bt_conn* conn, uint8_t reason)
 		g_spotflow_ble_transport_state.tx.conn = NULL;
 	}
 	g_spotflow_ble_transport_state.tx.notifications_enabled = false;
-	/* A disconnect terminates any partially reassembled RX config message. */
-	g_spotflow_ble_transport_state.config_rx.active = false;
-	g_spotflow_ble_transport_state.config_rx.sequence = 0;
-	g_spotflow_ble_transport_state.config_rx.total_len = 0;
-	g_spotflow_ble_transport_state.config_rx.received_len = 0;
+	g_spotflow_ble_transport_state.tx.connection_generation++;
+	/* Queued RX frames and partial messages are invalidated by the new generation. */
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
 	LOG_INF("BLE central disconnected: 0x%02x", reason);
