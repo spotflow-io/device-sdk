@@ -43,6 +43,14 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 #define SPOTFLOW_BLE_ENABLE_RETRY_COUNT 3
 #define SPOTFLOW_BLE_ENABLE_RETRY_DELAY K_MSEC(200)
 
+#if defined(CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION)
+#define SPOTFLOW_READ_PERMISSION BT_GATT_PERM_READ_ENCRYPT
+#define SPOTFLOW_WRITE_PERMISSION BT_GATT_PERM_WRITE_ENCRYPT
+#else
+#define SPOTFLOW_READ_PERMISSION BT_GATT_PERM_READ
+#define SPOTFLOW_WRITE_PERMISSION BT_GATT_PERM_WRITE
+#endif /* defined(CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION) */
+
 static const struct bt_uuid_128 spotflow_service_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_SERVICE_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_capabilities_uuid =
@@ -84,20 +92,19 @@ static void restart_advertising_work_handler(struct k_work* work);
 static void connected(struct bt_conn* conn, uint8_t err);
 static void disconnected(struct bt_conn* conn, uint8_t reason);
 
-BT_GATT_SERVICE_DEFINE(spotflow_svc, BT_GATT_PRIMARY_SERVICE(&spotflow_service_uuid),
-		       BT_GATT_CHARACTERISTIC(&spotflow_capabilities_uuid.uuid, BT_GATT_CHRC_READ,
-					      BT_GATT_PERM_READ, read_capabilities, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_device_id_uuid.uuid, BT_GATT_CHRC_READ,
-					      BT_GATT_PERM_READ, read_device_id, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_session_metadata_uuid.uuid,
-					      BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
-					      read_session_metadata, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_tx_stream_uuid.uuid, BT_GATT_CHRC_NOTIFY,
-					      BT_GATT_PERM_NONE, NULL, NULL, NULL),
-		       BT_GATT_CCC(tx_ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-		       BT_GATT_CHARACTERISTIC(&spotflow_rx_stream_uuid.uuid,
-					      BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE,
-					      NULL, write_rx_stream, NULL));
+BT_GATT_SERVICE_DEFINE(
+	spotflow_svc, BT_GATT_PRIMARY_SERVICE(&spotflow_service_uuid),
+	BT_GATT_CHARACTERISTIC(&spotflow_capabilities_uuid.uuid, BT_GATT_CHRC_READ,
+			       BT_GATT_PERM_READ, read_capabilities, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_device_id_uuid.uuid, BT_GATT_CHRC_READ,
+			       SPOTFLOW_READ_PERMISSION, read_device_id, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_session_metadata_uuid.uuid, BT_GATT_CHRC_READ,
+			       SPOTFLOW_READ_PERMISSION, read_session_metadata, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_tx_stream_uuid.uuid, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_NONE, NULL, NULL, NULL),
+	BT_GATT_CCC(tx_ccc_cfg_changed, SPOTFLOW_READ_PERMISSION | SPOTFLOW_WRITE_PERMISSION),
+	BT_GATT_CHARACTERISTIC(&spotflow_rx_stream_uuid.uuid, BT_GATT_CHRC_WRITE_WITHOUT_RESP,
+			       SPOTFLOW_WRITE_PERMISSION, NULL, write_rx_stream, NULL));
 
 BT_CONN_CB_DEFINE(spotflow_ble_conn_callbacks) = {
 	.connected = connected,
