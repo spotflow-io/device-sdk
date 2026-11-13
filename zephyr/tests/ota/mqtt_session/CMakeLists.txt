@@ -9,6 +9,7 @@ target_include_directories(app PRIVATE
 
 target_compile_definitions(app PRIVATE
         CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL=3
+        CONFIG_SPOTFLOW_LOG_BACKEND=1
         CONFIG_SPOTFLOW_OTA=1
 )
 

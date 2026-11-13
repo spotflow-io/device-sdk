@@ -16,6 +16,9 @@
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
+#ifdef CONFIG_SPOTFLOW_OTA
+#include "ota/spotflow_ota.h"
+#endif /* CONFIG_SPOTFLOW_OTA */
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
 #include "metrics/system/spotflow_metrics_system.h"
 #endif
@@ -107,6 +110,18 @@ int spotflow_ble_transport_start_impl(void)
 		k_mutex_init(&g_spotflow_ble_transport_state.lock);
 		k_work_init_delayable(&g_spotflow_ble_transport_state.restart_advertising_work,
 				      restart_advertising_work_handler);
+#ifdef CONFIG_SPOTFLOW_OTA
+		/* BLE keeps its OTA receiver across gateway reconnects. Install it
+		 * on the processing thread before Bluetooth accepts connections.
+		 */
+		int ota_rc = spotflow_ota_init_session();
+		if (ota_rc < 0) {
+			/* Keep telemetry/configuration available. A gateway reconnect
+			 * cannot repair local OTA startup; retry after reboot instead.
+			 */
+			LOG_ERR("BLE OTA unavailable until reboot: %d", ota_rc);
+		}
+#endif /* CONFIG_SPOTFLOW_OTA */
 		g_spotflow_ble_transport_state.initialized = true;
 	}
 

@@ -75,12 +75,12 @@ static void spotflow_processing_thread_entry(void)
 #endif /* CONFIG_SPOTFLOW_METRICS_HEARTBEAT */
 #endif /* CONFIG_SPOTFLOW_METRICS */
 
-#ifdef CONFIG_SPOTFLOW_OTA
+#if defined(CONFIG_SPOTFLOW_OTA) && defined(CONFIG_SPOTFLOW_TRANSPORT_MQTT)
 	int rc_ota = spotflow_ota_init();
 	if (rc_ota < 0) {
 		LOG_ERR("Failed to initialize OTA updates: %d", rc_ota);
 	}
-#endif /* CONFIG_SPOTFLOW_OTA */
+#endif /* CONFIG_SPOTFLOW_OTA && CONFIG_SPOTFLOW_TRANSPORT_MQTT */
 
 #if CONFIG_SPOTFLOW_TRANSPORT_MQTT
 	spotflow_mqtt_session_loop(process_config_coredumps_metrics_or_logs);
