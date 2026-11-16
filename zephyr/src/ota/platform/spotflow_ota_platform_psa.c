@@ -12,6 +12,7 @@ static bool confirmation_pending_reboot;
 static psa_fwu_component_t downloaded_component;
 
 static int get_running_image_state(enum spotflow_ota_running_image_state* state);
+static int confirm_image_locked(bool* reboot_required);
 
 int spotflow_ota_platform_init(void)
 {
@@ -59,29 +60,36 @@ int spotflow_ota_platform_request_upgrade(void)
 
 int spotflow_ota_platform_confirm_image(bool* reboot_required)
 {
-	enum spotflow_ota_running_image_state state;
-	int rc;
-
 	if (reboot_required == NULL) {
 		return -EINVAL;
 	}
 	*reboot_required = false;
 	k_mutex_lock(&psa_mutex, K_FOREVER);
-	rc = get_running_image_state(&state);
+	int rc = confirm_image_locked(reboot_required);
+
+	k_mutex_unlock(&psa_mutex);
+	return rc;
+}
+
+/* The caller holds psa_mutex across the state checks and acceptance. */
+static int confirm_image_locked(bool* reboot_required)
+{
+	enum spotflow_ota_running_image_state state;
+	int rc = get_running_image_state(&state);
+
 	if (rc < 0 || state == SPOTFLOW_OTA_RUNNING_IMAGE_CONFIRMED) {
-		goto done;
+		return rc;
 	}
 	if (state != SPOTFLOW_OTA_RUNNING_IMAGE_UNCONFIRMED) {
-		rc = -EINVAL;
-		goto done;
+		return -EINVAL;
 	}
 	if (confirmation_pending_reboot) {
 		*reboot_required = true;
-		goto done;
+		return 0;
 	}
 	rc = spotflow_ota_psa_check_accept();
 	if (rc < 0) {
-		goto done;
+		return rc;
 	}
 	psa_status_t status = psa_fwu_accept();
 
@@ -89,7 +97,7 @@ int spotflow_ota_platform_confirm_image(bool* reboot_required)
 		confirmation_pending_reboot = true;
 		*reboot_required = true;
 		LOG_INF("PSA confirmation requires an application-requested PSA reboot");
-		goto done;
+		return 0;
 	}
 	rc = spotflow_ota_psa_errno("psa_fwu_accept", status);
 	if (rc == 0) {
@@ -98,8 +106,6 @@ int spotflow_ota_platform_confirm_image(bool* reboot_required)
 			rc = -EIO;
 		}
 	}
-done:
-	k_mutex_unlock(&psa_mutex);
 	return rc;
 }
 

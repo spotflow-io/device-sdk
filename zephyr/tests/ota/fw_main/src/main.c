@@ -646,11 +646,14 @@ ZTEST(spotflow_ota_fw_main, test_confirm_idempotent_when_already_succeeded)
 	setup_post_reboot_context(build_id, &probation);
 	platform_fake->image_confirmed = true;
 	zassert_ok(reconcile_startup(&probation, true, &effects));
+	size_t notifications = progress_phase_count;
 
 	zassert_ok(spotflow_ota_fw_main_confirm_image(&state, &effects));
 	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_NOT_RUNNING);
 	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_SUCCEEDED);
 	zassert_equal(platform_fake->confirm_count, 0);
+	zassert_equal(effects, 0);
+	zassert_equal(progress_phase_count, notifications);
 	expect_reconciled_main_job(SPOTFLOW_OTA_RESULT_SUCCEEDED);
 }
 
@@ -664,6 +667,44 @@ static struct spotflow_ota_probation setup_unconfirmed_main_firmware(void)
 	platform_fake->image_confirmed = false;
 	zassert_ok(reconcile_startup(&probation, true, NULL));
 	return probation;
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_pending_reboot_does_not_notify_completion)
+{
+	struct spotflow_ota_probation probation = setup_unconfirmed_main_firmware();
+	struct spotflow_ota_probation saved_probation;
+	struct spotflow_ota_main_firmware_state state;
+	spotflow_ota_state_effects effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+	size_t notifications = progress_phase_count;
+	bool has_probation;
+
+	platform_fake->confirmation_requires_reboot = true;
+	zassert_ok(spotflow_ota_fw_main_confirm_image(&state, &effects));
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
+	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(effects, 0);
+	zassert_equal(progress_phase_count, notifications);
+	zassert_equal(platform_fake->confirm_count, 1);
+	zassert_equal(platform_fake->reboot_count, 0);
+	zassert_ok(spotflow_ota_persistence_load_probation(&saved_probation, &has_probation));
+	zassert_true(has_probation);
+	zassert_equal(saved_probation.attempt_id, probation.attempt_id);
+}
+
+ZTEST(spotflow_ota_fw_main, test_confirm_query_error_returns_current_state)
+{
+	(void)setup_unconfirmed_main_firmware();
+	struct spotflow_ota_main_firmware_state state;
+	spotflow_ota_state_effects effects = SPOTFLOW_OTA_STATE_EFFECT_WAKE_WORKER;
+	size_t notifications = progress_phase_count;
+
+	platform_fake->query_result = -EIO;
+	zassert_equal(spotflow_ota_fw_main_confirm_image(&state, &effects), -EIO);
+	zassert_equal(state.phase, SPOTFLOW_OTA_PHASE_UNCONFIRMED);
+	zassert_equal(state.result, SPOTFLOW_OTA_RESULT_PENDING);
+	zassert_equal(effects, 0);
+	zassert_equal(progress_phase_count, notifications);
+	zassert_equal(platform_fake->confirm_count, 0);
 }
 
 static void expect_confirmation_rejected(void)
@@ -1275,6 +1316,21 @@ ZTEST(spotflow_ota_fw_main, test_same_executable_identity_is_rejected_before_pro
 	spotflow_ota_build_id_fake_set_running_build_id(build_id);
 	accept_two_artifact_update();
 	zassert_equal(run_main_artifact(), SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(platform_fake->upgrade_request_count, 0);
+	zassert_equal(platform_fake->reboot_count, 0);
+	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
+	zassert_false(has_probation);
+}
+
+ZTEST(spotflow_ota_fw_main, test_begin_failure_releases_candidate_before_probation)
+{
+	struct spotflow_ota_probation probation;
+	bool has_probation;
+
+	platform_fake->begin_write_result = -EIO;
+	accept_two_artifact_update();
+	zassert_equal(run_main_artifact(), SPOTFLOW_OTA_RESULT_FAILED);
+	zassert_equal(platform_fake->abort_count, 1);
 	zassert_equal(platform_fake->upgrade_request_count, 0);
 	zassert_equal(platform_fake->reboot_count, 0);
 	zassert_ok(spotflow_ota_persistence_load_probation(&probation, &has_probation));
