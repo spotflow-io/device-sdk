@@ -924,7 +924,9 @@ success. Existing cumulative result reporting and cloud result requests recover 
 result messages.
 
 OTA builds require encrypted BLE service access by default through
-`CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION`. Applications own their trusted pairing policy.
+`CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION`. Enable `CONFIG_BT_SMP=y` in the application
+configuration when encryption is required; configuration fails if SMP is disabled.
+Applications own their trusted pairing policy.
 The [BLE sample](../samples/ble/README.md) disables this for development use.
 The gateway sees download credentials; neither encrypted BLE nor
 firmware signatures make an untrusted gateway safe.

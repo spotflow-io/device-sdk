@@ -52,7 +52,8 @@ behavior as other transports; see [OTA architecture](../../docs/ota.md).
 ## BLE OTA configuration
 
 OTA enables `CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION` by default. The sample's
-`ota.conf` disables it for development. Enable encryption and configure trusted
+`ota.conf` disables it for development. Enable
+`CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION=y` and `CONFIG_BT_SMP=y`, and configure trusted
 pairing before production use. TI signing keys must match the board's provisioning;
 replace the default development keys for production.
 
