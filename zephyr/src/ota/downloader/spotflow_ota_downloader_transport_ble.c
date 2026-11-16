@@ -270,8 +270,8 @@ static int consume_block(struct spotflow_ota_downloader_transport_request* reque
 {
 	uint8_t message[SPOTFLOW_OTA_BLE_READ_SIZE];
 	size_t count = MIN(sizeof(request->downloader->recv_buf), total - offset);
-	int message_len =
-		spotflow_ota_ble_encode_read(message, sizeof(message), header, offset, (uint16_t)count);
+	int message_len = spotflow_ota_ble_encode_read(message, sizeof(message), header, offset,
+						       (uint16_t)count);
 	struct spotflow_ota_ble_response response;
 
 	header->request_id++;

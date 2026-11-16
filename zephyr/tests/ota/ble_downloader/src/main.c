@@ -337,7 +337,7 @@ static void consume(const struct spotflow_artifact_block* block,
 
 		download_after_block = false;
 		nested_result = spotflow_download_artifact(&nested_downloader, &request,
-							 consume_nested, NULL);
+							   consume_nested, NULL);
 	}
 	if (cancel_after_block) {
 		zassert_ok(spotflow_cancel_download(instance));
