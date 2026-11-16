@@ -125,8 +125,9 @@ static void rx_thread(void)
 	static struct spotflow_ble_rx_frame frame;
 
 	while (true) {
-		k_msgq_get(&rx_queue, &frame, K_FOREVER);
-		process_queued_frame(&frame);
+		if (k_msgq_get(&rx_queue, &frame, K_FOREVER) == 0) {
+			process_queued_frame(&frame);
+		}
 	}
 }
 
