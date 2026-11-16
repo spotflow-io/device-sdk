@@ -4,6 +4,10 @@
 #include <string.h>
 
 #include <zephyr/sys/byteorder.h>
+#include <zephyr/sys/util.h>
+
+BUILD_ASSERT(SPOTFLOW_OTA_ARTIFACT_URL_MAX_LENGTH <= UINT16_MAX);
+BUILD_ASSERT(SPOTFLOW_OTA_ARTIFACT_SECRET_MAX_LENGTH <= UINT8_MAX);
 
 static void encode_header(uint8_t* buffer, const struct spotflow_ota_ble_header* header,
 			  enum spotflow_ota_ble_operation operation);
@@ -41,7 +45,7 @@ int spotflow_ota_ble_encode_open(uint8_t* buffer, size_t capacity,
 	}
 
 	encode_header(buffer, header, SPOTFLOW_OTA_BLE_OPEN);
-	sys_put_le16(url_len, buffer + SPOTFLOW_OTA_BLE_HEADER_SIZE);
+	sys_put_le16((uint16_t)url_len, buffer + SPOTFLOW_OTA_BLE_HEADER_SIZE);
 	buffer[11] = (uint8_t)secret_len;
 	memcpy(buffer + SPOTFLOW_OTA_BLE_OPEN_HEADER_SIZE, url, url_len);
 	memcpy(buffer + SPOTFLOW_OTA_BLE_OPEN_HEADER_SIZE + url_len, secret, secret_len);
@@ -78,7 +82,7 @@ int spotflow_ota_ble_encode_close(uint8_t* buffer, size_t capacity,
 
 	encode_header(buffer, header, SPOTFLOW_OTA_BLE_CLOSE);
 	sys_put_le32(consumed, buffer + SPOTFLOW_OTA_BLE_HEADER_SIZE);
-	buffer[SPOTFLOW_OTA_BLE_HEADER_SIZE + sizeof(consumed)] = reason;
+	buffer[SPOTFLOW_OTA_BLE_HEADER_SIZE + sizeof(consumed)] = (uint8_t)reason;
 	return SPOTFLOW_OTA_BLE_CLOSE_SIZE;
 }
 
@@ -134,7 +138,7 @@ int spotflow_ota_ble_status_error(uint8_t status)
 static void encode_header(uint8_t* buffer, const struct spotflow_ota_ble_header* header,
 			  enum spotflow_ota_ble_operation operation)
 {
-	buffer[0] = operation;
+	buffer[0] = (uint8_t)operation;
 	sys_put_le32(header->transfer_id, buffer + 1);
 	sys_put_le32(header->request_id, buffer + 5);
 }

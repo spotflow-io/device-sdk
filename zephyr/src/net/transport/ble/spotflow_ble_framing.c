@@ -67,7 +67,7 @@ int spotflow_ble_transport_encode_next_frame(uint8_t message_type, uint8_t seque
 	frame->data[1] = flags;
 	frame->data[2] = sequence;
 	if (first) {
-		sys_put_le16(len, &frame->data[3]);
+		sys_put_le16((uint16_t)len, &frame->data[3]);
 		memcpy(&frame->data[SPOTFLOW_BLE_FIRST_FRAGMENT_HEADER_LEN], &payload[offset],
 		       fragment_len);
 	} else {
@@ -173,7 +173,7 @@ static int send_framed_message(uint8_t message_type, uint8_t* sequence_counter, 
 
 static int notify_frame(struct bt_conn* conn, const uint8_t* frame, size_t frame_len)
 {
-	return bt_gatt_notify(conn, spotflow_ble_tx_stream_attr_get(), frame, frame_len);
+	return bt_gatt_notify(conn, spotflow_ble_tx_stream_attr_get(), frame, (uint16_t)frame_len);
 }
 
 static int map_notify_error(int rc)
