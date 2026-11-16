@@ -1,6 +1,6 @@
 #include "ota/platform/spotflow_ota_platform.h"
 
-#include "ota/platform/mcuboot/spotflow_ota_mcuboot_stream.h"
+#include "ota/platform/mcuboot/spotflow_ota_mcuboot_image_parser.h"
 
 #include <errno.h>
 #include <string.h>
@@ -14,8 +14,7 @@
 LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 
 static struct flash_img_context upload_context;
-static struct spotflow_ota_mcuboot_stream image_stream;
-static size_t upload_capacity;
+static struct spotflow_ota_mcuboot_image_parser image_parser;
 static bool image_write_finished;
 
 int spotflow_ota_platform_request_upgrade(void)
@@ -60,19 +59,19 @@ int spotflow_ota_platform_begin_image_write(void)
 		LOG_ERR("Cannot overwrite firmware storage while the running image is unconfirmed");
 		return -EBUSY;
 	}
-	memset(&image_stream, 0, sizeof(image_stream));
 	image_write_finished = false;
 	int rc = flash_img_init(&upload_context);
 
 	if (rc == 0) {
-		upload_capacity = upload_context.flash_area->fa_size;
+		rc = spotflow_ota_mcuboot_image_parser_init(&image_parser,
+							    upload_context.flash_area->fa_size);
 	}
 	return rc;
 }
 
 int spotflow_ota_platform_write_image_block(const struct spotflow_artifact_block* block)
 {
-	int rc = spotflow_ota_mcuboot_stream_feed(&image_stream, block, upload_capacity);
+	int rc = spotflow_ota_mcuboot_image_parser_feed(&image_parser, block);
 
 	if (rc < 0) {
 		return rc;
@@ -85,7 +84,7 @@ int spotflow_ota_platform_write_image_block(const struct spotflow_artifact_block
 
 int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
-	return spotflow_ota_mcuboot_stream_get_build_id(&image_stream, build_id);
+	return spotflow_ota_mcuboot_image_parser_get_build_id(&image_parser, build_id);
 }
 
 int spotflow_ota_platform_finish_image_write(void)
@@ -99,7 +98,7 @@ int spotflow_ota_platform_abort_image_write(void)
 		flash_area_close(upload_context.flash_area);
 		upload_context.flash_area = NULL;
 	}
-	memset(&image_stream, 0, sizeof(image_stream));
+	memset(&image_parser, 0, sizeof(image_parser));
 	image_write_finished = false;
 	return 0;
 }

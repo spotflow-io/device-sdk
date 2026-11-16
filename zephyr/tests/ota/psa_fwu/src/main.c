@@ -1,7 +1,7 @@
 #include "ota/firmware/spotflow_ota_fw_main.h"
 #include "ota/core/spotflow_ota_worker.h"
 #include "ota/platform/psa/spotflow_ota_psa_provider.h"
-#include "ota/platform/spotflow_ota_identity_stream.h"
+#include "ota/platform/psa/spotflow_ota_psa_ti_image_parser.h"
 #include "ota/persistence/spotflow_ota_persistence.h"
 #include "ota/protocol/spotflow_ota_net.h"
 #include "spotflow_ota_bindesc_test_util.h"
@@ -60,7 +60,46 @@ void spotflow_ota_worker_test_after_artifact_result_persisted(void)
 	}
 }
 
-ZTEST(spotflow_ota_psa, test_split_stream_installs_inactive_vendor_slot)
+ZTEST(spotflow_ota_psa, test_parser_prefix_readiness_and_final_block)
+{
+	for (size_t split = 0; split <= sizeof(PSA_FWU_GPESlot_t); split++) {
+		struct spotflow_ota_ti_image_parser parser;
+		const PSA_FWU_GPESlot_t* prefix = NULL;
+		uint8_t actual[SPOTFLOW_BUILD_ID_LENGTH];
+		struct spotflow_artifact_block block = { .data = image, .data_len = split };
+
+		zassert_ok(spotflow_ota_ti_image_parser_init(&parser, sizeof(image)));
+		zassert_ok(spotflow_ota_ti_image_parser_feed(&parser, &block));
+		if (split < sizeof(*prefix)) {
+			zassert_equal(spotflow_ota_ti_image_parser_get_prefix(&parser, &prefix),
+				      -EAGAIN);
+			zassert_is_null(prefix);
+		}
+		block.data = image + split;
+		block.offset = split;
+		block.data_len = sizeof(*prefix) - split;
+		zassert_ok(spotflow_ota_ti_image_parser_feed(&parser, &block));
+		zassert_ok(spotflow_ota_ti_image_parser_get_prefix(&parser, &prefix));
+		zassert_mem_equal(prefix, image, sizeof(*prefix));
+		block.data = image + sizeof(*prefix);
+		block.offset = sizeof(*prefix);
+		block.data_len = sizeof(image) - sizeof(*prefix);
+		zassert_ok(spotflow_ota_ti_image_parser_feed(&parser, &block));
+		zassert_equal(spotflow_ota_ti_image_parser_get_build_id(&parser, actual), -EBADMSG);
+		block = (struct spotflow_artifact_block){ .offset = sizeof(image),
+							  .is_last = true };
+		zassert_ok(spotflow_ota_ti_image_parser_feed(&parser, &block));
+		for (size_t i = 0; i < 2; i++) {
+			zassert_ok(spotflow_ota_ti_image_parser_get_build_id(&parser, actual));
+			zassert_mem_equal(actual, build_id, sizeof(actual));
+		}
+		zassert_ok(spotflow_ota_ti_image_parser_init(&parser, sizeof(image)));
+		zassert_equal(spotflow_ota_ti_image_parser_get_prefix(&parser, &prefix), -EAGAIN);
+		zassert_equal(spotflow_ota_ti_image_parser_get_build_id(&parser, actual), -EBADMSG);
+	}
+}
+
+ZTEST(spotflow_ota_psa, test_split_blocks_install_inactive_vendor_slot)
 {
 	zassert_equal(process(), SPOTFLOW_OTA_RESULT_PENDING);
 	zassert_equal(fake.target, 5);

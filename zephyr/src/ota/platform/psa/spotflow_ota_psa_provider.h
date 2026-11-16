@@ -22,7 +22,7 @@ extern "C" {
 
 /* Internal PSA implementation boundary. The PSA platform serializes these calls.
  * The application must give Spotflow exclusive ownership of the FWU service.
- * A provider selects the main component and prepares its native image stream.
+ * A provider selects the main component, parses the native image and writes its bytes.
  * The PSA platform owns finish/install/accept; the coordinator owns probation.
  */
 /**
@@ -52,13 +52,14 @@ int spotflow_ota_psa_begin(void);
 int spotflow_ota_psa_write(const struct spotflow_artifact_block* block);
 
 /**
- * @brief Read a completed candidate before PSA finish.
+ * @brief Copy retained candidate metadata after download, before PSA finish.
  * @param component Receives the provider-selected component ID.
- * @param build_id Receives the executable identity extracted from the stream.
+ * @param build_id Receives the executable build ID extracted during download.
  * @return Zero on success, negative errno for an incomplete or invalid artifact.
+ * @note Repeated calls are safe; this does not flush, finish or install the image.
  */
-int spotflow_ota_psa_end(psa_fwu_component_t* component,
-			 uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
+int spotflow_ota_psa_get_candidate_info(psa_fwu_component_t* component,
+					uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
 
 /**
  * @brief Discard the owned inactive candidate.

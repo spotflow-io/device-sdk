@@ -423,7 +423,7 @@ flowchart TD
     core --> firmware
     firmware --> downloader
     firmware --> platform
-    platform -->|PSA FWU| psa["PSA provider<br/>components and native stream"]
+    platform -->|PSA FWU| psa["PSA provider<br/>components, image parsing and writes"]
     psa --> zephyr
     firmware --> persistence
     firmware --> core
@@ -454,10 +454,10 @@ Important entry points:
 | `firmware/spotflow_ota_fw_custom.c` | Delegated firmware dispatch and cancellation callback |
 | `downloader/spotflow_ota_downloader.c` | Synchronous download API and in-process HTTP Range retry |
 | `platform/spotflow_ota_platform_mcuboot.c` / `spotflow_ota_platform_psa.c` | Native image management behind the shared platform interface |
-| `platform/psa/` | PSA provider contract, TI component ownership, and TI container framing |
+| `platform/psa/` | PSA provider contract, TI component ownership, image parsing, and writes |
 | `platform/spotflow_ota_identity.c` | Running identity and probation comparison |
-| `platform/spotflow_ota_identity_stream.c` | Incremental native-endian Zephyr descriptor reader |
-| `platform/mcuboot/` | MCUboot container framing and executable payload boundaries |
+| `platform/spotflow_ota_build_id_parser.c` | Incremental build-ID extraction from native-endian Zephyr descriptors |
+| `platform/mcuboot/` | MCUboot image parsing and executable payload boundaries |
 
 MQTT subscription and inbound routing live outside this directory in
 `spotflow_mqtt.c` and `spotflow_processor.c`.
@@ -689,19 +689,17 @@ attempt. If a reset interrupts that cleanup, startup clears the stale probation 
 observing the durable failure. A successful installation reboot leaves the result
 pending for startup reconciliation and application confirmation.
 
-Both backends extract the build ID during download using the same descriptor reader.
-Their framing wrappers supply only executable payload bytes, excluding headers, padding,
-and signature trailers. Zephyr descriptors use the target's native endianness; native
-container headers may use a different byte order. Missing, malformed or unpatched IDs
-fail the attempt before probation is saved.
-See [build ID generation](build-id.md) for packaging metadata and rebuild behavior.
+Both backends extract the build ID during download using
+[incremental image parsers](#incremental-image-parsing). Missing, malformed or unpatched
+IDs fail the attempt before probation is saved.
+MCUboot encrypted, compressed and split images are rejected because their executable
+payload cannot be inspected directly. RAM-load and fixed-address images are supported.
 
-MCUboot encrypted, compressed and split images are rejected because the stream
-reader cannot inspect their executable payload directly. RAM-load and fixed-address
-images are supported. Both backends reject a downloaded image whose build ID
-matches that of the currently running firmware before saving probation: otherwise a reset before installation could make the old confirmed image
-look like a successful update. The TI provider includes its numeric vendor image
-version in the ID by default; see [build ID generation](build-id.md).
+Both backends reject a downloaded image whose build ID matches that of the currently
+running firmware before saving probation: otherwise a reset before installation could
+make the old confirmed image look like a successful update. The TI provider includes
+its numeric vendor image version in the ID by default; see
+[build ID generation](build-id.md) for packaging metadata and rebuild behavior.
 
 Initialization resolves probation as follows:
 
@@ -741,12 +739,49 @@ repeats reconciliation; a reset afterward restores the result without repeating 
 After the result is committed in RAM, the coordinator schedules preparation of the
 cumulative result message, which the MQTT thread later publishes.
 
+#### Incremental image parsing
+
+Each backend feeds complete artifact blocks to its image parser and separately writes
+them through the flash or PSA API. The parsers retain enough state to handle headers
+and descriptors split across blocks, using bounded memory without network or flash I/O.
+Only executable payload bytes reach the shared build-ID parser; container headers,
+header padding and signature trailers cannot supply the candidate's identity.
+
+| Parser | Input | Responsibility |
+|---|---|---|
+| [MCUboot image parser](../src/ota/platform/mcuboot/spotflow_ota_mcuboot_image_parser.h) | Complete MCUboot artifact | Check header fields, supported flags, size bounds and payload completeness. |
+| [TI image parser](../src/ota/platform/psa/spotflow_ota_psa_ti_image_parser.h) | Complete TI signed artifact | Check the 48-byte prefix, payload/trailer framing and exact total size. |
+| [Shared build-ID parser](../src/ota/platform/spotflow_ota_build_id_parser.h) | Executable payload, starting at payload byte offset zero | Locate the Zephyr descriptor list and retain its build ID. |
+
+The shared parser searches for aligned Zephyr descriptor magic, then walks the entries,
+skipping other descriptors and their padding. It stops at the
+[build-ID descriptor](build-id.md#embedded-descriptor-and-retrieval), an end marker or a
+descriptor error. There is no fixed search window within the executable payload.
+Zephyr descriptors use the target's native byte order; container fields may use a
+different byte order.
+
+The backend initializes its image parser once per artifact with a nonzero size limit
+that includes container metadata. Blocks must be contiguous and ordered, with byte
+offsets measured from the start of the complete artifact. HTTP Range continuation
+retries preserve the parser context without replaying bytes. A feed error aborts the
+download; the parser must be reinitialized before another artifact.
+
+Image-parser `feed()` calls check framing; descriptor errors are retained for
+`get_build_id()`. Even if the shared parser finds the ID earlier, the image parser
+exposes it only after a valid final `is_last` block, which may be empty. Reading the ID
+does not consume it, flush storage or finalize the writer. The linked headers document
+payload boundaries, buffer lifetimes and return codes.
+
+MCUboot trailer contents and presence are not checked by its parser; the TI parser
+checks trailer headers and declared lengths, without inspecting individual entries.
+Parsing does not authenticate an image; see [security and trust boundaries](#security-and-trust-boundaries).
+
 #### PSA Firmware Update handler
 
 `platform/spotflow_ota_platform_psa.c` serializes PSA operations and handles the standard
 finish/install/accept lifecycle. The internal contract in
 `platform/psa/spotflow_ota_psa_provider.h` supplies initialization, selection of the main
-component, native stream preparation, running-component queries, and ownership checks.
+component, native image parsing and writing, running-component queries, and ownership checks.
 The currently supported provider is TI CC35xx. The model, probation fields, CBOR schema,
 and storage records are shared with MCUboot.
 
@@ -760,12 +795,19 @@ Providers that accept immediately can complete without an additional reboot.
 The TI provider requires exclusive ownership of the PSA FWU service. Its global install
 and acceptance operations must not include unrelated candidates, staged images, or trials.
 A trial without Spotflow probation is not accepted automatically, and its rollback slot
-cannot be overwritten. Complete signed `vendor_image.sign.bin` artifacts are validated
-and streamed with TI's 48-byte prefix and complete-file write offsets. The bootloader
-verifies signatures. Retries preserve the RAM context; after reboot, downloads restart.
+cannot be overwritten.
+
+For a complete signed `vendor_image.sign.bin` artifact, the provider feeds each block
+to the [TI image parser](#incremental-image-parsing) before writing it. Once
+`get_prefix()` makes the validated 48-byte prefix available, the provider passes it to
+`psa_fwu_start()`. Subsequent PSA writes contain the remaining artifact bytes, with
+offsets still measured from the beginning of the complete file.
 The provider combines HTTP fragments into 256-byte PSA writes and flushes the final
 remainder when the download completes. Partial buffers survive Range retries and are
 discarded on abort, so flash-write counts do not depend on network fragment sizes.
+After reboot, downloads restart. `spotflow_ota_psa_get_candidate_info()` copies the
+completed candidate's component and build ID before the PSA platform calls
+`psa_fwu_finish()`; the getter performs no writes or lifecycle operations.
 
 TI alternates the physical vendor slots: an image initially running from slot 1
 updates into slot 2, then the next update uses slot 1. The bootloader maps either
@@ -886,4 +928,4 @@ west twister -T spotflow/zephyr/tests/ota -p native_sim --inline-logs
 | Downloader | `downloader/` | Faked transport, retry, pause, resume, cancellation |
 | Platform and identity | `platform_identity/` | MCUboot framing, descriptor boundaries, and build-ID fakes |
 | Main firmware | `fw_main/` | Shared coordinator, controls, persistence, reconciliation |
-| PSA firmware | `psa_fwu/` | TI stream adapter, slot ownership, acceptance, confirmation reboot and rollback |
+| PSA firmware | `psa_fwu/` | TI image parsing and writes, slot ownership, acceptance, confirmation reboot and rollback |

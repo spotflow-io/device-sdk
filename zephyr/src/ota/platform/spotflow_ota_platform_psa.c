@@ -142,7 +142,7 @@ int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUIL
 		return -EINVAL;
 	}
 	k_mutex_lock(&psa_mutex, K_FOREVER);
-	int rc = spotflow_ota_psa_end(&downloaded_component, build_id);
+	int rc = spotflow_ota_psa_get_candidate_info(&downloaded_component, build_id);
 
 	k_mutex_unlock(&psa_mutex);
 	return rc;

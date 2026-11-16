@@ -45,6 +45,9 @@ On architectures without binary-descriptor support (notably ESP32), retrieve the
 ID through the ELF symbol table. See `get_build_id_from_elf` in
 [`test_patch_build_id.py`](../scripts/tests/test_patch_build_id.py) for an example.
 
+See [incremental image parsing](ota.md#incremental-image-parsing) for how OTA downloads
+locate this descriptor within executable payload bytes.
+
 ## Patched artifacts
 
 Zephyr generates derived files before the module's post-build command runs, so

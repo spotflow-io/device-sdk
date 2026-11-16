@@ -1,5 +1,5 @@
 #include "ota/platform/psa/spotflow_ota_psa_provider.h"
-#include "spotflow_ota_psa_ti_container.h"
+#include "spotflow_ota_psa_ti_image_parser.h"
 
 #include <psa_fwu.h>
 #include <string.h>
@@ -13,11 +13,11 @@ LOG_MODULE_DECLARE(spotflow_ota, CONFIG_SPOTFLOW_OTA_LOG_LEVEL);
 #define TI_WRITE_CHUNK_SIZE 256U
 
 struct spotflow_ota_ti_download {
-	struct spotflow_ota_ti_container container;
+	struct spotflow_ota_ti_image_parser image_parser;
 	psa_fwu_component_t component;
 	uint8_t write_buffer[TI_WRITE_CHUNK_SIZE];
 	size_t buffered_size;
-	size_t write_offset;
+	size_t artifact_write_offset;
 	bool selected;
 	bool started;
 };
@@ -138,8 +138,8 @@ int spotflow_ota_psa_begin(void)
 	}
 	download.component = vendor_components[target];
 	LOG_INF("PSA vendor update target: component %u", download.component);
-	rc = spotflow_ota_ti_container_init(&download.container,
-					    slot_size - SPOTFLOW_OTA_TI_SLOT_OVERHEAD);
+	rc = spotflow_ota_ti_image_parser_init(&download.image_parser,
+					       slot_size - SPOTFLOW_OTA_TI_SLOT_OVERHEAD);
 	if (rc < 0) {
 		return rc;
 	}
@@ -152,25 +152,30 @@ int spotflow_ota_psa_write(const struct spotflow_artifact_block* block)
 	if (!download.selected) {
 		return -EINVAL;
 	}
-	int rc = spotflow_ota_ti_container_feed(&download.container, block);
+	int rc = spotflow_ota_ti_image_parser_feed(&download.image_parser, block);
 
 	if (rc < 0) {
 		return rc;
 	}
-	size_t prefix_size = sizeof(download.container.prefix);
+	const PSA_FWU_GPESlot_t* prefix;
+	rc = spotflow_ota_ti_image_parser_get_prefix(&download.image_parser, &prefix);
 
-	if (download.container.offset < prefix_size) {
+	if (rc == -EAGAIN) {
 		return 0;
 	}
+	if (rc < 0) {
+		return rc;
+	}
+	size_t prefix_size = sizeof(*prefix);
+
 	if (!download.started) {
-		rc = spotflow_ota_psa_errno(
-			"psa_fwu_start",
-			psa_fwu_start(download.component, &download.container.prefix, prefix_size));
+		rc = spotflow_ota_psa_errno("psa_fwu_start",
+					    psa_fwu_start(download.component, prefix, prefix_size));
 		if (rc < 0) {
 			return rc;
 		}
 		download.started = true;
-		download.write_offset = prefix_size;
+		download.artifact_write_offset = prefix_size;
 	}
 	/* PSA start consumes the prefix. TI write offsets still include those bytes. */
 	size_t offset = MAX(block->offset, prefix_size);
@@ -195,12 +200,13 @@ int spotflow_ota_psa_write(const struct spotflow_artifact_block* block)
 	return block->is_last ? flush_write_buffer() : 0;
 }
 
-int spotflow_ota_psa_end(psa_fwu_component_t* component, uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
+int spotflow_ota_psa_get_candidate_info(psa_fwu_component_t* component,
+					uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
 	if (component == NULL || build_id == NULL) {
 		return -EINVAL;
 	}
-	int rc = spotflow_ota_ti_container_get_build_id(&download.container, build_id);
+	int rc = spotflow_ota_ti_image_parser_get_build_id(&download.image_parser, build_id);
 
 	if (rc == 0) {
 		*component = download.component;
@@ -213,13 +219,13 @@ static int flush_write_buffer(void)
 	if (download.buffered_size == 0) {
 		return 0;
 	}
-	int rc = spotflow_ota_psa_errno("psa_fwu_write",
-					psa_fwu_write(download.component, download.write_offset,
-						      download.write_buffer,
-						      download.buffered_size));
+	int rc = spotflow_ota_psa_errno(
+		"psa_fwu_write",
+		psa_fwu_write(download.component, download.artifact_write_offset,
+			      download.write_buffer, download.buffered_size));
 
 	if (rc == 0) {
-		download.write_offset += download.buffered_size;
+		download.artifact_write_offset += download.buffered_size;
 		download.buffered_size = 0;
 	}
 	return rc;

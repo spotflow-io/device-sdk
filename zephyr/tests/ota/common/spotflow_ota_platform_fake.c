@@ -1,7 +1,7 @@
 #include "spotflow_ota_platform_fake.h"
 
 #include "ota/platform/spotflow_ota_platform.h"
-#include "ota/platform/spotflow_ota_identity_stream.h"
+#include "ota/platform/spotflow_ota_build_id_parser.h"
 
 #include <errno.h>
 #include <string.h>
@@ -77,7 +77,8 @@ int spotflow_ota_platform_reboot(void)
 int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH])
 {
 	struct spotflow_ota_platform_fake* fake = spotflow_ota_platform_fake_get();
-	struct spotflow_ota_identity_stream stream = { 0 };
+	struct spotflow_ota_build_id_parser parser;
+	spotflow_ota_build_id_parser_init(&parser);
 
 	if (fake->image_info_result != 0) {
 		return fake->image_info_result;
@@ -85,9 +86,9 @@ int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUIL
 	if (fake->read_result != 0) {
 		return fake->read_result;
 	}
-	spotflow_ota_identity_stream_feed(&stream, fake->upload_slot + fake->upload_image_start,
+	spotflow_ota_build_id_parser_feed(&parser, fake->upload_slot + fake->upload_image_start,
 					  fake->upload_image_size);
-	return spotflow_ota_identity_stream_get(&stream, build_id);
+	return spotflow_ota_build_id_parser_get_build_id(&parser, build_id);
 }
 
 int spotflow_ota_platform_finish_image_write(void)

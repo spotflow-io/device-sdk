@@ -66,6 +66,7 @@ int spotflow_ota_platform_write_image_block(const struct spotflow_artifact_block
  * @brief Read the completed candidate's identity without exposing native storage.
  * @param build_id Receives the executable build ID.
  * @return Zero on success, negative errno if the identity is missing or invalid.
+ * @note Copies metadata retained during download after the final block; no flash read.
  */
 int spotflow_ota_platform_get_downloaded_build_id(uint8_t build_id[SPOTFLOW_BUILD_ID_LENGTH]);
 
