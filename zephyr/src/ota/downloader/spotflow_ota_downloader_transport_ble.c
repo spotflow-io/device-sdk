@@ -28,6 +28,8 @@ struct spotflow_ota_ble_response_state {
  * previous callback's consumption. Multiple downloader instances share the link.
  */
 static K_MUTEX_DEFINE(transfer_lock);
+/* Protected by transfer_lock; Zephyr mutexes permit recursive acquisition. */
+static bool transfer_active;
 /* Owned by transfer_lock for the entire OPEN/READ/CLOSE attempt. A reconnect
  * between exchanges must invalidate the transfer as well as an outstanding wait.
  */
@@ -125,6 +127,7 @@ int spotflow_ota_downloader_transport_download(
 		(void)close_transfer(request, &header, SPOTFLOW_OTA_BLE_CLOSE_ABORTED);
 	}
 
+	transfer_active = false;
 	k_mutex_unlock(&transfer_lock);
 	if (!*request->paused) {
 		spotflow_ota_downloader_transport_note_error(request, *request->bytes_downloaded,
@@ -143,6 +146,12 @@ static int acquire_transfer(struct spotflow_ota_downloader_transport_request* re
 			return rc;
 		}
 	}
+	if (transfer_active) {
+		/* Only a recursive caller can acquire the mutex during a transfer. */
+		(void)k_mutex_unlock(&transfer_lock);
+		return -EBUSY;
+	}
+	transfer_active = true;
 	return 0;
 }
 

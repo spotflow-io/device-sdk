@@ -87,6 +87,9 @@ struct spotflow_download_request {
  * Invoked synchronously from the thread that called
  * @ref spotflow_download_artifact. The callback runs until the download
  * finishes, is canceled, or fails.
+ * With the BLE transport, do not synchronously start another download, even
+ * on a different instance, or wait for another BLE download to finish. BLE
+ * transfers share one connection and are serialized until the callback returns.
  *
  * @param block Current block. Valid only for the duration of the call.
  * @param downloader Downloader instance performing the transfer.
@@ -114,7 +117,8 @@ typedef void (*spotflow_download_block_callback)(const struct spotflow_artifact_
  *
  * @retval 0 Download completed and the final block was delivered.
  * @retval -ECANCELED Download was canceled via @ref spotflow_cancel_download.
- * @retval -EBUSY A download is already active on @p downloader.
+ * @retval -EBUSY A download is already active on @p downloader, or a BLE download
+ *         was started recursively from another download's block callback.
  * @retval -EINVAL Invalid arguments or an unsupported or malformed URL.
  * @retval <0 Other negative errno on non-retryable transport or protocol failure.
  */

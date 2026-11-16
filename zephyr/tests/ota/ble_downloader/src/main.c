@@ -16,6 +16,7 @@ LOG_MODULE_REGISTER(spotflow_ota, LOG_LEVEL_INF);
 
 struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
 static struct spotflow_downloader downloader;
+static struct spotflow_downloader nested_downloader;
 static size_t consumed;
 static size_t first_read_offset;
 static int final_blocks;
@@ -35,6 +36,9 @@ static bool reconnect_after_block;
 static bool reconnect_before_send;
 static uint32_t gateway_transfer_id;
 static int stale_requests;
+static bool download_after_block;
+static int nested_result;
+static int nested_blocks;
 
 static int download(void);
 static void reconnect(void);
@@ -42,6 +46,8 @@ static void resume_download(struct k_work* work);
 static void consume(const struct spotflow_artifact_block* block,
 		    struct spotflow_downloader* instance, void* context);
 static void before_test(void* fixture);
+static void consume_nested(const struct spotflow_artifact_block* block,
+			   struct spotflow_downloader* instance, void* context);
 
 static K_WORK_DELAYABLE_DEFINE(resume_work, resume_download);
 
@@ -207,6 +213,36 @@ ZTEST(ble_downloader, test_reconnect_between_exchanges_resumes_after_consumed_bl
 	zassert_equal(final_blocks, 1);
 }
 
+ZTEST(ble_downloader, test_nested_download_is_rejected_without_disturbing_outer_transfer)
+{
+	download_after_block = true;
+	zassert_ok(download());
+	zassert_equal(nested_result, -EBUSY);
+	zassert_equal(nested_blocks, 0);
+	zassert_equal(spotflow_get_downloader_state(&nested_downloader),
+		      SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
+	zassert_equal(opens, 1);
+	zassert_equal(stale_requests, 0);
+	zassert_equal(consumed, ARTIFACT_SIZE);
+	zassert_equal(final_blocks, 1);
+}
+
+ZTEST(ble_downloader, test_nested_download_after_reconnect_preserves_outer_connection_binding)
+{
+	reconnect_after_block = true;
+	download_after_block = true;
+	zassert_ok(download());
+	zassert_equal(nested_result, -EBUSY);
+	zassert_equal(nested_blocks, 0);
+	zassert_equal(spotflow_get_downloader_state(&nested_downloader),
+		      SPOTFLOW_DOWNLOADER_STATE_INACTIVE);
+	zassert_equal(opens, 2);
+	zassert_equal(first_read_offset, 64);
+	zassert_equal(stale_requests, 0);
+	zassert_equal(consumed, ARTIFACT_SIZE);
+	zassert_equal(final_blocks, 1);
+}
+
 ZTEST(ble_downloader, test_reconnect_before_send_reopens_instead_of_using_old_transfer)
 {
 	reconnect_before_send = true;
@@ -293,6 +329,16 @@ static void consume(const struct spotflow_artifact_block* block,
 		reconnect_after_block = false;
 		reconnect();
 	}
+	if (download_after_block) {
+		const struct spotflow_download_request request = {
+			.url = "https://example.com/nested-artifact",
+			.secret = "secret",
+		};
+
+		download_after_block = false;
+		nested_result = spotflow_download_artifact(&nested_downloader, &request,
+							 consume_nested, NULL);
+	}
 	if (cancel_after_block) {
 		zassert_ok(spotflow_cancel_download(instance));
 	}
@@ -303,6 +349,15 @@ static void consume(const struct spotflow_artifact_block* block,
 	}
 }
 
+static void consume_nested(const struct spotflow_artifact_block* block,
+			   struct spotflow_downloader* instance, void* context)
+{
+	ARG_UNUSED(block);
+	ARG_UNUSED(instance);
+	ARG_UNUSED(context);
+	nested_blocks++;
+}
+
 static void before_test(void* fixture)
 {
 	ARG_UNUSED(fixture);
@@ -311,6 +366,7 @@ static void before_test(void* fixture)
 	g_spotflow_ble_transport_state.tx.notifications_enabled = true;
 	g_spotflow_ble_transport_state.tx.connection_generation = 0;
 	zassert_ok(spotflow_init_downloader(&downloader));
+	zassert_ok(spotflow_init_downloader(&nested_downloader));
 	consumed = 0;
 	first_read_offset = SIZE_MAX;
 	final_blocks = 0;
@@ -329,6 +385,9 @@ static void before_test(void* fixture)
 	reconnect_before_send = false;
 	gateway_transfer_id = 0;
 	stale_requests = 0;
+	download_after_block = false;
+	nested_result = 0;
+	nested_blocks = 0;
 }
 
 static void reconnect(void)
