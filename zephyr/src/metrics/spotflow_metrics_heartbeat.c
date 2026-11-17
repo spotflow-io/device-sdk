@@ -13,7 +13,8 @@ LOG_MODULE_DECLARE(spotflow_metrics, CONFIG_SPOTFLOW_METRICS_PROCESSING_LOG_LEVE
 static struct spotflow_metric_msg g_pending_heartbeat;
 static uint8_t g_pending_heartbeat_payload[SPOTFLOW_METRICS_HEARTBEAT_CBOR_MAX_LEN];
 static bool g_pending_heartbeat_valid;
-static struct k_mutex g_heartbeat_mutex;
+/* Statically initialized: the persistent buffer can take a heartbeat before init runs. */
+static K_MUTEX_DEFINE(g_heartbeat_mutex);
 
 /* Periodic heartbeat work */
 static struct k_work_delayable g_heartbeat_work;
@@ -57,7 +58,6 @@ reschedule:
 
 void spotflow_metrics_heartbeat_init(void)
 {
-	k_mutex_init(&g_heartbeat_mutex);
 	k_work_init_delayable(&g_heartbeat_work, heartbeat_work_handler);
 
 	/* Schedule first heartbeat immediately */
@@ -65,6 +65,22 @@ void spotflow_metrics_heartbeat_init(void)
 
 	LOG_INF("Heartbeat initialized (interval=%d s)",
 		CONFIG_SPOTFLOW_METRICS_HEARTBEAT_INTERVAL);
+}
+
+bool spotflow_metrics_heartbeat_take(uint8_t* buffer, size_t buffer_len, size_t* len)
+{
+	bool taken = false;
+
+	k_mutex_lock(&g_heartbeat_mutex, K_FOREVER);
+	if (g_pending_heartbeat_valid && g_pending_heartbeat.len <= buffer_len) {
+		memcpy(buffer, g_pending_heartbeat.payload, g_pending_heartbeat.len);
+		*len = g_pending_heartbeat.len;
+		g_pending_heartbeat_valid = false;
+		taken = true;
+	}
+	k_mutex_unlock(&g_heartbeat_mutex);
+
+	return taken;
 }
 
 int spotflow_poll_and_process_heartbeat(void)

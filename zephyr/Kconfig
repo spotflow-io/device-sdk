@@ -15,6 +15,7 @@ rsource "src/metrics/Kconfig"
 rsource "src/metrics/system/Kconfig"
 rsource "src/net/Kconfig"
 rsource "src/ota/Kconfig"
+rsource "src/persistent_buffer/Kconfig"
 
 config SPOTFLOW_GENERATE_BUILD_ID
 	bool "Generate build ID"

@@ -9,6 +9,7 @@
 
 #include <zcbor_encode.h>
 
+#include <zephyr/kernel.h>
 #include <zephyr/logging/log.h>
 #include <zephyr/random/random.h>
 
@@ -23,7 +24,10 @@
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
 static uint64_t device_run_id = 0;
+static struct k_spinlock device_run_id_lock;
 
+static int encode_session_metadata(bool include_last_update_attempt_id, uint8_t* buffer,
+				   size_t buffer_len, size_t* cbor_data_len);
 static int cbor_encode_session_metadata(const uint8_t* build_id_data, size_t build_id_data_len,
 					uint64_t run_id, bool include_last_update_attempt_id,
 					uint64_t last_update_attempt_id,
@@ -52,9 +56,47 @@ int spotflow_session_metadata_send(void)
 
 int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t* cbor_data_len)
 {
+	return encode_session_metadata(IS_ENABLED(CONFIG_SPOTFLOW_OTA), buffer, buffer_len,
+				       cbor_data_len);
+}
+
+int spotflow_session_metadata_encode_for_replay(uint8_t* buffer, size_t buffer_len,
+						size_t* cbor_data_len)
+{
+	/* lastUpdateAttemptId is omitted: a stale value replayed in a later boot could make
+	 * the cloud believe the firmware changed outside OTA. */
+	return encode_session_metadata(false, buffer, buffer_len, cbor_data_len);
+}
+
+uint64_t spotflow_session_metadata_get_run_id(void)
+{
+	bool generated = false;
+	k_spinlock_key_t key = k_spin_lock(&device_run_id_lock);
+
+	/* Generate device run ID once per boot. The persistent buffer reads it from its own
+	 * thread, so the generation must not race with the transport. */
+	if (device_run_id == 0) {
+		uint32_t rand_high = sys_rand32_get();
+		uint32_t rand_low = sys_rand32_get();
+		device_run_id = ((uint64_t)rand_high << 32) | rand_low;
+		generated = true;
+	}
+	uint64_t run_id = device_run_id;
+
+	k_spin_unlock(&device_run_id_lock, key);
+
+	if (generated) {
+		LOG_INF("Generated device run ID: %" PRIu64, run_id);
+	}
+
+	return run_id;
+}
+
+static int encode_session_metadata(bool include_last_update_attempt_id, uint8_t* buffer,
+				   size_t buffer_len, size_t* cbor_data_len)
+{
 	const uint8_t* build_id = NULL;
 	uint16_t build_id_len = 0;
-	bool include_last_update_attempt_id = false;
 	uint64_t last_update_attempt_id = 0;
 	int rc;
 	struct spotflow_session_metadata_labels labels =
@@ -78,13 +120,7 @@ int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t*
 		}
 	}
 
-	/* Generate device run ID once per boot */
-	if (device_run_id == 0) {
-		uint32_t rand_high = sys_rand32_get();
-		uint32_t rand_low = sys_rand32_get();
-		device_run_id = ((uint64_t)rand_high << 32) | rand_low;
-		LOG_INF("Generated device run ID: %" PRIu64, device_run_id);
-	}
+	uint64_t run_id = spotflow_session_metadata_get_run_id();
 
 #ifdef CONFIG_SPOTFLOW_GENERATE_BUILD_ID
 	rc = spotflow_build_id_get(&build_id, &build_id_len);
@@ -94,17 +130,18 @@ int spotflow_session_metadata_encode(uint8_t* buffer, size_t buffer_len, size_t*
 #endif /* CONFIG_SPOTFLOW_GENERATE_BUILD_ID */
 
 #ifdef CONFIG_SPOTFLOW_OTA
-	include_last_update_attempt_id = true;
-	last_update_attempt_id = spotflow_ota_get_last_received_attempt_id();
+	if (include_last_update_attempt_id) {
+		last_update_attempt_id = spotflow_ota_get_last_received_attempt_id();
+	}
 #endif /* CONFIG_SPOTFLOW_OTA */
 
-	rc = cbor_encode_session_metadata(build_id, build_id_len, device_run_id,
+	rc = cbor_encode_session_metadata(build_id, build_id_len, run_id,
 					  include_last_update_attempt_id, last_update_attempt_id,
 					  &labels, buffer, buffer_len, cbor_data_len);
 	if (rc == -EMSGSIZE && labels.count > 0) {
 		LOG_WRN("Session metadata labels exceed the configured buffer; omitting labels");
 		rc = cbor_encode_session_metadata(
-			build_id, build_id_len, device_run_id, include_last_update_attempt_id,
+			build_id, build_id_len, run_id, include_last_update_attempt_id,
 			last_update_attempt_id, &no_labels, buffer, buffer_len, cbor_data_len);
 	}
 

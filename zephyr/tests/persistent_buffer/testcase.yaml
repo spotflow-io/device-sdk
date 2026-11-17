@@ -1,0 +1,20 @@
+common:
+  tags:
+    - spotflow
+    - persistent_buffer
+    - unit
+
+tests:
+  spotflow.persistent_buffer:
+    integration_platforms:
+      - qemu_cortex_m3
+    platform_allow:
+      - qemu_cortex_m3
+      - native_sim
+      - native_sim/native/64
+  spotflow.persistent_buffer.write_block_1:
+    extra_args: EXTRA_DTC_OVERLAY_FILE=write_block_1.overlay
+    integration_platforms:
+      - qemu_cortex_m3
+    platform_allow:
+      - qemu_cortex_m3

@@ -1,0 +1,31 @@
+/* The sample does not use MCUboot, so the second image slot is free. Shrink it by 128 KiB and
+ * place the Spotflow persistent buffer and the core dump partition right before the storage
+ * partition.
+ */
+&slot1_partition {
+	reg = <0xc2000 DT_SIZE_K(584)>;
+};
+
+/* The persistent buffer uses Zephyr FCB, which supports write blocks of at most 8 bytes. RRAM
+ * defaults to 16-byte lines because of the RRAMC write buffer, so the buffer is disabled in
+ * nrf54l15dk_nrf54l15_cpuapp.conf (CONFIG_NRF_RRAM_WRITE_BUFFER_SIZE=0) and RRAM is written in
+ * 32-bit words.
+ */
+&cpuapp_rram {
+	write-block-size = <4>;
+
+	partitions {
+		/* 16 sectors of 4 KiB */
+		spotflow_buffer_partition: partition@154000 {
+			compatible = "zephyr,mapped-partition";
+			label = "spotflow-buffer";
+			reg = <0x154000 DT_SIZE_K(64)>;
+		};
+
+		coredump_partition: partition@164000 {
+			compatible = "zephyr,mapped-partition";
+			label = "coredump-partition";
+			reg = <0x164000 DT_SIZE_K(64)>;
+		};
+	};
+};

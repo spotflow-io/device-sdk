@@ -1,0 +1,37 @@
+config SPOTFLOW_PERSISTENT_BUFFER
+	bool "Store logs and metrics in flash until they are sent"
+	default n
+	select FLASH
+	select FLASH_MAP
+	select FCB
+	help
+		Store all logs and metrics in a flash circular buffer before they are sent, so they
+		survive reboots and battery loss while no connection is available. Buffered data
+		is sent after the next connection, attributed to the boot that produced it.
+
+		Requires a flash partition labelled spotflow_buffer_partition in devicetree, or a
+		spotflow_buffer partition when the Partition Manager is used. The partition size
+		sets the buffer capacity; use at least four flash sectors.
+
+		The flash write block must be at most 8 bytes. On nRF54L RRAM, set
+		CONFIG_NRF_RRAM_WRITE_BUFFER_SIZE=0 and write-block-size = <4> on the RRAM node
+		(see the nrf54l15dk_nrf54l15_cpuapp files of the BLE sample).
+
+if SPOTFLOW_PERSISTENT_BUFFER
+
+config SPOTFLOW_PERSISTENT_BUFFER_FLUSH_INTERVAL_MS
+	int "Interval of writing queued messages to flash (ms)"
+	default 5000
+	range 100 3600000
+	help
+		How often queued RAM messages are written to flash. Messages are also written when
+		a RAM queue is half full and when spotflow_persistent_buffer_flush() is called.
+		A sudden power loss loses at most the messages produced during the last interval.
+
+config HEAP_MEM_POOL_ADD_SIZE_SPOTFLOW_PERSISTENT_BUFFER
+	int
+	default 2048
+	help
+		Heap for the message that is read from flash and being sent.
+
+endif # SPOTFLOW_PERSISTENT_BUFFER

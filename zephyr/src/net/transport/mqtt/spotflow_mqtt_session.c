@@ -11,6 +11,9 @@
 #ifdef CONFIG_SPOTFLOW_OTA
 #include "ota/spotflow_ota.h"
 #endif /* CONFIG_SPOTFLOW_OTA */
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+#include "persistent_buffer/spotflow_persistent_buffer.h"
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 #include <errno.h>
 
@@ -46,6 +49,10 @@ static void process_mqtt_session(spotflow_mqtt_process_fn process_fn)
 		spotflow_mqtt_abort_mqtt();
 		return;
 	}
+
+#ifdef CONFIG_SPOTFLOW_PERSISTENT_BUFFER
+	spotflow_pb_on_session_start();
+#endif /* CONFIG_SPOTFLOW_PERSISTENT_BUFFER */
 
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 	rc = spotflow_config_init_session();

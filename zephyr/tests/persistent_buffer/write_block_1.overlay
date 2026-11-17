@@ -1,0 +1,4 @@
+/* Byte-writable flash, like most NOR flash. */
+&flash_sim0 {
+	write-block-size = <1>;
+};

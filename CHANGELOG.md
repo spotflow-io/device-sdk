@@ -8,6 +8,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added an opt-in Zephyr persistent buffer (`CONFIG_SPOTFLOW_PERSISTENT_BUFFER`) that stores logs, metrics and heartbeats in a flash partition before they are sent, so they survive reboots and power loss while the device is offline. Buffered data is sent with the session metadata of the boot that produced it.
+* Added Zephyr BLE sample support for the Nordic nRF54L15 DK, with the persistent buffer enabled.
 * Added opt-in Zephyr compact logs, which send format-string addresses, raw arguments, and source name addresses for cloud formatting.
 * Added TI LP-EM-CC35X1 support to the Zephyr logs, metrics, coredumps, and BLE samples.
 * Added a west manifest for TI CC35X1 using SimpleLink Zephyr v4.4.0-ti-10.10.00.
