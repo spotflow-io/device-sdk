@@ -1,0 +1,44 @@
+diff --git a/simplelink_lpf3/CMakeLists.txt b/simplelink_lpf3/CMakeLists.txt
+index 0a51698..f36d439 100644
+--- a/simplelink_lpf3/CMakeLists.txt
++++ b/simplelink_lpf3/CMakeLists.txt
+@@ -35,7 +35,7 @@ add_subdirectory(source/ti/boards)
+
+ include(${CMAKE_CURRENT_LIST_DIR}/CMakeSources.cmake)
+
+-if(NOT CONFIG_BT_HCI_TI_CC3XXX)
++if(NOT CONFIG_BT_HCI_TI_CC35XX)
+   add_subdirectory_ifdef(CONFIG_BT source/ti/ble)
+ endif()
+
+diff --git a/simplelink_wff3/kernel/zephyr/dpl/ClockP_zephyr.c b/simplelink_wff3/kernel/zephyr/dpl/ClockP_zephyr.c
+index 997159c..7784b4b 100644
+--- a/simplelink_wff3/kernel/zephyr/dpl/ClockP_zephyr.c
++++ b/simplelink_wff3/kernel/zephyr/dpl/ClockP_zephyr.c
+@@ -36,6 +36,7 @@
+
+
+ #include <zephyr/kernel.h>
++#include <zephyr/init.h>
+ #include <zephyr/sys/__assert.h>
+ #include <kernel/zephyr/dpl/dpl.h>
+ #include <ti/drivers/dpl/ClockP.h>
+@@ -340,3 +341,18 @@ void ClockP_destruct(ClockP_Struct *clockP)
+
+     k_timer_stop(&obj->timer);
+ }
++
++#ifdef CONFIG_HAS_CC35XX_SDK
++/*
++ * TI's RAM flash routines poll SYSTIM while interrupts are locked. Zephyr can
++ * use SysTick for its kernel clock and does not call the TI Power_init() path
++ * that normally enables SYSTIM. Enable the peripheral before any flash users.
++ */
++static int clockp_init_systim(void)
++{
++    HWREG(SYSTIM_BASE + SYSTIM_O_CLKCFG) = SYSTIM_CLKCFG_EN;
++    return 0;
++}
++
++SYS_INIT(clockp_init_systim, PRE_KERNEL_2, CONFIG_KERNEL_INIT_PRIORITY_DEFAULT);
++#endif /* CONFIG_HAS_CC35XX_SDK */

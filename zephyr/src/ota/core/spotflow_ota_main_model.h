@@ -16,11 +16,6 @@ struct ota_main_completion_transition {
 	bool claim_artifact_transaction;
 };
 
-struct ota_main_prereboot_transition {
-	struct spotflow_ota_main_firmware_state state;
-	bool clear_artifact_transaction;
-};
-
 void spotflow_ota_main_clear(struct ota_main_firmware_model* main);
 bool spotflow_ota_main_is_valid(const struct ota_main_firmware_model* main);
 void spotflow_ota_main_project_state(const struct ota_main_firmware_model* main,
@@ -56,8 +51,15 @@ bool spotflow_ota_main_claim_completion(struct ota_main_firmware_model* main,
 int spotflow_ota_main_commit_probation_cleared(struct ota_main_firmware_model* main,
 					       bool reconciliation_owned);
 
+/**
+ * @brief Enter the reboot-ready phase without releasing the handler's artifact.
+ * @param main Main-firmware model.
+ * @param handler_owned Whether the caller still owns the artifact transaction.
+ * @param out_state Optional output for the public state.
+ * @return Zero on success, -EINVAL unless the owned handler is installing.
+ */
 int spotflow_ota_main_finish_prereboot(struct ota_main_firmware_model* main, bool handler_owned,
-				       struct ota_main_prereboot_transition* transition);
+				       struct spotflow_ota_main_firmware_state* out_state);
 int spotflow_ota_main_enter_unconfirmed(struct ota_main_firmware_model* main, size_t artifact_index,
 					struct spotflow_ota_main_firmware_state* out_state);
 int spotflow_ota_main_set_paused(struct ota_main_firmware_model* main, bool has_attempt,
@@ -66,9 +68,9 @@ int spotflow_ota_main_request_abort(struct ota_main_firmware_model* main, bool h
 				    struct spotflow_ota_main_firmware_state* out_state);
 bool spotflow_ota_main_is_abort_requested(const struct ota_main_firmware_model* main,
 					  bool has_attempt);
-int spotflow_ota_main_begin_upgrade_commit(struct ota_main_firmware_model* main, bool handler_owned,
-					   bool attempt_canceled);
-int spotflow_ota_main_cancel_upgrade_commit(struct ota_main_firmware_model* main);
+int spotflow_ota_main_begin_installation(struct ota_main_firmware_model* main, bool handler_owned,
+					 bool attempt_canceled);
+int spotflow_ota_main_cancel_installation(struct ota_main_firmware_model* main);
 int spotflow_ota_main_begin_reboot(struct ota_main_firmware_model* main);
 
 #ifdef __cplusplus
