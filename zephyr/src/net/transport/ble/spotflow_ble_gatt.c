@@ -16,6 +16,9 @@
 #ifdef CONFIG_SPOTFLOW_LOG_BACKEND
 #include "config/spotflow_config.h"
 #endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
+#ifdef CONFIG_SPOTFLOW_OTA
+#include "ota/spotflow_ota.h"
+#endif /* CONFIG_SPOTFLOW_OTA */
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
 #include "metrics/system/spotflow_metrics_system.h"
 #endif
@@ -40,6 +43,14 @@ LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 #define SPOTFLOW_BLE_ENABLE_RETRY_COUNT 3
 #define SPOTFLOW_BLE_ENABLE_RETRY_DELAY K_MSEC(200)
 
+#if defined(CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION)
+#define SPOTFLOW_READ_PERMISSION BT_GATT_PERM_READ_ENCRYPT
+#define SPOTFLOW_WRITE_PERMISSION BT_GATT_PERM_WRITE_ENCRYPT
+#else
+#define SPOTFLOW_READ_PERMISSION BT_GATT_PERM_READ
+#define SPOTFLOW_WRITE_PERMISSION BT_GATT_PERM_WRITE
+#endif /* defined(CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION) */
+
 static const struct bt_uuid_128 spotflow_service_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_SERVICE_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_capabilities_uuid =
@@ -52,11 +63,6 @@ static const struct bt_uuid_128 spotflow_tx_stream_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_TX_STREAM_UUID_ENCODED);
 static const struct bt_uuid_128 spotflow_rx_stream_uuid =
 	BT_UUID_INIT_128(SPOTFLOW_RX_STREAM_UUID_ENCODED);
-
-static const uint8_t capabilities[] = {
-	SPOTFLOW_PROTOCOL_VERSION_MAJOR,
-	SPOTFLOW_PROTOCOL_VERSION_MINOR,
-};
 
 /* advertising payload */
 static const struct bt_data ad[] = {
@@ -86,20 +92,19 @@ static void restart_advertising_work_handler(struct k_work* work);
 static void connected(struct bt_conn* conn, uint8_t err);
 static void disconnected(struct bt_conn* conn, uint8_t reason);
 
-BT_GATT_SERVICE_DEFINE(spotflow_svc, BT_GATT_PRIMARY_SERVICE(&spotflow_service_uuid),
-		       BT_GATT_CHARACTERISTIC(&spotflow_capabilities_uuid.uuid, BT_GATT_CHRC_READ,
-					      BT_GATT_PERM_READ, read_capabilities, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_device_id_uuid.uuid, BT_GATT_CHRC_READ,
-					      BT_GATT_PERM_READ, read_device_id, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_session_metadata_uuid.uuid,
-					      BT_GATT_CHRC_READ, BT_GATT_PERM_READ,
-					      read_session_metadata, NULL, NULL),
-		       BT_GATT_CHARACTERISTIC(&spotflow_tx_stream_uuid.uuid, BT_GATT_CHRC_NOTIFY,
-					      BT_GATT_PERM_NONE, NULL, NULL, NULL),
-		       BT_GATT_CCC(tx_ccc_cfg_changed, BT_GATT_PERM_READ | BT_GATT_PERM_WRITE),
-		       BT_GATT_CHARACTERISTIC(&spotflow_rx_stream_uuid.uuid,
-					      BT_GATT_CHRC_WRITE_WITHOUT_RESP, BT_GATT_PERM_WRITE,
-					      NULL, write_rx_stream, NULL));
+BT_GATT_SERVICE_DEFINE(
+	spotflow_svc, BT_GATT_PRIMARY_SERVICE(&spotflow_service_uuid),
+	BT_GATT_CHARACTERISTIC(&spotflow_capabilities_uuid.uuid, BT_GATT_CHRC_READ,
+			       BT_GATT_PERM_READ, read_capabilities, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_device_id_uuid.uuid, BT_GATT_CHRC_READ,
+			       SPOTFLOW_READ_PERMISSION, read_device_id, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_session_metadata_uuid.uuid, BT_GATT_CHRC_READ,
+			       SPOTFLOW_READ_PERMISSION, read_session_metadata, NULL, NULL),
+	BT_GATT_CHARACTERISTIC(&spotflow_tx_stream_uuid.uuid, BT_GATT_CHRC_NOTIFY,
+			       BT_GATT_PERM_NONE, NULL, NULL, NULL),
+	BT_GATT_CCC(tx_ccc_cfg_changed, SPOTFLOW_READ_PERMISSION | SPOTFLOW_WRITE_PERMISSION),
+	BT_GATT_CHARACTERISTIC(&spotflow_rx_stream_uuid.uuid, BT_GATT_CHRC_WRITE_WITHOUT_RESP,
+			       SPOTFLOW_WRITE_PERMISSION, NULL, write_rx_stream, NULL));
 
 BT_CONN_CB_DEFINE(spotflow_ble_conn_callbacks) = {
 	.connected = connected,
@@ -112,6 +117,18 @@ int spotflow_ble_transport_start_impl(void)
 		k_mutex_init(&g_spotflow_ble_transport_state.lock);
 		k_work_init_delayable(&g_spotflow_ble_transport_state.restart_advertising_work,
 				      restart_advertising_work_handler);
+#ifdef CONFIG_SPOTFLOW_OTA
+		/* BLE keeps its OTA receiver across gateway reconnects. Install it
+		 * on the processing thread before Bluetooth accepts connections.
+		 */
+		int ota_rc = spotflow_ota_init_session();
+		if (ota_rc < 0) {
+			/* Keep telemetry/configuration available. A gateway reconnect
+			 * cannot repair local OTA startup; retry after reboot instead.
+			 */
+			LOG_ERR("BLE OTA unavailable until reboot: %d", ota_rc);
+		}
+#endif /* CONFIG_SPOTFLOW_OTA */
 		g_spotflow_ble_transport_state.initialized = true;
 	}
 
@@ -143,6 +160,14 @@ const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void)
 static ssize_t read_capabilities(struct bt_conn* conn, const struct bt_gatt_attr* attr, void* buf,
 				 uint16_t len, uint16_t offset)
 {
+	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
+	bool ota_ready = g_spotflow_ble_transport_state.ota_callback != NULL;
+	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+	const uint8_t capabilities[] = {
+		SPOTFLOW_PROTOCOL_VERSION_MAJOR,
+		SPOTFLOW_PROTOCOL_VERSION_MINOR,
+		ota_ready ? BIT(0) : 0,
+	};
 	return bt_gatt_attr_read(conn, attr, buf, len, offset, capabilities, sizeof(capabilities));
 }
 
@@ -189,7 +214,7 @@ static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* 
 		return BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
 	}
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(buf, len, flags);
+	int rc = spotflow_ble_transport_queue_rx_frame(buf, len);
 	if (rc < 0) {
 		return BT_GATT_ERR(BT_ATT_ERR_VALUE_NOT_ALLOWED);
 	}
@@ -209,6 +234,15 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 	g_spotflow_ble_transport_state.tx.notifications_enabled = enabled;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+	if (!was_enabled && enabled) {
+		int rc = spotflow_config_init_session();
+		if (rc < 0) {
+			LOG_WRN("Failed to initialize configuration updating: %d", rc);
+		}
+	}
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
+
 	LOG_INF("BLE TX Stream notifications %s", enabled ? "enabled" : "disabled");
 
 #ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
@@ -218,15 +252,6 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 		spotflow_metrics_system_report_connection_state(false);
 	}
 #endif
-
-#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
-	if (!was_enabled && enabled) {
-		int rc = spotflow_config_init_session();
-		if (rc < 0) {
-			LOG_WRN("Failed to initialize configuration updating: %d", rc);
-		}
-	}
-#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
 }
 
 /* A BLE transport session starts only after TX notifications are enabled. A
@@ -333,6 +358,7 @@ static void connected(struct bt_conn* conn, uint8_t err)
 		bt_conn_unref(g_spotflow_ble_transport_state.tx.conn);
 	}
 	g_spotflow_ble_transport_state.tx.conn = bt_conn_ref(conn);
+	g_spotflow_ble_transport_state.tx.connection_generation++;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
 	LOG_INF("BLE central connected");
@@ -350,11 +376,8 @@ static void disconnected(struct bt_conn* conn, uint8_t reason)
 		g_spotflow_ble_transport_state.tx.conn = NULL;
 	}
 	g_spotflow_ble_transport_state.tx.notifications_enabled = false;
-	/* A disconnect terminates any partially reassembled RX config message. */
-	g_spotflow_ble_transport_state.config_rx.active = false;
-	g_spotflow_ble_transport_state.config_rx.sequence = 0;
-	g_spotflow_ble_transport_state.config_rx.total_len = 0;
-	g_spotflow_ble_transport_state.config_rx.received_len = 0;
+	g_spotflow_ble_transport_state.tx.connection_generation++;
+	/* Queued RX frames and partial messages are invalidated by the new generation. */
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
 
 	LOG_INF("BLE central disconnected: 0x%02x", reason);

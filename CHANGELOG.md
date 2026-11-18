@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Unreleased
 
 ### Added
+* Added Zephyr OTA updates through a trusted BLE gateway, including resumable artifact
+  downloads, configurable request timeouts, pause, and cancellation.
+* Added BLE protocol 1.1 capabilities and optional ACK/NACK responses for configuration,
+  OTA commands, and artifact replies.
+* Added a TI LP-EM-CC35X1 BLE OTA sample profile and integration guide using PSA FWU.
 * Added a Zephyr PSA Firmware Update backend and OTA sample for TI LP-EM-CC35X1.
   TI image confirmation requires an application-requested `psa_fwu_request_reboot()` after
   `spotflow_confirm_main_firmware_image()`; success is reported after the next startup
@@ -23,6 +28,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Added runtime ingest keys for Zephyr via `CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC` and the required `spotflow_on_ingest_key_requested()` callback, while retaining compile-time validation of static ingest keys.
 
 ### Changed
+* Moved BLE receive reassembly and message handling to a dedicated thread, with
+  independent buffers for configuration, OTA commands, and artifact replies and
+  stale-frame rejection across reconnects.
+* Zephyr BLE OTA now requires encrypted service access by default through
+  `CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION`. Applications must enable `CONFIG_BT_SMP`
+  and configure trusted pairing; the sample disables encryption for development.
+* Scoped Zephyr OTA HTTP dependencies and URL preparation to the MQTT socket transport
+  so BLE OTA builds do not require the HTTP client or URL parser.
 * Automatic Zephyr main-firmware updates now reject downloaded images whose build ID
   matches the currently running firmware, before requesting installation.
 * Automatic MCUboot updates now require directly readable MCUboot v1 images. Encrypted,
@@ -34,6 +47,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 * Scoped Zephyr Mbed TLS and socket defaults to the MQTT transport so BLE-only workspaces do not require Mbed TLS.
 
 ### Fixed
+* Fixed potential deadlocks when starting a BLE artifact download recursively from
+  another download's block callback by returning `-EBUSY`, even across instances.
 * Fixed OTA cancellation results not being reported after restoring an unfinished update attempt.
 * Fixed Zephyr reset-cause metrics on targets that omit optional bootloader and flash reset flags.
 * Fixed TLS certificate parsing failures in the Zephyr TI CC35X1 MQTT samples.

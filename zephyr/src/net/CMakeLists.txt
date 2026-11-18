@@ -1,3 +1,10 @@
+if(CONFIG_SPOTFLOW_TRANSPORT_BLE AND CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION AND
+    NOT CONFIG_BT_SMP)
+    message(FATAL_ERROR
+        "Spotflow BLE encryption requires CONFIG_BT_SMP=y. "
+        "Enable it in the application configuration.")
+endif()
+
 zephyr_library_sources(
         spotflow_processor.c
         spotflow_device_id.c
@@ -21,4 +28,5 @@ zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_BLE
         transport/ble/spotflow_ble_transport.c
         transport/ble/spotflow_ble_gatt.c
         transport/ble/spotflow_ble_framing.c
+        transport/ble/spotflow_ble_rx.c
 )

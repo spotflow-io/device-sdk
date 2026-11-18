@@ -1,0 +1,12 @@
+common:
+  tags:
+    - spotflow
+    - ota
+    - bluetooth
+tests:
+  spotflow.ota.ble_downloader:
+    platform_allow:
+      - native_sim
+      - qemu_cortex_m3
+    integration_platforms:
+      - native_sim

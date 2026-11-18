@@ -3,6 +3,7 @@
 #include <spotflow/downloader.h>
 
 #include "ota/downloader/spotflow_ota_downloader.h"
+#include "ota/downloader/spotflow_ota_downloader_http.h"
 #include "ota/downloader/spotflow_ota_downloader_transport_range.h"
 #include "ota/downloader/spotflow_ota_url.h"
 
@@ -42,7 +43,7 @@ static int http_response_cb(struct http_response* rsp, enum http_final_call fina
 int spotflow_ota_downloader_transport_download(
 	struct spotflow_ota_downloader_transport_request* request)
 {
-	if (request == NULL || request->url == NULL || request->authorization_header == NULL ||
+	if (request == NULL || request->original_url == NULL || request->secret == NULL ||
 	    request->downloader == NULL || request->callback == NULL ||
 	    request->bytes_downloaded == NULL || request->artifact_size == NULL ||
 	    request->paused == NULL || request->transient_failure == NULL) {
@@ -53,9 +54,17 @@ int spotflow_ota_downloader_transport_download(
 	*request->transient_failure = false;
 	*request->bytes_downloaded = 0;
 
+	struct spotflow_ota_http_request http_request;
+	int rc = spotflow_ota_downloader_prepare_http_request(request->original_url,
+							      request->secret, &http_request);
+
+	if (rc != 0) {
+		return rc;
+	}
+
 	k_timepoint_t request_deadline =
 		sys_timepoint_calc(K_MSEC(CONFIG_SPOTFLOW_OTA_HTTP_TIMEOUT_MS));
-	int sock = connect_socket(request->url);
+	int sock = connect_socket(&http_request.url);
 
 	if (sock < 0) {
 		spotflow_ota_downloader_transport_note_error(request, 0, sock);
@@ -77,7 +86,7 @@ int spotflow_ota_downloader_transport_download(
 	const char* optional_headers[3];
 	size_t optional_header_count = 0;
 
-	optional_headers[optional_header_count++] = request->authorization_header;
+	optional_headers[optional_header_count++] = http_request.authorization_header;
 
 	if (request->range_start > 0) {
 		int written = snprintk(range_header, sizeof(range_header), "Range: bytes=%zu-\r\n",
@@ -96,8 +105,8 @@ int spotflow_ota_downloader_transport_download(
 
 	struct http_request req = {
 		.method = HTTP_GET,
-		.url = request->url->path,
-		.host = request->url->host,
+		.url = http_request.url.path,
+		.host = http_request.url.host,
 		.protocol = "HTTP/1.1",
 		.response = http_response_cb,
 		.recv_buf = request->downloader->recv_buf,
@@ -113,7 +122,7 @@ int spotflow_ota_downloader_transport_download(
 
 	int32_t http_timeout_ms =
 		k_ticks_to_ms_ceil32(sys_timepoint_timeout(request_deadline).ticks);
-	int rc = http_client_req(sock, &req, http_timeout_ms, &http_ctx);
+	rc = http_client_req(sock, &req, http_timeout_ms, &http_ctx);
 
 	zsock_close(sock);
 

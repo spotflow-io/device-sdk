@@ -9,12 +9,16 @@
 
 LOG_MODULE_REGISTER(spotflow_net, LOG_LEVEL_INF);
 
-struct spotflow_ble_transport_state g_spotflow_ble_transport_state;
 const struct bt_gatt_service_static spotflow_svc = { 0 };
 
 static uint8_t callback_payload[SPOTFLOW_CONFIG_RX_BUFFER_SIZE];
 static size_t callback_payload_len;
 static int callback_count;
+
+static struct spotflow_ble_rx_state config_rx_state;
+static uint8_t config_rx_buffer[SPOTFLOW_CONFIG_RX_BUFFER_SIZE];
+
+static int process_config_frame(const void* buf, uint16_t len, uint8_t flags);
 
 const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void)
 {
@@ -35,7 +39,7 @@ static void reset_rx_test_state(void)
 	callback_payload_len = 0;
 	callback_count = 0;
 	k_mutex_init(&g_spotflow_ble_transport_state.lock);
-	g_spotflow_ble_transport_state.config_rx.callback = config_callback;
+	memset(&config_rx_state, 0, sizeof(config_rx_state));
 }
 
 ZTEST_SUITE(spotflow_ble_framing, NULL, NULL, NULL, NULL, NULL);
@@ -148,18 +152,18 @@ ZTEST(spotflow_ble_framing, test_decode_single_frame_desired_config)
 
 	frame[0] = SPOTFLOW_MSG_DESIRED_CONFIGURATION;
 	frame[1] = SPOTFLOW_FRAME_IS_FIRST | SPOTFLOW_FRAME_IS_LAST;
-	frame[2] = 0x22;
+	frame[2] = 0x22; /* Sequence number. */
+	/* First-fragment length is uint16 LE, followed by payload at byte 5. */
 	sys_put_le16(sizeof(payload), &frame[3]);
 	memcpy(&frame[5], payload, sizeof(payload));
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(frame, sizeof(frame),
-								BT_GATT_WRITE_FLAG_CMD);
+	int rc = process_config_frame(frame, sizeof(frame), BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 1);
 	zassert_equal(callback_payload_len, sizeof(payload));
 	zassert_mem_equal(callback_payload, payload, sizeof(payload));
-	zassert_false(g_spotflow_ble_transport_state.config_rx.active);
+	zassert_false(config_rx_state.active);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_multiple_frames_from_encoder)
@@ -179,8 +183,7 @@ ZTEST(spotflow_ble_framing, test_decode_multiple_frames_from_encoder)
 							      16, offset, &frame, &next_offset);
 		zassert_equal(rc, 0, "unexpected encode rc %d", rc);
 
-		rc = spotflow_ble_transport_process_config_rx_frame(frame.data, frame.len,
-								    BT_GATT_WRITE_FLAG_CMD);
+		rc = process_config_frame(frame.data, frame.len, BT_GATT_WRITE_FLAG_CMD);
 		zassert_equal(rc, 0, "unexpected decode rc %d", rc);
 
 		offset = next_offset;
@@ -189,7 +192,7 @@ ZTEST(spotflow_ble_framing, test_decode_multiple_frames_from_encoder)
 	zassert_equal(callback_count, 1);
 	zassert_equal(callback_payload_len, sizeof(payload) - 1);
 	zassert_mem_equal(callback_payload, payload, sizeof(payload) - 1);
-	zassert_false(g_spotflow_ble_transport_state.config_rx.active);
+	zassert_false(config_rx_state.active);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_rejects_continuation_without_first)
@@ -197,14 +200,15 @@ ZTEST(spotflow_ble_framing, test_decode_rejects_continuation_without_first)
 	static const uint8_t frame[] = {
 		SPOTFLOW_MSG_DESIRED_CONFIGURATION,
 		0,
+		/* Sequence number. */
 		0x44,
+		/* Fragment payload. */
 		0x01,
 	};
 
 	reset_rx_test_state();
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(frame, sizeof(frame),
-								BT_GATT_WRITE_FLAG_CMD);
+	int rc = process_config_frame(frame, sizeof(frame), BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 0);
@@ -215,29 +219,38 @@ ZTEST(spotflow_ble_framing, test_decode_sequence_mismatch_resets_state)
 	static const uint8_t first_fragment[] = {
 		SPOTFLOW_MSG_DESIRED_CONFIGURATION,
 		SPOTFLOW_FRAME_IS_FIRST,
+		/* Sequence number. */
 		0x55,
+		/* Declared total message length: uint16 LE. */
 		0x04,
 		0x00,
+		/* Fragment payload. */
 		0xAA,
 		0xBB,
 	};
 	static const uint8_t wrong_sequence_fragment[] = {
-		SPOTFLOW_MSG_DESIRED_CONFIGURATION, SPOTFLOW_FRAME_IS_LAST, 0x56, 0xCC, 0xDD,
+		SPOTFLOW_MSG_DESIRED_CONFIGURATION,
+		SPOTFLOW_FRAME_IS_LAST,
+		/* Sequence number. */
+		0x56,
+		/* Fragment payload. */
+		0xCC,
+		0xDD,
 	};
 
 	reset_rx_test_state();
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(
-		first_fragment, sizeof(first_fragment), BT_GATT_WRITE_FLAG_CMD);
+	int rc = process_config_frame(first_fragment, sizeof(first_fragment),
+				      BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
-	zassert_true(g_spotflow_ble_transport_state.config_rx.active);
+	zassert_true(config_rx_state.active);
 
-	rc = spotflow_ble_transport_process_config_rx_frame(
-		wrong_sequence_fragment, sizeof(wrong_sequence_fragment), BT_GATT_WRITE_FLAG_CMD);
+	rc = process_config_frame(wrong_sequence_fragment, sizeof(wrong_sequence_fragment),
+				  BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 0);
-	zassert_false(g_spotflow_ble_transport_state.config_rx.active);
+	zassert_false(config_rx_state.active);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_rejects_invalid_first_fragment_lengths)
@@ -245,29 +258,33 @@ ZTEST(spotflow_ble_framing, test_decode_rejects_invalid_first_fragment_lengths)
 	static const uint8_t zero_total_len[] = {
 		SPOTFLOW_MSG_DESIRED_CONFIGURATION,
 		SPOTFLOW_FRAME_IS_FIRST | SPOTFLOW_FRAME_IS_LAST,
+		/* Sequence number. */
 		0x66,
+		/* Declared total message length: uint16 LE. */
 		0x00,
 		0x00,
 	};
 	static const uint8_t fragment_longer_than_total[] = {
 		SPOTFLOW_MSG_DESIRED_CONFIGURATION,
 		SPOTFLOW_FRAME_IS_FIRST | SPOTFLOW_FRAME_IS_LAST,
+		/* Sequence number. */
 		0x66,
+		/* Declared total message length: uint16 LE. */
 		0x01,
 		0x00,
+		/* Fragment payload. */
 		0xAA,
 		0xBB,
 	};
 
 	reset_rx_test_state();
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(
-		zero_total_len, sizeof(zero_total_len), BT_GATT_WRITE_FLAG_CMD);
+	int rc = process_config_frame(zero_total_len, sizeof(zero_total_len),
+				      BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 
-	rc = spotflow_ble_transport_process_config_rx_frame(fragment_longer_than_total,
-							    sizeof(fragment_longer_than_total),
-							    BT_GATT_WRITE_FLAG_CMD);
+	rc = process_config_frame(fragment_longer_than_total, sizeof(fragment_longer_than_total),
+				  BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 0);
 }
@@ -275,26 +292,36 @@ ZTEST(spotflow_ble_framing, test_decode_rejects_invalid_first_fragment_lengths)
 ZTEST(spotflow_ble_framing, test_decode_rejects_incomplete_last_fragment)
 {
 	static const uint8_t first_fragment[] = {
-		SPOTFLOW_MSG_DESIRED_CONFIGURATION, SPOTFLOW_FRAME_IS_FIRST, 0x77, 0x04, 0x00, 0xAA,
+		SPOTFLOW_MSG_DESIRED_CONFIGURATION,
+		SPOTFLOW_FRAME_IS_FIRST,
+		/* Sequence number. */
+		0x77,
+		/* Declared total message length: uint16 LE. */
+		0x04,
+		0x00,
+		/* Fragment payload. */
+		0xAA,
 	};
 	static const uint8_t incomplete_last_fragment[] = {
 		SPOTFLOW_MSG_DESIRED_CONFIGURATION,
 		SPOTFLOW_FRAME_IS_LAST,
+		/* Sequence number. */
 		0x77,
+		/* Fragment payload. */
 		0xBB,
 	};
 
 	reset_rx_test_state();
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(
-		first_fragment, sizeof(first_fragment), BT_GATT_WRITE_FLAG_CMD);
+	int rc = process_config_frame(first_fragment, sizeof(first_fragment),
+				      BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
 
-	rc = spotflow_ble_transport_process_config_rx_frame(
-		incomplete_last_fragment, sizeof(incomplete_last_fragment), BT_GATT_WRITE_FLAG_CMD);
+	rc = process_config_frame(incomplete_last_fragment, sizeof(incomplete_last_fragment),
+				  BT_GATT_WRITE_FLAG_CMD);
 	zassert_equal(rc, -EINVAL, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 0);
-	zassert_false(g_spotflow_ble_transport_state.config_rx.active);
+	zassert_false(config_rx_state.active);
 }
 
 ZTEST(spotflow_ble_framing, test_decode_ignores_other_message_types)
@@ -302,17 +329,29 @@ ZTEST(spotflow_ble_framing, test_decode_ignores_other_message_types)
 	static const uint8_t frame[] = {
 		SPOTFLOW_MSG_TELEMETRY,
 		SPOTFLOW_FRAME_IS_FIRST | SPOTFLOW_FRAME_IS_LAST,
+		/* Sequence number. */
 		0x88,
+		/* Declared total message length: uint16 LE. */
 		0x01,
 		0x00,
+		/* Fragment payload. */
 		0xAA,
 	};
 
 	reset_rx_test_state();
 
-	int rc = spotflow_ble_transport_process_config_rx_frame(frame, sizeof(frame),
-								BT_GATT_WRITE_FLAG_CMD);
+	int rc = process_config_frame(frame, sizeof(frame), BT_GATT_WRITE_FLAG_CMD);
 
 	zassert_equal(rc, 0, "unexpected rc %d", rc);
 	zassert_equal(callback_count, 0);
+}
+
+static int process_config_frame(const void* buf, uint16_t len, uint8_t flags)
+{
+	if ((flags & BT_GATT_WRITE_FLAG_CMD) == 0) {
+		return -EINVAL;
+	}
+	return spotflow_ble_transport_process_rx_frame(
+		SPOTFLOW_MSG_DESIRED_CONFIGURATION, &config_rx_state, config_rx_buffer,
+		sizeof(config_rx_buffer), buf, len, config_callback);
 }

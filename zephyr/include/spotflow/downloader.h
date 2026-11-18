@@ -25,7 +25,8 @@ enum spotflow_downloader_state {
 };
 
 /**
- * @brief Downloader instance for streaming one OTA artifact over HTTP(S).
+ * @brief Downloader instance for streaming an OTA artifact over HTTP(S), directly
+ * or through the selected BLE gateway transport.
  *
  * Define at file scope with @ref SPOTFLOW_DEFINE_DOWNLOADER or initialize with
  * @ref spotflow_init_downloader. Fields are visible so applications can embed
@@ -86,6 +87,9 @@ struct spotflow_download_request {
  * Invoked synchronously from the thread that called
  * @ref spotflow_download_artifact. The callback runs until the download
  * finishes, is canceled, or fails.
+ * With the BLE transport, do not synchronously start another download, even
+ * on a different instance, or wait for another BLE download to finish. BLE
+ * transfers share one connection and are serialized until the callback returns.
  *
  * @param block Current block. Valid only for the duration of the call.
  * @param downloader Downloader instance performing the transfer.
@@ -96,12 +100,12 @@ typedef void (*spotflow_download_block_callback)(const struct spotflow_artifact_
 						 void* callback_ctx);
 
 /**
- * @brief Download one artifact sequentially over HTTP(S).
+ * @brief Download one artifact sequentially using the selected transport.
  *
  * Blocks the calling thread until the download completes, is canceled, or
  * fails. Transient transport errors are retried automatically using HTTP
- * Range requests to resume from the last received byte. Retries use truncated
- * exponential backoff with jitter and continue indefinitely until the download
+ * Range requests (or BLE block requests) to resume from the last consumed byte.
+ * Retries use truncated exponential backoff with jitter and continue until the download
  * succeeds, is canceled, or encounters a non-retryable error.
  *
  * Only one download may run on a given downloader at a time.
@@ -113,7 +117,8 @@ typedef void (*spotflow_download_block_callback)(const struct spotflow_artifact_
  *
  * @retval 0 Download completed and the final block was delivered.
  * @retval -ECANCELED Download was canceled via @ref spotflow_cancel_download.
- * @retval -EBUSY A download is already active on @p downloader.
+ * @retval -EBUSY A download is already active on @p downloader, or a BLE download
+ *         was started recursively from another download's block callback.
  * @retval -EINVAL Invalid arguments or an unsupported or malformed URL.
  * @retval <0 Other negative errno on non-retryable transport or protocol failure.
  */
