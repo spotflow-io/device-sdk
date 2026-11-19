@@ -1,8 +1,3 @@
-Subject: Require aligned destinations for NVMCTRL G3 row and quad-double-word writes
-
-Base: 303ef231d24120af736bbf0ac8ebab72488ad3c6
-Repository: https://github.com/Zephyr4Microchip/microchip-zephyr
-
 diff --git a/drivers/flash/flash_mchp_nvmctrl_g3.c b/drivers/flash/flash_mchp_nvmctrl_g3.c
 --- a/drivers/flash/flash_mchp_nvmctrl_g3.c
 +++ b/drivers/flash/flash_mchp_nvmctrl_g3.c
