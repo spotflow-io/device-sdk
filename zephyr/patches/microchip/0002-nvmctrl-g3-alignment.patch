@@ -1,0 +1,23 @@
+diff --git a/drivers/flash/flash_mchp_nvmctrl_g3.c b/drivers/flash/flash_mchp_nvmctrl_g3.c
+--- a/drivers/flash/flash_mchp_nvmctrl_g3.c
++++ b/drivers/flash/flash_mchp_nvmctrl_g3.c
+@@ -391,7 +391,8 @@
+ 		fcw_ready_wait(regs);
+ 		LOG_DBG("Number of bytes yet to be written %u", no_of_bytes);
+ 
+-		if (no_of_bytes >= config->write_block_size_row) {
++		if (no_of_bytes >= config->write_block_size_row &&
++		    IS_MCHP_FLASH_G3_ALIGNED(offset, config->write_block_size_row)) {
+ 			regs->FCW_SRCADDR = (uint32_t)src_data_buff_read_ptr;
+ 			LOG_DBG("Writing row-block at address %#08x",
+ 				(uint32_t)(config->base_addr + offset));
+@@ -405,7 +406,8 @@
+ 			no_of_bytes -= config->write_block_size_row;
+ 			offset += config->write_block_size_row;
+ 			src_data_buff_read_ptr += config->write_block_size_row;
+-		} else if (no_of_bytes >= config->write_block_size_qdw) {
++		} else if (no_of_bytes >= config->write_block_size_qdw &&
++		    IS_MCHP_FLASH_G3_ALIGNED(offset, config->write_block_size_qdw)) {
+ 			for (uint32_t i = 0; i < (config->write_block_size_qdw / sizeof(uint32_t));
+ 			     i++) {
+ 				memcpy(&word, src_data_buff_read_ptr + (i * sizeof(uint32_t)),
