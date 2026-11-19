@@ -1,0 +1,38 @@
+Subject: Retain GMAC frame boundaries and software ownership of completed TX descriptors
+
+Base: 303ef231d24120af736bbf0ac8ebab72488ad3c6
+Also applies to: 9a1043c48f8529275207e05d70d4e585c00e8cfe
+Repository: https://github.com/Zephyr4Microchip/microchip-zephyr
+
+diff --git a/drivers/ethernet/eth_mchp_gmac_g1.c b/drivers/ethernet/eth_mchp_gmac_g1.c
+--- a/drivers/ethernet/eth_mchp_gmac_g1.c
++++ b/drivers/ethernet/eth_mchp_gmac_g1.c
+@@ -326,9 +326,10 @@
+ 		 "first buffer of a frame is not marked as own by GMAC");
+ 	while (tx_desc_list->tail != tx_desc_list->head) {
+ 		tx_desc = &tx_desc_list->buf_desc[tx_desc_list->tail];
+-		tx_desc->status &= ~(GMAC_TXW1_LEN | GMAC_TXW1_LASTBUFFER | GMAC_TXW1_NOCRC |
++		tx_desc->status &= ~(GMAC_TXW1_LEN | GMAC_TXW1_NOCRC |
+ 				     GMAC_TXW1_CHKSUMERR | GMAC_TXW1_LATECOLERR |
+-				     GMAC_TXW1_TRANSERR | GMAC_TXW1_RETRYEXC | GMAC_TXW1_USED);
++				     GMAC_TXW1_TRANSERR | GMAC_TXW1_RETRYEXC);
++		tx_desc->status |= GMAC_TXW1_USED;
+ 		MODULO_INC(tx_desc_list->tail, tx_desc_list->len);
+ 		k_sem_give(&queue->tx_desc_sem);
+ 		ring_buf_get(&queue->tx_frag_rb, (uint8_t *)&ptr, sizeof(ptr));
+@@ -338,7 +339,14 @@
+ 
+ 		if (tx_desc->status & GMAC_TXW1_LASTBUFFER) {
+ 			tx_desc->status &= ~GMAC_TXW1_LASTBUFFER;
+-			break;
++			/* USED is set on the first descriptor when its entire frame
++			 * completes. Leave the next frame's buffers owned by DMA until
++			 * that happens, but drain other completed frames in this IRQ.
++			 */
++			if (tx_desc_list->tail == tx_desc_list->head ||
++			    !(tx_desc_list->buf_desc[tx_desc_list->tail].status & GMAC_TXW1_USED)) {
++				break;
++			}
+ 		}
+ 	}
+ }
