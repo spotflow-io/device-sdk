@@ -6,7 +6,7 @@ extern "C" {
 #endif
 
 /**
- * @brief Resolve and cache the ingest key for the MQTT transport.
+ * @brief Resolve and cache the ingest key from the Spotflow processing thread.
  *
  * @return The Kconfig key in static mode, or the cached application-provided key in
  *         dynamic mode. Returns NULL while the dynamic callback has not provided a key.

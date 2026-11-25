@@ -18,3 +18,13 @@ target_sources(app PRIVATE
         ../../src/net/transport/ble/spotflow_ble_transport.c
         ../../src/net/transport/ble/spotflow_ble_gatt.c
 )
+
+if(SPOTFLOW_TEST_BLE_INGEST_KEY)
+    target_compile_definitions(app PRIVATE
+            CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY=1
+            CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC=1
+    )
+    if(NOT SPOTFLOW_TEST_BLE_UNENCRYPTED)
+        target_compile_definitions(app PRIVATE CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION=1)
+    endif()
+endif()

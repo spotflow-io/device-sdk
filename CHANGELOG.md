@@ -6,6 +6,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+### Added
+
+* Zephyr BLE devices can expose an optional ingest key over GATT, using either Kconfig or the runtime ingest key callback. The SDK requires BLE link encryption by default when a key is configured.
+
 ## [1.0.0] - 2026-11-23
 ### Added
 * Added Zephyr OTA updates through a trusted BLE gateway, including resumable artifact

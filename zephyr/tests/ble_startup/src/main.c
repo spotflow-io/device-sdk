@@ -1,3 +1,6 @@
+#ifdef CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY
+#include "net/spotflow_ingest_key.h"
+#endif /* CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY */
 #include "net/transport/ble/spotflow_ble_transport.h"
 #include "net/transport/ble/spotflow_ble_transport_internal.h"
 
@@ -28,6 +31,7 @@ enum {
 	CAPABILITIES_VALUE_INDEX = 2,
 	TX_CCC_INDEX = 9,
 	RX_VALUE_INDEX = 11,
+	INGEST_KEY_VALUE_INDEX = 13,
 };
 
 static int config_calls;
@@ -37,6 +41,13 @@ static int advertise_calls;
 static int config_error;
 static int ota_error;
 static bool app_bluetooth_enabled;
+
+#ifdef CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY
+static const char test_key[] = "a-key-longer-than-one-att-read-response";
+static int key_requests;
+static bool key_unavailable;
+static bool key_invalid;
+#endif /* CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY */
 
 extern const struct bt_gatt_service_static spotflow_svc;
 STRUCT_SECTION_START_EXTERN(bt_conn_cb);
@@ -48,7 +59,23 @@ static bool has_characteristic_uuid(const struct bt_gatt_attr* attr, uint32_t id
 static const struct bt_gatt_attr* characteristic_at(size_t index, uint32_t id);
 static void set_notifications(bool enabled);
 static void expect_capabilities(bool ota);
+#ifdef CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY
 static void expect_early_callbacks_ignored(void);
+#endif /* CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY */
+
+#ifdef CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY
+const char* spotflow_get_ingest_key(void)
+{
+	zassert_equal(enable_calls, 0, "Resolve the key before enabling the BLE service");
+	key_requests++;
+	if (key_unavailable) {
+		expect_early_callbacks_ignored();
+		key_unavailable = false;
+		return NULL;
+	}
+	return key_invalid ? "" : test_key;
+}
+#endif /* CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY */
 
 int spotflow_config_init_session(void)
 {
@@ -210,6 +237,47 @@ ZTEST(ble_startup, test_failed_config_setup_retries_on_next_notification_session
 	zassert_equal(ota_calls, 1);
 }
 
+ZTEST(ble_startup, test_ingest_key_characteristic)
+{
+#ifdef CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY
+	app_bluetooth_enabled = true;
+	key_unavailable = true;
+	zassert_ok(spotflow_ble_transport_start());
+	zassert_equal(key_requests, 2);
+	zassert_equal(advertise_calls, 1);
+	const struct bt_gatt_attr* key_attr = characteristic_at(INGEST_KEY_VALUE_INDEX, 0x26530007);
+	zassert_not_null(key_attr->read);
+	zassert_equal(key_attr->perm,
+		      IS_ENABLED(CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION) ? BT_GATT_PERM_READ_ENCRYPT
+									 : BT_GATT_PERM_READ);
+	zassert_is_null(key_attr->write);
+	char value[sizeof(test_key) - 1];
+	const size_t first_read_len = 22;
+	zassert_equal(key_attr->read(NULL, key_attr, value, first_read_len, 0), first_read_len);
+	const size_t remaining_len = sizeof(value) - first_read_len;
+	zassert_equal(key_attr->read(NULL, key_attr, value + first_read_len, remaining_len,
+				     first_read_len),
+		      remaining_len);
+	zassert_mem_equal(value, test_key, sizeof(value));
+#else
+	zassert_ok(spotflow_ble_transport_start());
+	for (size_t i = 0; i < spotflow_svc.attr_count; i++) {
+		zassert_false(has_characteristic_uuid(&spotflow_svc.attrs[i], 0x26530007),
+			      "Unexpected ingest key at GATT attribute %zu", i);
+	}
+#endif /* CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY */
+}
+
+#ifdef CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY
+ZTEST(ble_startup, test_invalid_key_keeps_callbacks_inactive)
+{
+	app_bluetooth_enabled = true;
+	key_invalid = true;
+	zassert_equal(spotflow_ble_transport_start(), -EINVAL);
+	expect_early_callbacks_ignored();
+}
+#endif /* CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY */
+
 ZTEST(ble_startup, test_only_tracked_disconnect_restarts_advertising)
 {
 	const struct bt_conn_cb* callbacks = STRUCT_SECTION_START(bt_conn_cb);
@@ -219,8 +287,6 @@ ZTEST(ble_startup, test_only_tracked_disconnect_restarts_advertising)
 	struct bt_conn* other_conn = (struct bt_conn*)&other_connection_token;
 	struct spotflow_ble_transport_state* state = &g_spotflow_ble_transport_state;
 
-	app_bluetooth_enabled = true;
-	expect_early_callbacks_ignored();
 	zassert_ok(spotflow_ble_transport_start());
 	callbacks->disconnected(other_conn, 0);
 	zassert_equal(state->tx.connection_generation, 0);
@@ -248,6 +314,11 @@ static void before(void* fixture)
 	config_error = 0;
 	ota_error = 0;
 	app_bluetooth_enabled = false;
+#ifdef CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY
+	key_requests = 0;
+	key_unavailable = false;
+	key_invalid = false;
+#endif /* CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY */
 }
 
 static void receive_message(uint8_t* payload, size_t len)
@@ -302,17 +373,20 @@ static void expect_capabilities(bool ota)
 	zassert_equal(capabilities[2], ota ? BIT(0) : 0);
 }
 
+#ifdef CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY
 static void expect_early_callbacks_ignored(void)
 {
 	const struct bt_conn_cb* callbacks = STRUCT_SECTION_START(bt_conn_cb);
 	uint64_t connection_token;
 	struct bt_conn* conn = (struct bt_conn*)&connection_token;
 	struct spotflow_ble_transport_state* state = &g_spotflow_ble_transport_state;
+	const struct bt_gatt_attr* key_attr = characteristic_at(INGEST_KEY_VALUE_INDEX, 0x26530007);
 	const struct bt_gatt_attr* capabilities_attr =
 		characteristic_at(CAPABILITIES_VALUE_INDEX, 0x26530002);
 	const struct bt_gatt_attr* rx_attr = characteristic_at(RX_VALUE_INDEX, 0x26530006);
 	uint8_t buf[3] = { 0 };
 
+	zassert_not_null(key_attr->read);
 	zassert_not_null(capabilities_attr->read);
 	zassert_not_null(rx_attr->write);
 	callbacks->connected(conn, 0);
@@ -322,6 +396,8 @@ static void expect_early_callbacks_ignored(void)
 	zassert_equal(config_calls, 0);
 	zassert_equal(capabilities_attr->read(conn, capabilities_attr, buf, sizeof(buf), 0),
 		      BT_GATT_ERR(BT_ATT_ERR_UNLIKELY));
+	zassert_equal(key_attr->read(conn, key_attr, buf, sizeof(buf), 0),
+		      BT_GATT_ERR(BT_ATT_ERR_UNLIKELY));
 	zassert_equal(rx_attr->write(conn, rx_attr, buf, sizeof(buf), 0, BT_GATT_WRITE_FLAG_CMD),
 		      BT_GATT_ERR(BT_ATT_ERR_UNLIKELY));
 	callbacks->disconnected(conn, 0);
@@ -329,3 +405,4 @@ static void expect_early_callbacks_ignored(void)
 	zassert_false(k_work_delayable_is_pending(&state->restart_advertising_work));
 	zassert_equal(advertise_calls, 0);
 }
+#endif /* CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY */
