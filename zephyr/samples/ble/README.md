@@ -1,9 +1,27 @@
 # Spotflow BLE sample
 
 This sample sends logs, metrics and crash reports through a Spotflow BLE gateway.
-It does not store cloud credentials. Configure a unique `CONFIG_SPOTFLOW_DEVICE_ID`
-in the selected board profile, then follow the
+By default, select an ingest key in the gateway. Configure a unique
+`CONFIG_SPOTFLOW_DEVICE_ID` in the selected board profile, then follow the
 [BLE setup guide](https://docs.spotflow.io/guides/bluetooth-low-energy).
+
+To use a device-provisioned key, set `CONFIG_SPOTFLOW_INGEST_KEY` in a private
+configuration overlay or enable `CONFIG_SPOTFLOW_INGEST_KEY_DYNAMIC` and implement
+`spotflow_on_ingest_key_requested()`. Choose **Use key from device** in the gateway.
+Either provisioning method enables BLE encryption by default.
+Set `CONFIG_BT_SMP=y` and configure trusted pairing for encrypted connections. An
+explicit `CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION=n` allows a connected gateway to read
+the key over an unencrypted link. Use this override for controlled testing.
+The gateway uses the key for MQTT authentication. With the runtime callback, the
+SDK starts advertising after the callback provides the key.
+
+Let the SDK manage connectable advertising and BLE connections. The application
+can enable the Zephyr Bluetooth host beforehand, configure pairing, and expose
+its own GATT services on the gateway connection. If the application provisions
+the key over BLE, stop its connectable advertiser, request disconnection, and
+wait for its links to close. Release any connection references before returning
+the key.
+See [BLE connection ownership](https://docs.spotflow.io/guides/zephyr/advanced-config-zephyr#ble-connection-ownership).
 
 ## OTA on LP-EM-CC35X1
 
@@ -20,6 +38,11 @@ From the West workspace root:
 ```sh
 west build --pristine -b lp_em_cc35x1/cc3551e -d build modules/lib/spotflow/zephyr/samples/ble -- '-DEXTRA_CONF_FILE=ota.conf;boards/lp_em_cc35x1_cc3551e-ota.conf' '-DEXTRA_DTC_OVERLAY_FILE=boards/lp_em_cc35x1_cc3551e-ota.overlay'
 ```
+
+The sample's `ota.conf` sets `CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION=n` for
+development. To require encryption, set `CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION=y`
+and `CONFIG_BT_SMP=y` in an overlay and append it to the end of the list, for example
+`'-DEXTRA_CONF_FILE=ota.conf;boards/lp_em_cc35x1_cc3551e-ota.conf;device-key.conf'`.
 
 Quote each complete `-D` argument, including in PowerShell. Complete the board's
 one-time activation if necessary. When migrating from the non-OTA sample, factory
@@ -52,7 +75,7 @@ behavior as other transports; see [OTA architecture](../../docs/ota.md).
 ## BLE OTA configuration
 
 OTA enables `CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION` by default. The sample's
-`ota.conf` disables it for development. Enable
+`ota.conf` disables it for development, including when the device supplies an ingest key. Enable
 `CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION=y` and `CONFIG_BT_SMP=y`, and configure trusted
 pairing before production use. TI signing keys must match the board's provisioning;
 replace the default development keys for production.
