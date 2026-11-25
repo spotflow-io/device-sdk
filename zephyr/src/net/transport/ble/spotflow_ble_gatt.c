@@ -1,9 +1,22 @@
 #include "spotflow_ble_transport_internal.h"
 
+#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
+#include "config/spotflow_config.h"
+#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+#include "metrics/system/spotflow_metrics_system.h"
+#endif /* CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION */
+#include "net/spotflow_device_id.h"
+#include "net/spotflow_session_metadata.h"
+#ifdef CONFIG_SPOTFLOW_OTA
+#include "ota/spotflow_ota.h"
+#endif /* CONFIG_SPOTFLOW_OTA */
+
 #include <stddef.h>
 #include <stdint.h>
 #include <string.h>
 
+#include <zephyr/bluetooth/att.h>
 #include <zephyr/bluetooth/bluetooth.h>
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/bluetooth/gatt.h>
@@ -11,19 +24,7 @@
 #include <zephyr/logging/log.h>
 #if IS_ENABLED(CONFIG_BT_SETTINGS)
 #include <zephyr/settings/settings.h>
-#endif
-
-#ifdef CONFIG_SPOTFLOW_LOG_BACKEND
-#include "config/spotflow_config.h"
-#endif /* CONFIG_SPOTFLOW_LOG_BACKEND */
-#ifdef CONFIG_SPOTFLOW_OTA
-#include "ota/spotflow_ota.h"
-#endif /* CONFIG_SPOTFLOW_OTA */
-#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
-#include "metrics/system/spotflow_metrics_system.h"
-#endif
-#include "net/spotflow_device_id.h"
-#include "net/spotflow_session_metadata.h"
+#endif /* CONFIG_BT_SETTINGS */
 
 LOG_MODULE_DECLARE(spotflow_net, CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL);
 
@@ -84,7 +85,6 @@ static ssize_t read_session_metadata(struct bt_conn* conn, const struct bt_gatt_
 static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* attr,
 			       const void* buf, uint16_t len, uint16_t offset, uint8_t flags);
 static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value);
-static bool tx_session_active_locked(void);
 static int enable_bluetooth(void);
 static int start_advertising(void);
 static void schedule_advertising_retry(void);
@@ -113,7 +113,7 @@ BT_CONN_CB_DEFINE(spotflow_ble_conn_callbacks) = {
 
 int spotflow_ble_transport_start_impl(void)
 {
-	if (!g_spotflow_ble_transport_state.initialized) {
+	if (!atomic_get(&g_spotflow_ble_transport_state.initialized)) {
 		k_mutex_init(&g_spotflow_ble_transport_state.lock);
 		k_work_init_delayable(&g_spotflow_ble_transport_state.restart_advertising_work,
 				      restart_advertising_work_handler);
@@ -129,10 +129,11 @@ int spotflow_ble_transport_start_impl(void)
 			LOG_ERR("BLE OTA unavailable until reboot: %d", ota_rc);
 		}
 #endif /* CONFIG_SPOTFLOW_OTA */
-		g_spotflow_ble_transport_state.initialized = true;
+		/* Static Bluetooth callbacks may already be active on an app-owned stack. */
+		atomic_set(&g_spotflow_ble_transport_state.initialized, 1);
 	}
 
-	if (!g_spotflow_ble_transport_state.bluetooth_enabled) {
+	if (!atomic_get(&g_spotflow_ble_transport_state.bluetooth_enabled)) {
 		int rc = enable_bluetooth();
 		if (rc != 0) {
 			return rc;
@@ -160,6 +161,10 @@ const struct bt_gatt_attr* spotflow_ble_tx_stream_attr_get(void)
 static ssize_t read_capabilities(struct bt_conn* conn, const struct bt_gatt_attr* attr, void* buf,
 				 uint16_t len, uint16_t offset)
 {
+	if (!atomic_get(&g_spotflow_ble_transport_state.initialized)) {
+		return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+	}
+
 	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
 	bool ota_ready = g_spotflow_ble_transport_state.ota_callback != NULL;
 	k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
@@ -210,6 +215,10 @@ static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* 
 	ARG_UNUSED(attr);
 	ARG_UNUSED(offset);
 
+	if (!atomic_get(&g_spotflow_ble_transport_state.initialized)) {
+		return BT_GATT_ERR(BT_ATT_ERR_UNLIKELY);
+	}
+
 	if ((flags & BT_GATT_WRITE_FLAG_CMD) == 0) {
 		return BT_GATT_ERR(BT_ATT_ERR_WRITE_REQ_REJECTED);
 	}
@@ -225,6 +234,10 @@ static ssize_t write_rx_stream(struct bt_conn* conn, const struct bt_gatt_attr* 
 static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 {
 	ARG_UNUSED(attr);
+
+	if (!atomic_get(&g_spotflow_ble_transport_state.initialized)) {
+		return;
+	}
 
 	bool enabled = value == BT_GATT_CCC_NOTIFY;
 	bool was_enabled;
@@ -252,15 +265,6 @@ static void tx_ccc_cfg_changed(const struct bt_gatt_attr* attr, uint16_t value)
 		spotflow_metrics_system_report_connection_state(false);
 	}
 #endif
-}
-
-/* A BLE transport session starts only after TX notifications are enabled. A
- * plain GAP connection without TX subscription is not counted as
- * transport-connected for config/session metrics.
- */
-static bool tx_session_active_locked(void)
-{
-	return g_spotflow_ble_transport_state.tx.notifications_enabled;
 }
 
 static int enable_bluetooth(void)
@@ -292,7 +296,7 @@ static int enable_bluetooth(void)
 	}
 #endif
 
-	g_spotflow_ble_transport_state.bluetooth_enabled = true;
+	atomic_set(&g_spotflow_ble_transport_state.bluetooth_enabled, 1);
 	LOG_INF("Bluetooth enabled for Spotflow BLE transport");
 
 	return 0;
@@ -348,6 +352,10 @@ static void restart_advertising_work_handler(struct k_work* work)
 
 static void connected(struct bt_conn* conn, uint8_t err)
 {
+	if (!atomic_get(&g_spotflow_ble_transport_state.initialized)) {
+		return;
+	}
+
 	if (err != 0) {
 		LOG_WRN("BLE connection failed: 0x%02x", err);
 		return;
@@ -366,15 +374,23 @@ static void connected(struct bt_conn* conn, uint8_t err)
 
 static void disconnected(struct bt_conn* conn, uint8_t reason)
 {
-	ARG_UNUSED(conn);
-	bool had_session;
+	if (!atomic_get(&g_spotflow_ble_transport_state.initialized)) {
+		return;
+	}
 
 	k_mutex_lock(&g_spotflow_ble_transport_state.lock, K_FOREVER);
-	had_session = tx_session_active_locked();
-	if (g_spotflow_ble_transport_state.tx.conn != NULL) {
-		bt_conn_unref(g_spotflow_ble_transport_state.tx.conn);
-		g_spotflow_ble_transport_state.tx.conn = NULL;
+	if (g_spotflow_ble_transport_state.tx.conn != conn) {
+		k_mutex_unlock(&g_spotflow_ble_transport_state.lock);
+		return;
 	}
+
+#ifdef CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION
+	/* A BLE transport session starts when the gateway enables TX notifications. */
+	bool had_session = g_spotflow_ble_transport_state.tx.notifications_enabled;
+#endif /* CONFIG_SPOTFLOW_METRICS_SYSTEM_CONNECTION */
+
+	bt_conn_unref(conn);
+	g_spotflow_ble_transport_state.tx.conn = NULL;
 	g_spotflow_ble_transport_state.tx.notifications_enabled = false;
 	g_spotflow_ble_transport_state.tx.connection_generation++;
 	/* Queued RX frames and partial messages are invalidated by the new generation. */
@@ -388,6 +404,8 @@ static void disconnected(struct bt_conn* conn, uint8_t reason)
 	}
 #endif
 
-	(void)k_work_reschedule(&g_spotflow_ble_transport_state.restart_advertising_work,
-				K_MSEC(500));
+	if (atomic_get(&g_spotflow_ble_transport_state.bluetooth_enabled)) {
+		(void)k_work_reschedule(&g_spotflow_ble_transport_state.restart_advertising_work,
+					K_MSEC(500));
+	}
 }

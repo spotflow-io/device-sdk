@@ -3,6 +3,7 @@ find_package(Zephyr REQUIRED HINTS $ENV{ZEPHYR_BASE})
 project(spotflow_ble_startup_tests)
 
 target_include_directories(app PRIVATE ../../src ../../include)
+zephyr_linker_sources(SECTIONS sections-rom.ld)
 target_compile_definitions(app PRIVATE
         CONFIG_SPOTFLOW_MODULE_DEFAULT_LOG_LEVEL=3
         CONFIG_SPOTFLOW_LOG_BACKEND=1
