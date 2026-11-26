@@ -80,11 +80,6 @@ OTA enables `CONFIG_SPOTFLOW_BLE_REQUIRE_ENCRYPTION` by default. The sample's
 pairing before production use. TI signing keys must match the board's provisioning;
 replace the default development keys for production.
 
-The TI profile disables `CONFIG_MBEDTLS_PSA_P256M_DRIVER_ENABLED` so encrypted BLE
-can use the built-in P-256 implementation and retain the legacy EC entry points
-required by TI's radio library. Keep this setting when enabling encryption on this
-TI downstream.
-
 `CONFIG_SPOTFLOW_OTA_BLE_REQUEST_TIMEOUT_MS` limits each gateway OPEN, READ or CLOSE
 exchange, including retransmissions. It defaults to 120 seconds; the complete image
 transfer may take longer. Timeouts retry with backoff from the last consumed block.
