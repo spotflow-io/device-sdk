@@ -15,13 +15,13 @@ the key over an unencrypted link. Use this override for controlled testing.
 The gateway uses the key for MQTT authentication. With the runtime callback, the
 SDK starts advertising after the callback provides the key.
 
-Let the SDK manage connectable advertising and BLE connections. The application
-can enable the Zephyr Bluetooth host beforehand, configure pairing, and expose
-its own GATT services on the gateway connection. If the application provisions
-the key over BLE, stop its connectable advertiser, request disconnection, and
-wait for its links to close. Release any connection references before returning
-the key.
-See [BLE connection ownership](https://docs.spotflow.io/guides/zephyr/advanced-config-zephyr#ble-connection-ownership).
+Use the SDK-managed BLE connection for application BLE communication. Your
+application can configure pairing and expose custom GATT services on that
+connection. See [BLE connection ownership](https://docs.spotflow.io/guides/zephyr/advanced-config-zephyr#ble-connection-ownership).
+
+If you set the Device ID at runtime, have it ready before the SDK starts
+advertising. See
+[setting the Device ID at runtime](https://docs.spotflow.io/guides/zephyr/advanced-config-zephyr#setting-device-id-at-runtime).
 
 ## OTA on LP-EM-CC35X1
 

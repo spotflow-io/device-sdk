@@ -37,10 +37,11 @@ config SPOTFLOW_BUILD_ID_INCLUDE_TI_VENDOR_IMAGE_VERSION
 config SPOTFLOW_DEVICE_ID
 	string "Device ID device will use to connect to Spotflow observability platform"
 	help
-		Device ID is a unique identifier for your device in Spotflow observability
-		platform. If empty, the hexadecimal representation of the result of
-		hwinfo_get_device_id(...) will be used. You can provide the device ID
-		in the code by defining the function char* spotflow_override_device_id().
+		The Device ID uniquely identifies your device in Spotflow. To supply it
+		at runtime, define const char* spotflow_override_device_id(void) and
+		return the intended ID on the first call. If the override returns NULL,
+		the SDK falls back to this setting or tries hwinfo_get_device_id() if
+		this setting is empty. The SDK caches the selected ID until reboot.
 
 
 config SPOTFLOW_SESSION_METADATA_BUFFER_SIZE

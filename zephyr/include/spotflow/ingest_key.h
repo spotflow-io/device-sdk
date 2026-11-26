@@ -15,11 +15,6 @@ extern "C" {
  * MQTT or starting BLE advertising. If it returns NULL, the SDK defers the
  * connection or advertising and calls the callback again later.
  *
- * If the application provisions the key over BLE, keep returning NULL until
- * it has stopped its connectable advertising, its links have closed, and it
- * has released its connection references. The SDK then manages advertising
- * and connections.
- *
  * The SDK caches the first non-NULL pointer (including an empty string) until reboot
  * without copying the string, so do not change the string contents.
  * For BLE, return 1 to 512 bytes of printable ASCII (0x21 through 0x7E),
