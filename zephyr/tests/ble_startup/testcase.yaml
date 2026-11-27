@@ -5,3 +5,19 @@ tests:
       - ble
     integration_platforms:
       - qemu_cortex_m3
+  spotflow.ble_startup.ingest_key:
+    tags:
+      - spotflow
+      - ble
+    integration_platforms:
+      - qemu_cortex_m3
+    extra_args: SPOTFLOW_TEST_BLE_INGEST_KEY=ON
+  spotflow.ble_startup.ingest_key_unencrypted:
+    tags:
+      - spotflow
+      - ble
+    integration_platforms:
+      - qemu_cortex_m3
+    extra_args:
+      - SPOTFLOW_TEST_BLE_INGEST_KEY=ON
+      - SPOTFLOW_TEST_BLE_UNENCRYPTED=ON

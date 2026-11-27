@@ -12,6 +12,8 @@ zephyr_library_sources(
         spotflow_transport.c
 )
 
+zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_BLE_HAS_INGEST_KEY spotflow_ingest_key.c)
+
 zephyr_library_sources_ifdef(CONFIG_SPOTFLOW_TRANSPORT_MQTT
         spotflow_ingest_key.c
         transport/mqtt/spotflow_connection_helper.c

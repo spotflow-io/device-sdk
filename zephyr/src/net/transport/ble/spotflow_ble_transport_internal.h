@@ -6,6 +6,7 @@
 
 #include <zephyr/bluetooth/conn.h>
 #include <zephyr/kernel.h>
+#include <zephyr/sys/atomic.h>
 
 #ifdef CONFIG_SPOTFLOW_COREDUMPS
 #include "coredumps/spotflow_coredumps_cbor.h"
@@ -87,8 +88,8 @@ struct spotflow_ble_rx_frame {
 
 struct spotflow_ble_transport_state {
 	struct k_mutex lock;
-	bool initialized;
-	bool bluetooth_enabled;
+	atomic_t initialized;
+	atomic_t bluetooth_enabled;
 	struct k_work_delayable restart_advertising_work;
 	struct spotflow_ble_tx_state tx;
 	spotflow_transport_message_cb config_callback;
