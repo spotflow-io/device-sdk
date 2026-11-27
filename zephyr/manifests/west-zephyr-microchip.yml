@@ -2,7 +2,7 @@ manifest:
   projects:
     - name: zephyr
       url: https://github.com/Zephyr4Microchip/microchip-zephyr
-      revision: 9a1043c48f8529275207e05d70d4e585c00e8cfe
+      revision: 303ef231d24120af736bbf0ac8ebab72488ad3c6
       clone-depth: 1
       import:
         name-allowlist:
@@ -22,7 +22,7 @@ manifest:
           - hal_atmel
     - name: hal_microchip
       url: https://github.com/Zephyr4Microchip/microchip-hal
-      revision: 85397d493b827496d0a0107ed22f3d5d179fef9c
+      revision: aed49c179a1b8296bb3d381046e7e9b1f93afe1d
       path: modules/hal/microchip
 
   self:
